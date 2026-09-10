@@ -1,0 +1,40 @@
+# Local dependencies and caches
+node_modules/
+.pnpm-store/
+.npm/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+**/llm_config.json
+**/*credentials*.json
+**/*secrets*.json
+
+# Runtime state and generated media
+**/data/*.sqlite
+**/data/*.sqlite-*
+**/*.sqlite
+**/*.sqlite-*
+**/audio-artifacts/
+*.wav
+*.mp3
+*.ogg
+*-test-output.txt
+*.log
+
+# Research downloads, generated CAD and scratch output
+tmp/
+dist/
+build/
+coverage/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

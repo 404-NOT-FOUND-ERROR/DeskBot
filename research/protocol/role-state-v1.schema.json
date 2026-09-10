@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/foundry/role-state-v1.schema.json",
+  "title": "Foundry Role State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "identity",
+    "revision",
+    "updated_at",
+    "transition",
+    "traits",
+    "evidence",
+    "visual_semantics",
+    "embodied_response",
+    "shell_trigger"
+  ],
+  "properties": {
+    "schema": { "const": "foundry.role-state.v1" },
+    "identity": { "type": "string", "minLength": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous_revision", "rule_version", "evidence_ids", "changes"],
+      "properties": {
+        "previous_revision": { "type": ["integer", "null"], "minimum": 0 },
+        "rule_version": { "type": "string", "minLength": 1 },
+        "evidence_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "before", "after", "reason"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^(traits|visual_semantics)\\." },
+              "before": { "type": ["number", "string", "boolean", "null"] },
+              "after": { "type": ["number", "string", "boolean", "null"] },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "traits": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 6,
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "source", "event", "summary", "weight", "observed_at"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "source": {
+            "enum": ["dialogue", "touch", "vision", "imu", "system", "manual", "external"]
+          },
+          "event": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+          "observed_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "visual_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["silhouette", "symmetry", "detail_density", "openness", "surface_language"],
+      "properties": {
+        "silhouette": { "type": "string", "minLength": 1 },
+        "symmetry": { "type": "number", "minimum": 0, "maximum": 1 },
+        "detail_density": { "type": "number", "minimum": 0, "maximum": 1 },
+        "openness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "surface_language": { "type": "string", "minLength": 1 }
+      }
+    },
+    "embodied_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["face", "yaw_deg", "pitch_deg", "tts_style", "display_theme"],
+      "properties": {
+        "face": { "type": "string", "minLength": 1 },
+        "yaw_deg": { "type": "number", "minimum": -180, "maximum": 180 },
+        "pitch_deg": { "type": "number", "minimum": -90, "maximum": 90 },
+        "tts_style": { "type": "string", "minLength": 1 },
+        "display_theme": { "type": "string", "minLength": 1 }
+      }
+    },
+    "shell_trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic_distance", "event_supported", "status", "reason"],
+      "properties": {
+        "semantic_distance": { "type": "number", "minimum": 0 },
+        "event_supported": { "type": "boolean" },
+        "status": { "enum": ["none", "candidate", "approved", "rejected", "fabricated"] },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
+

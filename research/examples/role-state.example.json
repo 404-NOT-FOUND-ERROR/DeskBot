@@ -1,0 +1,56 @@
+{
+  "schema": "foundry.role-state.v1",
+  "identity": "构造组记录者",
+  "revision": 3,
+  "updated_at": "2026-08-12T10:00:00+08:00",
+  "transition": {
+    "previous_revision": 2,
+    "rule_version": "evolution-rules.v0.1",
+    "evidence_ids": ["evt-0003"],
+    "changes": [
+      {
+        "path": "traits.agency",
+        "before": 0.61,
+        "after": 0.67,
+        "reason": "角色主动接受共同制作任务"
+      }
+    ]
+  },
+  "traits": {
+    "precision": 0.82,
+    "openness": 0.31,
+    "warmth": 0.54,
+    "agency": 0.67
+  },
+  "evidence": [
+    {
+      "id": "evt-0003",
+      "source": "dialogue",
+      "event": "加入构造组",
+      "summary": "角色主动接受共同制作任务",
+      "weight": 0.8,
+      "observed_at": "2026-08-12T09:58:00+08:00"
+    }
+  ],
+  "visual_semantics": {
+    "silhouette": "稳定、结构化",
+    "symmetry": 0.8,
+    "detail_density": 0.72,
+    "openness": 0.35,
+    "surface_language": "分层、可见连接"
+  },
+  "embodied_response": {
+    "face": "focused",
+    "yaw_deg": 12,
+    "pitch_deg": -4,
+    "tts_style": "precise",
+    "display_theme": "amber"
+  },
+  "shell_trigger": {
+    "semantic_distance": 0.43,
+    "event_supported": true,
+    "status": "candidate",
+    "reason": "稳定性维度连续三次上升，超过候选阈值"
+  }
+}
+

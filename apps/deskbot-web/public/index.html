@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#08111f" />
+    <title>聚形域 · DeskBot</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div><div><p class="eyebrow">DESKBOT · COMPANION</p><h1>聚形域</h1></div></div>
+        <div class="topbar-actions"><label class="switch-label" title="显示可审计的事件和状态字段"><span>研究视图</span><input id="research-toggle" type="checkbox" /><span class="switch" aria-hidden="true"></span></label><span id="service-pill" class="status-pill pending"><i></i><span>检查服务…</span></span></div>
+      </header>
+
+      <section id="world-warning" class="world-warning hidden" role="status"><span class="warning-icon">!</span><div><strong>世界快照需要重启服务</strong><p>当前进程仍返回旧的 DeskBot Workshop 快照；文字链路可用，但这轮回复可能尚未加载聚形域设定。</p></div></section>
+
+      <div class="workspace-grid">
+        <section class="conversation-card card">
+          <div class="card-heading conversation-heading"><div><p class="eyebrow">LIVE INTERACTION</p><h2>和桌面伙伴说话</h2></div><span id="character-badge" class="character-badge"><span class="pulse-dot"></span> 就绪</span></div>
+          <div id="message-list" class="message-list" aria-live="polite" aria-label="对话记录"><div class="empty-state" id="empty-state"><div class="empty-orbit" aria-hidden="true"><span></span></div><h3>可以开始了</h3><p>从一句话开始。</p></div></div>
+          <div class="quick-prompts" aria-label="快捷问题"><button data-prompt="现在几点了？">现在几点</button><button data-prompt="帮我列一个今天的待办清单。">整理待办</button><button data-prompt="讲讲聚形域和你的来历。">讲讲来历</button></div>
+          <form id="chat-form" class="composer"><label class="sr-only" for="message-input">输入消息</label><textarea id="message-input" rows="2" maxlength="2000" placeholder="和桌面伙伴说点什么…" required></textarea><div class="composer-footer"><span class="composer-hint"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 换行</span><button id="send-button" class="send-button" type="submit"><span>发送</span><span class="send-arrow">↗</span></button></div></form>
+        </section>
+
+        <aside class="inspector-column">
+          <section class="card context-card"><div class="card-heading"><div><p class="eyebrow">REAL-WORLD CONTEXT</p><h2>现在</h2></div><div class="heading-actions"><button id="open-context-lab" class="quiet-button" type="button">管理输入</button></div></div><time id="real-time" class="real-time" datetime="">读取中…</time><p id="real-time-source" class="context-caption">服务器本地时钟 · Asia/Shanghai</p><div id="connection-list" class="connection-list"><span class="console-hint">正在读取数据源…</span></div><div id="context-items" class="context-items"><span>尚未写入外部上下文。</span></div></section>
+
+          <section class="card forecast-card"><div class="card-heading"><div><p class="eyebrow">WEATHER OUTLOOK</p><h2>天气预报</h2></div><span id="forecast-status" class="mini-pill muted">尚未读取</span></div><p class="forecast-note">短临、小时和每日预报按各自缓存周期更新；只有明确的预报对话或服务端接口请求才访问 provider。</p><div class="forecast-grid"><section class="forecast-column"><div class="forecast-column-heading"><strong>短临</strong><span id="forecast-minutely-status">未请求</span></div><div id="forecast-minutely" class="forecast-list"><span>等待短临数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>小时</strong><span id="forecast-hourly-status">未请求</span></div><div id="forecast-hourly" class="forecast-list"><span>等待小时数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>每日</strong><span id="forecast-daily-status">未请求</span></div><div id="forecast-daily" class="forecast-list"><span>等待每日数据</span></div></section></div></section>
+
+          <section class="card state-card"><div class="card-heading"><div><p class="eyebrow">SHORT STATE</p><h2>此刻状态</h2></div><span id="state-revision" class="revision">rev —</span></div><div class="state-summary"><div id="state-expression" class="expression-orb neutral"><span></span></div><div><strong id="state-stance">等待互动</strong><p id="state-description">等待你开口。</p></div></div><div class="meter-list"><div class="meter-row"><div><span>温度</span><b id="warmth-value">—</b></div><div class="meter"><i id="warmth-meter"></i></div></div><div class="meter-row"><div><span>开放度</span><b id="openness-value">—</b></div><div class="meter"><i id="openness-meter"></i></div></div><div class="meter-row"><div><span>回应能量</span><b id="arousal-value">—</b></div><div class="meter"><i id="arousal-meter"></i></div></div></div><div class="state-tags"><span id="state-style" class="tag accent">balanced</span><span id="state-field" class="tag">状态待测</span></div><div class="research-only state-raw" id="state-raw">等待状态数据…</div></section>
+
+          <section class="card appearance-card"><div class="card-heading"><div><p class="eyebrow">CURRENT FORM</p><h2>当前形象</h2></div><span id="appearance-state" class="mini-pill ok">基础形态</span></div><div class="appearance-row"><div class="character-portrait" aria-hidden="true"><div class="portrait-ears"><i></i><i></i></div><div class="portrait-head"><div class="portrait-screen"><i></i><i></i></div></div><div class="portrait-body"><span class="portrait-lobe lobe-a"></span><span class="portrait-lobe lobe-b"></span><span class="portrait-lobe lobe-c"></span><span class="portrait-lobe lobe-d"></span><b class="portrait-button"></b></div></div><div class="appearance-copy"><strong id="appearance-silhouette">读取中…</strong><p id="appearance-anchor">—</p><small id="appearance-generation">生成层等待测量数据</small></div></div></section>
+
+          <section class="card world-card"><div class="card-heading"><div><p class="eyebrow">BACKGROUND WORLD</p><h2>背景世界</h2></div><span id="world-revision" class="revision">rev —</span></div><div class="world-location"><span class="location-glyph">✦</span><div><strong id="world-location-name">读取中…</strong><p id="world-location-description">—</p></div></div><div class="world-facts"><div><span>叙事时间</span><strong id="world-time">—</strong></div><div><span>互动回合</span><strong id="world-turns">—</strong></div></div><div id="world-event" class="world-event"><span class="event-spark">◌</span><span>当前没有进行中的世界事件</span></div><div class="world-line-summary"><div><span>当前剧情弧</span><strong id="world-current-arc">尚未设定</strong></div><button id="open-worldline" class="quiet-button" type="button">查看世界线</button></div><div class="research-only world-raw" id="world-raw">等待世界快照…</div></section>
+
+          <section class="card voice-card"><div class="card-heading"><div><p class="eyebrow">VOICE LAYER</p><h2>声音计划</h2></div><span id="voice-pill" class="mini-pill muted">未配置</span></div><div class="voice-row"><div class="voice-icon">◒</div><div><strong id="voice-profile">shaping-neutral</strong><p id="voice-description">暂时没有音频输出接口；语音层保留为可插拔计划。</p></div></div><div class="voice-plan"><span>当前风格</span><strong id="voice-style">balanced</strong><span class="plan-note">CosyVoice / 未来接入</span></div><div class="research-only voice-raw" id="voice-raw">voice sidecar 状态等待读取…</div></section>
+        </aside>
+      </div>
+
+      <section id="worldline-lab" class="research-only worldline-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">WORLD LINE WORKBENCH</p><h2>世界线工作台</h2></div>
+          <span id="worldline-pill" class="mini-pill muted">读取中</span>
+        </div>
+        <p class="console-intro">这里专门管理虚拟世界的大事件、赛季与长期剧情弧。修订会追加为新事件，旧记录仍保留在 mutation ledger 中。</p>
+        <div class="worldline-layout">
+          <div class="worldline-timeline-panel">
+            <div class="worldline-current"><span class="trace-label">当前剧情弧</span><strong id="worldline-current-arc">尚未设定</strong><p id="worldline-latest-summary">还没有世界线事件。</p></div>
+            <div class="ledger-heading"><span class="trace-label">最近世界线事件</span><button id="worldline-new" class="quiet-button" type="button">新建事件</button></div>
+            <div id="worldline-timeline" class="worldline-timeline"><span class="console-hint">尚未读取。</span></div>
+          </div>
+          <form id="worldline-form" class="worldline-form">
+            <div class="worldline-form-heading"><div><span class="trace-label">追加事件 / 修订副本</span><strong id="worldline-form-mode">新建世界线事件</strong></div><span id="worldline-selected" class="revision">未选择事件</span></div>
+            <div class="mutation-meta-row"><label>event_id<input id="worldline-event-id" maxlength="160" placeholder="自动生成" /></label><label>剧情弧 arc_id<input id="worldline-arc-id" maxlength="120" placeholder="例如 season-01-intersection" /></label></div>
+            <label>标题<input id="worldline-title" maxlength="240" placeholder="例如：第一季·交叠带" required /></label>
+            <label>事件摘要<textarea id="worldline-summary" rows="5" maxlength="4000" placeholder="描述会持续影响世界、角色行动和后续对话的长期事件…" required></textarea></label>
+            <div class="worldline-form-grid"><label>状态<select id="worldline-status"><option value="active">active · 当前生效</option><option value="planned">planned · 计划中</option><option value="resolved">resolved · 已解决</option><option value="archived">archived · 已归档</option></select></label><label>来源<input id="worldline-source" maxlength="120" value="world-engine" /></label></div>
+            <label>发生时间 <span class="field-note">可选，留空由服务记录当前时间</span><input id="worldline-occurred-at" type="datetime-local" /></label>
+            <div class="mutation-footer"><span id="worldline-hint" class="console-hint">这是追加式编辑，不会覆盖历史事件。</span><button class="send-button" type="submit"><span id="worldline-submit-label">写入世界线</span><span class="send-arrow">↗</span></button></div>
+          </form>
+        </div>
+        <div id="worldline-result" class="mutation-result" role="status">尚未提交世界线事件。</div>
+      </section>
+
+      <section id="context-lab" class="research-only context-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">CONTEXT SOURCES</p><h2>多源上下文工作台</h2></div>
+          <span class="mini-pill ok">5 个独立输入层</span>
+        </div>
+        <p class="console-intro">每个面板对应一个独立输入层。这里的编辑会追加为 world.mutation，服务再按自己的规则更新 canonical world；它们是角色的背景材料，不会自动变成逐字播报。</p>
+        <div class="context-panel-grid">
+          <article class="context-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">external_context</span><strong>外部事件 / 新闻</strong></div><span class="context-panel-status" id="external-context-status">未读取</span></div>
+            <div id="external-context-current" class="context-current">尚未写入外部事件。</div><div id="external-context-recent" class="context-recent"></div>
+            <form class="context-form" data-context-layer="external_context" id="external-context-form"><div class="context-form-grid"><label>item_id<input name="item_id" maxlength="160" placeholder="news-20260907-01" required></label><label>类别<input name="category" value="news" maxlength="80"></label></div><label>标题<input name="title" maxlength="240" placeholder="一件值得角色留意的外部大事" required></label><label>摘要<textarea name="summary" rows="3" maxlength="2000" placeholder="只写已核实、可引用的事实。" required></textarea></label><div class="context-form-grid"><label>来源 URL<input name="url" type="url" placeholder="https://…"></label><label>提供方<input name="provider" value="manual" maxlength="120"></label></div><label>发布时间<input name="published_at" type="datetime-local"></label><button class="quiet-button context-submit" type="submit">记录外部事件</button></form>
+          </article>
+          <article class="context-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">weather</span><strong>天气观测</strong></div><span class="context-panel-status" id="weather-context-status">未读取</span></div>
+            <div id="weather-context-current" class="context-current">尚未写入天气。</div><div id="weather-context-recent" class="context-recent"></div>
+            <form class="context-form" data-context-layer="weather" id="weather-context-form"><div class="context-form-grid"><label>地点<input name="location" placeholder="上海" required></label><label>天气<input name="condition" placeholder="多云" required></label></div><div class="context-form-grid context-form-grid-3"><label>温度 °C<input name="temperature_c" type="number" min="-90" max="70" step="0.1"></label><label>湿度 0–1<input name="humidity" type="number" min="0" max="1" step="0.01"></label><label>风速 m/s<input name="wind_mps" type="number" min="0" max="150" step="0.1"></label></div><div class="context-form-grid"><label>观测时间<input name="observed_at" type="datetime-local"></label><label>提供方<input name="provider" value="manual" maxlength="120"></label></div><button class="quiet-button context-submit" type="submit">记录天气</button></form>
+          </article>
+          <article class="context-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">calendar</span><strong>日历与世界时间</strong></div><span class="context-panel-status" id="calendar-context-status">未读取</span></div>
+            <div id="calendar-context-current" class="context-current">尚未设置日历。</div><div id="calendar-context-recent" class="context-recent"></div>
+            <form class="context-form" data-context-layer="calendar" id="calendar-context-form"><div class="context-form-grid"><label>日期 / 时间<input name="date" type="datetime-local"></label><label>时区<input name="timezone" value="Asia/Shanghai" maxlength="80"></label></div><div class="context-form-grid"><label>季节<input name="season" placeholder="秋"></label><label>节气<input name="solar_term" placeholder="白露"></label></div><label>节日 / 特殊日<input name="holiday" placeholder="可选"></label><button class="quiet-button context-submit" type="submit">更新日历</button></form>
+          </article>
+          <article class="context-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">user_profile</span><strong>用户习惯与偏好</strong></div><span class="context-panel-status" id="user-profile-context-status">未读取</span></div>
+            <div id="user-profile-context-current" class="context-current">还没有稳定偏好。</div><div id="user-profile-context-recent" class="context-recent"></div>
+            <form class="context-form" data-context-layer="user_profile" id="user-profile-context-form"><div class="context-form-grid"><label>偏好键<input name="preference_key" placeholder="conversation.pace" required></label><label>值类型<select name="value_type"><option value="string">文字</option><option value="number">数字</option><option value="boolean">布尔</option></select></label></div><label>偏好值<input name="value" placeholder="short" required></label><p class="field-note">同一值连续观察 3 次后才会标记为 stable。</p><button class="quiet-button context-submit" type="submit">记录一次观察</button></form>
+          </article>
+          <article class="context-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">device_context</span><strong>设备与固件上下文</strong></div><span class="context-panel-status" id="device-context-status">未读取</span></div>
+            <div id="device-context-current" class="context-current">尚未登记设备上下文。</div><div id="device-context-recent" class="context-recent"></div>
+            <form class="context-form" data-context-layer="device_context" id="device-context-form"><div class="context-form-grid"><label>设备 ID<input name="device_id" value="deskbot-device-001" maxlength="160" required></label><label>状态<input name="status" value="online" maxlength="80"></label></div><div class="context-form-grid"><label>metrics（JSON）<textarea name="metrics" rows="3" placeholder='{"battery":0.8}'></textarea></label><label>state（JSON）<textarea name="state" rows="3" placeholder='{"posture":"idle"}'></textarea></label></div><label>观测时间<input name="observed_at" type="datetime-local"></label><button class="quiet-button context-submit" type="submit">记录设备状态</button></form>
+          </article>
+        </div>
+        <div id="context-workbench-result" class="mutation-result" role="status">尚未提交多源上下文。</div>
+      </section>
+
+      <section id="scenario-lab" class="research-only scenario-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">REPEATABLE SCENARIOS</p><h2>多源场景验证</h2></div>
+          <span id="scenario-pill" class="mini-pill muted">场景读取中</span>
+        </div>
+        <p class="console-intro">每个场景都从相同初态运行，只让一种输入主导。运行发生在隔离内存中，不会改写当前持续世界。</p>
+        <div id="scenario-grid" class="scenario-grid"><span class="console-hint">正在读取固定场景…</span></div>
+        <div id="scenario-result" class="scenario-report" role="status"><span>选择一个场景查看逐事件字段变化与 L1b 待测记录。</span></div>
+      </section>
+
+      <section id="probe-lab" class="research-only probe-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">L1B FIXED PROBES</p><h2>固定探针记录</h2></div>
+          <span id="probe-pill" class="mini-pill muted">探针读取中</span>
+        </div>
+        <p class="console-intro">P4 身份核与 P6 代次自指为必留探针；T1/T2 原始回答独立保存。真实剖面向量和距离未测量前保持为空。</p>
+        <div id="probe-grid" class="probe-grid"><span class="console-hint">正在读取 P1–P8…</span></div>
+        <form id="probe-form" class="probe-form">
+          <div class="probe-controls">
+            <label>探针<select id="probe-id"></select></label>
+            <label>时间样本<select id="probe-time"><option value="T1">T1</option><option value="T2">T2</option></select></label>
+            <label>observation_id<input id="probe-observation-id" maxlength="120" placeholder="自动生成" /></label>
+          </div>
+          <div class="probe-meta-row">
+            <label>shell_epoch<input id="probe-shell-epoch" type="number" min="0" step="1" placeholder="可选" /></label>
+            <label>world_revision<input id="probe-world-revision" type="number" min="0" step="1" placeholder="可选" /></label>
+          </div>
+          <label class="payload-label">原始回答<textarea id="probe-response" rows="4" maxlength="8192" placeholder="记录角色对固定情境的完整回答…" required></textarea></label>
+          <div class="mutation-footer"><span id="probe-hint" class="console-hint">选择探针查看固定问题。</span><button class="send-button" type="submit"><span>记录回答</span><span class="send-arrow">↗</span></button></div>
+        </form>
+        <div id="probe-result" class="mutation-result" role="status">尚未记录探针回答。</div>
+        <div class="ledger-heading"><span class="trace-label">最近 L1b 观测</span><button id="refresh-probes" class="quiet-button" type="button">刷新记录</button></div>
+        <div id="probe-observations" class="event-log probe-observations"><span>尚未读取。</span></div>
+      </section>
+
+      <section id="multisource-console" class="research-only multisource-console card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">MULTISOURCE INPUT LAB</p><h2>多源事件研究台</h2></div>
+          <span id="schema-pill" class="mini-pill muted">契约读取中</span>
+        </div>
+        <p class="console-intro">把世界线、新闻、天气、日历、用户偏好、设备或互动观察写入同一事件入口；规则结果会保留在审计记录中。</p>
+        <form id="mutation-form" class="mutation-form">
+          <div class="mutation-controls">
+            <label>输入层<select id="mutation-layer"></select></label>
+            <label>动作<select id="mutation-action"></select></label>
+            <label>来源类型<select id="mutation-source-kind"><option value="service">service</option><option value="user">user</option><option value="device">device</option><option value="external_provider">external_provider</option><option value="world_engine">world_engine</option></select></label>
+            <label>置信度<input id="mutation-confidence" type="number" min="0" max="1" step="0.01" value="0.9" /></label>
+          </div>
+          <div class="mutation-meta-row">
+            <label>provider<input id="mutation-provider" value="research-console" maxlength="120" /></label>
+            <label>event_id<input id="mutation-event-id" maxlength="160" /></label>
+          </div>
+          <label class="payload-label">结构化 payload（JSON）<textarea id="mutation-payload" rows="8" spellcheck="false"></textarea></label>
+          <div class="mutation-footer"><span id="mutation-hint" class="console-hint">选择动作后载入最小示例。</span><button class="send-button" type="submit"><span>注入事件</span><span class="send-arrow">↗</span></button></div>
+        </form>
+        <div id="mutation-result" class="mutation-result" role="status">尚未提交事件。</div>
+        <div class="ledger-heading"><span class="trace-label">最近 mutation ledger</span><button id="refresh-ledger" class="quiet-button" type="button">刷新记录</button></div>
+        <div id="mutation-ledger" class="event-log mutation-ledger"><span>尚未读取。</span></div>
+      </section>
+
+      <section class="research-drawer card" id="research-drawer"><div class="drawer-heading"><div><p class="eyebrow">TRACE &amp; EVIDENCE</p><h2>这次互动留下了什么</h2></div><span id="last-event-label" class="revision">暂无事件</span></div><div class="trace-grid"><div class="trace-block"><span class="trace-label">最新事件</span><strong id="trace-event-id">—</strong><p id="trace-event-text">开启研究视图后，这里会显示事件 ID、分析标签和状态版本。</p></div><div class="trace-block"><span class="trace-label">处理管线</span><div class="pipeline-steps"><span>input</span><i>→</i><span>world</span><i>→</i><span>state</span><i>→</i><span>LLM</span><i>→</i><span>outbox</span></div><p id="trace-provider">provider —</p></div><div class="trace-block"><span class="trace-label">情境决策</span><strong id="trace-decision-route">—</strong><p id="trace-decision-reason">多源输入不会自动变成播报；这里显示本轮的使用方式。</p></div><div class="trace-block"><span class="trace-label">最近事件记录</span><div id="event-log" class="event-log"><span>—</span></div></div><div class="trace-block"><span class="trace-label">证据记录</span><div id="evidence-log" class="event-log"><span>—</span></div></div></div></section>
+      <footer class="footer-note"><span>聚形域 · 文字体验 v0.2</span><span>Node 状态源 · 可重复多源场景 · 语音层待接入</span></footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

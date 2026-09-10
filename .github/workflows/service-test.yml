@@ -1,0 +1,32 @@
+name: DeskBot service tests
+
+on:
+  pull_request:
+    paths:
+      - "apps/deskbot-service/**"
+      - ".github/workflows/service-test.yml"
+  push:
+    paths:
+      - "apps/deskbot-service/**"
+      - ".github/workflows/service-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  node-test:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/deskbot-service
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run service regression suite
+        run: npm.cmd test
+
