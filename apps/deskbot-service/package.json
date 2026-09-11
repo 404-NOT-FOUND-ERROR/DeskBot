@@ -1,0 +1,13 @@
+{
+  "name": "deskbot-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test"
+  }
+}

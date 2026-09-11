@@ -1,0 +1,19 @@
+{
+  "name": "deskbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeskBot / 聚形域 software baseline",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1 -StartWeb",
+    "start:service": "npm.cmd --prefix apps/deskbot-service start",
+    "start:web": "npm.cmd --prefix apps/deskbot-web start",
+    "stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local.ps1",
+    "test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1",
+    "test:service": "npm.cmd --prefix apps/deskbot-service test",
+    "test:voice": "python -m unittest discover -s voice-sidecar/tests -v",
+    "package:source": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-source.ps1"
+  }
+}
