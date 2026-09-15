@@ -43,3 +43,25 @@ test('pull merges duplicate events, decays old evidence, and caps retained direc
   ], { now: new Date('2026-09-14T00:00:00.000Z') });
   assert.equal(old.length, 0);
 });
+
+test('pull reads structured weather and preference fields used by real mutation events', () => {
+  const pulls = computeFantasyPull([
+    { event_id: 'structured-weather', layer: 'weather', source: 'qweather', payload: { snapshot: { condition: '连续下雨', location: '上海' } } },
+    { event_id: 'structured-preference', layer: 'user_profile', source: 'user', payload: { preference_key: 'walk.place', value: '池塘散步' } },
+    { event_id: 'structured-world', layer: 'world_line', source: 'world-engine', payload: { event: { title: '荷叶边的青蛙', summary: '湿地出现新的落脚处' } } },
+  ]);
+  assert.equal(pulls.find((item) => item.direction_id === 'wetland_frog')?.status, 'candidate');
+});
+
+test('candidate cap keeps the highest scoring directions after sorting', () => {
+  const pulls = computeFantasyPull([
+    event('low-1', 'weather', '星星'),
+    event('low-2', 'user_profile', '星空'),
+    event('low-3', 'world_line', '星星'),
+    event('high-1', 'weather', '雨天池塘青蛙'),
+    event('high-2', 'user_profile', '我喜欢池塘散步青蛙'),
+    event('high-3', 'world_line', '荷叶青蛙出现'),
+  ], { maxCandidates: 1 });
+  assert.equal(pulls.length, 1);
+  assert.equal(pulls[0].direction_id, 'wetland_frog');
+});

@@ -40,7 +40,7 @@ Node deskbot-service :4311
 - 天气 connector 的实时观测与 minutely/hourly/daily 预报使用独立缓存和 TTL。未显式加载 `DESKBOT_WEATHER_*` 时，当前状态是 disabled；历史 SQLite 快照不等于 provider 当前可用。
 - DeepSeek 出站可用性取决于运行 PowerShell/网络策略；`fetch failed` 不代表角色规则失败。
 - 当前 voice-sidecar 是 fake/model-free baseline，不代表真实中文 ASR/TTS 性能。
-- 角色演化仍是 P2-P4 计划；当前 `miaowu-expression-v2` 是表达基线，不是长期 `role-state.v1`。
+- 角色演化的 fantasy-pull、提案和有限试行已在 P2-P4 接入；当前仍不是长期 `role-state.v1`，也不会自动换壳。
 
 ## Related Documents
 

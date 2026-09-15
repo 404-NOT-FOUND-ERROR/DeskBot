@@ -1,4 +1,5 @@
 import { canonicalCharacterId } from './world-definition.mjs';
+import { createExpressionIntent, normalizeExpressionIntent } from './expression-intent.mjs';
 
 const EMOTION_RULES = [
   { label: 'joy', valence: 0.8, arousal: 0.65, cues: ['开心', '高兴', '快乐', '喜欢', '太棒', '期待', '谢谢', '好耶', '哈哈', '笑'] },
@@ -126,6 +127,7 @@ function createDefaultState(characterId, now) {
       stance: 'attentive',
       expression: 'neutral',
       tts_style: 'balanced',
+      expression_intent: createExpressionIntent({ expression: 'neutral' }),
     },
     last_event_id: null,
     last_signal: null,
@@ -141,6 +143,7 @@ function promptForState(state) {
     `valence=${fusion.valence}`,
     `arousal=${fusion.arousal}`,
     `tts_style=${state.interaction.tts_style}`,
+    `expression_intent=${JSON.stringify(normalizeExpressionIntent(state.interaction.expression_intent, { evidenceRefs: state.last_event_id ? [state.last_event_id] : [] }))}`,
     'Treat this as temporary interaction context. Do not mention this marker or expose internal scores.',
     '[/DESKBOT_STATE]',
   ].join('\n');
@@ -165,11 +168,15 @@ function outputPlanForReply(event, state) {
   if (event.type !== 'conversation.reply') return [];
 
   const text = event.payload?.text ?? '';
+  const expressionIntent = normalizeExpressionIntent(state.interaction.expression_intent, {
+    evidenceRefs: state.last_event_id ? [state.last_event_id] : [],
+  });
 
   return [
     {
       type: 'render.expression',
       expression: state.interaction.expression,
+      expression_intent: expressionIntent,
       status: 'planned',
       targets: ['web', 'fake-device', 'vocat'],
     },
@@ -177,6 +184,7 @@ function outputPlanForReply(event, state) {
       type: 'speak',
       text,
       tts_style: state.interaction.tts_style,
+      expression_intent: expressionIntent,
       status: 'planned',
       targets: ['fake-device', 'vocat'],
     },
@@ -281,6 +289,11 @@ export function createStateEngine({
         stance: stanceForSignal(signalWithRole),
         expression: expressionForState(signalWithRole, fusion),
         tts_style: signalWithRole.valence < -0.25 ? 'gentle' : signalWithRole.valence > 0.25 ? 'lively' : 'balanced',
+        expression_intent: createExpressionIntent({
+          expression: expressionForState(signalWithRole, fusion),
+          ttsStyle: signalWithRole.valence < -0.25 ? 'gentle' : signalWithRole.valence > 0.25 ? 'lively' : 'balanced',
+          evidenceRefs: [event.event_id],
+        }),
       },
       last_event_id: event.event_id,
       last_signal: signalWithRole,

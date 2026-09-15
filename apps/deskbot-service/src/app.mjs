@@ -16,6 +16,8 @@ import { createWebSocketBridge } from './websocket-bridge.mjs';
 import { createContextSourceRegistry } from './context-sources.mjs';
 import { createInteractionPolicy } from './interaction-policy.mjs';
 import { WeatherConnectorError } from './weather-connector.mjs';
+import { computeFantasyPull } from './fantasy-pull.mjs';
+import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import {
   getResearchScenarioCatalog,
   ResearchScenarioError,
@@ -131,6 +133,8 @@ export function createDeskBotServer({
   weatherConnector = null,
   contextSources = createContextSourceRegistry({ now, weatherConnector }),
   interactionPolicy = createInteractionPolicy({ now, persistence }),
+  roleProposalStore = null,
+  fantasyPullEngine = computeFantasyPull,
   l1bProbeStore = createL1bProbeStore({ now, persistence }),
   researchSessions = null,
   audioArtifacts = createAudioArtifactStore({ now, persistence }),
@@ -142,6 +146,7 @@ export function createDeskBotServer({
   websocket = true,
   websocketPath = '/ws',
 } = {}) {
+  const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -155,6 +160,18 @@ export function createDeskBotServer({
     voiceClient,
     ttsFormat,
     audioArtifacts,
+    activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
+    recordRoleTrialObservation: ({ characterId, eventId, evidenceId, signal }) => {
+      return roles.activeTrials({ characterId }).map((trial) => {
+        const result = roles.recordTrialObservation(trial.proposal_id, { eventId, evidenceId, signal });
+        return {
+          proposal_id: trial.proposal_id,
+          direction_id: trial.direction_id,
+          status: result.trial?.status ?? null,
+          turns_observed: result.trial?.turns_observed ?? null,
+        };
+      });
+    },
     refreshWeather: weatherConnector
       ? async ({ force = false } = {}) => {
         const weather = await weatherConnector.refresh({ force });
@@ -182,6 +199,31 @@ export function createDeskBotServer({
     turnResolver: (turnId) => orchestrator.get(turnId),
     probeResolver: (observationId) => l1bProbeStore.get(observationId),
   });
+  function rolePulls({ characterId = null, limit = 200 } = {}) {
+    const events = inputStore.list({ limit })
+      .filter((event) => !characterId || event.character_id === characterId || event.character_id === null);
+    return fantasyPullEngine(events, { now: now() });
+  }
+
+  function sendRoleError(response, error) {
+    const expected = error instanceof InputError || error instanceof RoleProposalError || error instanceof TypeError;
+    sendJson(response, expected ? (error.statusCode ?? 400) : 500, {
+      error: expected ? (error.code ?? 'invalid_role_request') : 'internal_error',
+      message: expected ? error.message : 'role proposal operation failed',
+    });
+  }
+
+  function requiredRoleText(value, field) {
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new InputError(400, 'invalid_role_request', `${field} must be a non-empty string`);
+    }
+    return value.trim();
+  }
+
+  function optionalRoleText(value, field) {
+    if (value === undefined || value === null) return null;
+    return requiredRoleText(value, field);
+  }
 
   function sendResearchSessionError(response, error) {
     const expected = error instanceof ResearchSessionError;
@@ -631,6 +673,106 @@ export function createDeskBotServer({
           limit: url.searchParams.get('limit') ?? 50,
         }),
       });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/roles/pulls') {
+      const characterId = url.searchParams.get('character_id') ?? null;
+      sendJson(response, 200, {
+        schema: 'deskbot.fantasy-pull-list.v0.1',
+        rule_version: 'fantasy-pull.v0.1',
+        character_id: characterId,
+        pulls: rolePulls({ characterId, limit: url.searchParams.get('limit') ?? 200 }),
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/roles/proposals') {
+      sendJson(response, 200, {
+        schema: 'deskbot.role-direction-proposal-list.v0.1',
+        proposals: roles.list({
+          characterId: url.searchParams.get('character_id') ?? null,
+          status: url.searchParams.get('status') ?? null,
+          limit: url.searchParams.get('limit') ?? 50,
+        }),
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/roles/trials') {
+      sendJson(response, 200, {
+        schema: 'deskbot.role-direction-trial-list.v0.1',
+        character_id: url.searchParams.get('character_id') ?? null,
+        trials: roles.activeTrials({
+          characterId: url.searchParams.get('character_id') ?? null,
+          limit: url.searchParams.get('limit') ?? 10,
+        }),
+      });
+      return;
+    }
+
+    const roleProposalMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)$/);
+    if (request.method === 'GET' && roleProposalMatch) {
+      const proposal = roles.get(decodeURIComponent(roleProposalMatch[1]));
+      if (!proposal) {
+        sendJson(response, 404, { error: 'role_proposal_not_found', message: 'role proposal not found' });
+      } else {
+        sendJson(response, 200, { schema: 'deskbot.role-direction-proposal-response.v0.1', proposal, decisions: roles.decisions({ proposalId: proposal.proposal_id }) });
+      }
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/roles/proposals') {
+      readJson(request)
+        .then((body) => {
+          const characterId = requiredRoleText(body.character_id, 'character_id');
+          const directionId = requiredRoleText(body.direction_id, 'direction_id');
+          const requestedProposalId = optionalRoleText(body.proposal_id, 'proposal_id');
+          const pulls = rolePulls({ characterId });
+          const pull = directionId
+            ? pulls.find((item) => item.direction_id === directionId)
+            : pulls.find((item) => item.status === 'candidate');
+          if (!pull || pull.status !== 'candidate') {
+            throw new RoleProposalError(409, 'role_direction_not_candidate', 'direction must currently be a candidate');
+          }
+          const existing = requestedProposalId
+            ? roles.get(requestedProposalId)
+            : roles.list({ characterId }).reverse().find((item) => item.direction_id === directionId
+              && ['proposed', 'deferred', 'trying'].includes(item.status));
+          if (existing) return { duplicate: true, proposal: existing };
+          const proposal = roles.propose(pull, { proposalId: requestedProposalId, characterId });
+          return { duplicate: Boolean(existing), proposal };
+        })
+        .then((result) => sendJson(response, result.duplicate ? 200 : 201, { schema: 'deskbot.role-proposal-accepted.v0.1', accepted: true, ...result }))
+        .catch((error) => sendRoleError(response, error));
+      return;
+    }
+
+    const roleActionMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/(choose|trial\/start|trial\/observations|trial\/complete|archive)$/);
+    if (request.method === 'POST' && roleActionMatch) {
+      const proposalId = decodeURIComponent(roleActionMatch[1]);
+      const action = roleActionMatch[2];
+      readJson(request, 64 * 1024, { allowEmpty: action === 'trial/start' || action === 'archive' })
+        .then((body) => {
+          const reason = optionalRoleText(body.reason, 'reason');
+          if (action === 'choose') return roles.choose(proposalId, body.choice, { reason });
+          if (action === 'trial/start') {
+            const rawWindow = body.window_turns ?? body.windowTurns ?? 5;
+            const windowTurns = typeof rawWindow === 'string' && /^\d+$/.test(rawWindow.trim()) ? Number(rawWindow) : rawWindow;
+            return roles.startTrial(proposalId, { windowTurns });
+          }
+          if (action === 'trial/observations') return roles.recordTrialObservation(proposalId, { eventId: requiredRoleText(body.event_id ?? body.eventId, 'event_id'), signal: body.signal ?? 'neutral', evidenceId: optionalRoleText(body.evidence_id ?? body.evidenceId, 'evidence_id') });
+          if (action === 'trial/complete') return roles.completeTrial(proposalId, { decision: body.decision ?? 'deferred', reason });
+          return roles.archive(proposalId, { reason });
+        })
+        .then((result) => {
+          if (!result) {
+            sendJson(response, 404, { error: 'role_proposal_not_found', message: 'role proposal not found' });
+            return;
+          }
+          sendJson(response, 202, { schema: 'deskbot.role-proposal-action-accepted.v0.1', accepted: true, proposal: result.proposal ?? result, ...(result.decision ? { decision: result.decision } : {}) });
+        })
+        .catch((error) => sendRoleError(response, error));
       return;
     }
 

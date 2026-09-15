@@ -21,6 +21,9 @@ test('emotion analysis is deterministic and produces an explainable signal', () 
   assert.deepEqual(result.analysis.cues, ['难过', '累']);
   assert.equal(result.state.state_revision, 1);
   assert.equal(result.state.interaction.expression, 'concerned');
+  assert.equal(result.state.interaction.expression_intent.schema, 'deskbot.expression-intent.v1');
+  assert.equal(result.state.interaction.expression_intent.expression, 'concerned');
+  assert.deepEqual(result.state.interaction.expression_intent.evidence_refs, ['evt-state-001']);
   assert.match(result.context, /\[DESKBOT_STATE\]/);
   assert.equal(result.outputs[0].type, 'render.expression');
 });
@@ -61,6 +64,8 @@ test('assistant replies plan outputs without feeding back into CAPS state', () =
   assert.equal(reply.state.state_revision, input.state.state_revision);
   assert.equal(reply.state.last_event_id, input.state.last_event_id);
   assert.deepEqual(reply.outputs.map((output) => output.type), ['render.expression', 'speak']);
+  assert.deepEqual(reply.outputs[0].expression_intent, reply.outputs[1].expression_intent);
+  assert.equal(reply.outputs[1].expression_intent.consumers.tts.interruptibility, 'barge_in');
 });
 
 test('assistant emotion metadata remains audit-only and cannot update short state', () => {

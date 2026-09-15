@@ -8,6 +8,7 @@
 |---|---|---|---|
 | 输入与聊天幂等 | 相同 event/correlation 不重复回合；冲突返回错误 | `apps/deskbot-service/test/input.test.mjs`、`persistence-restart.test.mjs` | existing |
 | 喵呜提示词 | seed/profile/反应节拍/边界字段进入 prompt | `chat-orchestrator.test.mjs`、`persistent-world.test.mjs` | existing |
+| 角色试行表达覆盖 | 活动方向进入 prompt；用户回合 neutral 观察；同角色单活动试行 | `chat-orchestrator.test.mjs`、`role-proposals.test.mjs`、`role-proposals-http.test.mjs` | existing |
 | 旧世界迁移 | `ember-001`/旧名迁移到 canonical ID/喵呜且保留历史 | `persistent-world-migration.test.mjs` | existing |
 | 多源隔离 | 世界线、天气、用户偏好和设备事件按 route 分类，不自动播报 | `interaction-policy.test.mjs`、`multisource-prompt.test.mjs` | existing |
 | 天气缓存 | TTL、force、观测时间单调、v7/v1 字段和错误不泄密 | `weather-connector.test.mjs`、`context-sources.test.mjs` | existing |
@@ -18,10 +19,9 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-最近一次 Node 服务回归为 `119/119`；新增 `llm-http-error.test.mjs` 验证聊天上游失败返回安全、可诊断的 `502`。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
+最近一次 Node 服务回归为 `141/141`；新增角色方向 HTTP、结构化证据聚合、持久化试行、活动方向表达覆盖和三端 expression intent 契约。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误，需在用户普通 PowerShell/网络策略允许的环境重新做 live smoke。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
-最近一次 Node 服务回归为 `118/118`；Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
 ## Proposed tests
 
@@ -40,7 +40,7 @@
 - **高风险：** 当前真实 DeepSeek/天气/语音出站受运行环境影响，未形成稳定 live evidence。
 - **高风险：** 固件 agent 尚未提供真实设备 ACK、播放和断线证据。
 - **中风险：** `expression_intent` 尚未驱动真实屏幕/TTS 三端一致性。
-- **中风险：** P2-P4 角色方向状态机和长期关系记忆尚未实现。
+- **中风险：** P2-P4 角色方向 API、有限试行和临时表达覆盖已实现；长期 `role-state.v1`、关系记忆和真实阶段演化尚未实现。
 
 ## Merge gate
 

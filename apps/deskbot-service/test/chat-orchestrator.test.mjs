@@ -182,3 +182,54 @@ test('an explicit latest-weather request refreshes the provider before LLM compl
   assert.match(prompt, /"status":"refreshed"/);
   assert.match(prompt, /小雨/);
 });
+
+test('an active role trial changes the prompt temporarily and records a neutral turn', async () => {
+  const prompts = [];
+  const observations = [];
+  const orchestrator = createChatOrchestrator({
+    inputStore: createInputStore({ now: () => fixedTime }),
+    stateEngine: createStateEngine({ now: () => fixedTime }),
+    worldContext: createWorldContext({ now: () => fixedTime }),
+    llm: {
+      async complete({ prompt }) {
+        prompts.push(prompt);
+        return { provider: 'test', model: 'test', text: '喵。先试这一块。', trace: {} };
+      },
+    },
+    activeRoleTrials: () => [{
+      proposal_id: 'proposal-trial-001',
+      direction_id: 'workshop_maker',
+      label: '工坊学徒',
+      life: '拆解、修理和亲手构造东西的生活',
+      trial: { status: 'active', turns_observed: 1, max_turns: 5 },
+      overlay: {
+        direction_id: 'workshop_maker',
+        label: '工坊学徒',
+        presence: '动手、拆解、验证',
+        speech: '先试这一块',
+        preferences: '机械和结构',
+        boundary: '不假装已经改好设备',
+      },
+    }],
+    recordRoleTrialObservation: (input) => {
+      observations.push(input);
+      return [{ proposal_id: 'proposal-trial-001', direction_id: 'workshop_maker', status: 'active', turns_observed: 2 }];
+    },
+    now: () => fixedTime,
+  });
+
+  const turn = await orchestrator.run({ event_id: 'turn-role-trial-001', character_id: 'shaping-001', message: '帮我拆一下这个任务。' });
+  assert.match(prompts[0], /\[DESKBOT_ACTIVE_ROLE_TRIAL\]/);
+  assert.match(prompts[0], /先试这一块/);
+  assert.equal(turn.active_role_trials[0].direction_id, 'workshop_maker');
+  assert.equal(turn.trial_observations[0].turns_observed, 2);
+  assert.equal(turn.expression_intent.role_trial.direction_id, 'workshop_maker');
+  assert.equal(turn.expression_intent.consumers.screen.motif, 'gear_tick');
+  assert.equal(turn.output_plan[0].expression_intent.consumers.tts.role_trial_direction, 'workshop_maker');
+  assert.deepEqual(observations[0], {
+    characterId: 'shaping-001',
+    eventId: 'turn-role-trial-001',
+    evidenceId: 'evidence-turn-role-trial-001',
+    signal: 'neutral',
+  });
+});

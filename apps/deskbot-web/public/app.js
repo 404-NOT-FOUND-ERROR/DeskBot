@@ -1,5 +1,5 @@
 const CHARACTER_ID = 'shaping-001';
-const state = { world: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false };
+const state = { world: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
 const emptyState = $('#empty-state');
@@ -603,23 +603,145 @@ async function refreshRuntimeContext() {
 function updateShortState(payload) {
   const shortState = payload?.state || payload; if (!shortState) return; state.shortState = shortState;
   const interaction = shortState.interaction || {}; const caps = shortState.caps || {}; const base = caps.base_layer || {}; const fusion = caps.fusion || {};
-  setText('#state-revision', `rev ${shortState.state_revision ?? '—'}`); setText('#state-stance', interaction.stance === 'attentive' ? '在留意你' : interaction.stance || '等待互动'); const expression = interaction.expression || 'neutral'; setText('#state-description', expression === 'neutral' ? '状态稳定，等待下一次互动。' : `当前表达倾向：${expression}`); $('#state-expression').className = `expression-orb ${expression}`;
-  setText('#state-style', interaction.tts_style || 'balanced'); setText('#voice-style', interaction.tts_style || 'balanced');
+  const intent = interaction.expression_intent || {}; const expression = interaction.expression || intent.expression || 'neutral';
+  const expressionLabels = { neutral: '状态稳定', concerned: '正在关心', happy: '有点开心', tired: '能量偏低', alert: '保持警觉', surprised: '被新东西吸引' };
+  const modeLabels = { companion: '陪伴', supportive: '支持', playful: '玩心', curious: '好奇', reflective: '思考', boundary: '边界' };
+  setText('#state-revision', `rev ${shortState.state_revision ?? '—'}`); setText('#state-stance', interaction.stance === 'attentive' ? '在留意你' : interaction.stance || '等待互动'); setText('#state-description', `${expressionLabels[expression] || expression}${intent.mode ? ` · ${modeLabels[intent.mode] || intent.mode}` : ''}`); $('#state-expression').className = `expression-orb ${expression} ${intent.mode || ''}`;
+  setText('#state-style', interaction.tts_style || 'balanced'); setText('#voice-style', interaction.tts_style || 'balanced'); setText('#state-intent', intent.pace ? `${modeLabels[intent.mode] || intent.mode || '陪伴'} · ${intent.pace} · ${Math.round(Number(intent.intensity ?? 0) * 100)}%` : '等待表达意图'); setText('#state-prosody', intent.prosody || 'warm_with_variation');
   for (const [name, value] of [['warmth', base.warmth], ['openness', base.openness], ['arousal', fusion.arousal]]) { const normalized = Number.isFinite(Number(value)) ? Math.max(0, Math.min(1, Number(value))) : null; setText(`#${name}-value`, normalized == null ? '—' : `${Math.round(normalized * 100)}%`); const meter = $(`#${name}-meter`); if (meter) meter.style.width = normalized == null ? '0%' : `${Math.round(normalized * 100)}%`; }
   const shaping = state.world?.shaping_field; setText('#state-field', shaping?.light_field ? `背景参数 · ${shaping.light_field}` : '背景参数 · 待观测'); $('#state-raw').textContent = JSON.stringify(shortState, null, 2);
+}
+function updateExpressionIntent(intent) {
+  if (!intent || typeof intent !== 'object') return;
+  const expression = intent.expression || state.shortState?.interaction?.expression || 'neutral';
+  const modeLabels = { companion: '陪伴', supportive: '支持', playful: '玩心', curious: '好奇', reflective: '思考', boundary: '边界', attentive: '专注' };
+  $('#state-expression').className = `expression-orb ${expression} ${intent.mode || ''}`;
+  setText('#state-intent', `${modeLabels[intent.mode] || intent.mode || '陪伴'} · ${intent.pace || 'natural'} · ${Math.round(Number(intent.intensity ?? 0) * 100)}%`);
+  setText('#state-prosody', intent.prosody || 'warm_with_variation');
+  setText('#voice-style', intent.prosody || state.shortState?.interaction?.tts_style || 'balanced');
 }
 function updateVoice(payload) { state.voice = payload; const available = payload && !payload.error && payload.status !== 'unavailable'; const pill = $('#voice-pill'); pill.className = `mini-pill ${available ? 'ok' : 'muted'}`; pill.textContent = available ? '已连接' : '未配置'; setText('#voice-description', available ? '语音 sidecar 已连接，可在有输出设备后试听。' : '暂时没有音频输出接口；语音层保留为可插拔计划。'); $('#voice-raw').textContent = JSON.stringify(payload || { status: 'not checked' }, null, 2); }
 function appendMessage(role, text, meta = '') { emptyState?.remove(); const item = document.createElement('article'); item.className = `message ${role}`; item.innerHTML = `<div class="message-avatar">${role === 'user' ? '你' : '✦'}</div><div><div class="message-bubble">${escapeHtml(text).replaceAll('\n', '<br>')}</div>${meta ? `<div class="message-meta">${escapeHtml(meta)}</div>` : ''}</div>`; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
 function appendPending() { emptyState?.remove(); const item = document.createElement('article'); item.className = 'message assistant pending'; item.innerHTML = '<div class="message-avatar">✦</div><div><div class="message-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div></div>'; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
-function updateTrace(turn) { if (!turn) return; const event = turn.input_event || turn.event || {}; const outputPlan = turn.output_plan || turn.planned_output_plan || []; const decision = turn.interaction_decision || null; setText('#last-event-label', formatTime(event.occurred_at)); setText('#trace-event-id', event.event_id || '—'); setText('#trace-event-text', event.payload?.text || '—'); const speak = outputPlan.find((entry) => entry.type === 'speak'); setText('#trace-provider', `${turn.provider || 'provider —'}${turn.trace?.usage?.total_tokens ? ` · ${turn.trace.usage.total_tokens} tokens` : ''}${speak?.tts_style ? ` · tts_style=${speak.tts_style}` : ''}`); setText('#trace-decision-route', decision?.route || '—'); setText('#trace-decision-reason', decision ? `${decision.reason || '—'}${turn.proactive_candidates?.length ? ` · 可选候选 ${turn.proactive_candidates.length} 条` : ''}` : '未生成情境决策。'); }
+function updateTrace(turn) { if (!turn) return; const event = turn.input_event || turn.event || {}; const outputPlan = turn.output_plan || turn.planned_output_plan || []; const decision = turn.interaction_decision || null; const intent = turn.expression_intent || turn.state?.interaction?.expression_intent || outputPlan.find((entry) => entry.expression_intent)?.expression_intent || null; setText('#last-event-label', formatTime(event.occurred_at)); setText('#trace-event-id', event.event_id || '—'); setText('#trace-event-text', event.payload?.text || '—'); const speak = outputPlan.find((entry) => entry.type === 'speak'); setText('#trace-provider', `${turn.provider || 'provider —'}${turn.trace?.usage?.total_tokens ? ` · ${turn.trace.usage.total_tokens} tokens` : ''}${speak?.tts_style ? ` · tts_style=${speak.tts_style}` : ''}${intent?.mode ? ` · ${intent.mode}/${intent.pace || 'natural'}` : ''}`); setText('#trace-decision-route', decision?.route || '—'); setText('#trace-decision-reason', decision ? `${decision.reason || '—'}${turn.proactive_candidates?.length ? ` · 可选候选 ${turn.proactive_candidates.length} 条` : ''}${turn.active_role_trials?.length ? ` · 试行 ${turn.active_role_trials.map((trial) => trial.label || trial.direction_id).join('、')}` : ''}` : '未生成情境决策。'); }
 function renderEventLog(events = []) { const target = $('#event-log'); target.innerHTML = events.length ? [...events].reverse().map((event) => `<div><b>${escapeHtml(event.layer || event.type || 'event')}</b> · ${escapeHtml(event.type || '')} · ${escapeHtml(event.source_kind || 'unknown')} · ${escapeHtml(event.payload?.text || event.event_id || '')}</div>`).join('') : '<span>还没有事件记录</span>'; }
 function renderEvidenceLog(evidence = []) { const target = $('#evidence-log'); target.innerHTML = evidence.length ? evidence.map((item) => `<div><b>${escapeHtml(item.eligibility?.status || 'unknown')}</b> · ${escapeHtml(item.event_type || item.event_id || '')}</div>`).join('') : '<span>还没有证据记录</span>'; }
 
+const ROLE_STATUS_LABELS = { proposed: '待选择', trying: '试行中', accepted: '已确认', rejected: '已拒绝', deferred: '稍后再议', archived: '已归档' };
+const ROLE_DIRECTION_LABELS = { wetland_frog: '荷叶青蛙', starry_observer: '星空观察者', workshop_maker: '工坊学徒', dream_cloud: '云朵梦境生物' };
+
+function setRoleResult(kind, title, details) {
+  const target = $('#role-result');
+  if (!target) return;
+  target.className = `mutation-result ${kind}`;
+  target.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(details)}</span>`;
+}
+
+function renderRolePulls(pulls = []) {
+  state.rolePulls = Array.isArray(pulls) ? pulls : [];
+  const target = $('#role-pulls');
+  if (!target) return;
+  const visible = state.rolePulls.filter((pull) => pull.status === 'candidate');
+  $('#role-pulls-status').textContent = visible.length ? `${visible.length} 个候选` : '暂无候选';
+  target.innerHTML = visible.length ? visible.map((pull) => `
+    <article class="role-item candidate">
+      <div class="role-item-heading"><div><span class="role-direction-id">${escapeHtml(pull.direction_id)}</span><strong>${escapeHtml(pull.label)}</strong></div><b>${escapeHtml(pull.fantasy_pull)}</b></div>
+      <p>${escapeHtml(pull.life)}</p>
+      <small>${escapeHtml(pull.evidence_ids?.length || 0)} 条证据 · ${escapeHtml(pull.sources?.join(' / ') || '来源未知')}</small>
+      <button class="quiet-button role-action" type="button" data-role-action="propose" data-direction-id="${escapeHtml(pull.direction_id)}">提出试行</button>
+    </article>
+  `).join('') : '<span class="console-hint">还没有达到跨来源门槛的方向。继续生活，证据会慢慢聚合。</span>';
+}
+
+function roleActionButtons(proposal) {
+  const id = escapeHtml(proposal.proposal_id);
+  if (proposal.status === 'proposed' || proposal.status === 'deferred') {
+    return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="try">试一段</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">稍后</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">不要</button></div>`;
+  }
+  if (proposal.status === 'trying') {
+    if (!proposal.trial) return `<button class="quiet-button role-action" type="button" data-role-action="start" data-role-id="${id}">开始试行</button>`;
+    const trial = proposal.trial;
+    const feedback = trial.status === 'active' ? `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="observe" data-signal="positive" data-role-id="${id}">这方向不错</button><button class="quiet-button role-action" type="button" data-role-action="observe" data-signal="negative" data-role-id="${id}">不太像我</button></div>` : '';
+    return `${feedback}<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="complete" data-decision="accepted" data-role-id="${id}">确认方向</button><button class="quiet-button role-action" type="button" data-role-action="complete" data-decision="deferred" data-role-id="${id}">暂不确认</button><button class="quiet-button role-action" type="button" data-role-action="complete" data-decision="rejected" data-role-id="${id}">回退</button></div>`;
+  }
+  if (proposal.status !== 'archived') return `<button class="quiet-button role-action" type="button" data-role-action="archive" data-role-id="${id}">归档</button>`;
+  return '';
+}
+
+function renderRoleProposals(proposals = []) {
+  state.roleProposals = Array.isArray(proposals) ? proposals : [];
+  const target = $('#role-proposals');
+  if (!target) return;
+  $('#role-proposals-status').textContent = state.roleProposals.length ? `${state.roleProposals.length} 条记录` : '暂无记录';
+  target.innerHTML = state.roleProposals.length ? [...state.roleProposals].reverse().map((proposal) => {
+    const trial = proposal.trial;
+    const trialSummary = trial ? `试行 ${trial.turns_observed}/${trial.max_turns} · 正 ${trial.positive_feedback} / 负 ${trial.negative_feedback} · ${trial.status}` : '尚未开始试行';
+    const overlay = trial?.status === 'active' ? { wetland_frog: '亲水、轻快、把事变成一个小动作', starry_observer: '观察细节、保留不确定性', workshop_maker: '拆解、验证、先试一块', dream_cloud: '轻盈联想、提出奇怪但低风险的选择' }[proposal.direction_id] : null;
+    return `<article class="role-item proposal ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${escapeHtml(proposal.direction_id)}</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.life || '')}</p><small>${escapeHtml(trialSummary)}</small>${overlay ? `<small class="role-overlay">当前表达覆盖：${escapeHtml(overlay)}</small>` : ''}${proposal.evidence_ids?.length ? `<small>提案证据：${escapeHtml(proposal.evidence_ids.join(', '))}</small>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
+  }).join('') : '<span class="console-hint">提出方向后，它会出现在这里。接受不会自动换壳。</span>';
+}
+
+async function refreshRoleLab() {
+  const results = await Promise.allSettled([
+    getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`),
+    getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`),
+  ]);
+  if (results[0].status === 'fulfilled') renderRolePulls(results[0].value.pulls || []);
+  else { $('#role-pulls-status').textContent = '接口不可用'; $('#role-pulls').innerHTML = '<span class="console-hint">角色方向接口尚未启动。</span>'; }
+  if (results[1].status === 'fulfilled') renderRoleProposals(results[1].value.proposals || []);
+  else { $('#role-proposals-status').textContent = '接口不可用'; $('#role-proposals').innerHTML = '<span class="console-hint">角色提案接口尚未启动。</span>'; }
+  const count = state.roleProposals.length;
+  const pill = $('#role-pill');
+  if (pill) { pill.className = `mini-pill ${count ? 'ok' : 'muted'}`; pill.textContent = count ? `${count} 条阶段记录` : '等待候选'; }
+}
+
+async function handleRoleAction(actionTarget) {
+  if (state.roleBusy) return;
+  state.roleBusy = true;
+  actionTarget.disabled = true;
+  try {
+    const action = actionTarget.dataset.roleAction;
+    const proposalId = actionTarget.dataset.roleId;
+    let result;
+    if (action === 'propose') {
+      result = await postJson('/api/roles/proposals', { character_id: CHARACTER_ID, direction_id: actionTarget.dataset.directionId });
+      setRoleResult('ok', '方向提案已创建', `${result.proposal.label} · 仍需明确选择是否试行`);
+    } else if (action === 'choose') {
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/choose`, { choice: actionTarget.dataset.choice });
+      if (actionTarget.dataset.choice === 'try') {
+        result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
+      }
+      setRoleResult('ok', '选择已记录', `当前阶段：${ROLE_STATUS_LABELS[result.proposal?.status] || result.proposal?.status || '已更新'}`);
+    } else if (action === 'start') {
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
+      setRoleResult('ok', '试行已开始', `观察窗口 ${result.proposal.trial.max_turns} 回合`);
+    } else if (action === 'observe') {
+      const eventId = `role-feedback-${proposalId}-${Date.now()}`;
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/observations`, { event_id: eventId, signal: actionTarget.dataset.signal, evidence_id: `evidence-${eventId}` });
+      setRoleResult('ok', '试行反馈已记录', `当前反馈：${actionTarget.dataset.signal === 'positive' ? '喜欢这个方向' : '暂时不合适'} · ${result.proposal.trial.turns_observed}/${result.proposal.trial.max_turns}`);
+    } else if (action === 'complete') {
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/complete`, { decision: actionTarget.dataset.decision, reason: '研究台明确阶段选择' });
+      setRoleResult('ok', '试行阶段已更新', `当前阶段：${ROLE_STATUS_LABELS[result.proposal.status] || result.proposal.status}`);
+    } else if (action === 'archive') {
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/archive`, { reason: '研究台归档' });
+      setRoleResult('ok', '方向已归档', '历史记录仍可回放。');
+    }
+    await refreshRoleLab();
+  } catch (error) {
+    setRoleResult('bad', '角色方向操作失败', error.message);
+  } finally {
+    state.roleBusy = false;
+    actionTarget.disabled = false;
+  }
+}
+
 async function refreshDashboard() {
   setServicePill('pending', '检查服务…');
-  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast')]);
-  const [health, runtimeContext, world, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast] = results;
+  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast'), getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`)]);
+  const [health, runtimeContext, world, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast, rolePulls, roleProposals] = results;
   if (health.status === 'fulfilled') setServicePill('ok', `在线 · ${health.value.version || 'Node'}`); else setServicePill('bad', '服务不可达');
+  if (rolePulls.status === 'fulfilled') renderRolePulls(rolePulls.value.pulls || []);
+  if (roleProposals.status === 'fulfilled') renderRoleProposals(roleProposals.value.proposals || []);
   if (weatherForecast.status === 'fulfilled') updateWeatherForecast(weatherForecast.value);
   if (runtimeContext.status === 'fulfilled') updateRuntimeContext(runtimeContext.value); else refreshRuntimeContext(); if (world.status === 'fulfilled') updateWorld(world.value.world || world.value); if (shortState.status === 'fulfilled') updateShortState(shortState.value); if (voice.status === 'fulfilled') updateVoice(voice.value); else updateVoice({ status: 'unavailable', error: voice.reason?.body?.error || 'voice_sidecar_not_configured' }); renderEventLog(events.status === 'fulfilled' ? events.value.events || [] : []); renderEvidenceLog(evidence.status === 'fulfilled' ? evidence.value.evidence || [] : []); if (schema.status === 'fulfilled') updateWorldSchema(schema.value); else { $('#schema-pill').className = 'mini-pill muted'; $('#schema-pill').textContent = '契约不可用'; } state.multisourceMutations = mutations.status === 'fulfilled' ? mutations.value.mutations || [] : []; renderMutationLedger(state.multisourceMutations); renderContextWorkbench(state.world, state.multisourceMutations); if (scenarios.status === 'fulfilled') renderScenarioCatalog(scenarios.value); else { $('#scenario-pill').className = 'mini-pill muted'; $('#scenario-pill').textContent = '场景不可用'; } if (probes.status === 'fulfilled') renderProbeCatalog(probes.value); else { $('#probe-pill').className = 'mini-pill muted'; $('#probe-pill').textContent = '探针不可用'; } renderProbeObservations(probeObservations.status === 'fulfilled' ? probeObservations.value.observations || [] : []);
 }
@@ -667,7 +789,7 @@ async function submitMutation() {
 
 async function sendMessage(text) {
   if (!text || state.busy) return; state.busy = true; sendButton.disabled = true; input.disabled = true; appendMessage('user', text); const pending = appendPending(); const eventId = `web-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-  try { const payload = await postJson('/api/chat', { event_id: eventId, character_id: CHARACTER_ID, source: 'deskbot-web', message: text }); pending.remove(); const turn = payload.turn || payload; const reply = turn.reply || turn.reply_event?.payload?.text || '这次没有收到可显示的回复。'; const style = turn.state?.interaction?.tts_style || turn.output_plan?.find((entry) => entry.type === 'speak')?.tts_style; appendMessage('assistant', reply, style ? `表达计划 · ${style}` : '表达计划 · balanced'); updateTrace(turn); if (payload.state || turn.state) updateShortState({ state: payload.state || turn.state }); if (payload.canonical_world?.snapshot) updateWorld(payload.canonical_world.snapshot); else if (payload.canonical_world?.world) updateWorld(payload.canonical_world.world); await refreshDashboard(); }
+  try { const payload = await postJson('/api/chat', { event_id: eventId, character_id: CHARACTER_ID, source: 'deskbot-web', message: text }); pending.remove(); const turn = payload.turn || payload; const reply = turn.reply || turn.reply_event?.payload?.text || '这次没有收到可显示的回复。'; const style = turn.state?.interaction?.tts_style || turn.output_plan?.find((entry) => entry.type === 'speak')?.tts_style; const intent = turn.expression_intent || turn.state?.interaction?.expression_intent; appendMessage('assistant', reply, intent?.mode ? `表达计划 · ${intent.mode} · ${intent.pace || 'natural'}` : style ? `表达计划 · ${style}` : '表达计划 · balanced'); updateTrace(turn); if (payload.state || turn.state) updateShortState({ state: payload.state || turn.state }); if (turn.expression_intent) updateExpressionIntent(turn.expression_intent); if (payload.canonical_world?.snapshot) updateWorld(payload.canonical_world.snapshot); else if (payload.canonical_world?.world) updateWorld(payload.canonical_world.world); await refreshDashboard(); }
   catch (error) { pending.remove(); appendMessage('assistant', `这次连接没有完成：${error.message}`, '错误不会写入角色世界'); }
   finally { state.busy = false; sendButton.disabled = false; input.disabled = false; input.focus(); }
 }
@@ -701,3 +823,7 @@ document.querySelectorAll('.context-form').forEach((form) => form.addEventListen
 $('#probe-id').addEventListener('change', configureProbePrompt);
 $('#probe-form').addEventListener('submit', (event) => { event.preventDefault(); submitProbeObservation(); });
 $('#refresh-probes').addEventListener('click', refreshProbeObservations);
+$('#role-lab').addEventListener('click', (event) => {
+  const target = event.target.closest('[data-role-action]');
+  if (target) handleRoleAction(target);
+});

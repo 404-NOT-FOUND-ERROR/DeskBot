@@ -11,13 +11,13 @@
 |---|---|---|
 | 聚形域是持续世界背景与演化机制，不是每句话都故弄玄虚 | `world-definition.mjs`、world context、角色提示词 | 已实现基础框架；实际表达仍由 LLM 生成，需用真实 DeepSeek 做人工验收 |
 | 当前第一角色叫“喵呜”，猫型潮玩外壳只是阶段形态，不是永久身份 | canonical `protagonist`、`miaowu-expression-seed-v2`、角色圣经 | 已写入角色/世界决策文档；长期角色阶段状态机仍属 P4 |
-| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs` | Soul v0.1 与运行时表达已建立；幻想吸引聚合、角色提案和换壳状态机仍属 P2-P4 |
-| 角色化表达必须先完成事情，再用猫式反应、口癖和余韵增加存在感 | prompt composer、`interaction-policy.v0.1`、表达验收合同 | 已有反应/任务/事实分流和表达意图；没有保证每次输出都达到“激进角色化” |
-| 多源输入只能影响角色方向候选，不能由单句命令直接改人格、外壳或世界事实 | evidence ledger、world context、interaction policy、state engine | 已实现输入分层、证据和路由；P2-P4 的方向候选与阶段状态机尚未完成 |
+| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs`、`fantasy-pull.mjs`、`role-proposals.mjs`、`prompt-composer.mjs` | Soul v0.1、幻想吸引聚合、角色提案、有限试行和活动方向的临时表达覆盖已实现；长期 role-state 与真实换壳仍未实现 |
+| 角色化表达必须先完成事情，再用猫式反应、口癖和余韵增加存在感 | prompt composer、`interaction-policy.v0.1`、表达验收合同、active role trial overlay | 已有反应/任务/事实分流、表达意图和方向试行覆盖；真实 DeepSeek 仍需人工验证“激进角色化”体感 |
+| 多源输入只能影响角色方向候选，不能由单句命令直接改人格、外壳或世界事实 | evidence ledger、world context、interaction policy、state engine、`/api/roles/*` | 已实现输入分层、证据、候选、提案和有限试行；接受方向仍不自动换壳 |
 | 世界环境由世界规则和明确 mutation 改变，不由 LLM 正文直接写入 | persistent world、mutation ledger、world matches | 已实现 canonical world 和只追加 ledger；复杂世界线事件仍是后续能力 |
 | 时间、天气、外部事件、用户偏好、关系事件和设备状态是不同来源 | `/api/context`、weather connector、event/evidence stores | 已有来源状态和天气连接器；外部新闻、稳定偏好、关系记忆仍未接入完整闭环 |
 | 外部天气应缓存慢更新，用户明确要求“最新/实时”时才强制刷新 | weather connector TTL、`/api/connectors/weather/refresh`、聊天天气意图 | 已实现当前天气及短临/小时/每日预报缓存；实际 provider 是否可用取决于服务端 token/Host |
-| 文字、屏幕和未来 TTS 必须共享同一个表达意图 | `expression_intent` / output plan、device outbox 合同 | 文字侧已有基础字段；真实 TTS、屏幕和固件 ACK 闭环尚未验收 |
+| 文字、屏幕和未来 TTS 必须共享同一个表达意图 | `expression-intent.mjs`、`expression_intent` / output plan、device outbox 合同 | 已有版本化意图及 text/screen/TTS consumer 字段；真实 TTS、屏幕和固件 ACK 闭环尚未验收 |
 | 固件只负责采集、播放和显示，不持有世界、人格或 API key | `interaction-contract-v0.1`、WebSocket bridge、outbox | 合同和桥接已实现；真实固件由独立 agent 维护，不能据此宣称真机闭环 |
 
 ## 当前可验证状态

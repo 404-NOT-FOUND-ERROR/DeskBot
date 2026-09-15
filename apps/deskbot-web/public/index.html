@@ -30,7 +30,7 @@
 
           <section class="card forecast-card"><div class="card-heading"><div><p class="eyebrow">WEATHER OUTLOOK</p><h2>天气预报</h2></div><span id="forecast-status" class="mini-pill muted">尚未读取</span></div><p class="forecast-note">短临、小时和每日预报按各自缓存周期更新；只有明确的预报对话或服务端接口请求才访问 provider。</p><div class="forecast-grid"><section class="forecast-column"><div class="forecast-column-heading"><strong>短临</strong><span id="forecast-minutely-status">未请求</span></div><div id="forecast-minutely" class="forecast-list"><span>等待短临数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>小时</strong><span id="forecast-hourly-status">未请求</span></div><div id="forecast-hourly" class="forecast-list"><span>等待小时数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>每日</strong><span id="forecast-daily-status">未请求</span></div><div id="forecast-daily" class="forecast-list"><span>等待每日数据</span></div></section></div></section>
 
-          <section class="card state-card"><div class="card-heading"><div><p class="eyebrow">SHORT STATE</p><h2>此刻状态</h2></div><span id="state-revision" class="revision">rev —</span></div><div class="state-summary"><div id="state-expression" class="expression-orb neutral"><span></span></div><div><strong id="state-stance">等待互动</strong><p id="state-description">等待你开口。</p></div></div><div class="meter-list"><div class="meter-row"><div><span>温度</span><b id="warmth-value">—</b></div><div class="meter"><i id="warmth-meter"></i></div></div><div class="meter-row"><div><span>开放度</span><b id="openness-value">—</b></div><div class="meter"><i id="openness-meter"></i></div></div><div class="meter-row"><div><span>回应能量</span><b id="arousal-value">—</b></div><div class="meter"><i id="arousal-meter"></i></div></div></div><div class="state-tags"><span id="state-style" class="tag accent">balanced</span><span id="state-field" class="tag">状态待测</span></div><div class="research-only state-raw" id="state-raw">等待状态数据…</div></section>
+          <section class="card state-card"><div class="card-heading"><div><p class="eyebrow">SHORT STATE</p><h2>此刻状态</h2></div><span id="state-revision" class="revision">rev —</span></div><div class="state-summary"><div id="state-expression" class="expression-orb neutral"><span></span></div><div><strong id="state-stance">等待互动</strong><p id="state-description">等待你开口。</p></div></div><div class="meter-list"><div class="meter-row"><div><span>温度</span><b id="warmth-value">—</b></div><div class="meter"><i id="warmth-meter"></i></div></div><div class="meter-row"><div><span>开放度</span><b id="openness-value">—</b></div><div class="meter"><i id="openness-meter"></i></div></div><div class="meter-row"><div><span>回应能量</span><b id="arousal-value">—</b></div><div class="meter"><i id="arousal-meter"></i></div></div></div><div class="state-tags"><span id="state-style" class="tag accent">balanced</span><span id="state-intent" class="tag">等待表达意图</span><span id="state-prosody" class="tag">warm_with_variation</span><span id="state-field" class="tag">状态待测</span></div><div class="research-only state-raw" id="state-raw">等待状态数据…</div></section>
 
           <section class="card appearance-card"><div class="card-heading"><div><p class="eyebrow">CURRENT FORM</p><h2>当前形象</h2></div><span id="appearance-state" class="mini-pill ok">基础形态</span></div><div class="appearance-row"><div class="character-portrait" aria-hidden="true"><div class="portrait-ears"><i></i><i></i></div><div class="portrait-head"><div class="portrait-screen"><i></i><i></i></div></div><div class="portrait-body"><span class="portrait-lobe lobe-a"></span><span class="portrait-lobe lobe-b"></span><span class="portrait-lobe lobe-c"></span><span class="portrait-lobe lobe-d"></span><b class="portrait-button"></b></div></div><div class="appearance-copy"><strong id="appearance-silhouette">读取中…</strong><p id="appearance-anchor">—</p><small id="appearance-generation">生成层等待测量数据</small></div></div></section>
 
@@ -99,6 +99,25 @@
           </article>
         </div>
         <div id="context-workbench-result" class="mutation-result" role="status">尚未提交多源上下文。</div>
+      </section>
+
+      <section id="role-lab" class="research-only role-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">ROLE EVOLUTION</p><h2>角色方向试行</h2></div>
+          <span id="role-pill" class="mini-pill muted">读取中</span>
+        </div>
+        <p class="console-intro">候选来自不同输入层的累积证据。这里的选择只启动一段可回退的生活试行，不会直接改写 Soul、世界线或外壳。</p>
+        <div class="role-lab-grid">
+          <section class="role-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">fantasy_pull</span><strong>最近被吸引的方向</strong></div><span id="role-pulls-status" class="context-panel-status">未读取</span></div>
+            <div id="role-pulls" class="role-list"><span class="console-hint">等待多源证据…</span></div>
+          </section>
+          <section class="role-panel">
+            <div class="context-panel-heading"><div><span class="scenario-layer">proposal / trial</span><strong>已提出的方向</strong></div><span id="role-proposals-status" class="context-panel-status">未读取</span></div>
+            <div id="role-proposals" class="role-list"><span class="console-hint">还没有角色提案。</span></div>
+          </section>
+        </div>
+        <div id="role-result" class="mutation-result" role="status">尚未操作角色方向。</div>
       </section>
 
       <section id="scenario-lab" class="research-only scenario-lab card">

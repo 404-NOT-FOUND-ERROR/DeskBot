@@ -108,6 +108,7 @@ export function composePrompt({
   interactionDecision = null,
   proactiveCandidates = [],
   recentConversation = [],
+  activeRoleTrials = [],
   userText,
 }) {
   const worldBlock = worldConditions.length > 0
@@ -177,6 +178,16 @@ export function composePrompt({
   const recentConversationBlock = recentConversation.length > 0
     ? recentConversation.map((entry) => `- ${entry.role === 'assistant' ? '角色' : '用户'}：${entry.text}`).join('\n')
     : '- 没有可用的最近对话。';
+  const activeRoleTrialBlock = Array.isArray(activeRoleTrials) && activeRoleTrials.length > 0
+    ? activeRoleTrials.map((trial) => JSON.stringify({
+      proposal_id: trial.proposal_id,
+      direction_id: trial.direction_id,
+      label: trial.label,
+      life: trial.life,
+      trial: trial.trial,
+      overlay: trial.overlay,
+    })).join('\n')
+    : 'null';
 
   const prompt = [
     '[DESKBOT_ROLE]',
@@ -201,6 +212,11 @@ export function composePrompt({
     recentConversationBlock,
     '这里只是有限的近期记忆，用来保持称呼、承诺和语气连续；不要把它当成新的世界事实，也不要声称记得窗口之外的往事。',
     '[/DESKBOT_RECENT_CONVERSATION]',
+    '',
+    '[DESKBOT_ACTIVE_ROLE_TRIAL]',
+    activeRoleTrialBlock,
+    '这是当前角色方向的有限试行覆盖层，不是新的 Soul、当前外壳、世界事实或永久身份。只在试行窗口内影响措辞、节奏、兴趣和可选的主动提议；先完成用户任务，再让方向感露出来。不得声称已经换壳、已经成为该方向，不能把 overlay 字段原样读给用户。试行结束或回退后，不得继续使用该覆盖层。',
+    '[/DESKBOT_ACTIVE_ROLE_TRIAL]',
     '',
     '[DESKBOT_RESPONSE_POLICY]',
     '先直接回答、执行或澄清用户此刻的请求。喵呜的角色感应当明确可感：按当前情境选择 task、fact、companion、playful、curious、reflective 或 boundary 之一，但绝不把模式名说出来。',
@@ -258,6 +274,7 @@ export function composePrompt({
     role_card: roleCard,
     world_snapshot: worldSnapshot,
     world_conditions: worldConditions,
+    active_role_trials: Array.isArray(activeRoleTrials) ? activeRoleTrials : [],
   };
 }
 

@@ -38,7 +38,7 @@ P1 喵呜强角色表达验收与软件基线
 
 **G1：** 自动测试全绿；九类真实样本全部通过“可用、角色、真实、存在感、变化”五项；无密钥/SQLite/音频进入 Git；GitHub Actions 实测通过。
 
-**当前阻断记录（2026-09-11）：** Node 回归已达到 `119/119`，本地 `4311/4322` 可通过脚本启动并健康检查；真实 DeepSeek live smoke 在当前 Codex PowerShell 被 Windows socket 权限策略阻断，返回结构化 `502 llm_transport_error`，因此不计入 G1 的真实模型样本。天气本次未加载 QWeather 环境文件，状态为 `open-meteo/disabled`；需要在保留用户配置的普通 PowerShell 中重新启动并验收。
+**当前阻断记录（2026-09-11）：** Node 回归已达到 `141/141`，本地 `4311/4322` 可通过脚本启动并健康检查；真实 DeepSeek live smoke 在当前 Codex PowerShell 被 Windows socket 权限策略阻断，返回结构化 `502 llm_transport_error`，因此不计入 G1 的真实模型样本。天气本次未加载 QWeather 环境文件，状态为 `open-meteo/disabled`；需要在保留用户配置的普通 PowerShell 中重新启动并验收。
 
 ## P2：多源证据到角色方向候选（3-7 天，核心聚合器已完成）
 
@@ -46,7 +46,7 @@ P1 喵呜强角色表达验收与软件基线
 
 来源只冻结为：虚拟世界线、外部事实、真实时间/天气、用户稳定偏好、关系事件和设备状态。每条证据须有 `source/layer/confidence/occurred_at/observed_at/provenance/decay`。
 
-已完成 `fantasy-pull.v0.1` 四类奇幻方向聚合器和跨源证据门槛；下一步将其接入服务 API 和 Web。界面必须分开显示原始输入、采纳证据、方向变化、未采纳理由和规则版本。
+已完成 `fantasy-pull.v0.1` 四类奇幻方向聚合器、跨源证据门槛，并接入 `/api/roles/pulls` 与研究 Web。界面分开显示候选方向、证据来源、提案状态和试行反馈；原始输入与 mutation ledger 仍从独立视图回读。
 
 **G2：** 三组固定事件序列可回放，结果一致；单句“你变成……”无法直接改变阶段；每一处方向变化可追到 evidence ID。
 
@@ -62,19 +62,19 @@ P1 喵呜强角色表达验收与软件基线
 
 **G3：** 记录过的关系事实可跨会话正确回调并可更正；未记录的不被声称记得；主动性有理由、可关闭、不过量。
 
-## P4：角色方向试行与阶段档案（1-2 周）
+## P4：角色方向试行与阶段档案（1-2 周，有限试行已实现）
 
 **目的：** 真正做出“它会变成不同的它”，而不是换一份提示词。
 
-建立 `observing -> candidate -> trying -> accepted/rejected/deferred -> archived` 状态机。试行期先改变说话、主动性和偏好权重，之后才有资格提出新角色定位或外壳视觉候选。角色与用户均可对试行作出解释性选择；LLM 正文没有写入权。
+建立 `observing -> candidate -> trying -> accepted/rejected/deferred -> archived` 状态机。当前已实现提案 API、有限窗口、正负/中性反馈累计、幂等观察、明确完成/回退、阶段历史和活动试行表达覆盖，并在研究 Web 可操作。试行覆盖层会临时改变提示词中的措辞、节奏、兴趣和主动提议；试行结束后立即失效，仍不会自动改变 Soul、世界或外壳。后续接入长期 `role-state.v1`，再让确认结果改变说话、主动性和偏好权重。LLM 正文没有写入权。
 
 **G4：** 一个候选的证据、试行记录、确认/拒绝理由和旧阶段档案可完整回放；世界环境未经世界行动不变。
 
-## P5：统一表达意图（1 周）
+## P5：统一表达意图（1 周，基础合同已实现）
 
 **目的：** 不让文字像难过、屏幕像开心、声音像播报。
 
-定义版本化 `expression_intent.v1`：`mode/intensity/pace/prosody/expression/interruptibility/evidence_refs`。文本消费称呼、口癖和句式；TTS 消费语速、停顿、音高和能量；屏幕只消费表情意图。严肃事实和风险由同一输出路由收敛。
+已定义并接入版本化 `expression_intent.v1`：`mode/intensity/pace/prosody/expression/interruptibility/evidence_refs`，并在输出计划中同时提供 text/screen/TTS consumer 字段。文本、屏幕和 TTS consumer 已消费基础状态与活动角色试行覆盖；真实屏幕动作、TTS 参数和统一回放仍待假设备与 sidecar 验收。严肃事实和风险由同一输出路由收敛。
 
 **G5：** 六种表达意图在假设备上可回放；同一回合三端不冲突；未连接设备时不宣称动作发生。
 

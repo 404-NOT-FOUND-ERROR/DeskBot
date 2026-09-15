@@ -113,7 +113,10 @@ test('voice pipeline keeps ASR transport read-only and routes final reply to aud
   assert.equal(finalIngest.turn.input_event.payload.text, '我今天很开心');
   assert.equal(finalIngest.turn.input_event.correlation_id, 'voice-pipeline-001');
   assert.equal(finalIngest.turn.voice.audio_id, 'audio-tts-voice-chat-utt-pipeline-001');
-  assert.equal(finalIngest.turn.output_plan.find((item) => item.type === 'audio.play').payload.audio_id, 'audio-tts-voice-chat-utt-pipeline-001');
+  const render = finalIngest.turn.output_plan.find((item) => item.type === 'render.expression');
+  const audio = finalIngest.turn.output_plan.find((item) => item.type === 'audio.play');
+  assert.equal(audio.payload.audio_id, 'audio-tts-voice-chat-utt-pipeline-001');
+  assert.deepEqual(audio.payload.expression_intent, render.expression_intent);
 
   const worldResponse = await fetch(`${baseUrl}/api/world/state`);
   const worldBody = await worldResponse.json();

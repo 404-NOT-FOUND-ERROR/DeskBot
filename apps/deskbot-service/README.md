@@ -2,8 +2,7 @@
 
 本地研究服务，是最终系统唯一的输入收口、状态真相、LLM 和输出编排核心。RisuAI 只提供“文本 -> 情绪标签 -> 立绘”参考，SillyTavern 只提供“条件触发 -> prompt 选择性注入”参考；两者均为可选对照，不是运行依赖、主入口或回复来源。
 
-当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge，以及 SQLite 启动恢复。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 的代码路径和失败诊断已有回归覆盖，真实 `/api/chat` smoke 必须在普通 PowerShell 的网络权限下验收，不能把受限 Codex 运行环境的失败当作 provider 已验证。
-当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge，以及 SQLite 启动恢复。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 已完成本机真实 API 和完整 `/api/chat` smoke。
+当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge、SQLite 启动恢复，以及可回放的 fantasy-pull/角色提案/有限试行 API。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 已完成本机真实 API 和完整 `/api/chat` smoke。
 
 ## 运行
 
@@ -32,8 +31,7 @@ npm start
 npm test
 ```
 
-当前 Node 回归测试为 `119/119`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
-当前 Node 回归测试为 `118/118`，另有独立协议边界回归 `7/7`；Python sidecar 测试为 `16/16`。服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
+当前 Node 回归测试为 `141/141`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
 
 ## 语音 sidecar
 
@@ -121,6 +119,22 @@ npm start
 - 可用环境变量覆盖预报 TTL：`DESKBOT_WEATHER_MINUTELY_TTL_MS`、`DESKBOT_WEATHER_HOURLY_TTL_MS`、`DESKBOT_WEATHER_DAILY_TTL_MS`。密钥仍只从服务端环境变量读取。
 
 `interaction-policy.v0.1` 是多源输入进入角色表达前的情境决策层。它把每个规范化事件分为四条路由：`reply_context`（进入当前用户回合）、`proactive_candidate`（可在自然相关时提起，但不会自动打断）、`record_only`（只记录）和 `suppress`（助手输出/语音传输仅作审计，不能再次驱动角色）。世界线、外部事件和显著天气默认只能产生主动候选；设备状态、日历推进和未稳定的用户偏好只记录。`GET /api/interaction/decisions` 可按 `character_id`、`route` 和 `limit` 回读决策及其理由、候选、TTL 和冷却时间。候选会在聊天编排时以 `[DESKBOT_INTERACTION_DECISION]` 上下文提供给 LLM；没有自然关联时必须保持安静，不能把候选当成通知清单。
+
+## 角色方向试行 API
+
+`fantasy-pull.v0.1` 从已保存的输入事件计算方向候选；它要求至少三条证据和至少两个来源，且不接受单句命令直接变身。候选和提案是服务端计算结果，Web 不保存第二份状态：
+
+- `GET /api/roles/pulls?character_id=shaping-001`：读取当前方向吸引及 evidence/source 列表。
+- `POST /api/roles/proposals`：以 `{ "character_id": "shaping-001", "direction_id": "wetland_frog" }` 把当前 candidate 转成提案。
+- `GET /api/roles/proposals`、`GET /api/roles/proposals/:proposal_id`：读取提案、试行观察和阶段历史。
+- `POST /api/roles/proposals/:proposal_id/choose`：提交 `{ "choice": "try|later|reject", "reason": "..." }`。
+- `POST /api/roles/proposals/:proposal_id/trial/start`：提交 `{ "window_turns": 5 }`，建立有限试行窗口。
+- `POST /api/roles/proposals/:proposal_id/trial/observations`：提交 `{ "event_id": "...", "signal": "positive|negative|neutral", "evidence_id": "..." }`；相同 event ID 幂等。
+- `POST /api/roles/proposals/:proposal_id/trial/complete`：提交 `{ "decision": "accepted|rejected|deferred", "reason": "..." }`；接受方向不会自动换壳或改写 Soul。
+- `POST /api/roles/proposals/:proposal_id/archive`：追加归档记录，旧阶段仍可回放。
+- `GET /api/roles/trials?character_id=shaping-001`：读取当前活动试行及其方向表达覆盖层。
+
+活动试行会以只读 `[DESKBOT_ACTIVE_ROLE_TRIAL]` 上下文进入聊天提示词，并按每个完成的用户回合追加一条 `neutral` 观察；明确的正/负反馈仍必须由研究台或其他受控入口提交。覆盖层会临时影响文字措辞、节奏、兴趣和主动提议，并通过 `expression_intent.v1` 同步方向化的屏幕 motif 与 TTS 参数；担忧、警觉和边界状态会优先保持安全清晰。它不会写入 Soul、canonical world 或外壳。每个角色同时最多一个活动试行。提案和试行记录分别持久化在 `role.proposals`、`role.proposal-decisions`；当前仍是 P4 的方向阶段数据，不等同于最终 `role-state.v1` 或外壳变更。
 
 `POST /api/devices/hello` 注册设备的硬件、固件和能力清单；`GET /api/devices` 查看最近上线设备。`GET /api/outbox` 可领取待执行的 `foundry.device-command.v0.1`，`GET /api/outbox/:command_id` 查看单条命令，`POST /api/outbox/:command_id/ack` 提交 `completed` 或 `failed`。命令 ID 由源事件和动作稳定生成，重复 ACK 返回原结果；正式运行时这些记录会跨服务重启恢复。服务端 bridge 默认监听同一 HTTP 端口的 `ws://127.0.0.1:4311/ws`，执行 `device.hello`、格式协商、设备事件、DBA1 音频帧和命令 ACK；协议字段以 `DeskBotClaude\固件桥接接口合同_v0.1.md` 为准。长期 `role-state.v1` 提交仍是后续工作。
 

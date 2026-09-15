@@ -6,7 +6,17 @@ const DIRECTIONS = Object.freeze({
 });
 
 function textOf(event) {
-  return [event.payload?.text, event.payload?.summary, event.payload?.title, event.payload?.event?.summary, event.payload?.event?.title]
+  return [
+    event.payload?.text,
+    event.payload?.summary,
+    event.payload?.title,
+    event.payload?.event?.summary,
+    event.payload?.event?.title,
+    event.payload?.snapshot?.condition,
+    event.payload?.snapshot?.location,
+    event.payload?.preference_key,
+    event.payload?.value,
+  ]
     .filter((value) => typeof value === 'string').join(' ');
 }
 
@@ -54,8 +64,8 @@ export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 
     })
     .filter((item) => item.evidence_ids.length > 0)
     .filter((item) => item.status === 'candidate' || item.score >= minScore)
-    .slice(0, Math.max(1, maxCandidates))
-    .sort((a, b) => b.score - a.score || a.direction_id.localeCompare(b.direction_id));
+    .sort((a, b) => b.score - a.score || a.direction_id.localeCompare(b.direction_id))
+    .slice(0, Math.max(1, maxCandidates));
 }
 
 export { DIRECTIONS };

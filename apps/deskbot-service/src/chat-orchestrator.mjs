@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { normalizeChat } from './input-store.mjs';
 import { composePrompt } from './prompt-composer.mjs';
 import { DEFAULT_TTS_PROFILE, canonicalCharacterId } from './world-definition.mjs';
+import { applyRoleTrialExpressionIntent, normalizeExpressionIntent } from './expression-intent.mjs';
 
 const DEFAULT_TTS_FORMAT = Object.freeze({ codec: 'pcm_s16le', sample_rate_hz: 16_000, channels: 1 });
 
@@ -53,6 +54,8 @@ export function createChatOrchestrator({
   persistence = null,
   refreshWeather = null,
   refreshWeatherForecast = null,
+  activeRoleTrials = null,
+  recordRoleTrialObservation = null,
 }) {
   const turns = new Map(
     (persistence?.list('chat.turns') ?? []).map((turn) => [turn.turn_id, turn]),
@@ -112,6 +115,7 @@ export function createChatOrchestrator({
         type: ignoredType,
         text: ignoredText,
         tts_style: ignoredTtsStyle,
+        expression_intent: expressionIntent,
         status: ignoredStatus,
         payload: existingPayload,
         ...routeFields
@@ -121,6 +125,7 @@ export function createChatOrchestrator({
         type: 'audio.play',
         payload: {
           ...(existingPayload ?? {}),
+          ...(expressionIntent ? { expression_intent: expressionIntent } : {}),
           audio_id: voice.audio_id,
           audio_ref: voice.audio_ref,
           stream_id: voice.stream_id,
@@ -134,6 +139,13 @@ export function createChatOrchestrator({
         },
       };
     });
+  }
+
+  function outputPlanWithExpressionIntent(outputPlan, expressionIntent) {
+    if (!Array.isArray(outputPlan)) return outputPlan;
+    return outputPlan.map((output) => ['render.expression', 'speak'].includes(output.type)
+      ? { ...output, expression_intent: expressionIntent }
+      : output);
   }
 
   async function execute(userEvent) {
@@ -192,6 +204,13 @@ export function createChatOrchestrator({
       excludeEventId: userEvent.event_id,
     }) ?? [];
     const recentConversation = recentConversationFor(userEvent.character_id);
+    const roleTrials = activeRoleTrials?.(userEvent.character_id) ?? [];
+    const expressionIntent = applyRoleTrialExpressionIntent(
+      normalizeExpressionIntent(stateResult.state?.interaction?.expression_intent, {
+        evidenceRefs: stateResult.state?.last_event_id ? [stateResult.state.last_event_id] : [],
+      }),
+      roleTrials,
+    );
     const runtimePromptContext = {
       ...(runtimeContext ?? {}),
       weather_request: weatherRefreshResult
@@ -212,6 +231,7 @@ export function createChatOrchestrator({
       interactionDecision,
       proactiveCandidates,
       recentConversation,
+      activeRoleTrials: roleTrials,
       userText: userEvent.payload.text,
     });
     // Runtime sources inform the character's reply. They must not replace the
@@ -238,6 +258,11 @@ export function createChatOrchestrator({
           stream_id: requestedStreamId,
           text: completion.text,
           profile_id: ttsProfile,
+          profile: {
+            profile_id: ttsProfile,
+            ...(expressionIntent.consumers?.tts ?? {}),
+          },
+          expression_intent: expressionIntent,
           format: ttsFormat,
         });
         if (!audioArtifacts) {
@@ -267,6 +292,7 @@ export function createChatOrchestrator({
           encoding: artifact.encoding,
           content_type: artifact.content_type ?? null,
           duplicate: stored.duplicate,
+          expression_intent: expressionIntent,
         };
       } catch (error) {
         voiceError = {
@@ -303,6 +329,7 @@ export function createChatOrchestrator({
             byte_count: voice.byte_count,
             sha256: voice.sha256,
             content_type: voice.content_type,
+            expression_intent: voice.expression_intent,
           },
         } : {}),
         ...(voiceError ? { tts_error: voiceError } : {}),
@@ -317,7 +344,8 @@ export function createChatOrchestrator({
     inputStore.save(replyEvent);
     persistentWorld?.ingest(replyEvent);
     const replyResult = stateEngine.ingest(replyEvent);
-    const effectiveOutputPlan = outputPlanWithAudio(replyResult.outputs, voice);
+    const trialAwareOutputPlan = outputPlanWithExpressionIntent(replyResult.outputs, expressionIntent);
+    const effectiveOutputPlan = outputPlanWithAudio(trialAwareOutputPlan, voice);
     const replyEvidence = evidenceLedger?.record({
       event: replyEvent,
       worldMatches: [],
@@ -326,6 +354,15 @@ export function createChatOrchestrator({
       source_event: replyEvent,
       output_plan: effectiveOutputPlan,
     }) ?? null;
+    // Count only a turn that reached its output route. Explicit positive or
+    // negative feedback remains a separate action; the LLM cannot grade its
+    // own performance.
+    const trialObservations = recordRoleTrialObservation?.({
+      characterId: userEvent.character_id,
+      eventId: userEvent.event_id,
+      evidenceId: inputEvidence?.evidence?.evidence_id ?? `evidence-${userEvent.event_id}`,
+      signal: 'neutral',
+    }) ?? [];
 
     const turn = {
       schema: 'foundry.chat-turn.v0.1',
@@ -348,6 +385,9 @@ export function createChatOrchestrator({
       runtime_context: runtimeContext,
       interaction_decision: interactionDecision,
       proactive_candidates: proactiveCandidates,
+      active_role_trials: composed.active_role_trials ?? [],
+      trial_observations: trialObservations,
+      expression_intent: expressionIntent,
       weather_refresh: weatherRefreshResult
         ? { status: 'refreshed', cached: weatherRefreshResult.cached === true, snapshot: weatherRefreshResult.snapshot ?? null }
         : weatherForecastResult
