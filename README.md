@@ -27,6 +27,9 @@
 - 角色与世界决策记录：[`research/聚形域-角色与世界决策记录_2026-09-09.md`](research/聚形域-角色与世界决策记录_2026-09-09.md)
 - 喵呜角色验收：[`research/miaowu-expression-acceptance-v0.1.md`](research/miaowu-expression-acceptance-v0.1.md)
 - 喵呜角色表演：[`research/miaowu-roleplay-bible-v0.1.md`](research/miaowu-roleplay-bible-v0.1.md)
+- 喵呜 Soul 人格基线：[`research/soul/miaowu-soul-v0.1.md`](research/soul/miaowu-soul-v0.1.md)
+- GitHub P1 里程碑：[`research/milestones/software-baseline-p1.md`](research/milestones/software-baseline-p1.md)
+- P2 奇幻吸引里程碑：[`research/milestones/p2-fantasy-pull-v0.1.md`](research/milestones/p2-fantasy-pull-v0.1.md)
 - 服务与固件接口：[`research/protocol/interaction-contract-v0.1.md`](research/protocol/interaction-contract-v0.1.md)
 
 `research/development-roadmap-v0.1.md` 与 `research/development-roadmap-v0.2.md` 是历史计划，不再作为当前排期依据。角色提示词或状态结构变更只有在自动测试和真实模型人工验收都通过后，才算完成。
@@ -71,11 +74,19 @@ Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot'
 ```
 
 若端口已占用会直接失败，不会把旧进程误认成新版本。也可以分别启动服务和 Web：
+## 本地运行
+
+需要 Node.js 24 或更高版本。先启动服务：
 
 ```powershell
 Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot\apps\deskbot-service'
 npm.cmd start
 
+```
+
+再启动 Web 页面：
+
+```powershell
 Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot\apps\deskbot-web'
 npm.cmd start
 ```

@@ -100,7 +100,7 @@ test('a bounded recent conversation and the character seed reach the next turn p
   });
 
   assert.equal(prompts.length, 2);
-  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v2/);
+  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v3/);
   assert.match(prompts[1], /model_name=喵呜/);
   assert.match(prompts[1], /continuity_identity=聚形域中持续存在的同一个个体/);
   assert.match(prompts[1], /first_scene=第一天没有宏大的降临/);
@@ -111,6 +111,10 @@ test('a bounded recent conversation and the character seed reach the next turn p
   assert.match(prompts[1], /disagreement_style=/);
   assert.match(prompts[1], /roleplay_methods=稳定动机/);
   assert.match(prompts[1], /presence_matrix=high：呼唤、闲聊/);
+  assert.match(prompts[1], /soul_positioning=一个存在于奇幻持续世界中的潮玩生命体/);
+  assert.match(prompts[1], /likes=把混乱的事情变清楚/);
+  assert.match(prompts[1], /aversions=被当作只会执行命令的按钮/);
+  assert.match(prompts[1], /fantasy_drive=多源输入先形成被某种奇幻生活吸引/);
   assert.match(prompts[1], /连续三次这类场景至少两次出现“喵呜”或“喵”/);
   assert.match(prompts[1], /tts_direction=未来 TTS/);
   assert.match(prompts[1], /\[DESKBOT_CHARACTER_PROFILE\]/);

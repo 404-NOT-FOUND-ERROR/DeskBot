@@ -3,6 +3,7 @@
 本地研究服务，是最终系统唯一的输入收口、状态真相、LLM 和输出编排核心。RisuAI 只提供“文本 -> 情绪标签 -> 立绘”参考，SillyTavern 只提供“条件触发 -> prompt 选择性注入”参考；两者均为可选对照，不是运行依赖、主入口或回复来源。
 
 当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge，以及 SQLite 启动恢复。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 的代码路径和失败诊断已有回归覆盖，真实 `/api/chat` smoke 必须在普通 PowerShell 的网络权限下验收，不能把受限 Codex 运行环境的失败当作 provider 已验证。
+当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge，以及 SQLite 启动恢复。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 已完成本机真实 API 和完整 `/api/chat` smoke。
 
 ## 运行
 
@@ -32,6 +33,7 @@ npm test
 ```
 
 当前 Node 回归测试为 `119/119`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
+当前 Node 回归测试为 `118/118`，另有独立协议边界回归 `7/7`；Python sidecar 测试为 `16/16`。服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
 
 ## 语音 sidecar
 

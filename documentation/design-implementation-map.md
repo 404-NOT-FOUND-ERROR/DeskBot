@@ -11,6 +11,7 @@
 |---|---|---|
 | 聚形域是持续世界背景与演化机制，不是每句话都故弄玄虚 | `world-definition.mjs`、world context、角色提示词 | 已实现基础框架；实际表达仍由 LLM 生成，需用真实 DeepSeek 做人工验收 |
 | 当前第一角色叫“喵呜”，猫型潮玩外壳只是阶段形态，不是永久身份 | canonical `protagonist`、`miaowu-expression-seed-v2`、角色圣经 | 已写入角色/世界决策文档；长期角色阶段状态机仍属 P4 |
+| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs` | Soul v0.1 与运行时表达已建立；幻想吸引聚合、角色提案和换壳状态机仍属 P2-P4 |
 | 角色化表达必须先完成事情，再用猫式反应、口癖和余韵增加存在感 | prompt composer、`interaction-policy.v0.1`、表达验收合同 | 已有反应/任务/事实分流和表达意图；没有保证每次输出都达到“激进角色化” |
 | 多源输入只能影响角色方向候选，不能由单句命令直接改人格、外壳或世界事实 | evidence ledger、world context、interaction policy、state engine | 已实现输入分层、证据和路由；P2-P4 的方向候选与阶段状态机尚未完成 |
 | 世界环境由世界规则和明确 mutation 改变，不由 LLM 正文直接写入 | persistent world、mutation ledger、world matches | 已实现 canonical world 和只追加 ledger；复杂世界线事件仍是后续能力 |

@@ -21,6 +21,7 @@
 最近一次 Node 服务回归为 `119/119`；新增 `llm-http-error.test.mjs` 验证聊天上游失败返回安全、可诊断的 `502`。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误，需在用户普通 PowerShell/网络策略允许的环境重新做 live smoke。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
+最近一次 Node 服务回归为 `118/118`；Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
 ## Proposed tests
 

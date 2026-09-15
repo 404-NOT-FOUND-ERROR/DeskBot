@@ -38,6 +38,7 @@ Node deskbot-service :4311
 - DeepSeek 出站可用性取决于运行 PowerShell/网络策略。聊天上游失败会返回结构化 `502`：`llm_transport_error` 表示没有收到 provider 响应，`llm_http_error` 表示收到 HTTP 错误；响应只包含错误码、可重试性和安全的 provider 状态，不回显响应体或密钥。
 - `scripts/start-local.ps1` 启动前检查端口，启动后要求本次 PID 持有监听端口并通过 `/health`；旧进程不能作为新代码的验收证据。
 - 天气 connector 的实时观测与 minutely/hourly/daily 预报使用独立缓存和 TTL。未显式加载 `DESKBOT_WEATHER_*` 时，当前状态是 disabled；历史 SQLite 快照不等于 provider 当前可用。
+- DeepSeek 出站可用性取决于运行 PowerShell/网络策略；`fetch failed` 不代表角色规则失败。
 - 当前 voice-sidecar 是 fake/model-free baseline，不代表真实中文 ASR/TTS 性能。
 - 角色演化仍是 P2-P4 计划；当前 `miaowu-expression-v2` 是表达基线，不是长期 `role-state.v1`。
 

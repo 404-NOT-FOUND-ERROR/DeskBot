@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/deskbot/miaowu-soul-v0.1.schema.json",
+  "title": "DeskBot Miaowu Soul v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["soul_version", "continuity_id", "current_stage", "likes", "aversions", "evolution_axes", "write_permissions"],
+  "properties": {
+    "soul_version": { "const": "miaowu-soul-v0.1" },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "current_stage": { "type": "string", "minLength": 1 },
+    "likes": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "aversions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "evolution_axes": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "write_permissions": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
+  }
+}

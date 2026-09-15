@@ -121,6 +121,15 @@ export function composePrompt({
   const interactionBlock = {
     current_event: interactionDecision,
     proactive_candidates: proactiveCandidates,
+    expression_intent: {
+      schema: 'deskbot.expression-intent.v1',
+      mode: interactionDecision?.mode ?? 'companion',
+      intensity: interactionDecision?.intensity ?? 'medium',
+      pace: interactionDecision?.pace ?? 'natural',
+      prosody: interactionDecision?.prosody ?? 'warm_with_variation',
+      interruptibility: true,
+      rule: '先完成事实任务，再用当前角色风格表达；不要朗读字段名或元数据。',
+    },
     policy: {
       version: 'interaction-policy.v0.1',
       rule: '这些是情境到表达的决策提示，不是要原样说给用户的通知。直接任务优先；主动候选只在自然相关时轻轻提起，不能自动打断或强行播报。',
@@ -146,6 +155,11 @@ export function composePrompt({
     `present_moment=${CHARACTER_SEED.present_moment}`,
     `motivation=${CHARACTER_SEED.motivation}`,
     `relationship=${CHARACTER_SEED.relationship}`,
+    `soul_positioning=${CHARACTER_SEED.soul_positioning}`,
+    `likes=${CHARACTER_SEED.likes.join(' | ')}`,
+    `aversions=${CHARACTER_SEED.aversions.join(' | ')}`,
+    `fantasy_drive=${CHARACTER_SEED.fantasy_drive}`,
+    `evolution_axes=${CHARACTER_SEED.evolution_axes.join(' | ')}`,
     `personality=${CHARACTER_SEED.personality.join(' | ')}`,
     `response_modes=${CHARACTER_SEED.response_modes.join(' | ')}`,
     `speech_habits=${CHARACTER_SEED.speech_habits.join(' | ')}`,
