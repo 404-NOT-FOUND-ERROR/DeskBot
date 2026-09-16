@@ -121,3 +121,18 @@
 .expression-orb.surprised,.expression-orb.curious { border-color:rgba(120,232,224,.55); background:radial-gradient(circle at 35% 30%,rgba(120,232,224,.4),transparent 65%); }
 .expression-orb.surprised span,.expression-orb.curious span { background:var(--cyan); box-shadow:0 0 18px var(--cyan); }
 .role-overlay { color:var(--amber) !important; }
+#shared-life-panel { padding:24px; margin-top:20px; }
+#shared-life-panel > p { color:var(--muted); line-height:1.7; }
+#shared-life-panel textarea { width:100%; box-sizing:border-box; padding:12px; background:rgba(0,0,0,.2); color:inherit; border:1px solid var(--line); border-radius:10px; }
+#shared-life-panel .event-log { max-height:360px; overflow:auto; margin:16px 0; }
+#shared-life-panel .event-log > div { padding:14px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+#shared-life-panel button { margin:5px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
+#shared-life-panel button:disabled { opacity:.5; cursor:wait; }
+#shared-life-panel details { margin-top:20px; line-height:1.7; }
+#shared-life-panel small { color:var(--muted); }
+#life-status { min-height:24px; }
+#npc-goal-editor fieldset { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; border:1px solid var(--line); margin:12px 0; padding:16px; min-width:0; }
+#npc-goal-editor label { display:grid; gap:6px; min-width:0; }
+#npc-goal-editor input,#npc-goal-editor select { box-sizing:border-box; width:100%; min-width:0; padding:9px; background:var(--bg,#12151b); color:inherit; border:1px solid var(--line); border-radius:6px; }
+#npc-goal-editor li,#npc-goal-editor strong { overflow-wrap:anywhere; }
+@media(max-width:620px) { #npc-goal-editor fieldset { grid-template-columns:minmax(0,1fr); } }

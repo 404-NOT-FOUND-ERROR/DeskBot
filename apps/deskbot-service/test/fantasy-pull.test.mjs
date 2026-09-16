@@ -65,3 +65,24 @@ test('candidate cap keeps the highest scoring directions after sorting', () => {
   assert.equal(pulls.length, 1);
   assert.equal(pulls[0].direction_id, 'wetland_frog');
 });
+
+test('assistant replies and output transport cannot create or reinforce fantasy pulls', () => {
+  const pulls = computeFantasyPull([
+    { event_id: 'reply-1', type: 'conversation.reply', layer: 'dialogue', source: 'deskbot-service', payload: { role: 'assistant', text: '雨、池塘、荷叶和青蛙让我想变成湿地生物' } },
+    { event_id: 'reply-2', type: 'conversation.reply', layer: 'weather', source: 'deskbot-service', payload: { text: '雨天去池塘散步' } },
+    { event_id: 'voice-1', type: 'voice.tts.output', layer: 'world_line', source: 'voice-sidecar', payload: { text: '云朵、梦、漂浮和童话' } },
+    { event_id: 'device-life-1', type: 'device.lifecycle.connected', layer: 'device_context', source: 'deskbot-service', payload: { summary: '工坊机械设备连接' } },
+  ]);
+  assert.deepEqual(pulls, []);
+});
+
+test('assistant wording cannot promote otherwise insufficient real evidence', () => {
+  const pulls = computeFantasyPull([
+    event('real-weather', 'weather', '今天下雨'),
+    { event_id: 'self-reply-1', type: 'conversation.reply', layer: 'dialogue', source: 'deskbot-service', payload: { role: 'assistant', text: '我想去池塘蹲在荷叶上当青蛙' } },
+    { event_id: 'self-reply-2', type: 'conversation.reply', layer: 'world_line', source: 'deskbot-service', payload: { role: 'assistant', text: '湿地散步很适合我' } },
+  ]);
+  assert.equal(pulls[0].direction_id, 'wetland_frog');
+  assert.equal(pulls[0].status, 'observing');
+  assert.deepEqual(pulls[0].evidence_ids, ['evidence-real-weather']);
+});

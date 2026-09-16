@@ -19,15 +19,17 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-最近一次 Node 服务回归为 `141/141`；新增角色方向 HTTP、结构化证据聚合、持久化试行、活动方向表达覆盖和三端 expression intent 契约。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
+最近一次 Node 服务回归为 `145/145`；覆盖角色方向 HTTP、结构化证据聚合、持久化试行、活动方向表达覆盖、三端 expression intent、世界生活切片、assistant 证据隔离、后台口吻近期记忆隔离和紧凑 canonical prompt 投影。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
-2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误，需在用户普通 PowerShell/网络策略允许的环境重新做 live smoke。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
+2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
+
+2026-09-16 运行态修订：沙箱外 DeepSeek 直连最小请求返回 HTTP 200；最新服务真实聊天返回 HTTP 202。角色样本验证了融合式功能话语、猫式开场、低风险代选、情绪承接、世界生活细节和“机会/悬念未观测前不得当作事实”的规则。当前服务 PID 由启动时动态分配，验收时以 `/health` 和当次请求为准；天气仍明确为 `open-meteo / disabled`。
 
 ## Proposed tests
 
 | 用例 | 类型 | 通过条件 | 状态 |
 |---|---|---|---|
-| 九类喵呜真实 DeepSeek 样本 | guarded live + manual review | utility/character/grounding/presence/variety 五项全 1 | proposed |
+| 十类喵呜真实 DeepSeek 样本 | guarded live + manual review | utility/character/grounding/presence/variety 五项全 1 | partial: representative samples pass; full matrix open |
 | 正式 QWeather v7/v1 刷新 | guarded live integration | 真实观测/预报、TTL、失败旧快照均可解释 | proposed |
 | 认证和局域网暴露 | automated integration + security review | 未认证请求拒绝，Origin/速率/设备密钥有效 | proposed |
 | CosyVoice/真实 ASR | guarded live + hardware | 20 回合一次且仅一次、延迟和播放失败可回放 | proposed |
@@ -37,7 +39,7 @@
 ## Gaps
 
 - **高风险：** 当前无认证/授权/速率限制测试；禁止把 `0.0.0.0` 当作生产配置。
-- **高风险：** 当前真实 DeepSeek/天气/语音出站受运行环境影响，未形成稳定 live evidence。
+- **高风险：** QWeather/真实语音出站与 provider 预报仍未形成稳定 live evidence；DeepSeek 角色样本已在沙箱外完成代表性验证。
 - **高风险：** 固件 agent 尚未提供真实设备 ACK、播放和断线证据。
 - **中风险：** `expression_intent` 尚未驱动真实屏幕/TTS 三端一致性。
 - **中风险：** P2-P4 角色方向 API、有限试行和临时表达覆盖已实现；长期 `role-state.v1`、关系记忆和真实阶段演化尚未实现。
@@ -45,3 +47,19 @@
 ## Merge gate
 
 合并到 `main` 至少要求：Node CI 通过、无密钥/SQLite/音频/临时输出、接口变化附迁移说明；角色表达变化还需附真实模型人工记录，硬件协议变化需通知固件 agent。
+# 2026-09-16 shared-life verification
+
+NPC editor follow-up: 157/157 passing, including frontend request mapping, priority order, empty input and maximum-alternative validation. JS syntax check passed; `/npc-goal-editor.js` returned HTTP 200 and proxied goal API returned successfully. Browser permission review timed out, so rendered desktop/mobile layout and actual browser clicks remain unverified. No live NPC goal was installed by verification.
+
+NPC deployment verification follow-up: the running backend now exposes `/api/life/npc-goals` directly and through port 4322, both returning an empty goals array. Page HTTP 200; real DeepSeek chat returned successfully; QWeather refresh returned accepted=true, cached=false, condition=阴, temperature_c=27. No NPC goal was installed by this smoke test. This supersedes the earlier deployment-blocked status, but is not a browser visual test or live NPC goal lifecycle test.
+
+NPC finite-goal follow-up: 156/156 passed. Tests cover waiting for canonical evidence, persisted pause/resume, single execution across reload, reservation/cancellation, failed-goal blocking, and replay of a persisted immutable decision after interrupted delivery. Tests do not validate an open-ended planner, LLM-generated goals, or longitudinal NPC experience. Goal creation remains opt-in through API.
+
+Plan admission follow-up: 153/153 tests pass. Covers read-only domain preview, sequential NPC dependency, exclusive resource conflict and cancellation release, malformed steps and missing fields, plus runtime failure blocking. Future plans may still fail after manual world edits; installation validation is not a guarantee against later state changes.
+
+Memory follow-up: 151/151 passing. Added old-note retrieval beyond 20 records, cross-character ID protection, SQLite-persisted deletion boundary, and HTTP chat checks proving previous user text and assistant paraphrases are excluded after correction/deletion. This validates prompt inputs, not guaranteed model behavior or deletion from historical audit records.
+
+Follow-up: 149/149 tests passed after Web authoring and cancellation support. Added cross-source candidate threshold and cancellation/reload coverage. Frontend `node --check` passed. Deployed backend with existing local credentials; proxied memory/plan GETs returned successfully, page HTML contains the panel, real DeepSeek chat succeeded, and QWeather refresh returned accepted=true with a new observation. Browser visual/click validation remains blocked by `unsupported Codex auth method: apikey`. No sample plan or test memory was installed in the live database.
+
+`npm.cmd --prefix apps/deskbot-service test`: 148 passed, 0 failed.
+New `shared-life.test.mjs` checks SQLite restart persistence, explicit memory confirmation, revision, character isolation, physical note deletion, prompt inclusion, real HTTP memory-to-chat wiring, scheduled NPC-to-ledger wiring, cross-day clock simulation, bounded catch-up, duplicate prevention, and failure blocking. Test databases are isolated temporary files. These checks do not establish long-term user experience quality, real model memory recall quality, or deployed availability on port 4311. The running user service was not restarted in this change.

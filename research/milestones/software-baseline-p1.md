@@ -1,7 +1,7 @@
 # GitHub 里程碑：software-baseline / P1 Soul
 
 **日期：** 2026-09-14  
-**状态：** 开发基线，待真实 DeepSeek 人工验收
+**状态：** 开发基线，自动回归通过；真实 DeepSeek 已完成最小闭环，完整人工样本仍待补齐
 
 ## 目标
 
@@ -11,7 +11,7 @@
 
 - Node 服务、Web、voice-sidecar 的根目录启动和测试命令；
 - `miaowu-soul-v0.1` 人格宪法与 JSON Schema；
-- `miaowu-expression-seed-v3` 运行时角色种子；
+- `miaowu-expression-seed-v4` 运行时角色种子；
 - 爱憎、主动性、奇幻吸引和角色提案的表达规则；
 - 多源输入、canonical world、evidence ledger、role-state 和设备协议边界；
 - 配置模板、密钥排除、公开源码打包和 CI 工作流；
@@ -19,8 +19,8 @@
 
 ## P1 验收
 
-自动验收：Node service `141/141`，voice-sidecar `16/16`。
-人工验收待完成：真实 DeepSeek 下测试呼唤、夸奖、打趣、低风险代选、普通任务、事实天气、迷茫、边界、风险和“想尝试新形态”十类场景。
+自动验收：Node service `145/145`，voice-sidecar `16/16`。
+人工验收待完成：真实 DeepSeek 下的完整呼唤、夸奖、打趣、低风险代选、普通任务、事实天气、迷茫、边界、风险和“想尝试新形态”样本矩阵。
 
 每个场景记录五项：信息可用、角色可辨认、没有虚构、存在感、表达变化。高存在感场景应能出现猫式反应、态度或选择；奇幻场景应能表达“想体验什么”，但不能直接宣称已经换壳。
 
@@ -32,3 +32,11 @@ P2 实现 `fantasy_pull`：把虚拟世界线、外部事件、时间天气、�
 
 建议提交信息：`feat: establish p1 soul and role expression baseline`  
 建议标签：`software-baseline`。公开仓库不包含密钥、本地配置、SQLite、音频、模型缓存或固件生成物。
+
+## 2026-09-15 增量修订
+
+运行时表达基线已推进到 `miaowu-expression-seed-v4` / `miaowu-expression-v3` / `miaowu-roleplay-v2`：功能信息与角色态度一次成形，活动试行只提供唯一的当前生活倾向，世界线事件可以携带今日影响、眼前机会和未解钩子。普通对话不得泄漏候选、分数、模式、阶段或 overlay；喵呜自己的输出、语音与设备传输事件不作为幻想方向证据。
+
+P1 自动验收已覆盖：高存在感猫式反应、功能内生表达、世界生活切片、候选隔离、assistant 证据隔离、旧后台口吻的近期记忆隔离、紧凑 canonical prompt 投影和迁移版本一致性。真实 DeepSeek 验收仍是运行时交付门槛，旧服务进程的回复不计入本里程碑。
+
+2026-09-16 真实验收记录：沙箱外 DeepSeek 最小请求返回 HTTP 200；最新 4311 服务返回 HTTP 202，真实回复已验证喵呜式开场、低风险代选、情绪承接、世界线生活切片、拒绝单句换壳和悬念事实边界。示例中明确说“三次错位我还没凑齐”，没有把 `opportunity`/`unresolved_hook` 冒充已发生观测。天气 connector 本次仍为未配置，不计入天气验收。

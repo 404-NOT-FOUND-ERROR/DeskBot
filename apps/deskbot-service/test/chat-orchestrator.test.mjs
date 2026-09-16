@@ -100,7 +100,7 @@ test('a bounded recent conversation and the character seed reach the next turn p
   });
 
   assert.equal(prompts.length, 2);
-  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v3/);
+  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v4/);
   assert.match(prompts[1], /model_name=喵呜/);
   assert.match(prompts[1], /continuity_identity=聚形域中持续存在的同一个个体/);
   assert.match(prompts[1], /first_scene=第一天没有宏大的降临/);
@@ -115,16 +115,49 @@ test('a bounded recent conversation and the character seed reach the next turn p
   assert.match(prompts[1], /likes=把混乱的事情变清楚/);
   assert.match(prompts[1], /aversions=被当作只会执行命令的按钮/);
   assert.match(prompts[1], /fantasy_drive=多源输入先形成被某种奇幻生活吸引/);
+  assert.match(prompts[1], /lived_world_drive=聚形域不是数据库背景板/);
   assert.match(prompts[1], /连续三次这类场景至少两次出现“喵呜”或“喵”/);
   assert.match(prompts[1], /tts_direction=未来 TTS/);
   assert.match(prompts[1], /\[DESKBOT_CHARACTER_PROFILE\]/);
   assert.match(prompts[1], /"current_role":\{"stage_id":"miaowu-v1","display_name":"喵呜"/);
   assert.match(prompts[1], /"current_form":\{"form_id":"cat-toy-baseline-v1"/);
+  assert.doesNotMatch(prompts[1], /"candidate_directions"/);
   assert.match(prompts[1], /\[DESKBOT_RECENT_CONVERSATION\]/);
   assert.match(prompts[1], /用户：以后叫我小周/);
   assert.match(prompts[1], /角色：我记住了。/);
   assert.match(prompts[1], /不得说“已经记下\/已设提醒\/已经执行”/);
   assert.match(prompts[1], /不得把未观测到的屏幕亮起、耳朵转动、动作或传感器状态描述成已经真实发生/);
+  assert.match(prompts[1], /daily_consequence 是当前已生效的影响/);
+});
+
+test('recent assistant replies that expose role backend language are not imitated', async () => {
+  const prompts = [];
+  let turn = 0;
+  const orchestrator = createChatOrchestrator({
+    inputStore: createInputStore({ now: () => fixedTime }),
+    stateEngine: createStateEngine({ now: () => fixedTime }),
+    worldContext: createWorldContext({ now: () => fixedTime }),
+    llm: {
+      async complete({ prompt }) {
+        prompts.push(prompt);
+        turn += 1;
+        return {
+          provider: 'test',
+          model: 'test',
+          text: turn === 1 ? '一个方向是水边跳跃，另一个方向是记录者角色卡。' : '喵，这次只说眼前的。',
+          trace: {},
+        };
+      },
+    },
+    now: () => fixedTime,
+  });
+
+  await orchestrator.run({ event_id: 'turn-leak-001', character_id: 'shaping-001', message: '你最近想做什么？' });
+  await orchestrator.run({ event_id: 'turn-leak-002', character_id: 'shaping-001', message: '说具体一点。' });
+
+  assert.equal(prompts.length, 2);
+  assert.doesNotMatch(prompts[1], /一个方向是水边跳跃/);
+  assert.match(prompts[1], /旧助手回复若带后台方向或审计口吻会被隔离/);
 });
 
 test('an explicit latest-weather request refreshes the provider before LLM completion', async () => {
@@ -220,7 +253,11 @@ test('an active role trial changes the prompt temporarily and records a neutral 
 
   const turn = await orchestrator.run({ event_id: 'turn-role-trial-001', character_id: 'shaping-001', message: '帮我拆一下这个任务。' });
   assert.match(prompts[0], /\[DESKBOT_ACTIVE_ROLE_TRIAL\]/);
-  assert.match(prompts[0], /先试这一块/);
+  assert.match(prompts[0], /把复杂东西拆成能亲手验证的小块/);
+  assert.doesNotMatch(prompts[0], /proposal-trial-001/);
+  assert.doesNotMatch(prompts[0], /"direction_id":"workshop_maker"/);
+  assert.doesNotMatch(prompts[0], /"turns_observed":1/);
+  assert.doesNotMatch(prompts[0], /"overlay"/);
   assert.equal(turn.active_role_trials[0].direction_id, 'workshop_maker');
   assert.equal(turn.trial_observations[0].turns_observed, 2);
   assert.equal(turn.expression_intent.role_trial.direction_id, 'workshop_maker');

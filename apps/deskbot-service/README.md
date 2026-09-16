@@ -31,7 +31,7 @@ npm start
 npm test
 ```
 
-当前 Node 回归测试为 `141/141`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
+当前 Node 回归测试为 `145/145`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
 
 ## 语音 sidecar
 
@@ -122,7 +122,7 @@ npm start
 
 ## 角色方向试行 API
 
-`fantasy-pull.v0.1` 从已保存的输入事件计算方向候选；它要求至少三条证据和至少两个来源，且不接受单句命令直接变身。候选和提案是服务端计算结果，Web 不保存第二份状态：
+`fantasy-pull.v0.2` 从已保存的输入事件计算方向候选；它要求至少三条证据和至少两个来源，且不接受单句命令直接变身。助手回复、语音传输、设备输出和服务生命周期事件不具备幻想方向证据资格。候选和提案是服务端计算结果，Web 不保存第二份状态：
 
 - `GET /api/roles/pulls?character_id=shaping-001`：读取当前方向吸引及 evidence/source 列表。
 - `POST /api/roles/proposals`：以 `{ "character_id": "shaping-001", "direction_id": "wetland_frog" }` 把当前 candidate 转成提案。
@@ -164,3 +164,34 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:4311/api/research/sessions/
 ```
 
 固定类别为 `direct_task`、`fact_qa`、`emotion_support`、`world_discussion` 和 `probe`。会话完成后通过 `GET /api/research/sessions/:session_id` 回读，列表通过 `GET /api/research/sessions` 获取；契约见 `GET /api/research/session-contract`。
+# Cross-day shared-life API (2026-09-16)
+
+## Finite NPC Goals
+
+Web authoring is now available: research view -> 一起生活的记录 -> NPC 目标. Select an existing NPC, enter a purpose and 1-5 ordered alternatives, then register. The list shows selected option/world revision and pause/resume/cancel commands. Use the existing world authoring console to create an NPC if the selector is empty. To test without waiting for a future event, select `角色当前状态等于`, use the exact status shown in the NPC selector, and provide an action/result status. After the next one-minute evaluation, refresh records and inspect the completed goal and world NPC status. This changes the real world; it is not an isolated simulation.
+
+`GET /api/life/npc-goals` lists durable goals and decisions. `POST` creates an authored finite goal for an existing NPC:
+
+```json
+{"id":"scout-route-v1","npc_id":"scout","purpose":"确认路线是否可以通行","options":[{"when":{"kind":"event_present","value":"tide-path-day-1"},"action_name":"inspect_route","status":"正在巡查湿地旧路"}]}
+```
+
+Create the NPC through the existing world authoring console first. Conditions are either `event_present` (event ID in retained canonical world-line records) or `npc_status` (the acting NPC's exact status). Up to five alternatives are checked in author priority order; the first satisfied option performs one `npc_action` and completes the goal. `purpose` documents author intent; no planner or LLM interprets it. No match means waiting. Real weather and user requests cannot directly satisfy these world conditions.
+
+Control with `POST {"id":"scout-route-v1","operation":"pause"}` (also `resume`, `cancel`). Failed goals must be cancelled and replaced, not retried with a changed event. Paused/failed goals reserve the NPC; completed/cancelled goals release it. Active schedule reservations and goal reservations are checked in both directions. Manual author edits can still change the world and cause execution to fail.
+
+Decisions persist the selected condition, canonical revision and exact immutable mutation before execution, making crash replay idempotent. The one-minute scheduler evaluates goals after scheduled world steps. NPC status/actions enter canonical context and the mutation ledger, not fabricated narration. Nothing is automatically installed in the user's world. This release provides API authoring only, not a dedicated NPC goal editor; it is rule-based finite autonomy, not open-ended goal generation or multi-step planning.
+
+Plan admission now previews all steps against a clone of current canonical state using the same mutation rules as execution, without ledger writes. Invalid NPCs, locations, missing fields and capacity violations are rejected before installation; sequential creation/action dependencies within a plan are supported. Pending/failed plans exclusively reserve their NPC IDs and the shared world-line slot until cancelled or completed (regardless of scheduled time). This is intentionally conservative, not interval-based scheduling. Manual world mutations remain allowed and can invalidate future execution; runtime validation still blocks on failure. Existing stored plans are not silently removed or retroactively rewritten.
+
+Memory follow-up: GET now lists all notes for management. Chat uses up to eight notes ranked by local lexical overlap (Chinese characters / Latin words), with recent notes as fallback; this is not embedding-based semantic retrieval. Corrections that change text and deletions persist a per-character timestamp boundary: subsequent prompts omit entire conversation turns at or before that boundary, including assistant paraphrases. This deliberately sacrifices some recent conversational continuity. Historical chats remain on disk, independently stored canonical preferences/world records are not erased, and already in-flight/completed replies are not recalled. IDs cannot be reassigned to another character.
+
+Web usage: refresh port 4322 and find “一起生活的记录”. Save only an experience you explicitly want retained, ask a related question, then correct/delete the note to check the list. In research view, expand the world author section to install the three-day sample (first due step runs within one minute, others after 24/48 hours). View its progress with “查看最新记录”. Installation writes real world-line events; it is not an isolated simulation. Candidate formation still requires multiple input layers, and neither scheduling nor a candidate automatically changes the shell.
+
+`POST /api/life/plans` also accepts `{ "operation": "cancel", "id": "visit-1" }`. This persists cancellation and marks pending steps cancelled; already-applied world history is retained. The Web now has memory editing and schedule inspection/cancellation; arbitrary plan editing is still API-only through creation of a new plan after cancellation.
+
+`GET /api/life/memories?character_id=shaping-001` returns the latest 20 confirmed notes. `POST` on the same path accepts `{ "id": "rain", "text": "User-confirmed shared experience", "evidence_ref": "user-note-1", "confirmed": true }`. Reusing an ID corrects the note. `{ "operation": "forget", "id": "rain" }` physically deletes this note, not previous chat or audit records. No automatic extraction or sensitive-data classifier is implemented; save only explicit, non-sensitive user-approved notes. Notes are read-only prompt data, never world or personality commands.
+
+`GET /api/life/plans` lists author-defined world schedules. `POST` accepts `{ "id": "visit-1", "steps": [{ "at": "2026-10-01T08:00:00Z", "payload": { "action": "upsert_npc", "npc": { "npc_id": "courier", "display_name": "Courier", "status": "waiting" } } }] }`. Up to 20 chronological steps are supported; actions are limited to `apply_world_line_event`, `upsert_npc`, and `npc_action`. These are local authoring/debug APIs, not LLM tools or authenticated public endpoints.
+
+While the service runs, a one-minute scheduler executes due steps through the existing evidence and canonical-world pipeline. Startup catch-up is capped at three steps per tick, with deterministic event IDs. A rejected mutation blocks later steps in that plan. No plans are installed automatically, no API/model requests are generated by ticking, and no user participation is invented. Plan cancellation/editing and a Web authoring surface are not yet implemented.

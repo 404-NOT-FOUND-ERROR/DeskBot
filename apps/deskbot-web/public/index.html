@@ -56,7 +56,10 @@
             <div class="worldline-form-heading"><div><span class="trace-label">追加事件 / 修订副本</span><strong id="worldline-form-mode">新建世界线事件</strong></div><span id="worldline-selected" class="revision">未选择事件</span></div>
             <div class="mutation-meta-row"><label>event_id<input id="worldline-event-id" maxlength="160" placeholder="自动生成" /></label><label>剧情弧 arc_id<input id="worldline-arc-id" maxlength="120" placeholder="例如 season-01-intersection" /></label></div>
             <label>标题<input id="worldline-title" maxlength="240" placeholder="例如：第一季·交叠带" required /></label>
-            <label>事件摘要<textarea id="worldline-summary" rows="5" maxlength="4000" placeholder="描述会持续影响世界、角色行动和后续对话的长期事件…" required></textarea></label>
+            <label>事件摘要<textarea id="worldline-summary" rows="4" maxlength="4000" placeholder="描述会持续影响世界、角色行动和后续对话的长期事件…" required></textarea></label>
+            <label>今天怎样影响生活 <span class="field-note">可选；写具体后果，不重复大设定</span><textarea id="worldline-daily-consequence" rows="2" maxlength="1000" placeholder="例如：交叠潮让桌边的影子偶尔朝错误方向移动。"></textarea></label>
+            <label>喵呜眼前的机会 <span class="field-note">可选；一件现在能尝试的事</span><textarea id="worldline-opportunity" rows="2" maxlength="1000" placeholder="例如：今晚可以收集三次影子错位的时刻。"></textarea></label>
+            <label>尚未解决的小钩子 <span class="field-note">可选；留给后续世界线</span><textarea id="worldline-unresolved-hook" rows="2" maxlength="1000" placeholder="例如：第三次错位时，影子里似乎多出了一对耳朵。"></textarea></label>
             <div class="worldline-form-grid"><label>状态<select id="worldline-status"><option value="active">active · 当前生效</option><option value="planned">planned · 计划中</option><option value="resolved">resolved · 已解决</option><option value="archived">archived · 已归档</option></select></label><label>来源<input id="worldline-source" maxlength="120" value="world-engine" /></label></div>
             <label>发生时间 <span class="field-note">可选，留空由服务记录当前时间</span><input id="worldline-occurred-at" type="datetime-local" /></label>
             <div class="mutation-footer"><span id="worldline-hint" class="console-hint">这是追加式编辑，不会覆盖历史事件。</span><button class="send-button" type="submit"><span id="worldline-submit-label">写入世界线</span><span class="send-arrow">↗</span></button></div>
@@ -181,6 +184,35 @@
       </section>
 
       <section class="research-drawer card" id="research-drawer"><div class="drawer-heading"><div><p class="eyebrow">TRACE &amp; EVIDENCE</p><h2>这次互动留下了什么</h2></div><span id="last-event-label" class="revision">暂无事件</span></div><div class="trace-grid"><div class="trace-block"><span class="trace-label">最新事件</span><strong id="trace-event-id">—</strong><p id="trace-event-text">开启研究视图后，这里会显示事件 ID、分析标签和状态版本。</p></div><div class="trace-block"><span class="trace-label">处理管线</span><div class="pipeline-steps"><span>input</span><i>→</i><span>world</span><i>→</i><span>state</span><i>→</i><span>LLM</span><i>→</i><span>outbox</span></div><p id="trace-provider">provider —</p></div><div class="trace-block"><span class="trace-label">情境决策</span><strong id="trace-decision-route">—</strong><p id="trace-decision-reason">多源输入不会自动变成播报；这里显示本轮的使用方式。</p></div><div class="trace-block"><span class="trace-label">最近事件记录</span><div id="event-log" class="event-log"><span>—</span></div></div><div class="trace-block"><span class="trace-label">证据记录</span><div id="evidence-log" class="event-log"><span>—</span></div></div></div></section>
+      <section class="card" id="shared-life-panel">
+        <div class="drawer-heading"><h2>一起生活的记录</h2><button id="life-refresh" class="quiet-button" type="button">查看最新记录</button></div>
+        <p>只保存你确认的经历和偏好。更正或删除后，后续对话不再读取此前的聊天窗口，以免旧说法被带回来；旧聊天记录仍保留。已发送的回复不会被撤回。这不会修改世界事件或独立保存的偏好。</p>
+        <form id="life-memory-form" class="probe-form">
+          <input id="life-memory-id" type="hidden" />
+          <label>想让喵呜记住什么<textarea id="life-memory-text" maxlength="2000" required rows="3"></textarea></label>
+          <button type="submit" class="quiet-button">确认并保存</button>
+          <button type="button" class="quiet-button" id="life-memory-reset">取消编辑</button>
+        </form>
+        <div id="life-memories" class="event-log"></div>
+        <details class="research-only"><summary>世界作者：三日事件计划</summary>
+          <p>「潮后寻路」是三日共同经历：先预览，不写入世界；确认安装后才登记世界事件与巡路员行动。它不会替喵呜做决定或自动换壳。</p>
+          <button id="life-preview" class="quiet-button" type="button">预览三日故事</button><button id="life-install" class="quiet-button" type="button" disabled>确认安装</button>
+          <div id="life-story-preview" class="event-log" role="status">尚未预览故事。</div>
+          <div id="life-plans" class="event-log"></div>
+        </details>
+        <details class="research-only" id="npc-goal-editor">
+          <summary>NPC 目标</summary>
+          <form id="npc-goal-form" class="probe-form">
+            <label>角色<select id="npc-goal-npc" required></select></label>
+            <label>目标<input id="npc-goal-purpose" required maxlength="500" /></label>
+            <div id="npc-goal-options"></div>
+            <div><button type="button" id="npc-goal-add">添加备选行动</button><button type="submit" id="npc-goal-submit">登记目标</button></div>
+          </form>
+          <div id="npc-goal-list" class="event-log"></div>
+          <p id="npc-goal-status" role="status"></p>
+        </details>
+        <p id="life-status" role="status"></p>
+      </section>
       <footer class="footer-note"><span>聚形域 · 文字体验 v0.2</span><span>Node 状态源 · 可重复多源场景 · 语音层待接入</span></footer>
     </main>
     <script type="module" src="/app.js"></script>

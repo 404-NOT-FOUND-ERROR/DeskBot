@@ -1,4 +1,6 @@
 import { createServer } from 'node:http';
+import { createSharedLife } from './shared-life.mjs';
+import { createNpcGoals } from './npc-goals.mjs';
 
 import { createInputStore, InputError, normalizeChat, normalizeEvent } from './input-store.mjs';
 import { createStateEngine } from './state-engine.mjs';
@@ -18,6 +20,7 @@ import { createInteractionPolicy } from './interaction-policy.mjs';
 import { WeatherConnectorError } from './weather-connector.mjs';
 import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
+import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import {
   getResearchScenarioCatalog,
   ResearchScenarioError,
@@ -147,6 +150,10 @@ export function createDeskBotServer({
   websocketPath = '/ws',
 } = {}) {
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
+  let npcGoals;
+  const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
+  npcGoals = createNpcGoals({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event),
+    reserved: id => sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending', 'failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === id)) });
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -161,6 +168,8 @@ export function createDeskBotServer({
     ttsFormat,
     audioArtifacts,
     activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
+    relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
+    conversationHistoryAfter: (characterId) => sharedLife.historyAfter(characterId),
     recordRoleTrialObservation: ({ characterId, eventId, evidenceId, signal }) => {
       return roles.activeTrials({ characterId }).map((trial) => {
         const result = roles.recordTrialObservation(trial.proposal_id, { eventId, evidenceId, signal });
@@ -277,6 +286,50 @@ export function createDeskBotServer({
 
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
+    if (url.pathname === '/api/life/story-packages') {
+      if (request.method === 'GET') { sendJson(response, 200, { schema: 'deskbot.story-package-list.v0.1', packages: listStoryPackages() }); return; }
+      if (request.method === 'POST') {
+        readJson(request).then(body => {
+          const options = { now: now(), plans: sharedLife.plans(), world: persistentWorld.get() };
+          const result = body.operation === 'preview'
+            ? previewStoryPackage(body.package_id, options)
+            : body.operation === 'install' ? installStoryPackage(body.package_id, { ...options, schedule: sharedLife.schedule })
+              : (() => { throw new InputError(400, 'invalid_story_package_operation', 'Use preview or install'); })();
+          sendJson(response, 200, result);
+        }).catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
+          { error: error.code ?? 'internal_error', message: error.message ?? 'Story package failed' }));
+        return;
+      }
+    }
+    if (url.pathname === '/api/life/npc-goals') {
+      if (request.method === 'GET') { sendJson(response, 200, { goals: npcGoals.list() }); return; }
+      if (request.method === 'POST') {
+        readJson(request).then(body => sendJson(response, 200, body.operation ? npcGoals.control(body.id, body.operation) : npcGoals.add(body)))
+          .catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
+            { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
+        return;
+      }
+    }
+    if (url.pathname === '/api/life/memories' || url.pathname === '/api/life/plans') {
+      const isMemory = url.pathname.endsWith('/memories');
+      if (request.method === 'GET') {
+        sendJson(response, 200, isMemory
+          ? { memories: sharedLife.recall(url.searchParams.get('character_id') ?? undefined, Infinity) }
+          : { plans: sharedLife.plans() });
+        return;
+      }
+      if (request.method === 'POST') {
+        readJson(request).then(body => {
+          const result = isMemory
+            ? body.operation === 'forget'
+              ? { removed: sharedLife.forget(body.id) } : sharedLife.remember(body)
+            : body.operation === 'cancel' ? sharedLife.cancel(body.id) : sharedLife.schedule(body);
+          sendJson(response, 200, result);
+        }).catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500,
+          { error: error instanceof InputError ? error.code : 'internal_error', message: error instanceof InputError ? error.message : 'Internal error' }));
+        return;
+      }
+    }
 
     if (request.method === 'OPTIONS') {
       response.writeHead(204, {
@@ -679,8 +732,8 @@ export function createDeskBotServer({
     if (request.method === 'GET' && url.pathname === '/api/roles/pulls') {
       const characterId = url.searchParams.get('character_id') ?? null;
       sendJson(response, 200, {
-        schema: 'deskbot.fantasy-pull-list.v0.1',
-        rule_version: 'fantasy-pull.v0.1',
+        schema: 'deskbot.fantasy-pull-list.v0.2',
+        rule_version: 'fantasy-pull.v0.2',
         character_id: characterId,
         pulls: rolePulls({ characterId, limit: url.searchParams.get('limit') ?? 200 }),
       });
@@ -1211,5 +1264,13 @@ export function createDeskBotServer({
         : null,
     });
   server.websocketBridge = deviceBridge;
+  server.sharedLife = sharedLife;
+  server.once('listening', () => {
+    sharedLife.tick();
+    npcGoals.tick();
+    const timer = setInterval(() => { sharedLife.tick(); npcGoals.tick(); }, 60_000);
+    timer.unref();
+    server.once('close', () => clearInterval(timer));
+  });
   return server;
 }

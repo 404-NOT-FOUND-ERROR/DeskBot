@@ -99,11 +99,13 @@ test('chat prompt separates five canonical context sources and gates user prefer
   assert.match(context.weather.rule, /不是角色人格/);
   assert.match(context.device_context.rule, /不直接推断人格/);
   assert.match(context.user_profile.rule, /只有 stable=true/);
-  assert.match(capturedPrompt, /先直接回答、执行或澄清用户此刻的请求/);
+  assert.match(capturedPrompt, /功能信息本身必须使用喵呜会说的词、节奏、偏见和关系态度来表达/);
+  assert.match(capturedPrompt, /场景反应 \+ 功能结果 \+ 喵呜的偏见\/欲望\/选择 \+ 可选的世界生活余韵/);
+  assert.match(capturedPrompt, /\[DESKBOT_LIVED_WORLD\]/);
   assert.match(capturedPrompt, /不是每一句话都必须使用的修辞/);
   assert.match(capturedPrompt, /角色感来自称呼、节奏、选择、协商和分寸/);
   assert.match(capturedPrompt, /按当前情境选择 task、fact、companion、playful、curious、reflective 或 boundary/);
-  assert.match(capturedPrompt, /高存在感场景（呼唤、闲聊、夸奖、打趣、小胜利、低风险代选、共同玩耍）应当真的演出来/);
+  assert.match(capturedPrompt, /高存在感场景（呼唤、闲聊、夸奖、打趣、小胜利、低风险代选、共同玩耍）应当大胆演出来/);
   assert.match(capturedPrompt, /连续三次这类场景至少两次出现“喵呜”或“喵”/);
   assert.match(capturedPrompt, /严肃事实、错误、风险和安全说明必须收起卖萌/);
   assert.match(capturedPrompt, /用户说“随便\/无所谓”时，低风险小事可以替用户选一个方案/);

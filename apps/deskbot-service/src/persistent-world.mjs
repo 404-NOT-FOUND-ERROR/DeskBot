@@ -74,13 +74,13 @@ const MULTISOURCE_LAYERS = Object.freeze([
 
 const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action: 'advance_time', layer: 'calendar', required: ['minutes'], optional: [], description: '推进连续世界逻辑时间' },
-  { action: 'activate_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.source'], description: '创建唯一进行中的世界事件' },
+  { action: 'activate_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.source'], description: '创建唯一进行中的世界事件及其可生活切片' },
   { action: 'resolve_active_event', layer: 'world_line', required: [], optional: ['event_id', 'outcome'], description: '结束当前进行中的世界事件' },
   { action: 'enqueue_pending_item', layer: 'world_line', required: ['item.item_id', 'item.summary'], optional: ['item.kind', 'item.source'], description: '按 FIFO 加入待处理事项' },
   { action: 'dequeue_pending_item', layer: 'world_line', required: [], optional: ['item_id'], description: '按 FIFO 取出待处理事项' },
   { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC，最多 3 个' },
   { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: [], description: '把主角移动到已知位置' },
-  { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.arc_id', 'event.status', 'event.source', 'event.occurred_at'], description: '记录世界线事件与当前弧段' },
+  { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.arc_id', 'event.status', 'event.source', 'event.occurred_at'], description: '记录世界线事件、当前弧段及其可生活切片' },
   { action: 'update_weather', layer: 'weather', required: ['snapshot'], optional: ['snapshot.location', 'snapshot.condition', 'snapshot.temperature_c', 'snapshot.humidity', 'snapshot.wind_mps', 'snapshot.observed_at', 'snapshot.provider'], description: '写入天气观测，旧观测只留审计记录' },
   { action: 'record_external_context', layer: 'external_context', required: ['item.item_id', 'item.title'], optional: ['item.summary', 'item.category', 'item.url', 'item.published_at', 'item.observed_at', 'item.provider'], description: '写入外部新闻或网络事件' },
   { action: 'advance_calendar', layer: 'calendar', required: [], optional: ['date', 'timezone', 'season', 'solar_term', 'holiday', 'observed_at'], description: '推进日历，日期不可倒退' },
@@ -421,6 +421,10 @@ function migrateWorldToCurrentSetting(world, now) {
       }
       changed = true;
     }
+    if (next.protagonist.appearance.model_label === '喵伴出厂造型') {
+      next.protagonist.appearance.model_label = createInitialCharacterAppearance(timestamp).model_label;
+      changed = true;
+    }
   }
 
   const existingLocations = Array.isArray(next.locations) ? next.locations : [];
@@ -564,6 +568,9 @@ function normalizeActiveEvent(value) {
     event_id: requireText(event.event_id, 'payload.event.event_id'),
     title: requireText(event.title, 'payload.event.title'),
     summary: optionalText(event.summary, 'payload.event.summary', ''),
+    daily_consequence: optionalText(event.daily_consequence, 'payload.event.daily_consequence', null),
+    opportunity: optionalText(event.opportunity, 'payload.event.opportunity', null),
+    unresolved_hook: optionalText(event.unresolved_hook, 'payload.event.unresolved_hook', null),
     source: optionalText(event.source, 'payload.event.source', 'world.mutation'),
   };
 }
@@ -605,6 +612,9 @@ function normalizeWorldLineEvent(value) {
     event_id: eventId,
     title: requireText(item.title, 'payload.event.title'),
     summary: optionalText(item.summary, 'payload.event.summary', ''),
+    daily_consequence: optionalText(item.daily_consequence, 'payload.event.daily_consequence', null),
+    opportunity: optionalText(item.opportunity, 'payload.event.opportunity', null),
+    unresolved_hook: optionalText(item.unresolved_hook, 'payload.event.unresolved_hook', null),
     arc_id: optionalText(item.arc_id ?? item.arc, 'payload.event.arc_id', null),
     status: optionalText(item.status, 'payload.event.status', 'active'),
     source: optionalText(item.source, 'payload.event.source', 'world-engine'),
@@ -772,6 +782,12 @@ function applyNpcAction(next, payload) {
   npc.last_action_at = optionalDateTime(payload.occurred_at, 'payload.occurred_at', null);
   next.npcs[index] = npc;
   return { action: 'npc_action', details: { npc_id: npcId, action_name: actionName, npc: clone(npc) } };
+}
+
+export function previewWorldMutations(world, payloads) {
+  let projected = clone(world);
+  for (const payload of payloads) projected = applyExplicitMutation(projected, { payload }).next;
+  return projected;
 }
 
 function applyExplicitMutation(world, event) {

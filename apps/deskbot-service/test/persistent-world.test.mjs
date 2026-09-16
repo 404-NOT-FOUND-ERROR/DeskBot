@@ -31,14 +31,14 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
   assert.equal(initial.protagonist.display_name, '喵呜');
   assert.equal(initial.protagonist.display_name_status, 'active_role_stage');
   assert.equal(initial.protagonist.character_profile.schema, 'deskbot.character-profile.v0.1');
-  assert.equal(initial.protagonist.character_profile.version, 'miaowu-expression-v2');
+  assert.equal(initial.protagonist.character_profile.version, 'miaowu-expression-v3');
   assert.equal(initial.protagonist.character_profile.continuity_identity.identity_id, 'shaping-001');
   assert.equal(initial.protagonist.character_profile.current_role.stage_id, 'miaowu-v1');
   assert.equal(initial.protagonist.character_profile.current_role.display_name, '喵呜');
   assert.equal(initial.protagonist.character_profile.current_form.form_id, 'cat-toy-baseline-v1');
   assert.ok(initial.protagonist.character_profile.response_modes.includes('playful'));
-  assert.match(initial.protagonist.character_profile.speech_style.performance_pattern, /反应 -> 核心内容/);
-  assert.equal(initial.protagonist.character_profile.roleplay_contract.version, 'miaowu-roleplay-v1');
+  assert.match(initial.protagonist.character_profile.speech_style.performance_pattern, /场景反应 \+ 功能结果/);
+  assert.equal(initial.protagonist.character_profile.roleplay_contract.version, 'miaowu-roleplay-v2');
   assert.equal(initial.protagonist.character_profile.tts_profile.profile_id, 'miaowu-v1');
   assert.equal(initial.protagonist.appearance.state, 'baseline');
   assert.equal(initial.protagonist.appearance.version, 'appearance-baseline-v0.2');
@@ -66,7 +66,7 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
     event_id: 'world-event-activate',
     payload: {
       action: 'activate_event',
-      event: { event_id: 'evt-tea', title: 'Tea arrives', summary: 'A cup is placed on the desk.' },
+      event: { event_id: 'evt-tea', title: 'Tea arrives', summary: 'A cup is placed on the desk.', daily_consequence: 'The desk smells of tea today.', opportunity: 'Taste the cooling tea.', unresolved_hook: 'Nobody saw who brought it.' },
     },
   }));
   persistentWorld.ingest(event({
@@ -87,6 +87,9 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
   const state = persistentWorld.get();
   assert.equal(state.world_revision, 4);
   assert.equal(state.active_event.event_id, 'evt-tea');
+  assert.equal(state.active_event.daily_consequence, 'The desk smells of tea today.');
+  assert.equal(state.active_event.opportunity, 'Taste the cooling tea.');
+  assert.equal(state.active_event.unresolved_hook, 'Nobody saw who brought it.');
   assert.equal(state.pending_items[0].item_id, 'pending-note');
   assert.equal(state.npcs[0].npc_id, 'npc-lin');
   assert.deepEqual(
@@ -101,6 +104,29 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
     })),
     (error) => error instanceof PersistentWorldError && error.code === 'active_event_conflict',
   );
+});
+
+test('world-line events preserve concrete lived-world slices', () => {
+  const persistentWorld = createPersistentWorld({ now: () => fixedTime });
+  persistentWorld.ingest(event({
+    event_id: 'world-line-lived-slice',
+    layer: 'world_line',
+    payload: {
+      action: 'apply_world_line_event',
+      event: {
+        event_id: 'crossing-shadow-001',
+        title: '交叠潮经过桌边',
+        summary: '两条远处世界线短暂重叠。',
+        daily_consequence: '桌边的影子今天偶尔朝错误方向移动。',
+        opportunity: '喵呜可以记下三次影子错位的时刻。',
+        unresolved_hook: '第三次错位时，影子里多出了一对耳朵。',
+      },
+    },
+  }));
+  const latest = persistentWorld.get().world_line.latest_event;
+  assert.equal(latest.daily_consequence, '桌边的影子今天偶尔朝错误方向移动。');
+  assert.equal(latest.opportunity, '喵呜可以记下三次影子错位的时刻。');
+  assert.equal(latest.unresolved_hook, '第三次错位时，影子里多出了一对耳朵。');
 });
 
 test('world mutation event IDs are idempotent and conflicting reuse is rejected', () => {

@@ -31,13 +31,16 @@ test('multisource events are classified without becoming direct announcements', 
     source_kind: 'world_engine',
     payload: {
       action: 'apply_world_line_event',
-      event: { event_id: 'echo-001', title: '一阵回响', summary: '桌面世界出现一件小事', arc_id: 'opening' },
+      event: { event_id: 'echo-001', title: '一阵回响', summary: '桌面世界出现一件小事', daily_consequence: '杯里的倒影比动作慢半拍。', opportunity: '可以观察下一次倒影迟到。', unresolved_hook: '倒影里少了一颗星。', arc_id: 'opening' },
     },
   });
   assert.equal(world.response.status, 202);
   assert.equal(world.body.interaction_decision.route, 'proactive_candidate');
   assert.equal(world.body.interaction_decision.audience, 'proactive_queue');
   assert.match(world.body.interaction_decision.reason, /不自动打断/);
+  assert.equal(world.body.interaction_decision.candidate.daily_consequence, '杯里的倒影比动作慢半拍。');
+  assert.equal(world.body.interaction_decision.candidate.opportunity, '可以观察下一次倒影迟到。');
+  assert.equal(world.body.interaction_decision.candidate.unresolved_hook, '倒影里少了一颗星。');
 
   const device = await post(origin, '/api/event', {
     event_id: 'policy-device-001',
@@ -95,6 +98,6 @@ test('a chat event enters the current reply while prior world events remain opti
   assert.equal(chat.body.turn.proactive_candidates[0].candidate.topic, 'world_line_event');
   assert.ok(capturedPrompt);
   assert.match(capturedPrompt, /\[DESKBOT_INTERACTION_DECISION\]/);
-  assert.match(capturedPrompt, /不能自动打断或强行播报/);
+  assert.match(capturedPrompt, /这里只给一个可选关联话题，不是必须提及的通知/);
   assert.match(capturedPrompt, /没有自然关联时保持安静/);
 });

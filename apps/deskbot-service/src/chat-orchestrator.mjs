@@ -55,6 +55,8 @@ export function createChatOrchestrator({
   refreshWeather = null,
   refreshWeatherForecast = null,
   activeRoleTrials = null,
+  relationshipMemories = null,
+  conversationHistoryAfter = null,
   recordRoleTrialObservation = null,
 }) {
   const turns = new Map(
@@ -80,10 +82,13 @@ export function createChatOrchestrator({
 
   function recentConversationFor(characterId, limit = 4) {
     const canonicalId = canonicalCharacterId(characterId) ?? 'unbound';
+    const boundary = conversationHistoryAfter?.(characterId);
     const entries = [];
     for (const turn of turns.values()) {
       const turnCharacterId = canonicalCharacterId(turn.input_event?.character_id) ?? 'unbound';
       if (turnCharacterId !== canonicalId) continue;
+      // Exclude entire old turns, including assistant paraphrases of removed notes.
+      if (boundary && !(Date.parse(turn.input_event?.occurred_at) > Date.parse(boundary))) continue;
       const inputText = turn.input_event?.payload?.text;
       const replyText = turn.reply_event?.payload?.text ?? turn.reply;
       if (typeof inputText === 'string' && inputText.trim() !== '') {
@@ -231,6 +236,7 @@ export function createChatOrchestrator({
       interactionDecision,
       proactiveCandidates,
       recentConversation,
+      relationshipMemories: relationshipMemories?.(userEvent.character_id, userEvent.payload.text) ?? [],
       activeRoleTrials: roleTrials,
       userText: userEvent.payload.text,
     });

@@ -24,11 +24,32 @@ function sourceOf(event) {
   return event.layer ?? (event.type?.startsWith('world.') ? 'world_line' : event.source ?? 'unknown');
 }
 
+const EVIDENCE_LAYERS = new Set([
+  'dialogue',
+  'world_line',
+  'weather',
+  'external_context',
+  'user_profile',
+  'device_context',
+]);
+
+export function isFantasyEvidenceEvent(event) {
+  if (!event || typeof event !== 'object') return false;
+  const type = typeof event.type === 'string' ? event.type : '';
+  const role = typeof event.payload?.role === 'string' ? event.payload.role.toLowerCase() : '';
+  if (type === 'conversation.reply' || role === 'assistant') return false;
+  if (type.startsWith('voice.') || type.startsWith('transport.') || type.startsWith('service.')) return false;
+  if (type.startsWith('conversation.output') || type.startsWith('device.output') || type.startsWith('device.lifecycle')) return false;
+
+  const layer = sourceOf(event);
+  return EVIDENCE_LAYERS.has(layer) || type === 'conversation.input';
+}
+
 export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 3, minScore = 0.25, maxCandidates = 3, now = new Date() } = {}) {
   const scores = new Map(Object.keys(DIRECTIONS).map((id) => [id, { score: 0, evidence: [], sources: new Set() }]));
   const seen = new Set();
   for (const event of events) {
-    if (!event || typeof event !== 'object') continue;
+    if (!isFantasyEvidenceEvent(event)) continue;
     if (!event.event_id || seen.has(event.event_id)) continue;
     seen.add(event.event_id);
     const text = textOf(event);
@@ -50,7 +71,7 @@ export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 
       const direction = DIRECTIONS[id];
       const eligible = bucket.evidence.length >= minEvidence && bucket.sources.size >= minSources;
       return {
-        schema: 'deskbot.fantasy-pull.v0.1',
+        schema: 'deskbot.fantasy-pull.v0.2',
         direction_id: id,
         label: direction.label,
         life: direction.life,

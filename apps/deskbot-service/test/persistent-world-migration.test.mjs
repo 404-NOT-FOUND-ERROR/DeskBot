@@ -44,6 +44,13 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
       character_id: 'ember-001',
       display_name: 'Ember',
       location_id: 'workshop-desk',
+      appearance: {
+        schema: 'deskbot.character-appearance.v0.2',
+        version: 'appearance-baseline-v0.2',
+        state: 'baseline',
+        model_label: '喵伴出厂造型',
+        generation_layer: { status: 'awaiting_measurement', accessories: [] },
+      },
     },
     locations: [{
       location_id: 'workshop-desk',
@@ -71,11 +78,12 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
   assert.equal(migrated.protagonist.location_id, 'shaping-field-desk');
   assert.equal(migrated.protagonist.appearance.version, 'appearance-baseline-v0.2');
   assert.equal(migrated.protagonist.appearance.state, 'baseline');
-  assert.equal(migrated.protagonist.character_profile.version, 'miaowu-expression-v2');
+  assert.equal(migrated.protagonist.appearance.model_label, '喵呜猫型第一形态');
+  assert.equal(migrated.protagonist.character_profile.version, 'miaowu-expression-v3');
   assert.equal(migrated.protagonist.character_profile.continuity_identity.identity_id, 'shaping-001');
   assert.equal(migrated.protagonist.character_profile.current_role.display_name, '喵呜');
   assert.equal(migrated.protagonist.character_profile.current_form.form_id, 'cat-toy-baseline-v1');
-  assert.equal(migrated.protagonist.character_profile.roleplay_contract.version, 'miaowu-roleplay-v1');
+  assert.equal(migrated.protagonist.character_profile.roleplay_contract.version, 'miaowu-roleplay-v2');
   assert.deepEqual(migrated.protagonist.character_id_aliases, ['ember-001']);
   assert.deepEqual(migrated.locations[0].location_id_aliases, ['workshop-desk']);
   assert.equal(migrated.shaping_field.measurement_status, 'unmeasured');

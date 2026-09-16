@@ -48,7 +48,10 @@ function candidateForWorldLine(event, worldSnapshot) {
     topic: 'world_line_event',
     title: title || null,
     summary: summary || null,
-    instruction: '仅在当前话题自然相关时提起这件事；不要像系统通知一样播报。',
+    daily_consequence: item.daily_consequence ?? null,
+    opportunity: item.opportunity ?? null,
+    unresolved_hook: item.unresolved_hook ?? null,
+    instruction: '仅在当前话题自然相关时，把它当作喵呜今天正在经历的生活情境；不要像系统通知一样播报。',
   };
 }
 

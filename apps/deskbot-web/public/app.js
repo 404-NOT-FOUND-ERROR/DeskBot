@@ -1,4 +1,59 @@
+import { mountNpcGoalEditor } from './npc-goal-editor.js';
 const CHARACTER_ID = 'shaping-001';
+// Shared-life records are deliberately separate from chat and world authoring.
+let lifeMemories = [];
+async function refreshLife() {
+  const [memoryData, planData] = await Promise.all([getJson('/api/life/memories'), getJson('/api/life/plans')]);
+  lifeMemories = memoryData.memories;
+  $('#life-memories').innerHTML = lifeMemories.map(item => `<div><p>${escapeHtml(item.text)}</p><small>${escapeHtml(new Date(item.updated_at).toLocaleString('zh-CN'))} · 修订 ${item.revision}</small><button type="button" data-edit-memory="${escapeHtml(item.id)}">更正</button><button type="button" data-forget-memory="${escapeHtml(item.id)}">删除</button></div>`).join('') || '还没有确认保存的记忆。';
+  $('#life-plans').innerHTML = planData.plans.map(plan => `<div><strong>${escapeHtml(plan.id)}</strong><span>${plan.cancelled_at ? '已取消后续步骤' : '计划已登记'}</span><ol>${plan.steps.map(step => `<li>${escapeHtml(new Date(step.at).toLocaleString('zh-CN'))} · ${escapeHtml(step.payload.event?.title || step.payload.action)} · ${escapeHtml(({pending:'待发生',applied:'已发生',failed:'失败，后续阻断'})[step.status] || step.status)}</li>`).join('')}</ol>${!plan.cancelled_at && plan.steps.some(s => s.status === 'pending') ? `<button type="button" data-cancel-plan="${escapeHtml(plan.id)}">取消后续步骤</button>` : ''}</div>`).join('') || '没有世界计划。';
+}
+async function lifeAction(action) {
+  if ($('#shared-life-panel').dataset.busy === 'true') return;
+  $('#shared-life-panel').dataset.busy = 'true';
+  $('#shared-life-panel').querySelectorAll('button').forEach(button => { button.disabled = true; });
+  try { await action(); await refreshLife(); setText('#life-status', '记录已更新。'); }
+  catch (error) { setText('#life-status', error.status === 404 ? '当前后端尚未加载共同生活功能，需要更新服务。' : error.message); }
+  finally {
+    $('#shared-life-panel').dataset.busy = 'false';
+    $('#shared-life-panel').querySelectorAll('button').forEach(button => { button.disabled = false; });
+  }
+}
+function initializeLife() {
+  mountNpcGoalEditor({ getJson, postJson });
+  $('#life-refresh').addEventListener('click', () => lifeAction(async () => {}));
+  $('#life-memory-reset').addEventListener('click', () => $('#life-memory-form').reset());
+  $('#life-memory-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const id = $('#life-memory-id').value || crypto.randomUUID();
+    lifeAction(async () => {
+      await postJson('/api/life/memories', { id, character_id: CHARACTER_ID, text: $('#life-memory-text').value, evidence_ref: `web-confirmation:${crypto.randomUUID()}`, confirmed: true });
+      $('#life-memory-form').reset();
+    });
+  });
+  $('#life-memories').addEventListener('click', event => {
+    const edit = event.target.dataset.editMemory;
+    const forget = event.target.dataset.forgetMemory;
+    if (edit) { $('#life-memory-id').value = edit; $('#life-memory-text').value = lifeMemories.find(m => m.id === edit).text; }
+    if (forget) lifeAction(() => postJson('/api/life/memories', { operation: 'forget', id: forget }));
+  });
+  $('#life-plans').addEventListener('click', event => {
+    const id = event.target.dataset.cancelPlan;
+    if (id) lifeAction(() => postJson('/api/life/plans', { operation: 'cancel', id }));
+  });
+  $('#life-preview').addEventListener('click', () => lifeAction(async () => {
+    const result = await postJson('/api/life/story-packages', { operation: 'preview', package_id: 'tide-path-three-days-v1' });
+    $('#life-story-preview').innerHTML = `<strong>${escapeHtml(result.package.title)}</strong> · ${escapeHtml(result.reason)}<ol>${result.steps.map(step => `<li>${escapeHtml(step.title)} · ${escapeHtml(new Date(step.at).toLocaleString('zh-CN'))}</li>`).join('')}</ol>`;
+    $('#life-install').disabled = !result.installable;
+  }));
+  $('#life-install').addEventListener('click', () => lifeAction(async () => {
+    const result = await postJson('/api/life/story-packages', { operation: 'install', package_id: 'tide-path-three-days-v1' });
+    $('#life-story-preview').textContent = `已安装：${result.package_id}，${result.plan.steps.length} 个步骤等待世界时间推进。`;
+    $('#life-install').disabled = true;
+  }));
+  lifeAction(async () => {});
+}
+window.addEventListener('DOMContentLoaded', initializeLife);
 const state = { world: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
@@ -231,7 +286,7 @@ function updateWorld(world) {
     appearanceState.textContent = appearance.state === 'baseline' ? '基础形态' : appearance.state || '未标注';
   }
   const logical = world.logical_time; setText('#world-time', logical ? `第 ${logical.day} 天 · ${String(Math.floor((logical.minute_of_day || 0) / 60)).padStart(2, '0')}:${String((logical.minute_of_day || 0) % 60).padStart(2, '0')}` : '—'); setText('#world-turns', world.interaction?.user_turn_count ?? 0);
-  const event = world.active_event; $('#world-event').innerHTML = event ? `<span class="event-spark">◌</span><span>${escapeHtml(event.title || event.event_id || '进行中的事件')}</span>` : '<span class="event-spark">◌</span><span>当前没有进行中的世界事件</span>';
+  const event = world.active_event || world.world_line?.latest_event; $('#world-event').innerHTML = event ? `<span class="event-spark">◌</span><span><strong>${escapeHtml(event.title || event.event_id || '进行中的事件')}</strong>${event.daily_consequence ? `<small>${escapeHtml(event.daily_consequence)}</small>` : ''}</span>` : '<span class="event-spark">◌</span><span>当前没有进行中的世界事件</span>';
   renderWorldLine(world.world_line || {});
   const weather = world.weather?.snapshot;
   const externalItems = world.external_context?.items || [];
@@ -241,7 +296,7 @@ function updateWorld(world) {
   ].filter(Boolean);
   $('#context-items').innerHTML = contextItems.length ? contextItems.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>尚未接入天气或外部事件。</span>';
   $('#world-raw').textContent = JSON.stringify(world, null, 2);
-  const isCurrent = protagonist.character_id === CHARACTER_ID && world.name === '聚形域'; $('#world-warning').classList.toggle('hidden', isCurrent); setText('#character-badge', isCurrent ? (protagonist.display_name || '喵伴') : `${protagonist.display_name || '旧角色'} · 待重启`);
+  const isCurrent = protagonist.character_id === CHARACTER_ID && world.name === '聚形域'; $('#world-warning').classList.toggle('hidden', isCurrent); setText('#character-badge', isCurrent ? (protagonist.display_name || '喵呜') : `${protagonist.display_name || '旧角色'} · 待重启`);
 }
 
 function formatDateTimeLocal(value) {
@@ -268,6 +323,9 @@ function renderWorldLine(worldLine = {}) {
         <div class="worldline-event-top"><span class="scenario-layer">${escapeHtml(event.arc_id || '未分配弧段')}</span><span class="worldline-status">${escapeHtml(event.status || 'active')}</span></div>
         <strong>${escapeHtml(event.title || event.event_id)}</strong>
         <p>${escapeHtml(event.summary || '没有摘要。')}</p>
+        ${event.daily_consequence ? `<p><b>今日影响</b> · ${escapeHtml(event.daily_consequence)}</p>` : ''}
+        ${event.opportunity ? `<p><b>眼前机会</b> · ${escapeHtml(event.opportunity)}</p>` : ''}
+        ${event.unresolved_hook ? `<p><b>未解钩子</b> · ${escapeHtml(event.unresolved_hook)}</p>` : ''}
         <small>${escapeHtml(event.event_id)}${event.occurred_at ? ` · ${escapeHtml(new Date(event.occurred_at).toLocaleString('zh-CN'))}` : ''}</small>
         <button class="quiet-button worldline-edit" type="button" data-worldline-id="${escapeHtml(event.event_id)}">复制并修订</button>
       </div>
@@ -443,6 +501,9 @@ function resetWorldLineForm() {
   $('#worldline-event-id').value = '';
   $('#worldline-title').value = '';
   $('#worldline-summary').value = '';
+  $('#worldline-daily-consequence').value = '';
+  $('#worldline-opportunity').value = '';
+  $('#worldline-unresolved-hook').value = '';
   $('#worldline-arc-id').value = state.world?.world_line?.current_arc || '';
   $('#worldline-status').value = 'active';
   $('#worldline-source').value = 'world-engine';
@@ -459,6 +520,9 @@ function selectWorldLineEvent(eventId) {
   $('#worldline-event-id').value = '';
   $('#worldline-title').value = event.title || '';
   $('#worldline-summary').value = event.summary || '';
+  $('#worldline-daily-consequence').value = event.daily_consequence || '';
+  $('#worldline-opportunity').value = event.opportunity || '';
+  $('#worldline-unresolved-hook').value = event.unresolved_hook || '';
   $('#worldline-arc-id').value = event.arc_id || '';
   $('#worldline-status').value = event.status || 'active';
   $('#worldline-source').value = event.source || 'world-engine';
@@ -488,6 +552,9 @@ async function submitWorldLine() {
       event_id: eventId,
       title,
       summary,
+      daily_consequence: $('#worldline-daily-consequence').value.trim() || null,
+      opportunity: $('#worldline-opportunity').value.trim() || null,
+      unresolved_hook: $('#worldline-unresolved-hook').value.trim() || null,
       arc_id: $('#worldline-arc-id').value.trim() || null,
       status: $('#worldline-status').value,
       source: $('#worldline-source').value.trim() || 'world-engine',
