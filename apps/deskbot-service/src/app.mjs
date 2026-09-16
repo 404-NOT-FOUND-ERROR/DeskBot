@@ -733,7 +733,7 @@ export function createDeskBotServer({
       const characterId = url.searchParams.get('character_id') ?? null;
       sendJson(response, 200, {
         schema: 'deskbot.fantasy-pull-list.v0.2',
-        rule_version: 'fantasy-pull.v0.2',
+        rule_version: 'fantasy-pull.v0.3',
         character_id: characterId,
         pulls: rolePulls({ characterId, limit: url.searchParams.get('limit') ?? 200 }),
       });

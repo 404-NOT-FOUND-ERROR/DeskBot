@@ -5,6 +5,25 @@ const DIRECTIONS = Object.freeze({
   dream_cloud: Object.freeze({ label: '云朵梦境生物', life: '轻盈、跳跃、把联想变成道路的生活', cues: ['梦', '云', '幻想', '童话', '漂浮', '想象'] }),
 });
 
+function dynamicDirections(events = []) {
+  const result = new Map();
+  for (const event of events) {
+    if (!isFantasyEvidenceEvent(event)) continue;
+    const hint = event.payload?.role_direction ?? event.payload?.direction_hint;
+    if (!hint || typeof hint !== 'object') continue;
+    const label = typeof hint.label === 'string' ? hint.label.trim() : '';
+    const life = typeof hint.life === 'string' ? hint.life.trim() : '';
+    const cues = Array.isArray(hint.cues) ? hint.cues.filter(c => typeof c === 'string' && c.trim()).map(c => c.trim()).slice(0, 12) : [];
+    if (!label || !life || cues.length < 2) continue;
+    const directionId = typeof hint.direction_id === 'string' && /^[a-z0-9][a-z0-9_-]{2,60}$/.test(hint.direction_id)
+      ? hint.direction_id : `dynamic_${label.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '_').replace(/^_|_$/g, '').slice(0, 48)}`;
+    if (Object.hasOwn(DIRECTIONS, directionId)) continue;
+    const previous = result.get(directionId);
+    result.set(directionId, { label, life, cues: [...new Set([...(previous?.cues ?? []), ...cues])] });
+  }
+  return result;
+}
+
 function textOf(event) {
   return [
     event.payload?.text,
@@ -16,6 +35,12 @@ function textOf(event) {
     event.payload?.snapshot?.location,
     event.payload?.preference_key,
     event.payload?.value,
+    event.payload?.role_direction?.label,
+    event.payload?.role_direction?.life,
+    ...(event.payload?.role_direction?.cues ?? []),
+    event.payload?.direction_hint?.label,
+    event.payload?.direction_hint?.life,
+    ...(event.payload?.direction_hint?.cues ?? []),
   ]
     .filter((value) => typeof value === 'string').join(' ');
 }
@@ -46,7 +71,8 @@ export function isFantasyEvidenceEvent(event) {
 }
 
 export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 3, minScore = 0.25, maxCandidates = 3, now = new Date() } = {}) {
-  const scores = new Map(Object.keys(DIRECTIONS).map((id) => [id, { score: 0, evidence: [], sources: new Set() }]));
+  const directionCatalog = { ...DIRECTIONS, ...Object.fromEntries(dynamicDirections(events)) };
+  const scores = new Map(Object.keys(directionCatalog).map((id) => [id, { score: 0, evidence: [], sources: new Set() }]));
   const seen = new Set();
   for (const event of events) {
     if (!isFantasyEvidenceEvent(event)) continue;
@@ -55,7 +81,7 @@ export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 
     const text = textOf(event);
     if (!text) continue;
     const source = sourceOf(event);
-    for (const [id, direction] of Object.entries(DIRECTIONS)) {
+    for (const [id, direction] of Object.entries(directionCatalog)) {
       const cues = direction.cues.filter((cue) => text.includes(cue));
       if (!cues.length) continue;
       const bucket = scores.get(id);
@@ -68,10 +94,10 @@ export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 
   }
   return [...scores.entries()]
     .map(([id, bucket]) => {
-      const direction = DIRECTIONS[id];
+      const direction = directionCatalog[id];
       const eligible = bucket.evidence.length >= minEvidence && bucket.sources.size >= minSources;
       return {
-        schema: 'deskbot.fantasy-pull.v0.2',
+        schema: Object.hasOwn(DIRECTIONS, id) ? 'deskbot.fantasy-pull.v0.2' : 'deskbot.fantasy-pull.v0.3',
         direction_id: id,
         label: direction.label,
         life: direction.life,

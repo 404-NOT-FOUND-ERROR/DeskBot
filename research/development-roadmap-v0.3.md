@@ -128,6 +128,10 @@ P1 喵呜强角色表达验收与软件基线
 
 这一步借鉴 Character.ai 的 Lorebook（按触发相关性注入背景）、Scene（固定开场状态与可继续钩子）和 Greeting/example dialogue（用具体示范承载角色表达），但保留 DeskBot 的 canonical mutation、用户显式安装和证据可追溯边界。后续需把三日包接入 NPC 目标、确认记忆和角色候选证据，而不是把一次故事包当作长期生命感证据。
 
+### 目标四开放方向增量
+
+`fantasy-pull.v0.3` 现在接受作者/输入源提供的结构化 `role_direction` 或 `direction_hint`（`direction_id/label/life/cues`），并与内置方向使用同一套跨来源、最小证据量、置信度和衰减规则。相同方向会按 ID 合并，缺少两条以上 cue 的低质量条目会丢弃；单一输入仍不会进入候选。动态条目只产生 `observing/candidate` 读模型，仍必须经过提案、试行和明确决定，不会写入 Soul、外壳或世界。
+
 新增 `shared-life.mjs`，使用已有 SQLite records 持久化，不改固件、不迁移用户存档、不增加外部 API 费用。
 
 - `GET/POST /api/life/memories`：显式确认的关系笔记，带来源引用、角色隔离、修订和物理删除；最近 20 条进入对话上下文。不是自动提取或完整长期记忆系统。删除只移除该记忆记录，既有聊天/审计记录不随之删除。
