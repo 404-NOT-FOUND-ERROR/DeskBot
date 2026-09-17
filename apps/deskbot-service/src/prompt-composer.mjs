@@ -186,13 +186,45 @@ function composeLivedWorld(worldSnapshot, activeRoleTrials = [], userText = '') 
   if (!worldSnapshot) return '- 当前没有可用的世界生活切片；不要自行补造。';
   const location = currentLocation(worldSnapshot);
   const event = worldSnapshot.active_event ?? worldSnapshot.world_line?.latest_event ?? null;
+  const lifeScene = worldSnapshot.life?.current_scene?.location_id === worldSnapshot.protagonist?.location_id
+    ? worldSnapshot.life.current_scene
+    : null;
+  const nearbyNpcs = (worldSnapshot.npcs ?? [])
+    .filter((npc) => npc.location_id === worldSnapshot.protagonist?.location_id)
+    .slice(0, 3);
+  const npcContextRequested = nearbyNpcs.some((npc) => userText.includes(npc.display_name))
+    || /(刚才|那位|这个人|这个角色|NPC|npc|巡路员|影栖)/.test(userText);
   const lines = [
     `- 你现在以猫型潮玩第一形态生活在${location?.name ?? '聚形域桌面'}。`,
   ];
+  if (lifeScene) {
+    lines.push(`- 世界生活引擎已经发生并记录的当前 Scene：${lifeScene.title}。${lifeScene.narration ?? ''}`);
+    if (lifeScene.continuation_count > 0) {
+      lines.push(`- 这件事已跨过 ${lifeScene.continuation_count} 个生活时段继续发展，不要把它说成刚刚重新发生。`);
+    } else if (lifeScene.continuity?.kind === 'local_progression' && lifeScene.continuity.previous_title) {
+      lines.push(`- 场景连续性：它承接此前的“${lifeScene.continuity.previous_title}”，不是互不相干的随机插曲。`);
+    }
+    if (lifeScene.sensory_cue) lines.push(`- 当前 Scene 的感官细节：${lifeScene.sensory_cue}`);
+    if (lifeScene.opportunity) lines.push(`- 当前 Scene 提供但尚未发生的机会：${lifeScene.opportunity}`);
+  }
   if (location?.scene) {
     lines.push(`- 当前 Scene 锚点：${location.scene.anchor}`);
     lines.push(`- 当前地点可感知的具体细节：${location.scene.sensory_cues.join('；')}`);
     lines.push(`- 尚未发生、可以选择去做的生活片段：${location.scene.possible_beats.join('；')}`);
+  }
+  if (nearbyNpcs.length > 0) {
+    lines.push(`- 此地真实在场的 NPC：${nearbyNpcs.map((npc) => `${npc.display_name}（${npc.role || '身份未明'}；${npc.status || '正在做自己的事'}${npc.last_action ? `；当前行动 ${npc.last_action}` : ''}）`).join('；')}`);
+    if (npcContextRequested) {
+      for (const npc of nearbyNpcs.filter((item) => item.last_interaction?.response)) {
+        lines.push(`- 与${npc.display_name}相关的最近一次已发生互动：${npc.last_interaction.response}`);
+      }
+      const recentExperience = [...(worldSnapshot.life?.recent_experiences ?? [])]
+        .reverse()
+        .find((experience) => nearbyNpcs.some((npc) => npc.npc_id === experience.npc_id));
+      if (recentExperience) lines.push(`- 可归因的最近共同经历：${recentExperience.summary}`);
+    }
+  } else {
+    lines.push('- 此地现在没有已记录为在场的 NPC；不要凭空让远方 NPC 出现。');
   }
   for (const loreLocation of relevantLoreLocations(worldSnapshot, userText, location)) {
     lines.push(`- 本轮关键词触发的地点 Lore：${loreLocation.name}——${loreLocation.scene.anchor}`);
@@ -206,7 +238,7 @@ function composeLivedWorld(worldSnapshot, activeRoleTrials = [], userText = '') 
     lines.push('- 当前没有生效的世界线生活事件；不要为了显得奇幻而临时编一个。');
   }
   lines.push(`- 此刻唯一的角色倾向：${composeRoleTrialDesire(activeRoleTrials)}`);
-  lines.push('- 这是按当前位置检索出的 Lorebook 切片与当前 Scene，不是要向用户朗读的设定卡。只取一两个与本轮相关的具体细节；possible_beats 尚未发生，除非 canonical mutation 已记录结果，否则只能作为想法、邀请或选择。');
+  lines.push('- 这是按当前位置检索出的 Lorebook 切片与当前 Scene，不是要向用户朗读的设定卡。只取一两个与本轮相关的具体细节；possible_beats 尚未发生，Scene opportunity 同样尚未发生；除非 canonical mutation 已记录结果，否则只能作为想法、邀请或选择。NPC 有自己的行程和判断，不要承诺它会按用户要求改写世界。');
   return lines.join('\n');
 }
 

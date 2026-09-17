@@ -6,7 +6,12 @@ export function goalPayload(npcId, purpose, options, id) {
   return { id, npc_id: npcId, purpose: purpose.trim(), options: options.map(o => {
     if (![o.value, o.action_name, o.status].every(v => typeof v === 'string' && v.trim() && v.length <= 500)) throw new Error('每个备选行动都需要完整填写');
     if (!['event_present', 'npc_status'].includes(o.kind)) throw new Error('无效的触发条件');
-    return { when: { kind: o.kind, value: o.value.trim() }, action_name: o.action_name.trim(), status: o.status.trim() };
+    return {
+      when: { kind: o.kind, value: o.value.trim() },
+      action_name: o.action_name.trim(),
+      status: o.status.trim(),
+      ...(typeof o.location_id === 'string' && o.location_id.trim() ? { location_id: o.location_id.trim() } : {}),
+    };
   }) };
 }
 
@@ -17,20 +22,27 @@ export function mountNpcGoalEditor({ getJson, postJson }) {
   const list = document.querySelector('#npc-goal-list');
   const status = document.querySelector('#npc-goal-status');
   let busy = false;
+  let worldLocations = [];
+  const locationOptions = selected => `<option value="">保持当前地点</option>${worldLocations.map(location => `<option value="${escapeHtml(location.location_id)}"${location.location_id === selected ? ' selected' : ''}>前往 ${escapeHtml(location.name)}</option>`).join('')}`;
   function addOption() {
     if (options.children.length >= 5) return;
     const row = document.createElement('fieldset');
-    row.innerHTML = '<legend>备选行动（从上到下优先）</legend><label>触发条件<select name="kind"><option value="event_present">世界事件 ID 已出现</option><option value="npc_status">角色当前状态等于</option></select></label><label>条件值<input name="value" required maxlength="500"></label><label>行动<input name="action_name" required maxlength="500"></label><label>行动后的状态<input name="status" required maxlength="500"></label><button type="button" data-remove-option>移除</button>';
+    row.innerHTML = `<legend>备选行动（从上到下优先）</legend><label>触发条件<select name="kind"><option value="event_present">世界事件 ID 已出现</option><option value="npc_status">角色当前状态等于</option></select></label><label>条件值<input name="value" required maxlength="500"></label><label>行动<input name="action_name" required maxlength="500"></label><label>行动后的状态<input name="status" required maxlength="500"></label><label>地点变化<select name="location_id">${locationOptions('')}</select></label><button type="button" data-remove-option>移除</button>`;
     options.append(row);
   }
   async function refresh() {
     const [worldData, goalData] = await Promise.all([getJson('/api/world'), getJson('/api/life/npc-goals')]);
+    worldLocations = worldData.world.locations ?? [];
+    document.querySelectorAll('#npc-goal-options select[name="location_id"]').forEach(select => {
+      const selectedLocation = select.value;
+      select.innerHTML = locationOptions(selectedLocation);
+    });
     const selected = selector.value;
     selector.innerHTML = (worldData.world.npcs ?? []).map(n => `<option value="${escapeHtml(n.npc_id)}">${escapeHtml(n.display_name)} · ${escapeHtml(n.status ?? '')}</option>`).join('') || '<option value="">暂无 NPC</option>';
     if ([...selector.options].some(o => o.value === selected)) selector.value = selected;
     list.innerHTML = goalData.goals.map(g => {
       const commands = g.state === 'active' ? ['pause', 'cancel'] : g.state === 'paused' ? ['resume', 'cancel'] : g.state === 'failed' ? ['cancel'] : [];
-      return `<div><strong>${escapeHtml(g.purpose)}</strong><p>${escapeHtml(g.npc_id)} · ${escapeHtml(labels[g.state] ?? g.state)}</p><ol>${g.options.map(o => `<li>${escapeHtml(o.when.kind === 'event_present' ? '世界事件' : '自身状态')}：${escapeHtml(o.when.value)} → ${escapeHtml(o.payload.action_name)} · ${escapeHtml(o.payload.status)}</li>`).join('')}</ol>${g.decision ? `<p>选择第 ${g.decision.option_index + 1} 项 · 世界版本 ${escapeHtml(g.decision.world_revision)} · ${escapeHtml(g.decision.event.occurred_at)}</p>` : ''}${g.error ? `<p>错误：${escapeHtml(g.error)}</p>` : ''}${commands.map(op => `<button type="button" data-goal="${escapeHtml(g.id)}" data-operation="${op}">${({pause:'暂停',resume:'恢复',cancel:'取消'})[op]}</button>`).join('')}</div>`;
+      return `<div><strong>${escapeHtml(g.purpose)}</strong><p>${escapeHtml(g.npc_id)} · ${escapeHtml(labels[g.state] ?? g.state)}${g.origin === 'world-life-engine' ? ' · 自动日程' : ''}</p><ol>${g.options.map(o => `<li>${escapeHtml(o.when.kind === 'event_present' ? '世界事件' : '自身状态')}：${escapeHtml(o.when.value)} → ${escapeHtml(o.payload.action_name)} · ${escapeHtml(o.payload.status)}${o.payload.location_id ? ` · 前往 ${escapeHtml(worldLocations.find(location => location.location_id === o.payload.location_id)?.name ?? o.payload.location_id)}` : ''}</li>`).join('')}</ol>${g.decision ? `<p>选择第 ${g.decision.option_index + 1} 项 · 世界版本 ${escapeHtml(g.decision.world_revision)} · ${escapeHtml(g.decision.event.occurred_at)}</p>` : ''}${g.error ? `<p>错误：${escapeHtml(g.error)}</p>` : ''}${commands.map(op => `<button type="button" data-goal="${escapeHtml(g.id)}" data-operation="${op}">${({pause:'暂停',resume:'恢复',cancel:'取消'})[op]}</button>`).join('')}</div>`;
     }).join('') || '尚未登记目标。';
     if (!selector.value) status.textContent = '当前世界没有 NPC。';
   }

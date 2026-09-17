@@ -60,3 +60,24 @@ test('persisted decision replays unchanged after interrupted delivery', () => {
   createNpcGoals(config).tick();
   assert.equal(world.listMutations().length, count);
 });
+
+test('NPC goal may move one adjacent map hop but cannot teleport', () => {
+  const { world, engine } = setup();
+  const moving = engine.add({
+    id: 'scout-move',
+    npc_id: 'scout',
+    purpose: '去潮痕旧路确认路标',
+    options: [{ when: { kind: 'npc_status', value: 'waiting' }, action_name: 'walk_to_road', status: '正在确认潮痕路标', location_id: 'tidal-old-road' }],
+  });
+  assert.equal(moving.options[0].payload.location_id, 'tidal-old-road');
+  engine.tick();
+  assert.equal(world.get().npcs[0].location_id, 'tidal-old-road');
+  assert.equal(engine.list()[0].state, 'completed');
+
+  assert.throws(() => createNpcGoals({ worldSnapshot: () => world.get(), ingest: event => world.ingest(event) }).add({
+    id: 'scout-teleport',
+    npc_id: 'scout',
+    purpose: '直接跨越地图',
+    options: [{ when: { kind: 'npc_status', value: '正在确认潮痕路标' }, action_name: 'teleport', status: '不应发生', location_id: 'echo-waterside' }],
+  }), { code: 'npc_location_not_reachable' });
+});

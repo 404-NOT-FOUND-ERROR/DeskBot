@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { createSharedLife } from './shared-life.mjs';
 import { createNpcGoals } from './npc-goals.mjs';
+import { createWorldLife } from './world-life.mjs';
 
 import { createInputStore, InputError, normalizeChat, normalizeEvent } from './input-store.mjs';
 import { createStateEngine } from './state-engine.mjs';
@@ -148,12 +149,20 @@ export function createDeskBotServer({
   voiceIngress,
   websocket = true,
   websocketPath = '/ws',
+  worldLifeEnabled = false,
 } = {}) {
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
   let npcGoals;
   const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
   npcGoals = createNpcGoals({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event),
     reserved: id => sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending', 'failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === id)) });
+  const worldLife = createWorldLife({
+    now,
+    worldSnapshot: () => persistentWorld.get(),
+    ingest: event => ingestNonChatEvent(event),
+    npcGoals,
+    enabled: worldLifeEnabled,
+  });
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -309,6 +318,19 @@ export function createDeskBotServer({
             { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
         return;
       }
+    }
+    if (url.pathname === '/api/life/world') {
+      if (request.method === 'GET') {
+        sendJson(response, 200, worldLife.snapshot());
+        return;
+      }
+    }
+    if (url.pathname === '/api/life/npc-interactions' && request.method === 'POST') {
+      readJson(request)
+        .then((body) => sendJson(response, 200, worldLife.interact(body)))
+        .catch((error) => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
+          { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'NPC interaction failed' }));
+      return;
     }
     if (url.pathname === '/api/life/memories' || url.pathname === '/api/life/plans') {
       const isMemory = url.pathname.endsWith('/memories');
@@ -1039,13 +1061,15 @@ export function createDeskBotServer({
             },
           };
           const result = ingestNonChatEvent(event);
+          worldLife.tick({ force: true });
+          const refreshedWorld = persistentWorld.get();
           sendJson(response, result.duplicate ? 200 : (result.worldMutation.applied ? 202 : 409), {
             schema: 'deskbot.world-travel-response.v0.1',
             accepted: result.worldMutation.applied,
             duplicate: result.duplicate,
             event: result.event,
-            world_mutation: result.worldMutation,
-            map: getWorldMap(result.worldMutation.world, { characterId: event.character_id }),
+            world_mutation: { ...result.worldMutation, world: refreshedWorld },
+            map: getWorldMap(refreshedWorld, { characterId: event.character_id }),
           });
         })
         .catch((error) => {
@@ -1332,10 +1356,12 @@ export function createDeskBotServer({
     });
   server.websocketBridge = deviceBridge;
   server.sharedLife = sharedLife;
+  server.worldLife = worldLife;
   server.once('listening', () => {
     sharedLife.tick();
     npcGoals.tick();
-    const timer = setInterval(() => { sharedLife.tick(); npcGoals.tick(); }, 60_000);
+    worldLife.tick();
+    const timer = setInterval(() => { sharedLife.tick(); npcGoals.tick(); worldLife.tick(); }, 60_000);
     timer.unref();
     server.once('close', () => clearInterval(timer));
   });

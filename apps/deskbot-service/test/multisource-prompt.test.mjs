@@ -106,6 +106,9 @@ test('chat prompt separates five canonical context sources and gates user prefer
   assert.match(capturedPrompt, /按当前位置检索出的 Lorebook 切片与当前 Scene/);
   assert.match(capturedPrompt, /possible_beats 尚未发生/);
   assert.match(capturedPrompt, /本轮关键词触发的地点 Lore：低语集市/);
+  assert.match(capturedPrompt, /此地现在没有已记录为在场的 NPC/);
+  assert.match(capturedPrompt, /Scene opportunity 同样尚未发生/);
+  assert.match(capturedPrompt, /NPC 有自己的行程和判断/);
   assert.match(capturedPrompt, /不是每一句话都必须使用的修辞/);
   assert.match(capturedPrompt, /角色感来自称呼、节奏、选择、协商和分寸/);
   assert.match(capturedPrompt, /按当前情境选择 task、fact、companion、playful、curious、reflective 或 boundary/);

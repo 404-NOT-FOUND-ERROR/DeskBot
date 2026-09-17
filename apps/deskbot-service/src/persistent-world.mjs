@@ -26,7 +26,7 @@ const MAX_PENDING_ITEMS = 20;
 const MAX_CONTEXT_ITEMS = 20;
 const PREFERENCE_STABLE_OBSERVATIONS = 3;
 const MINUTES_PER_DAY = 24 * 60;
-const WORLD_RULE_VERSION = 'canonical-world-rules-v0.3';
+const WORLD_RULE_VERSION = 'canonical-world-rules-v0.4';
 
 const MULTISOURCE_LAYERS = Object.freeze([
   {
@@ -81,13 +81,16 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action: 'dequeue_pending_item', layer: 'world_line', required: [], optional: ['item_id'], description: '按 FIFO 取出待处理事项' },
   { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC，最多 3 个' },
   { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: ['reason'], description: '沿可见且未被阻断的相邻路线移动主角，并推进旅行时间' },
+  { action: 'set_life_scene', layer: 'world_line', required: ['scene.scene_id', 'scene.location_id', 'scene.title'], optional: ['scene.content_version', 'scene.narration', 'scene.sensory_cue', 'scene.opportunity', 'scene.participants', 'scene.source_factors', 'scene.continuity', 'scene.started_at', 'scene.expires_at'], description: '由世界生活引擎切换当前可回放 Scene' },
+  { action: 'continue_life_scene', layer: 'world_line', required: ['scene_id', 'slot_key', 'expires_at'], optional: ['source_factors', 'continuity'], description: '同一生活事件跨时间槽继续，不重复制造新 Scene' },
+  { action: 'npc_interaction', layer: 'world_line', required: ['interaction_id', 'npc_id', 'intent', 'response'], optional: ['idea', 'occurred_at', 'experience', 'role_direction'], description: '记录同地点 NPC 对白名单互动、共同经历与有限关系变化' },
   { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.arc_id', 'event.status', 'event.source', 'event.occurred_at'], description: '记录世界线事件、当前弧段及其可生活切片' },
   { action: 'update_weather', layer: 'weather', required: ['snapshot'], optional: ['snapshot.location', 'snapshot.condition', 'snapshot.temperature_c', 'snapshot.humidity', 'snapshot.wind_mps', 'snapshot.observed_at', 'snapshot.provider'], description: '写入天气观测，旧观测只留审计记录' },
   { action: 'record_external_context', layer: 'external_context', required: ['item.item_id', 'item.title'], optional: ['item.summary', 'item.category', 'item.url', 'item.published_at', 'item.observed_at', 'item.provider'], description: '写入外部新闻或网络事件' },
   { action: 'advance_calendar', layer: 'calendar', required: [], optional: ['date', 'timezone', 'season', 'solar_term', 'holiday', 'observed_at'], description: '推进日历，日期不可倒退' },
   { action: 'observe_user_preference', layer: 'user_profile', required: ['preference_key', 'value'], optional: [], description: '记录一次用户偏好观察，连续 3 次一致后 stable' },
   { action: 'record_device_context', layer: 'device_context', required: ['device_id'], optional: ['status', 'metrics', 'state', 'observed_at'], description: '写入设备或传感器上下文' },
-  { action: 'npc_action', layer: 'world_line', required: ['npc_id', 'action_name'], optional: ['location_id', 'status', 'occurred_at'], description: '更新已有 NPC 的行动与位置' },
+  { action: 'npc_action', layer: 'world_line', required: ['npc_id', 'action_name'], optional: ['location_id', 'status', 'occurred_at'], description: '更新已有 NPC 的行动；位置变化只能沿相邻路线' },
 ]);
 
 function clone(value) {
@@ -249,6 +252,15 @@ function createMultisourceState() {
   };
 }
 
+function createInitialLifeState() {
+  return {
+    schema: 'deskbot.world-life-state.v0.2',
+    current_scene: null,
+    recent_scenes: [],
+    recent_experiences: [],
+  };
+}
+
 function createDefaultWorld(now) {
   const timestamp = now().toISOString();
   return {
@@ -285,6 +297,7 @@ function createDefaultWorld(now) {
     },
     locations: clone(DEFAULT_WORLD_LOCATIONS),
     npcs: [],
+    life: createInitialLifeState(),
     active_event: null,
     pending_items: [],
     shaping_field: createInitialShapingField(timestamp),
@@ -483,6 +496,22 @@ function migrateWorldToCurrentSetting(world, now) {
       locations.push(definition);
     }
   }
+
+  const lifeDefault = createInitialLifeState();
+  const existingLife = next.life;
+  const mergedLife = existingLife && typeof existingLife === 'object' && !Array.isArray(existingLife)
+    ? {
+        ...lifeDefault,
+        ...existingLife,
+        schema: lifeDefault.schema,
+        recent_scenes: Array.isArray(existingLife.recent_scenes) ? existingLife.recent_scenes.slice(-12) : [],
+        recent_experiences: Array.isArray(existingLife.recent_experiences) ? existingLife.recent_experiences.slice(-20) : [],
+      }
+    : lifeDefault;
+  if (!valuesEqual(existingLife, mergedLife)) {
+    next.life = mergedLife;
+    changed = true;
+  }
   if (JSON.stringify(next.locations ?? []) !== JSON.stringify(locations)) {
     next.locations = locations;
     changed = true;
@@ -618,7 +647,7 @@ function normalizePendingItem(value) {
   };
 }
 
-function normalizeNpc(value, world) {
+function normalizeNpc(value, world, existing = null) {
   const npc = requireObject(value, 'payload.npc');
   const requestedLocationId = optionalText(
     npc.location_id,
@@ -632,9 +661,91 @@ function normalizeNpc(value, world) {
   return {
     npc_id: requireText(npc.npc_id, 'payload.npc.npc_id'),
     display_name: requireText(npc.display_name, 'payload.npc.display_name'),
-    role: optionalText(npc.role, 'payload.npc.role', 'visitor'),
+    role: optionalText(npc.role, 'payload.npc.role', existing?.role ?? 'visitor'),
     location_id: locationId,
-    status: optionalText(npc.status, 'payload.npc.status', 'present'),
+    status: optionalText(npc.status, 'payload.npc.status', existing?.status ?? 'present'),
+    bio: optionalText(npc.bio, 'payload.npc.bio', existing?.bio ?? null),
+    temperament: optionalText(npc.temperament, 'payload.npc.temperament', existing?.temperament ?? null),
+    speech_style: optionalText(npc.speech_style, 'payload.npc.speech_style', existing?.speech_style ?? null),
+    accent: optionalText(npc.accent, 'payload.npc.accent', existing?.accent ?? null),
+    relationship: existing?.relationship && typeof existing.relationship === 'object'
+      ? clone(existing.relationship)
+      : { familiarity: 0, trust: 0, encounters: 0 },
+    last_action: existing?.last_action ?? null,
+    last_action_at: existing?.last_action_at ?? null,
+    last_response: existing?.last_response ?? null,
+    last_interaction: existing?.last_interaction ? clone(existing.last_interaction) : null,
+    recent_interactions: Array.isArray(existing?.recent_interactions) ? clone(existing.recent_interactions.slice(-10)) : [],
+  };
+}
+
+function normalizeLifeScene(value, world) {
+  const scene = requireObject(value, 'payload.scene');
+  const locationId = canonicalLocationId(requireText(scene.location_id, 'payload.scene.location_id'));
+  if (!world.locations.some((location) => location.location_id === locationId)) {
+    throw new PersistentWorldError(400, 'invalid_world_mutation', `unknown Scene location ${locationId}`);
+  }
+  const participants = Array.isArray(scene.participants)
+    ? uniqueStrings(scene.participants.map((value) => requireText(value, 'payload.scene.participants[]')))
+    : [];
+  for (const npcId of participants) {
+    const npc = world.npcs.find((item) => item.npc_id === npcId);
+    if (!npc || npc.location_id !== locationId) {
+      throw new PersistentWorldError(409, 'scene_participant_not_present', `NPC ${npcId} is not present at ${locationId}`);
+    }
+  }
+  return {
+    scene_id: requireText(scene.scene_id, 'payload.scene.scene_id'),
+    content_version: optionalText(scene.content_version, 'payload.scene.content_version', null),
+    template_id: optionalText(scene.template_id, 'payload.scene.template_id', null),
+    slot_key: optionalText(scene.slot_key, 'payload.scene.slot_key', null),
+    location_id: locationId,
+    title: requireText(scene.title, 'payload.scene.title'),
+    narration: optionalText(scene.narration, 'payload.scene.narration', ''),
+    sensory_cue: optionalText(scene.sensory_cue, 'payload.scene.sensory_cue', null),
+    opportunity: optionalText(scene.opportunity, 'payload.scene.opportunity', null),
+    time_band: optionalText(scene.time_band, 'payload.scene.time_band', null),
+    participants,
+    source_factors: optionalObject(scene.source_factors, 'payload.scene.source_factors', {}),
+    continuity: optionalObject(scene.continuity, 'payload.scene.continuity', null),
+    started_at: optionalDateTime(scene.started_at, 'payload.scene.started_at', null),
+    expires_at: optionalDateTime(scene.expires_at, 'payload.scene.expires_at', null),
+    continuation_count: 0,
+    status: 'active',
+  };
+}
+
+function normalizeRoleDirection(value) {
+  if (value === undefined || value === null) return null;
+  const direction = requireObject(value, 'payload.role_direction');
+  const cues = Array.isArray(direction.cues)
+    ? uniqueStrings(direction.cues.map((cue) => requireText(cue, 'payload.role_direction.cues[]'))).slice(0, 12)
+    : [];
+  if (cues.length < 2) {
+    throw new PersistentWorldError(400, 'invalid_world_mutation', 'payload.role_direction.cues needs at least two cues');
+  }
+  return {
+    direction_id: requireText(direction.direction_id, 'payload.role_direction.direction_id'),
+    label: requireText(direction.label, 'payload.role_direction.label'),
+    life: requireText(direction.life, 'payload.role_direction.life'),
+    cues,
+  };
+}
+
+function normalizeLifeExperience(value, context) {
+  if (value === undefined || value === null) return null;
+  const experience = requireObject(value, 'payload.experience');
+  return {
+    experience_id: requireText(experience.experience_id, 'payload.experience.experience_id'),
+    kind: optionalText(experience.kind, 'payload.experience.kind', 'npc_interaction'),
+    npc_id: context.npc_id,
+    npc_name: optionalText(experience.npc_name, 'payload.experience.npc_name', null),
+    scene_id: optionalText(experience.scene_id, 'payload.experience.scene_id', null),
+    location_id: context.location_id,
+    intent: context.intent,
+    summary: requireText(experience.summary, 'payload.experience.summary'),
+    occurred_at: optionalDateTime(experience.occurred_at, 'payload.experience.occurred_at', context.occurred_at),
+    role_direction: context.role_direction,
   };
 }
 
@@ -808,6 +919,13 @@ function applyNpcAction(next, payload) {
     if (!next.locations.some((location) => location.location_id === locationId)) {
       throw new PersistentWorldError(400, 'invalid_world_mutation', `unknown NPC location ${locationId}`);
     }
+    if (locationId !== npc.location_id) {
+      const origin = next.locations.find((location) => location.location_id === npc.location_id);
+      const neighbors = Array.isArray(origin?.neighbors) ? origin.neighbors.map(canonicalLocationId) : [];
+      if (!neighbors.includes(locationId)) {
+        throw new PersistentWorldError(409, 'npc_location_not_reachable', `${locationId} is not adjacent to ${npc.location_id}`);
+      }
+    }
     npc.location_id = locationId;
   }
   if (payload.status !== undefined) npc.status = optionalText(payload.status, 'payload.status', npc.status);
@@ -815,6 +933,89 @@ function applyNpcAction(next, payload) {
   npc.last_action_at = optionalDateTime(payload.occurred_at, 'payload.occurred_at', null);
   next.npcs[index] = npc;
   return { action: 'npc_action', details: { npc_id: npcId, action_name: actionName, npc: clone(npc) } };
+}
+
+function applyLifeScene(next, payload) {
+  const scene = normalizeLifeScene(payload.scene, next);
+  const previous = next.life?.current_scene ?? null;
+  next.life ??= createInitialLifeState();
+  if (previous && previous.scene_id !== scene.scene_id) {
+    next.life.recent_scenes = appendBounded(
+      Array.isArray(next.life.recent_scenes) ? next.life.recent_scenes : [],
+      { ...previous, status: 'ended', ended_at: scene.started_at },
+      12,
+    );
+  }
+  next.life.current_scene = scene;
+  return { action: 'set_life_scene', details: { scene: clone(scene), previous_scene_id: previous?.scene_id ?? null } };
+}
+
+function applyLifeSceneContinuation(next, payload) {
+  next.life ??= createInitialLifeState();
+  const current = next.life.current_scene;
+  const sceneId = requireText(payload.scene_id, 'payload.scene_id');
+  if (!current || current.scene_id !== sceneId) {
+    throw new PersistentWorldError(409, 'life_scene_not_current', `Scene ${sceneId} is not current`);
+  }
+  current.slot_key = requireText(payload.slot_key, 'payload.slot_key');
+  current.expires_at = optionalDateTime(payload.expires_at, 'payload.expires_at', current.expires_at);
+  current.source_factors = optionalObject(payload.source_factors, 'payload.source_factors', current.source_factors ?? {});
+  current.continuity = optionalObject(payload.continuity, 'payload.continuity', current.continuity ?? null);
+  current.continuation_count = Math.max(0, Number(current.continuation_count) || 0) + 1;
+  return { action: 'continue_life_scene', details: { scene_id: sceneId, slot_key: current.slot_key, continuation_count: current.continuation_count } };
+}
+
+function applyNpcInteraction(next, payload) {
+  const interactionId = requireText(payload.interaction_id, 'payload.interaction_id');
+  const npcId = requireText(payload.npc_id, 'payload.npc_id');
+  const intent = requireText(payload.intent, 'payload.intent');
+  if (!['observe', 'greet', 'suggest', 'help', 'invite'].includes(intent)) {
+    throw new PersistentWorldError(400, 'invalid_npc_interaction', `unsupported NPC intent ${intent}`);
+  }
+  const index = next.npcs.findIndex((npc) => npc.npc_id === npcId);
+  if (index === -1) throw new PersistentWorldError(404, 'npc_not_found', `NPC ${npcId} does not exist`);
+  const npc = { ...next.npcs[index] };
+  if (npc.location_id !== next.protagonist.location_id) {
+    throw new PersistentWorldError(409, 'npc_not_present', `NPC ${npcId} is not at the protagonist location`);
+  }
+  const familiarityGain = { observe: 1, greet: 2, suggest: 3, help: 4, invite: 3 }[intent];
+  const trustGain = { observe: 0, greet: 1, suggest: 1, help: 2, invite: 1 }[intent];
+  const relationship = npc.relationship && typeof npc.relationship === 'object' ? npc.relationship : {};
+  npc.relationship = {
+    familiarity: Math.min(100, Math.max(0, Number(relationship.familiarity) || 0) + familiarityGain),
+    trust: Math.min(100, Math.max(0, Number(relationship.trust) || 0) + trustGain),
+    encounters: Math.max(0, Number(relationship.encounters) || 0) + 1,
+  };
+  const interaction = {
+    interaction_id: interactionId,
+    intent,
+    idea: optionalText(payload.idea, 'payload.idea', null),
+    response: requireText(payload.response, 'payload.response'),
+    occurred_at: optionalDateTime(payload.occurred_at, 'payload.occurred_at', null),
+  };
+  const roleDirection = normalizeRoleDirection(payload.role_direction);
+  const experience = normalizeLifeExperience(payload.experience, {
+    npc_id: npcId,
+    location_id: npc.location_id,
+    intent,
+    occurred_at: interaction.occurred_at,
+    role_direction: roleDirection,
+  });
+  npc.last_action = `respond_${intent}`;
+  npc.last_action_at = interaction.occurred_at;
+  npc.last_response = interaction.response;
+  npc.last_interaction = interaction;
+  npc.recent_interactions = appendBounded([...(Array.isArray(npc.recent_interactions) ? npc.recent_interactions : [])], interaction, 10);
+  next.npcs[index] = npc;
+  next.life ??= createInitialLifeState();
+  if (experience) {
+    next.life.recent_experiences = appendBounded(
+      Array.isArray(next.life.recent_experiences) ? next.life.recent_experiences : [],
+      experience,
+      20,
+    );
+  }
+  return { action: 'npc_interaction', details: { npc_id: npcId, intent, relationship: clone(npc.relationship), interaction: clone(interaction), experience: clone(experience) } };
 }
 
 export function previewWorldMutations(world, payloads) {
@@ -891,8 +1092,10 @@ function applyExplicitMutation(world, event) {
       break;
     }
     case 'upsert_npc': {
-      const npc = normalizeNpc(payload.npc, next);
-      const existingIndex = next.npcs.findIndex((existing) => existing.npc_id === npc.npc_id);
+      const requestedNpc = requireObject(payload.npc, 'payload.npc');
+      const requestedNpcId = requireText(requestedNpc.npc_id, 'payload.npc.npc_id');
+      const existingIndex = next.npcs.findIndex((existing) => existing.npc_id === requestedNpcId);
+      const npc = normalizeNpc(requestedNpc, next, existingIndex >= 0 ? next.npcs[existingIndex] : null);
       if (existingIndex === -1 && next.npcs.length >= MAX_NPCS) {
         throw new PersistentWorldError(409, 'npc_limit_reached', `this world supports at most ${MAX_NPCS} NPCs`);
       }
@@ -944,6 +1147,12 @@ function applyExplicitMutation(world, event) {
       };
       break;
     }
+    case 'set_life_scene':
+      details = applyLifeScene(next, payload).details;
+      break;
+    case 'continue_life_scene':
+      details = applyLifeSceneContinuation(next, payload).details;
+      break;
     case 'apply_world_line_event':
       details = applyWorldLineEvent(next, payload).details;
       break;
@@ -964,6 +1173,9 @@ function applyExplicitMutation(world, event) {
       break;
     case 'npc_action':
       details = applyNpcAction(next, payload).details;
+      break;
+    case 'npc_interaction':
+      details = applyNpcInteraction(next, payload).details;
       break;
     default:
       throw new PersistentWorldError(400, 'unsupported_world_action', `unsupported world mutation action ${action}`);
@@ -1281,6 +1493,7 @@ export function getWorldSchema() {
       protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, travel_state: { type: 'object' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
       locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
       npcs: { type: 'array', item: 'npc', maximum: MAX_NPCS },
+      life: { type: 'object', schema: 'deskbot.world-life-state.v0.2', fields: ['current_scene', 'recent_scenes', 'recent_experiences'] },
       active_event: { type: ['object', 'null'] },
       pending_items: { type: 'array', maximum: MAX_PENDING_ITEMS },
       shaping_field: { type: 'object', fields: clone(SHAPING_FIELD_DEFINITIONS) },
@@ -1301,6 +1514,7 @@ export function getWorldSchema() {
       { id: 'preference-stability', description: `同一 preference_key 连续 ${PREFERENCE_STABLE_OBSERVATIONS} 次一致观察后 stable=true` },
       { id: 'npc-bound', description: `canonical world 最多 ${MAX_NPCS} 个 NPC，位置必须是已知 location_id` },
       { id: 'travel-adjacency', description: '主角只能沿 location.neighbors 移动；旅行由 move_protagonist mutation 记录并推进逻辑时间' },
+      { id: 'npc-travel-adjacency', description: 'NPC 位置变化只能沿 location.neighbors 移动；用户对话不能直接移动 NPC' },
       { id: 'transport-read-only', description: 'ASR partial/final、assistant reply 与 TTS 传输事件不改变 canonical world' },
     ],
     metadata_fields: {

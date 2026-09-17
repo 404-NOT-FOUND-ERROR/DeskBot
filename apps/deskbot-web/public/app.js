@@ -56,7 +56,7 @@ function initializeLife() {
   lifeAction(async () => {});
 }
 window.addEventListener('DOMContentLoaded', initializeLife);
-const state = { world: null, worldMap: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
+const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
 const emptyState = $('#empty-state');
@@ -316,6 +316,109 @@ function updateWorld(world) {
   const isCurrent = protagonist.character_id === CHARACTER_ID && world.name === '聚形域'; $('#world-warning').classList.toggle('hidden', isCurrent); setText('#character-badge', isCurrent ? (protagonist.display_name || '喵呜') : `${protagonist.display_name || '旧角色'} · 待重启`);
 }
 
+function localEncounters() {
+  return Array.isArray(state.worldLife?.encounters) ? state.worldLife.encounters : [];
+}
+
+function encounterSeen(npcId) {
+  try { return sessionStorage.getItem(`deskbot.encountered.${npcId}`) === '1'; } catch { return true; }
+}
+
+function markEncounterSeen(npcId) {
+  try { sessionStorage.setItem(`deskbot.encountered.${npcId}`, '1'); } catch { /* session storage can be unavailable */ }
+}
+
+function openNpcPanel(npcId, { automatic = false } = {}) {
+  const encounters = localEncounters();
+  if (!encounters.some((npc) => npc.npc_id === npcId)) return;
+  state.selectedNpcId = npcId;
+  renderNpcPanel();
+  const panel = document.querySelector('[data-game-panel="npc"]');
+  document.querySelectorAll('.floating-panel[data-game-panel]').forEach((other) => { other.hidden = true; });
+  if (panel) panel.hidden = false;
+  markEncounterSeen(npcId);
+  syncGameDock();
+}
+
+function renderEncounterStrip() {
+  const strip = $('#encounter-strip');
+  const encounters = localEncounters();
+  strip.hidden = encounters.length === 0;
+  strip.innerHTML = encounters.length
+    ? `<span>此地遇见</span>${encounters.map((npc) => `<button type="button" data-open-npc="${escapeHtml(npc.npc_id)}"><i class="npc-mini-avatar ${escapeHtml(npc.accent || 'neutral')}" aria-hidden="true"></i><b>${escapeHtml(npc.display_name)}</b><small>${escapeHtml(npc.status || '正在做自己的事')}</small></button>`).join('')}`
+    : '';
+}
+
+function renderNpcPanel() {
+  const encounters = localEncounters();
+  const location = worldMapLocation(state.worldLife?.current_location_id);
+  setText('#npc-location-label', location?.name || '当前地点');
+  const roster = $('#npc-roster');
+  const empty = $('#npc-empty');
+  const profile = $('#npc-profile');
+  empty.hidden = encounters.length > 0;
+  roster.innerHTML = encounters.map((npc) => `<button type="button" class="${npc.npc_id === state.selectedNpcId ? 'active' : ''}" data-open-npc="${escapeHtml(npc.npc_id)}"><i class="npc-mini-avatar ${escapeHtml(npc.accent || 'neutral')}" aria-hidden="true"></i><span><b>${escapeHtml(npc.display_name)}</b><small>${escapeHtml(npc.status || '正在做自己的事')}</small></span></button>`).join('');
+  if (!encounters.length) {
+    state.selectedNpcId = null;
+    profile.hidden = true;
+    return;
+  }
+  if (!encounters.some((npc) => npc.npc_id === state.selectedNpcId)) state.selectedNpcId = encounters[0].npc_id;
+  const npc = encounters.find((item) => item.npc_id === state.selectedNpcId);
+  const relationship = npc.relationship || {};
+  profile.hidden = false;
+  $('#npc-portrait').className = `npc-portrait ${npc.accent || 'neutral'}`;
+  setText('#npc-role', npc.role || '身份仍在观察');
+  setText('#npc-name', npc.display_name);
+  setText('#npc-status', npc.status || '正在做自己的事');
+  setText('#npc-bio', npc.bio || '它还没有留下完整档案。');
+  setText('#npc-temperament', `性情 · ${npc.temperament || '仍在观察'}`);
+  setText('#npc-speech-style', `说话 · ${npc.speech_style || '直接回应眼前的事'}`);
+  const familiarity = Math.max(0, Math.min(100, Number(relationship.familiarity) || 0));
+  const trust = Math.max(0, Math.min(100, Number(relationship.trust) || 0));
+  setText('#npc-familiarity', familiarity);
+  setText('#npc-trust', trust);
+  $('#npc-familiarity-meter').style.width = `${familiarity}%`;
+  $('#npc-trust-meter').style.width = `${trust}%`;
+  setText('#npc-encounters', relationship.encounters ? `已经正式相遇 ${relationship.encounters} 次` : '还没有正式相遇');
+  const lastResponse = $('#npc-last-response');
+  lastResponse.hidden = !npc.last_response;
+  lastResponse.textContent = npc.last_response || '';
+  const experienceBox = $('#npc-experiences');
+  const experiences = [...(state.worldLife?.recent_experiences ?? [])]
+    .filter((experience) => experience.npc_id === npc.npc_id)
+    .slice(-3)
+    .reverse();
+  experienceBox.hidden = experiences.length === 0;
+  experienceBox.querySelector('ol').innerHTML = experiences.map((experience) => `<li><span>${escapeHtml(experience.summary)}</span>${experience.role_direction ? `<small>留下方向痕迹 · ${escapeHtml(experience.role_direction.label)}</small>` : ''}</li>`).join('');
+  $('#npc-profile').querySelectorAll('button, input').forEach((control) => { control.disabled = state.npcBusy; });
+}
+
+function updateWorldLife(life, { allowAutoOpen = true } = {}) {
+  if (!life) return;
+  state.worldLife = life;
+  const encounters = localEncounters();
+  if (!encounters.some((npc) => npc.npc_id === state.selectedNpcId)) state.selectedNpcId = encounters[0]?.npc_id ?? null;
+  renderEncounterStrip();
+  renderNpcPanel();
+  const currentLocation = (state.world?.locations || []).find((location) => location.location_id === life.current_location_id);
+  const currentEvent = state.world?.active_event || state.world?.world_line?.latest_event;
+  if (currentLocation) renderScenePreview(currentLocation, currentEvent);
+  if (life.current_scene && state.announcedSceneId !== life.current_scene.scene_id) {
+    state.announcedSceneId = life.current_scene.scene_id;
+    appendSceneMessage(life.current_scene);
+  }
+  const recentTarget = $('#game-life-scenes');
+  if (recentTarget) {
+    const scenes = [life.current_scene, ...(life.recent_scenes || []).slice(-4).reverse()].filter(Boolean);
+    recentTarget.innerHTML = scenes.map((scene, index) => `<article><strong>${escapeHtml(scene.title || scene.scene_id)}</strong><p>${escapeHtml(scene.narration || '这个片段没有留下旁白。')}</p><small>${index === 0 ? `正在发生${scene.continuation_count ? ` · 已延续 ${scene.continuation_count} 个时段` : ''}` : `已结束 · ${formatTime(scene.ended_at || scene.expires_at)}`}</small></article>`).join('') || '<p>世界还没有留下日常片段。</p>';
+  }
+  if (allowAutoOpen) {
+    const firstUnseen = encounters.find((npc) => !encounterSeen(npc.npc_id));
+    if (firstUnseen) openNpcPanel(firstUnseen.npc_id, { automatic: true });
+  }
+}
+
 function renderScenePreview(location, event) {
   const visual = $('#scene-visual');
   if (!visual) return;
@@ -325,16 +428,17 @@ function renderScenePreview(location, event) {
     : location
       ? { x: location.x, y: location.y }
       : { x: 50, y: 50 };
-  const cue = location?.scene?.sensory_cues?.[0] || mapLocation?.scene_preview?.sensory_cues?.[0] || location?.description;
+  const lifeScene = state.worldLife?.current_scene?.location_id === location?.location_id ? state.worldLife.current_scene : null;
+  const cue = lifeScene?.sensory_cue || location?.scene?.sensory_cues?.[0] || mapLocation?.scene_preview?.sensory_cues?.[0] || location?.description;
   const possibility = location?.scene?.possible_beats?.[0] || mapLocation?.scene_preview?.possible_beats?.[0];
   const livedConsequence = event?.daily_consequence;
   visual.style.setProperty('--scene-x', `${Math.max(0, Math.min(100, Number(coordinate.x) || 50))}%`);
   visual.style.setProperty('--scene-y', `${Math.max(0, Math.min(100, Number(coordinate.y) || 50))}%`);
   visual.dataset.location = location?.location_id || 'unknown';
   visual.setAttribute('aria-label', `喵呜在${location?.name || '聚形域'}的场景`);
-  setText('#scene-visual-kicker', livedConsequence ? '世界正在发生' : '我眼前');
-  setText('#scene-visual-title', event?.title || location?.name || '聚形域');
-  setText('#scene-visual-copy', livedConsequence || (cue ? `我看见${String(cue).replace(/[。.]$/, '')}。` : possibility ? `我有点想${possibility}。` : '我正在看看这里今天会发生什么。'));
+  setText('#scene-visual-kicker', lifeScene ? '此刻正在发生' : livedConsequence ? '世界正在发生' : '我眼前');
+  setText('#scene-visual-title', lifeScene?.title || event?.title || location?.name || '聚形域');
+  setText('#scene-visual-copy', lifeScene?.narration || livedConsequence || (cue ? `我看见${String(cue).replace(/[。.]$/, '')}。` : possibility ? `我有点想${possibility}。` : '我正在看看这里今天会发生什么。'));
 }
 
 function worldMapLocation(locationId) {
@@ -406,9 +510,12 @@ function renderMapDetail() {
     return;
   }
   const currentEvent = location.current_event_summary ? `<span class="map-event-note">此刻 · ${escapeHtml(location.current_event_summary)}</span>` : '';
-  const npcs = location.npc_summary?.length ? `<span class="map-npc-note">在这里 · ${location.npc_summary.map((npc) => escapeHtml(npc.display_name)).join('、')}</span>` : '';
-  const sceneCue = location.scene_preview?.sensory_cues?.[0] ? `<span class="map-scene-note">眼前 · ${escapeHtml(location.scene_preview.sensory_cues[0])}</span>` : '';
-  const possibleBeat = location.scene_preview?.possible_beats?.[0] ? `<span class="map-possibility-note">可以试试 · ${escapeHtml(location.scene_preview.possible_beats[0])}</span>` : '';
+  const localLifeScene = location.current && state.worldLife?.current_scene?.location_id === location.location_id ? state.worldLife.current_scene : null;
+  const npcs = location.npc_summary?.length ? `<span class="map-npc-note">在这里 · ${location.npc_summary.map((npc) => location.current ? `<button type="button" data-open-npc="${escapeHtml(npc.npc_id)}">${escapeHtml(npc.display_name)}</button>` : escapeHtml(npc.display_name)).join('、')}</span>` : '';
+  const sceneCueValue = localLifeScene?.sensory_cue || location.scene_preview?.sensory_cues?.[0];
+  const possibleBeatValue = localLifeScene?.opportunity || location.scene_preview?.possible_beats?.[0];
+  const sceneCue = sceneCueValue ? `<span class="map-scene-note">眼前 · ${escapeHtml(sceneCueValue)}</span>` : '';
+  const possibleBeat = possibleBeatValue ? `<span class="map-possibility-note">可以试试 · ${escapeHtml(possibleBeatValue)}</span>` : '';
   let action = '<span class="map-current-label">喵呜现在就在这里</span>';
   if (!location.current && location.reachable) action = `<button class="map-travel-button" type="button" data-travel-location="${escapeHtml(location.location_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>前往这里 <span>${escapeHtml(location.travel_cost || '—')} 分钟</span></button>`;
   if (!location.current && !location.reachable) action = '<span class="map-distant-label">要先经过相邻地点</span>';
@@ -452,6 +559,39 @@ async function travelTo(locationId) {
   } finally {
     state.mapTravelBusy = false;
     renderMapDetail();
+  }
+}
+
+async function interactWithNpc(intent, idea = null) {
+  if (state.npcBusy || !state.selectedNpcId) return;
+  const npc = localEncounters().find((item) => item.npc_id === state.selectedNpcId);
+  if (!npc) return;
+  state.npcBusy = true;
+  const resultTarget = $('#npc-result');
+  resultTarget.className = 'npc-result pending';
+  resultTarget.textContent = `${npc.display_name}正在判断要怎么回应…`;
+  renderNpcPanel();
+  try {
+    const payload = await postJson('/api/life/npc-interactions', {
+      interaction_id: crypto.randomUUID(),
+      npc_id: npc.npc_id,
+      intent,
+      ...(idea ? { idea } : {}),
+      source: 'deskbot-web',
+    });
+    state.selectedNpcId = npc.npc_id;
+    updateWorldLife(payload.life, { allowAutoOpen: false });
+    appendNpcMessage(payload.npc, payload.response);
+    resultTarget.className = 'npc-result ok';
+    resultTarget.textContent = '这次相遇已经写进世界记录。';
+    if (intent === 'suggest') $('#npc-idea').value = '';
+    await refreshDashboard({ allowEncounterAutoOpen: false });
+  } catch (error) {
+    resultTarget.className = 'npc-result bad';
+    resultTarget.textContent = error.message;
+  } finally {
+    state.npcBusy = false;
+    renderNpcPanel();
   }
 }
 
@@ -845,6 +985,8 @@ function updateExpressionIntent(intent) {
 }
 function updateVoice(payload) { state.voice = payload; const available = payload && !payload.error && payload.status !== 'unavailable'; const pill = $('#voice-pill'); pill.className = `mini-pill ${available ? 'ok' : 'muted'}`; pill.textContent = available ? '已连接' : '未配置'; setText('#voice-description', available ? '语音 sidecar 已连接，可在有输出设备后试听。' : '暂时没有音频输出接口；语音层保留为可插拔计划。'); $('#voice-raw').textContent = JSON.stringify(payload || { status: 'not checked' }, null, 2); }
 function appendMessage(role, text, meta = '') { emptyState?.remove(); const item = document.createElement('article'); item.className = `message ${role}`; item.innerHTML = `<div class="message-avatar">${role === 'user' ? '你' : '✦'}</div><div><div class="message-bubble">${escapeHtml(text).replaceAll('\n', '<br>')}</div>${meta ? `<div class="message-meta">${escapeHtml(meta)}</div>` : ''}</div>`; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
+function appendNpcMessage(npc, text) { emptyState?.remove(); const item = document.createElement('article'); item.className = 'message npc'; item.innerHTML = `<div class="message-avatar">${escapeHtml((npc?.display_name || '?').slice(0, 1))}</div><div><div class="message-bubble">${escapeHtml(text).replaceAll('\n', '<br>')}</div><div class="message-meta npc-meta">${escapeHtml(npc?.display_name || '此地人物')} · 独立回应</div></div>`; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
+function appendSceneMessage(scene) { emptyState?.remove(); const item = document.createElement('article'); item.className = 'message scene'; item.innerHTML = `<div class="message-avatar">景</div><div><div class="message-bubble"><strong>${escapeHtml(scene.title || '世界日常')}</strong><span>${escapeHtml(scene.narration || '')}</span>${scene.sensory_cue ? `<small>${escapeHtml(scene.sensory_cue)}</small>` : ''}${scene.opportunity ? `<em>可以试试：${escapeHtml(scene.opportunity)}</em>` : ''}</div><div class="message-meta scene-meta">世界生活引擎 · 已发生场景；“可以试试”尚未发生</div></div>`; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
 function appendPending() { emptyState?.remove(); const item = document.createElement('article'); item.className = 'message assistant pending'; item.innerHTML = '<div class="message-avatar">✦</div><div><div class="message-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div></div>'; messageList.append(item); messageList.scrollTop = messageList.scrollHeight; return item; }
 function updateTrace(turn) { if (!turn) return; const event = turn.input_event || turn.event || {}; const outputPlan = turn.output_plan || turn.planned_output_plan || []; const decision = turn.interaction_decision || null; const intent = turn.expression_intent || turn.state?.interaction?.expression_intent || outputPlan.find((entry) => entry.expression_intent)?.expression_intent || null; setText('#last-event-label', formatTime(event.occurred_at)); setText('#trace-event-id', event.event_id || '—'); setText('#trace-event-text', event.payload?.text || '—'); const speak = outputPlan.find((entry) => entry.type === 'speak'); setText('#trace-provider', `${turn.provider || 'provider —'}${turn.trace?.usage?.total_tokens ? ` · ${turn.trace.usage.total_tokens} tokens` : ''}${speak?.tts_style ? ` · tts_style=${speak.tts_style}` : ''}${intent?.mode ? ` · ${intent.mode}/${intent.pace || 'natural'}` : ''}`); setText('#trace-decision-route', decision?.route || '—'); setText('#trace-decision-reason', decision ? `${decision.reason || '—'}${turn.proactive_candidates?.length ? ` · 可选候选 ${turn.proactive_candidates.length} 条` : ''}${turn.active_role_trials?.length ? ` · 试行 ${turn.active_role_trials.map((trial) => trial.label || trial.direction_id).join('、')}` : ''}` : '未生成情境决策。'); }
 function renderEventLog(events = []) { const target = $('#event-log'); target.innerHTML = events.length ? [...events].reverse().map((event) => `<div><b>${escapeHtml(event.layer || event.type || 'event')}</b> · ${escapeHtml(event.type || '')} · ${escapeHtml(event.source_kind || 'unknown')} · ${escapeHtml(event.payload?.text || event.event_id || '')}</div>`).join('') : '<span>还没有事件记录</span>'; }
@@ -958,16 +1100,18 @@ async function handleRoleAction(actionTarget) {
   }
 }
 
-async function refreshDashboard() {
+async function refreshDashboard({ allowEncounterAutoOpen = true } = {}) {
   setServicePill('pending', '检查服务…');
-  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson('/api/world/map'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast'), getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`)]);
-  const [health, runtimeContext, world, worldMap, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast, rolePulls, roleProposals] = results;
+  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson('/api/world/map'), getJson('/api/life/world'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast'), getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`)]);
+  const [health, runtimeContext, world, worldMap, worldLife, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast, rolePulls, roleProposals] = results;
   if (health.status === 'fulfilled') setServicePill('ok', `在线 · ${health.value.version || 'Node'}`); else setServicePill('bad', '服务不可达');
   if (rolePulls.status === 'fulfilled') renderRolePulls(rolePulls.value.pulls || []);
   if (roleProposals.status === 'fulfilled') renderRoleProposals(roleProposals.value.proposals || []);
   if (weatherForecast.status === 'fulfilled') updateWeatherForecast(weatherForecast.value);
+  if (world.status === 'fulfilled') updateWorld(world.value.world || world.value);
   if (worldMap.status === 'fulfilled') renderWorldMap(worldMap.value); else { $('#map-status').className = 'mini-pill warn'; $('#map-status').textContent = '地图不可用'; }
-  if (runtimeContext.status === 'fulfilled') updateRuntimeContext(runtimeContext.value); else refreshRuntimeContext(); if (world.status === 'fulfilled') updateWorld(world.value.world || world.value); if (shortState.status === 'fulfilled') updateShortState(shortState.value); if (voice.status === 'fulfilled') updateVoice(voice.value); else updateVoice({ status: 'unavailable', error: voice.reason?.body?.error || 'voice_sidecar_not_configured' }); renderEventLog(events.status === 'fulfilled' ? events.value.events || [] : []); renderEvidenceLog(evidence.status === 'fulfilled' ? evidence.value.evidence || [] : []); if (schema.status === 'fulfilled') updateWorldSchema(schema.value); else { $('#schema-pill').className = 'mini-pill muted'; $('#schema-pill').textContent = '契约不可用'; } state.multisourceMutations = mutations.status === 'fulfilled' ? mutations.value.mutations || [] : []; renderMutationLedger(state.multisourceMutations); renderContextWorkbench(state.world, state.multisourceMutations); if (scenarios.status === 'fulfilled') renderScenarioCatalog(scenarios.value); else { $('#scenario-pill').className = 'mini-pill muted'; $('#scenario-pill').textContent = '场景不可用'; } if (probes.status === 'fulfilled') renderProbeCatalog(probes.value); else { $('#probe-pill').className = 'mini-pill muted'; $('#probe-pill').textContent = '探针不可用'; } renderProbeObservations(probeObservations.status === 'fulfilled' ? probeObservations.value.observations || [] : []);
+  if (worldLife.status === 'fulfilled') updateWorldLife(worldLife.value, { allowAutoOpen: allowEncounterAutoOpen });
+  if (runtimeContext.status === 'fulfilled') updateRuntimeContext(runtimeContext.value); else refreshRuntimeContext(); if (shortState.status === 'fulfilled') updateShortState(shortState.value); if (voice.status === 'fulfilled') updateVoice(voice.value); else updateVoice({ status: 'unavailable', error: voice.reason?.body?.error || 'voice_sidecar_not_configured' }); renderEventLog(events.status === 'fulfilled' ? events.value.events || [] : []); renderEvidenceLog(evidence.status === 'fulfilled' ? evidence.value.evidence || [] : []); if (schema.status === 'fulfilled') updateWorldSchema(schema.value); else { $('#schema-pill').className = 'mini-pill muted'; $('#schema-pill').textContent = '契约不可用'; } state.multisourceMutations = mutations.status === 'fulfilled' ? mutations.value.mutations || [] : []; renderMutationLedger(state.multisourceMutations); renderContextWorkbench(state.world, state.multisourceMutations); if (scenarios.status === 'fulfilled') renderScenarioCatalog(scenarios.value); else { $('#scenario-pill').className = 'mini-pill muted'; $('#scenario-pill').textContent = '场景不可用'; } if (probes.status === 'fulfilled') renderProbeCatalog(probes.value); else { $('#probe-pill').className = 'mini-pill muted'; $('#probe-pill').textContent = '探针不可用'; } renderProbeObservations(probeObservations.status === 'fulfilled' ? probeObservations.value.observations || [] : []);
 }
 
 async function submitMutation() {
@@ -1055,6 +1199,19 @@ $('#world-map').addEventListener('click', (event) => {
 $('#map-detail').addEventListener('click', (event) => {
   const button = event.target.closest('[data-travel-location]');
   if (button) travelTo(button.dataset.travelLocation);
+});
+document.addEventListener('click', (event) => {
+  const npcButton = event.target.closest('[data-open-npc]');
+  if (npcButton) openNpcPanel(npcButton.dataset.openNpc);
+});
+$('#npc-profile').addEventListener('click', (event) => {
+  const action = event.target.closest('[data-npc-intent]');
+  if (action) interactWithNpc(action.dataset.npcIntent);
+});
+$('#npc-suggest-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const idea = $('#npc-idea').value.trim();
+  if (idea) interactWithNpc('suggest', idea);
 });
 document.querySelectorAll('[data-panel-target]').forEach((button) => button.addEventListener('click', () => toggleGamePanel(button.dataset.panelTarget)));
 document.querySelectorAll('.panel-close').forEach((button) => button.addEventListener('click', () => {

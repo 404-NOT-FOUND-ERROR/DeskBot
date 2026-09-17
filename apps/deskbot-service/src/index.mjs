@@ -29,7 +29,7 @@ const voiceClient = voiceSidecarUrl
   })
   : null;
 const weatherConnector = createWeatherConnector();
-const server = createDeskBotServer({ persistence, llm, voiceClient, weatherConnector, websocketPath });
+const server = createDeskBotServer({ persistence, llm, voiceClient, weatherConnector, websocketPath, worldLifeEnabled: true });
 
 server.listen(port, host, () => {
   console.log(`DeskBot Service v0.1.0 listening on http://${host}:${port}`);

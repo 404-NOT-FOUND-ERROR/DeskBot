@@ -11,6 +11,7 @@ Web / 固件 / RisuAI 对照适配器
 Node deskbot-service :4311
   input -> world/state/evidence -> prompt -> LLM
   canonical world    -> derived map -> validated travel mutation
+  world-life engine  -> timed Scene + bounded NPC actions
   weather connector  -> canonical mutation
   output router      -> idempotent device outbox
   WebSocket /ws      -> device hello, audio, ACK
@@ -49,7 +50,19 @@ Node deskbot-service :4311
 
 `POST /api/world/travel` 会把出发请求转换成标准 `world.mutation / move_protagonist`，再走现有 input、world、evidence 和 ledger 管线。服务端校验：目的地存在、与当前位置相邻、当前世界事件没有阻断旅行、事件 ID 幂等。成功后一次性写入当前位置、抵达状态和旅行耗时；失败不改地点和逻辑时间。LLM 回复仍是只读输出，文本里声称“去了某地”不能移动角色。
 
-当前 P1 地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。下一步应由世界事件/NPC 计划改变地点的可见状态、在地生活切片和可用行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
+当前地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。世界生活 V1 已让世界事件、天气、逻辑时间段和当前位置从有限目录中选择在地生活切片，并让同地 NPC 留下当前行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
+
+## 世界自动生活与 NPC 相遇
+
+`world-life.mjs` 是 canonical world 之上的有限、确定、可回放调度器，不是第二个世界状态源。正式服务启动时播种有档案的首发 NPC，并立即生成当前地点 Scene；之后每分钟检查，默认以 30 分钟真实时间槽选择生活片段。Scene 选择只读取当前位置、逻辑时间段、最新世界线和天气，结果必须通过 `set_life_scene` mutation 写回 canonical world。相同事件跨槽时使用 `continue_life_scene` 延长同一个 Scene，不重复制造旁白；同地点最近两个模板进入冷却，只有时段约束没有可用替代时才继续当前事件。当前 Scene、最近 12 个已结束 Scene、NPC 当前行动、共同经历和互动关系都能在 SQLite 重启后恢复。
+
+首版用户与 NPC 的互动只开放 `observe/greet/suggest/help/invite` 五种意图。`suggest` 可以携带最多 500 字想法，但服务端决定 NPC 的回应；NPC 必须与喵呜同地，远方 NPC 不能互动。每次互动带幂等 ID，通过 `npc_interaction` mutation 增加有限的熟悉度、信任和相遇次数，并在 `life.recent_experiences` 留下一条可归因共同经历。`suggest/help/invite` 可附带由 NPC 身份规则决定的低置信角色方向提示；它只进入多源证据聚合的 `observing` 阶段，仍需跨来源、重复证据才能成为候选，不能直接修改 Soul、身份或外壳。
+
+NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带 `location_id`，但 canonical world 强制 NPC 每次只能走一个相邻地点；世界生活引擎每两小时最多为内置 NPC 安排一个有限日程，手工创建且尚未结束的目标优先。目标决策先持久化再执行，NPC 抵达或离开会改变同地点 encounters 和 Scene 参与者；用户对话、LLM 文本和人物面板按钮都不能直接移动 NPC。
+
+`GET /api/life/world` 是只读相遇视图，不会因为刷新网页推进世界；`POST /api/life/npc-interactions` 是唯一普通用户 NPC 互动入口。Web 在故事窗显示已发生 Scene，在“可以试试”前明确保留未发生语义；同地点 NPC 通过横排入口和人物面板出现，首次相遇每个浏览器会话只自动呼出一次。NPC 回应使用独立署名进入故事流，不伪装成喵呜发言。
+
+这一版仍不是开放式自主世界：Scene 来自每地点三条有限模板，只有两个内置 NPC，NPC 回应和两小时日程由有限角色规则确定。下一阶段才是把共同经历接进可延续支线与事件结果、让 NPC 目标具有多步等待/失败/改道，并用真实跨天体验校准冷却和打扰频率。
 
 ## 世界体验客户端与叙事分层
 
@@ -61,7 +74,7 @@ Node deskbot-service :4311
 - Lorebook：地点、NPC、物品、派系和世界规则等“有时相关”的资料；按当前位置、话题或事件键检索，不把整本设定塞入每轮 prompt。
 - Scene：此刻的地点、可观察动作、感官线索、参与者、限制与自然出现的选择。Scene 描述处境，不替喵呜规定情绪或决定。
 
-地点 `scene.possible_beats` 只是尚未发生的场景机会。只有经过 world mutation 的结果才可被叙述为既成事实；这样既保留 Character.AI 式即兴沉浸，也保持 WorldOS 式世界状态可追溯和可联动。
+地点 `scene.possible_beats` 和生活 Scene 的 `opportunity` 只是尚未发生的场景机会。只有经过 world mutation 的结果才可被叙述为既成事实；这样既保留 Character.AI 式即兴沉浸，也保持 WorldOS 式世界状态可追溯和可联动。
 
 设计方法来源（用于结构原则，不复制其角色或世界素材）：
 

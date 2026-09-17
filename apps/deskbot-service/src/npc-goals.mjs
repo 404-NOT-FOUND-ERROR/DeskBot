@@ -11,6 +11,16 @@ const requireText = value => {
 export function createNpcGoals({ persistence = null, now = () => new Date(), worldSnapshot, ingest, reserved = () => false }) {
   const goals = new Map((persistence?.list('life.npc-goals') ?? []).map(g => [g.id, g]));
   function save(goal) { persistence?.put('life.npc-goals', goal.id, goal); goals.set(goal.id, goal); return structuredClone(goal); }
+  function pruneManagedGoals() {
+    const stale = [...goals.values()]
+      .filter(goal => goal.origin === 'world-life-engine' && ['completed', 'cancelled', 'failed'].includes(goal.state))
+      .sort((left, right) => String(right.completed_at ?? right.created_at).localeCompare(String(left.completed_at ?? left.created_at)))
+      .slice(12);
+    for (const goal of stale) {
+      goals.delete(goal.id);
+      persistence?.remove?.('life.npc-goals', goal.id);
+    }
+  }
   function add(body) {
     const id = requireText(body.id);
     const npcId = requireText(body.npc_id);
@@ -23,10 +33,22 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
       if (!option || !['event_present', 'npc_status'].includes(option.when?.kind)) throw new InputError(400, 'invalid_goal', 'Unsupported world condition');
       const when = { kind: option.when.kind, value: requireText(option.when.value) };
       const payload = { action: 'npc_action', npc_id: npcId, action_name: requireText(option.action_name), status: requireText(option.status) };
+      if (option.location_id !== undefined && option.location_id !== null && String(option.location_id).trim()) {
+        payload.location_id = requireText(String(option.location_id));
+      }
       previewWorldMutations(worldSnapshot(), [payload]);
       return { when, payload };
     });
-    return save({ id, npc_id: npcId, purpose: requireText(body.purpose), options, state: 'active', created_at: now().toISOString(), decision: null });
+    return save({
+      id,
+      npc_id: npcId,
+      purpose: requireText(body.purpose),
+      options,
+      origin: body.origin === 'world-life-engine' ? 'world-life-engine' : 'author',
+      state: 'active',
+      created_at: now().toISOString(),
+      decision: null,
+    });
   }
   function control(id, operation) {
     const current = goals.get(id);
@@ -49,7 +71,7 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
         const chosen = goal.options[index];
         const timestamp = now().toISOString();
         goal.decision = { option_index: index, condition: chosen.when, world_revision: world.world_revision,
-          event: { event_id: `npc-goal:${goal.id}`, type: 'world.mutation', source: 'npc-goal-engine', source_kind: 'world_engine',
+          event: { event_id: `npc-goal:${goal.id}`, type: 'world.mutation', source: goal.origin === 'world-life-engine' ? 'world-life-engine' : 'npc-goal-engine', source_kind: 'world_engine',
             layer: 'world_line', character_id: DEFAULT_CHARACTER_ID, occurred_at: timestamp, observed_at: timestamp,
             payload: { ...chosen.payload, occurred_at: timestamp } } };
         // Persist the exact command before delivery so restart replays the same event.
@@ -59,6 +81,7 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
       catch (error) { goal.state = 'failed'; goal.error = error.code ?? 'npc_action_failed'; }
       save(goal);
     }
+    pruneManagedGoals();
   }
   return { add, control, tick, list: () => structuredClone([...goals.values()]),
     reserved: npcId => [...goals.values()].some(g => g.npc_id === npcId && ['active', 'paused', 'failed'].includes(g.state)) };
