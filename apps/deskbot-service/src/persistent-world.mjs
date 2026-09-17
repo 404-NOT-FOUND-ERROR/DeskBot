@@ -6,6 +6,7 @@ import {
   DEFAULT_CHARACTER_ID,
   DEFAULT_LOCATION_ID,
   DEFAULT_LOCATION_NAME,
+  DEFAULT_WORLD_LOCATIONS,
   LEGACY_CHARACTER_IDS,
   LEGACY_LOCATION_IDS,
   WORLD_SETTING,
@@ -25,7 +26,7 @@ const MAX_PENDING_ITEMS = 20;
 const MAX_CONTEXT_ITEMS = 20;
 const PREFERENCE_STABLE_OBSERVATIONS = 3;
 const MINUTES_PER_DAY = 24 * 60;
-const WORLD_RULE_VERSION = 'canonical-world-rules-v0.2';
+const WORLD_RULE_VERSION = 'canonical-world-rules-v0.3';
 
 const MULTISOURCE_LAYERS = Object.freeze([
   {
@@ -79,7 +80,7 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action: 'enqueue_pending_item', layer: 'world_line', required: ['item.item_id', 'item.summary'], optional: ['item.kind', 'item.source'], description: '按 FIFO 加入待处理事项' },
   { action: 'dequeue_pending_item', layer: 'world_line', required: [], optional: ['item_id'], description: '按 FIFO 取出待处理事项' },
   { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC，最多 3 个' },
-  { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: [], description: '把主角移动到已知位置' },
+  { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: ['reason'], description: '沿可见且未被阻断的相邻路线移动主角，并推进旅行时间' },
   { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.arc_id', 'event.status', 'event.source', 'event.occurred_at'], description: '记录世界线事件、当前弧段及其可生活切片' },
   { action: 'update_weather', layer: 'weather', required: ['snapshot'], optional: ['snapshot.location', 'snapshot.condition', 'snapshot.temperature_c', 'snapshot.humidity', 'snapshot.wind_mps', 'snapshot.observed_at', 'snapshot.provider'], description: '写入天气观测，旧观测只留审计记录' },
   { action: 'record_external_context', layer: 'external_context', required: ['item.item_id', 'item.title'], optional: ['item.summary', 'item.category', 'item.url', 'item.published_at', 'item.observed_at', 'item.provider'], description: '写入外部新闻或网络事件' },
@@ -271,17 +272,18 @@ function createDefaultWorld(now) {
       display_name: DEFAULT_CHARACTER_DISPLAY_NAME,
       display_name_status: DEFAULT_CHARACTER_DISPLAY_NAME_STATUS,
       location_id: DEFAULT_LOCATION_ID,
+      travel_state: {
+        status: 'idle',
+        from_location_id: null,
+        to_location_id: null,
+        event_id: null,
+        reason: null,
+        arrived_at: null,
+      },
       appearance: createInitialCharacterAppearance(timestamp),
       character_profile: createInitialCharacterProfile(),
     },
-    locations: [
-      {
-        location_id: DEFAULT_LOCATION_ID,
-        location_id_aliases: [...LEGACY_LOCATION_IDS],
-        name: DEFAULT_LOCATION_NAME,
-        description: '互动在这里转化为光粒；屏幕是配套的信号界面，外壳由光粒凝聚成形。',
-      },
-    ],
+    locations: clone(DEFAULT_WORLD_LOCATIONS),
     npcs: [],
     active_event: null,
     pending_items: [],
@@ -372,6 +374,14 @@ function migrateWorldToCurrentSetting(world, now) {
       display_name: DEFAULT_CHARACTER_DISPLAY_NAME,
       display_name_status: DEFAULT_CHARACTER_DISPLAY_NAME_STATUS,
       location_id: DEFAULT_LOCATION_ID,
+      travel_state: {
+        status: 'idle',
+        from_location_id: null,
+        to_location_id: null,
+        event_id: null,
+        reason: null,
+        arrived_at: null,
+      },
       appearance: createInitialCharacterAppearance(timestamp),
       character_profile: createInitialCharacterProfile(),
     };
@@ -410,6 +420,22 @@ function migrateWorldToCurrentSetting(world, now) {
       next.protagonist.location_id = canonicalProtagonistLocation;
       changed = true;
     }
+    const baselineTravelState = {
+      status: 'idle',
+      from_location_id: null,
+      to_location_id: null,
+      event_id: null,
+      reason: null,
+      arrived_at: null,
+    };
+    const existingTravelState = next.protagonist.travel_state;
+    const mergedTravelState = existingTravelState && typeof existingTravelState === 'object' && !Array.isArray(existingTravelState)
+      ? { ...baselineTravelState, ...existingTravelState }
+      : baselineTravelState;
+    if (!valuesEqual(existingTravelState, mergedTravelState)) {
+      next.protagonist.travel_state = mergedTravelState;
+      changed = true;
+    }
     if (!next.protagonist.appearance || typeof next.protagonist.appearance !== 'object' || Array.isArray(next.protagonist.appearance)) {
       next.protagonist.appearance = createInitialCharacterAppearance(timestamp);
       changed = true;
@@ -427,6 +453,8 @@ function migrateWorldToCurrentSetting(world, now) {
     }
   }
 
+  const defaultLocations = clone(DEFAULT_WORLD_LOCATIONS);
+  const defaultLocationsById = new Map(defaultLocations.map((location) => [location.location_id, location]));
   const existingLocations = Array.isArray(next.locations) ? next.locations : [];
   const locations = existingLocations.map((location) => {
     const migrated = { ...location };
@@ -438,11 +466,11 @@ function migrateWorldToCurrentSetting(world, now) {
         location.location_id,
       ]).filter((value) => value !== canonicalId);
     }
+    const definition = defaultLocationsById.get(canonicalId);
+    if (definition) {
+      Object.assign(migrated, definition);
+    }
     if (canonicalId === DEFAULT_LOCATION_ID) {
-      if (migrated.name !== DEFAULT_LOCATION_NAME) migrated.name = DEFAULT_LOCATION_NAME;
-      if (migrated.description !== '互动在这里转化为光粒；屏幕是配套的信号界面，外壳由光粒凝聚成形。') {
-        migrated.description = '互动在这里转化为光粒；屏幕是配套的信号界面，外壳由光粒凝聚成形。';
-      }
       migrated.location_id_aliases = uniqueStrings([
         ...(Array.isArray(migrated.location_id_aliases) ? migrated.location_id_aliases : []),
         ...LEGACY_LOCATION_IDS,
@@ -450,17 +478,21 @@ function migrateWorldToCurrentSetting(world, now) {
     }
     return migrated;
   });
-  if (!locations.some((location) => location.location_id === DEFAULT_LOCATION_ID)) {
-    locations.push({
-      location_id: DEFAULT_LOCATION_ID,
-      location_id_aliases: [...LEGACY_LOCATION_IDS],
-      name: DEFAULT_LOCATION_NAME,
-      description: '互动在这里转化为光粒；屏幕是配套的信号界面，外壳由光粒凝聚成形。',
-    });
+  for (const definition of defaultLocations) {
+    if (!locations.some((location) => location.location_id === definition.location_id)) {
+      locations.push(definition);
+    }
   }
   if (JSON.stringify(next.locations ?? []) !== JSON.stringify(locations)) {
     next.locations = locations;
     changed = true;
+    const migrations = Array.isArray(next.schema_migrations) ? next.schema_migrations : [];
+    if (!migrations.some((migration) => migration.id === 'canonical-world-map-p1')) {
+      next.schema_migrations = [...migrations, {
+        id: 'canonical-world-map-p1',
+        applied_at: timestamp,
+      }];
+    }
   }
 
   const initialField = createInitialShapingField(
@@ -572,6 +604,7 @@ function normalizeActiveEvent(value) {
     opportunity: optionalText(event.opportunity, 'payload.event.opportunity', null),
     unresolved_hook: optionalText(event.unresolved_hook, 'payload.event.unresolved_hook', null),
     source: optionalText(event.source, 'payload.event.source', 'world.mutation'),
+    blocks_travel: event.blocks_travel === true,
   };
 }
 
@@ -870,12 +903,45 @@ function applyExplicitMutation(world, event) {
     }
     case 'move_protagonist': {
       const locationId = canonicalLocationId(requireText(payload.location_id, 'payload.location_id'));
-      if (!next.locations.some((location) => location.location_id === locationId)) {
+      const destination = next.locations.find((location) => location.location_id === locationId);
+      if (!destination) {
         throw new PersistentWorldError(400, 'invalid_world_mutation', `unknown location ${locationId}`);
       }
       const previousLocationId = next.protagonist.location_id;
+      if (previousLocationId === locationId) {
+        throw new PersistentWorldError(409, 'already_at_location', `protagonist is already at ${locationId}`);
+      }
+      const origin = next.locations.find((location) => location.location_id === previousLocationId);
+      const neighbors = Array.isArray(origin?.neighbors) ? origin.neighbors.map(canonicalLocationId) : [];
+      if (!neighbors.includes(locationId)) {
+        throw new PersistentWorldError(409, 'location_not_reachable', `${locationId} is not adjacent to ${previousLocationId}`);
+      }
+      if (next.active_event?.blocks_travel === true) {
+        throw new PersistentWorldError(409, 'travel_blocked', `active event ${next.active_event.event_id} blocks travel`);
+      }
+      const travelCost = Number.isInteger(destination.travel_cost) && destination.travel_cost > 0
+        ? destination.travel_cost
+        : 10;
       next.protagonist.location_id = locationId;
-      details = { from: previousLocationId, to: locationId };
+      const totalMinutes = next.logical_time.minute_of_day + travelCost;
+      next.logical_time.day += Math.floor(totalMinutes / MINUTES_PER_DAY);
+      next.logical_time.minute_of_day = totalMinutes % MINUTES_PER_DAY;
+      next.protagonist.travel_state = {
+        status: 'arrived',
+        from_location_id: previousLocationId,
+        to_location_id: locationId,
+        event_id: event.event_id ?? null,
+        reason: optionalText(payload.reason, 'payload.reason', null),
+        arrived_at: event.occurred_at ?? null,
+        travel_cost_minutes: travelCost,
+      };
+      details = {
+        from: previousLocationId,
+        to: locationId,
+        reason: next.protagonist.travel_state.reason,
+        travel_cost_minutes: travelCost,
+        arrival_text: destination.arrival_text || null,
+      };
       break;
     }
     case 'apply_world_line_event':
@@ -1129,6 +1195,79 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   };
 }
 
+// Derived read model for map clients. It never becomes a second source of
+// truth: every value is rebuilt from the canonical snapshot on each request.
+export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) {
+  if (!world || typeof world !== 'object') return null;
+  const protagonist = world.protagonist || {};
+  const currentLocationId = canonicalLocationId(protagonist.location_id);
+  const activeEvent = world.active_event || null;
+  const locations = (Array.isArray(world.locations) ? world.locations : []).map((location) => {
+    const npcs = (Array.isArray(world.npcs) ? world.npcs : [])
+      .filter((npc) => canonicalLocationId(npc.location_id) === location.location_id)
+      .map((npc) => ({ npc_id: npc.npc_id, display_name: npc.display_name, role: npc.role, status: npc.status }));
+    return {
+      location_id: location.location_id,
+      name: location.name,
+      description: location.description,
+      x: Number.isFinite(location.x) ? location.x : null,
+      y: Number.isFinite(location.y) ? location.y : null,
+      neighbors: Array.isArray(location.neighbors) ? location.neighbors.map(canonicalLocationId).filter(Boolean) : [],
+      travel_cost: Number.isInteger(location.travel_cost) ? location.travel_cost : null,
+      visibility: location.visibility || 'visible',
+      current: location.location_id === currentLocationId,
+      reachable: false,
+      current_event_summary: activeEvent?.daily_consequence || activeEvent?.summary || null,
+      npc_summary: npcs,
+      arrival_text: location.arrival_text || null,
+      scene_preview: location.scene ? {
+        anchor: location.scene.anchor ?? null,
+        sensory_cues: clone(location.scene.sensory_cues ?? []),
+        possible_beats: clone(location.scene.possible_beats ?? []),
+      } : null,
+    };
+  });
+  const locationById = new Map(locations.map((location) => [location.location_id, location]));
+  const routes = [];
+  for (const location of locations) {
+    for (const neighborId of location.neighbors) {
+      const neighbor = locationById.get(neighborId);
+      if (!neighbor || location.location_id >= neighbor.location_id) continue;
+      const from = location.location_id === currentLocationId;
+      const to = neighbor.location_id === currentLocationId;
+      routes.push({
+        from_location_id: location.location_id,
+        to_location_id: neighbor.location_id,
+        travel_cost_minutes: from
+          ? (neighbor.travel_cost ?? 10)
+          : to ? (location.travel_cost ?? 10) : null,
+        reachable: !activeEvent?.blocks_travel && (from || to),
+        blocked_reason: activeEvent?.blocks_travel ? `事件阻断：${activeEvent.title}` : null,
+      });
+    }
+  }
+  for (const location of locations) {
+    const reachable = location.location_id !== currentLocationId
+      && routes.some((route) => route.reachable && (route.from_location_id === location.location_id || route.to_location_id === location.location_id));
+    location.reachable = reachable;
+  }
+  return {
+    schema: 'deskbot.world-map.v0.1',
+    world_id: world.world_id,
+    world_revision: world.world_revision,
+    logical_time: clone(world.logical_time),
+    protagonist: {
+      character_id: characterId,
+      location_id: currentLocationId,
+      travel_state: clone(protagonist.travel_state || { status: 'idle' }),
+    },
+    locations,
+    paths: routes,
+    npcs: clone(Array.isArray(world.npcs) ? world.npcs : []),
+    active_event: activeEvent ? clone(activeEvent) : null,
+  };
+}
+
 export function getWorldSchema() {
   return {
     schema: 'foundry.canonical-world-schema.v0.1',
@@ -1139,8 +1278,8 @@ export function getWorldSchema() {
       world_id: { type: 'string', immutable: true },
       world_revision: { type: 'integer', minimum: 0, writer: 'accepted world mutation' },
       logical_time: { type: 'object', fields: { day: { type: 'integer', minimum: 1 }, minute_of_day: { type: 'integer', minimum: 0, maximum: MINUTES_PER_DAY - 1 }, tick: { type: 'integer', minimum: 0 } } },
-      protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
-      locations: { type: 'array', item: 'location', maximum: null },
+      protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, travel_state: { type: 'object' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
+      locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
       npcs: { type: 'array', item: 'npc', maximum: MAX_NPCS },
       active_event: { type: ['object', 'null'] },
       pending_items: { type: 'array', maximum: MAX_PENDING_ITEMS },
@@ -1161,6 +1300,7 @@ export function getWorldSchema() {
       { id: 'weather-freshness', description: '较旧 observed_at 不覆盖当前 weather.snapshot，但会进入 mutation ledger' },
       { id: 'preference-stability', description: `同一 preference_key 连续 ${PREFERENCE_STABLE_OBSERVATIONS} 次一致观察后 stable=true` },
       { id: 'npc-bound', description: `canonical world 最多 ${MAX_NPCS} 个 NPC，位置必须是已知 location_id` },
+      { id: 'travel-adjacency', description: '主角只能沿 location.neighbors 移动；旅行由 move_protagonist mutation 记录并推进逻辑时间' },
       { id: 'transport-read-only', description: 'ASR partial/final、assistant reply 与 TTS 传输事件不改变 canonical world' },
     ],
     metadata_fields: {

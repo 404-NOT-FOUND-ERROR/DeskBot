@@ -172,13 +172,31 @@ function composeRoleTrialDesire(activeRoleTrials = []) {
     ?? `你最近对“${active.life ?? '一种新的生活方式'}”有些在意。猫型外壳仍未改变；相关时从第一人称说出这份兴趣，不解释后台分类。`;
 }
 
-function composeLivedWorld(worldSnapshot, activeRoleTrials = []) {
+function relevantLoreLocations(worldSnapshot, userText, current) {
+  const query = typeof userText === 'string' ? userText.toLowerCase() : '';
+  if (!query) return [];
+  return (worldSnapshot?.locations ?? [])
+    .filter((location) => location.location_id !== current?.location_id && location.scene)
+    .filter((location) => [location.name, ...(location.scene.lore_keys ?? [])]
+      .some((keyword) => typeof keyword === 'string' && keyword !== '' && query.includes(keyword.toLowerCase())))
+    .slice(0, 2);
+}
+
+function composeLivedWorld(worldSnapshot, activeRoleTrials = [], userText = '') {
   if (!worldSnapshot) return '- 当前没有可用的世界生活切片；不要自行补造。';
   const location = currentLocation(worldSnapshot);
   const event = worldSnapshot.active_event ?? worldSnapshot.world_line?.latest_event ?? null;
   const lines = [
     `- 你现在以猫型潮玩第一形态生活在${location?.name ?? '聚形域桌面'}。`,
   ];
+  if (location?.scene) {
+    lines.push(`- 当前 Scene 锚点：${location.scene.anchor}`);
+    lines.push(`- 当前地点可感知的具体细节：${location.scene.sensory_cues.join('；')}`);
+    lines.push(`- 尚未发生、可以选择去做的生活片段：${location.scene.possible_beats.join('；')}`);
+  }
+  for (const loreLocation of relevantLoreLocations(worldSnapshot, userText, location)) {
+    lines.push(`- 本轮关键词触发的地点 Lore：${loreLocation.name}——${loreLocation.scene.anchor}`);
+  }
   if (event) {
     lines.push(`- 正在延续的世界线：${event.title}${event.summary ? `。${event.summary}` : '。'}`);
     if (event.daily_consequence) lines.push(`- 它今天具体影响生活的方式：${event.daily_consequence}`);
@@ -188,7 +206,7 @@ function composeLivedWorld(worldSnapshot, activeRoleTrials = []) {
     lines.push('- 当前没有生效的世界线生活事件；不要为了显得奇幻而临时编一个。');
   }
   lines.push(`- 此刻唯一的角色倾向：${composeRoleTrialDesire(activeRoleTrials)}`);
-  lines.push('- 这些是你正在生活的处境，不是要向用户朗读的设定卡。只在当前话题相碰时，让具体后果、行动或牵挂自然进入一句话。');
+  lines.push('- 这是按当前位置检索出的 Lorebook 切片与当前 Scene，不是要向用户朗读的设定卡。只取一两个与本轮相关的具体细节；possible_beats 尚未发生，除非 canonical mutation 已记录结果，否则只能作为想法、邀请或选择。');
   return lines.join('\n');
 }
 
@@ -238,7 +256,7 @@ export function composePrompt({
     worldSnapshot?.protagonist?.character_profile ?? DEFAULT_CHARACTER_PROFILE,
   );
   const interactionBlock = composeInteractionGuide(interactionDecision, proactiveCandidates);
-  const livedWorldBlock = composeLivedWorld(worldSnapshot, activeRoleTrials);
+  const livedWorldBlock = composeLivedWorld(worldSnapshot, activeRoleTrials, userText);
   const settingBlock = [
     `setting_id=${WORLD_SETTING.setting_id}`,
     `setting_version=${WORLD_SETTING.version}`,

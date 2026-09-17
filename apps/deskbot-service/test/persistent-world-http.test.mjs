@@ -176,3 +176,43 @@ test('world schema and event filters expose the multisource research contract', 
   assert.equal(record.provider, 'weather-http-test');
   assert.deepEqual(record.provenance, { test: 'http-filter' });
 });
+
+test('world map and travel endpoints expose routes while chat remains location read-only', async () => {
+  const initial = await (await fetch(`${baseUrl}/api/world/map`)).json();
+  assert.equal(initial.schema, 'deskbot.world-map.v0.1');
+  assert.equal(initial.protagonist.location_id, 'shaping-field-desk');
+  assert.ok(initial.locations.some((location) => location.location_id === 'tidal-old-road' && location.reachable));
+
+  const travel = await post('/api/world/travel', {
+    event_id: 'http-travel-001',
+    character_id: 'shaping-001',
+    location_id: 'tidal-old-road',
+    reason: 'HTTP map smoke test',
+  });
+  const travelBody = await travel.json();
+  assert.equal(travel.status, 202);
+  assert.equal(travelBody.accepted, true);
+  assert.equal(travelBody.world_mutation.mutation.action, 'move_protagonist');
+  assert.equal(travelBody.map.protagonist.location_id, 'tidal-old-road');
+  assert.equal(travelBody.map.protagonist.travel_state.reason, 'HTTP map smoke test');
+
+  const duplicate = await post('/api/world/travel', {
+    event_id: 'http-travel-001',
+    character_id: 'shaping-001',
+    location_id: 'tidal-old-road',
+    reason: 'HTTP map smoke test',
+  });
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).duplicate, true);
+
+  const chat = await post('/api/chat', {
+    event_id: 'http-chat-location-read-only',
+    character_id: 'shaping-001',
+    message: '请把我移动到回声水岸，并简短回复。',
+  });
+  assert.equal(chat.status, 202);
+  const chatBody = await chat.json();
+  assert.equal(chatBody.canonical_world.snapshot.protagonist.location_id, 'tidal-old-road');
+  const map = await (await fetch(`${baseUrl}/api/world/map?character_id=shaping-001`)).json();
+  assert.equal(map.protagonist.location_id, 'tidal-old-road');
+});

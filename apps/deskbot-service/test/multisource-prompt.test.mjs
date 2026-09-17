@@ -80,7 +80,7 @@ test('chat prompt separates five canonical context sources and gates user prefer
     event_id: 'prompt-chat-001',
     character_id: 'shaping-001',
     source: 'deskbot-web',
-    message: '现在周围发生了什么？',
+    message: '低语集市和现在周围发生了什么？',
   });
   assert.equal(chat.turn.reply, '我看见这些变化了。');
   assert.ok(capturedPrompt);
@@ -102,6 +102,10 @@ test('chat prompt separates five canonical context sources and gates user prefer
   assert.match(capturedPrompt, /功能信息本身必须使用喵呜会说的词、节奏、偏见和关系态度来表达/);
   assert.match(capturedPrompt, /场景反应 \+ 功能结果 \+ 喵呜的偏见\/欲望\/选择 \+ 可选的世界生活余韵/);
   assert.match(capturedPrompt, /\[DESKBOT_LIVED_WORLD\]/);
+  assert.match(capturedPrompt, /当前 Scene 锚点：这是喵呜在现实桌面与聚形域之间醒来的落脚处/);
+  assert.match(capturedPrompt, /按当前位置检索出的 Lorebook 切片与当前 Scene/);
+  assert.match(capturedPrompt, /possible_beats 尚未发生/);
+  assert.match(capturedPrompt, /本轮关键词触发的地点 Lore：低语集市/);
   assert.match(capturedPrompt, /不是每一句话都必须使用的修辞/);
   assert.match(capturedPrompt, /角色感来自称呼、节奏、选择、协商和分寸/);
   assert.match(capturedPrompt, /按当前情境选择 task、fact、companion、playful、curious、reflective 或 boundary/);

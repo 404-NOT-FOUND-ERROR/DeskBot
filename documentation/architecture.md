@@ -10,6 +10,7 @@ Web / 固件 / RisuAI 对照适配器
           v
 Node deskbot-service :4311
   input -> world/state/evidence -> prompt -> LLM
+  canonical world    -> derived map -> validated travel mutation
   weather connector  -> canonical mutation
   output router      -> idempotent device outbox
   WebSocket /ws      -> device hello, audio, ACK
@@ -41,6 +42,34 @@ Node deskbot-service :4311
 - DeepSeek 出站可用性取决于运行 PowerShell/网络策略；`fetch failed` 不代表角色规则失败。
 - 当前 voice-sidecar 是 fake/model-free baseline，不代表真实中文 ASR/TTS 性能。
 - 角色演化的 fantasy-pull、提案和有限试行已在 P2-P4 接入；当前仍不是长期 `role-state.v1`，也不会自动换壳。
+
+## 持续世界地图与旅行
+
+地图不是第二套世界状态。`persistent-world` 保存地点、坐标、邻接路线、路程、NPC 位置和喵呜当前位置；`GET /api/world/map` 每次从这份 canonical snapshot 派生一个只读地图模型。Web 只负责绘制与选择，不拥有地点、路线或旅行结果。
+
+`POST /api/world/travel` 会把出发请求转换成标准 `world.mutation / move_protagonist`，再走现有 input、world、evidence 和 ledger 管线。服务端校验：目的地存在、与当前位置相邻、当前世界事件没有阻断旅行、事件 ID 幂等。成功后一次性写入当前位置、抵达状态和旅行耗时；失败不改地点和逻辑时间。LLM 回复仍是只读输出，文本里声称“去了某地”不能移动角色。
+
+当前 P1 地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。下一步应由世界事件/NPC 计划改变地点的可见状态、在地生活切片和可用行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
+
+## 世界体验客户端与叙事分层
+
+默认客户端采用“世界优先”布局：地图是全屏背景；左上浮窗承载喵呜的第一人称故事和对话；底部输入框始终可达；地点、角色状态、世界事件、天气、形态与现实输入通过游戏化工具栏按需展开。研究台、原始字段、mutation 和证据仍在第二层，不能挤占普通用户的第一屏。
+
+叙事上下文按 Character.AI 类方法拆成三层，但仍服从 DeskBot canonical state：
+
+- Character / Soul：长期始终相关的动机、爱憎、声音、习惯和行为边界，每轮都约束表达。
+- Lorebook：地点、NPC、物品、派系和世界规则等“有时相关”的资料；按当前位置、话题或事件键检索，不把整本设定塞入每轮 prompt。
+- Scene：此刻的地点、可观察动作、感官线索、参与者、限制与自然出现的选择。Scene 描述处境，不替喵呜规定情绪或决定。
+
+地点 `scene.possible_beats` 只是尚未发生的场景机会。只有经过 world mutation 的结果才可被叙述为既成事实；这样既保留 Character.AI 式即兴沉浸，也保持 WorldOS 式世界状态可追溯和可联动。
+
+设计方法来源（用于结构原则，不复制其角色或世界素材）：
+
+- Character.AI Lorebooks：https://support.character.ai/hc/en-us/articles/52739596326811-Lorebooks
+- Character.AI Scene Creation：https://support.character.ai/hc/en-us/articles/41918454359451-Scene-Creation-Quickstart-Guide
+- Character.AI Creator Guide：https://support.character.ai/hc/en-us/articles/50608794517915-1-Welcome-to-the-Creator-Guide
+
+对应关系是：Creator Guide 约束长期 Character/Soul，Lorebooks 指导按相关性检索地点与世界知识，Scene 指导“此时、此地、可观察事实和自然选择”的构造。三者都只进入叙事上下文；世界事实仍由 canonical mutation 决定。
 
 ## Related Documents
 

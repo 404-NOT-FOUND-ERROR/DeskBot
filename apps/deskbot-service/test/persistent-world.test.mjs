@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   createPersistentWorld,
+  getWorldMap,
   PersistentWorldError,
 } from '../src/persistent-world.mjs';
 
@@ -44,7 +45,8 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
   assert.equal(initial.protagonist.appearance.version, 'appearance-baseline-v0.2');
   assert.equal(initial.protagonist.appearance.silhouette, '白色圆润多瓣底座 + 圆形黑屏幕脸 + 两只短三角耳');
   assert.equal(initial.protagonist.appearance.recognition_anchor, '白色多瓣底座 + 黑色圆屏 + 两只短三角耳 + 黄色胸口圆点');
-  assert.equal(initial.locations.length, 1);
+  assert.equal(initial.locations.length, 5);
+  assert.equal(initial.locations.find((location) => location.location_id === 'tidal-old-road').neighbors.includes('whisper-market'), true);
   assert.deepEqual(initial.npcs, []);
   assert.equal(initial.active_event, null);
   assert.deepEqual(initial.pending_items, []);
@@ -104,6 +106,58 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
     })),
     (error) => error instanceof PersistentWorldError && error.code === 'active_event_conflict',
   );
+});
+
+test('world map exposes canonical routes and travel advances time through one mutation', () => {
+  const persistentWorld = createPersistentWorld({ now: () => fixedTime });
+  const initialMap = getWorldMap(persistentWorld.get());
+  const desk = initialMap.locations.find((location) => location.current);
+  const road = initialMap.locations.find((location) => location.location_id === 'tidal-old-road');
+  assert.equal(desk.location_id, 'shaping-field-desk');
+  assert.equal(road.reachable, true);
+  assert.equal(road.scene_preview.possible_beats.length, 2);
+  assert.ok(initialMap.paths.some((path) => path.reachable && path.to_location_id === 'tidal-old-road'));
+
+  const moved = persistentWorld.ingest(event({
+    event_id: 'travel-to-old-road',
+    payload: { action: 'move_protagonist', location_id: 'tidal-old-road', reason: '去看看潮退后的路标' },
+  }));
+  assert.equal(moved.applied, true);
+  assert.equal(moved.mutation.action, 'move_protagonist');
+  assert.equal(moved.mutation.details.arrival_text.includes('潮痕旧路'), true);
+  assert.equal(moved.world.protagonist.location_id, 'tidal-old-road');
+  assert.equal(moved.world.protagonist.travel_state.reason, '去看看潮退后的路标');
+  assert.equal(moved.world.logical_time.minute_of_day, 488);
+
+  const after = getWorldMap(moved.world);
+  assert.equal(after.locations.find((location) => location.current).location_id, 'tidal-old-road');
+  assert.equal(after.locations.find((location) => location.location_id === 'whisper-market').reachable, true);
+  assert.equal(after.paths.find((path) => path.from_location_id === 'backlit-grove' && path.to_location_id === 'tidal-old-road').travel_cost_minutes, 14);
+
+  assert.throws(
+    () => persistentWorld.ingest(event({ event_id: 'travel-too-far', payload: { action: 'move_protagonist', location_id: 'echo-waterside' } })),
+    (error) => error instanceof PersistentWorldError && error.code === 'location_not_reachable',
+  );
+  assert.throws(
+    () => persistentWorld.ingest(event({ event_id: 'travel-same-place', payload: { action: 'move_protagonist', location_id: 'tidal-old-road' } })),
+    (error) => error instanceof PersistentWorldError && error.code === 'already_at_location',
+  );
+});
+
+test('active world events can block travel without changing location or time', () => {
+  const persistentWorld = createPersistentWorld({ now: () => fixedTime });
+  persistentWorld.ingest(event({
+    event_id: 'travel-blocker',
+    payload: { action: 'activate_event', event: { event_id: 'storm-001', title: '逆风潮', blocks_travel: true } },
+  }));
+  const before = persistentWorld.get();
+  assert.throws(
+    () => persistentWorld.ingest(event({ event_id: 'blocked-travel', payload: { action: 'move_protagonist', location_id: 'tidal-old-road' } })),
+    (error) => error instanceof PersistentWorldError && error.code === 'travel_blocked',
+  );
+  const after = persistentWorld.get();
+  assert.equal(after.protagonist.location_id, before.protagonist.location_id);
+  assert.equal(after.logical_time.minute_of_day, before.logical_time.minute_of_day);
 });
 
 test('world-line events preserve concrete lived-world slices', () => {

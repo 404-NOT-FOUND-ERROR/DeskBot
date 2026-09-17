@@ -10,7 +10,7 @@ import { createChatOrchestrator } from './chat-orchestrator.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
 import { createOutputRouter, OutputRouterError } from './output-router.mjs';
 import { createDeviceRegistry, DeviceRegistryError } from './device-registry.mjs';
-import { createPersistentWorld, getWorldSchema, PersistentWorldError } from './persistent-world.mjs';
+import { createPersistentWorld, getWorldMap, getWorldSchema, PersistentWorldError } from './persistent-world.mjs';
 import { createAudioArtifactStore, AudioArtifactError } from './audio-artifacts.mjs';
 import { createVoiceIngress, VoiceIngressError } from './voice-ingress.mjs';
 import { VoiceSidecarError } from './voice-sidecar-client.mjs';
@@ -988,6 +988,73 @@ export function createDeskBotServer({
         schema: 'foundry.canonical-world-response.v0.1',
         world,
       });
+      return;
+    }
+
+    // The map is a read model derived from canonical world state. Travel is
+    // intentionally funneled through the normal world.mutation ingestion path
+    // so adjacency, event blocking, time costs, and idempotency stay server-owned.
+    if (request.method === 'GET' && url.pathname === '/api/world/map') {
+      const worldId = url.searchParams.get('world_id') ?? undefined;
+      const world = persistentWorld.get(worldId);
+      if (!world) {
+        sendJson(response, 404, { error: 'world_not_found', message: `world ${worldId} does not exist` });
+        return;
+      }
+      sendJson(response, 200, getWorldMap(world, {
+        characterId: url.searchParams.get('character_id') ?? world.protagonist?.character_id,
+      }));
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/world/travel') {
+      readJson(request, 64 * 1024)
+        .then((body) => {
+          const locationId = body.location_id ?? body.destination_location_id;
+          if (typeof locationId !== 'string' || locationId.trim() === '') {
+            throw new InputError(400, 'invalid_travel_request', 'location_id is required');
+          }
+          const eventId = typeof body.event_id === 'string' && body.event_id.trim() !== ''
+            ? body.event_id.trim()
+            : `travel-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+          const event = {
+            event_id: eventId,
+            type: 'world.mutation',
+            source: body.source ?? 'deskbot-web',
+            character_id: body.character_id ?? 'shaping-001',
+            correlation_id: body.correlation_id ?? eventId,
+            occurred_at: body.occurred_at ?? now().toISOString(),
+            source_kind: body.source_kind ?? 'user',
+            confidence: body.confidence,
+            provider: body.provider,
+            provenance: {
+              interface: 'deskbot-web',
+              action: 'travel',
+              ...(body.provenance && typeof body.provenance === 'object' ? body.provenance : {}),
+            },
+            payload: {
+              action: 'move_protagonist',
+              location_id: locationId.trim(),
+              ...(body.reason !== undefined ? { reason: body.reason } : {}),
+            },
+          };
+          const result = ingestNonChatEvent(event);
+          sendJson(response, result.duplicate ? 200 : (result.worldMutation.applied ? 202 : 409), {
+            schema: 'deskbot.world-travel-response.v0.1',
+            accepted: result.worldMutation.applied,
+            duplicate: result.duplicate,
+            event: result.event,
+            world_mutation: result.worldMutation,
+            map: getWorldMap(result.worldMutation.world, { characterId: event.character_id }),
+          });
+        })
+        .catch((error) => {
+          const expected = error instanceof InputError || error instanceof PersistentWorldError;
+          sendJson(response, expected ? error.statusCode : 500, {
+            error: expected ? error.code : 'internal_error',
+            message: expected ? error.message : 'travel request failed',
+          });
+        });
       return;
     }
 

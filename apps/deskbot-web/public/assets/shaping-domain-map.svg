@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" shape-rendering="crispEdges">
+  <rect width="1440" height="900" fill="#36b8bd"/>
+  <path fill="#62d3c4" d="M0 0h1440v112H0zM0 690h1440v210H0z" opacity=".58"/>
+  <path fill="#258f9d" d="M0 112h122v578H0zM1314 112h126v578h-126z" opacity=".46"/>
+
+  <!-- upper echo waterside -->
+  <path fill="#f1c27f" d="M374 0h692v52h98v92h-72v63h-88v68H823v38H616v-42H456v-56H342v-92h32z"/>
+  <path fill="#e79b6b" d="M408 0h626v28H408zM374 52h718v24H374zM342 123h750v20H342zM456 215h548v22H456z"/>
+  <path fill="#7fc45c" d="M402 0h92v44h-92zM1008 48h84v92h-84zM374 145h76v70h-76zM949 145h143v70H949z"/>
+  <path fill="#287c68" d="M433 18h18v53h-18zM1018 70h20v78h-20zM1048 87h18v60h-18z"/>
+  <circle cx="442" cy="15" r="26" fill="#32a46f"/><circle cx="1028" cy="55" r="30" fill="#32a46f"/><circle cx="1061" cy="73" r="24" fill="#2e9568"/>
+  <path fill="#d8f1d4" d="M564 82h310v82H564z"/>
+  <path fill="#addbbf" d="M592 101h254v44H592z"/>
+  <path fill="#f8dfac" d="M677 165h84v49h-84z"/>
+  <path fill="#a27055" d="M705 177h28v37h-28z"/>
+
+  <!-- left whisper market island -->
+  <path fill="#efb475" d="M0 236h114v-44h191v31h128v65h75v162h-50v71H332v62H188v-31H51v-68H0z"/>
+  <path fill="#da8663" d="M0 255h92v-42h198v33h126v38H0zM0 497h345v42H188v-21H0z"/>
+  <path fill="#4bab69" d="M39 287h86v61H39zM324 287h97v61h-97zM87 456h295v66H87z"/>
+  <path fill="#3b825f" d="M67 312h22v60H67zM355 312h22v62h-22zM108 468h18v72h-18z"/>
+  <g fill="#f4d77e">
+    <rect x="126" y="306" width="26" height="34"/><rect x="197" y="275" width="26" height="34"/><rect x="272" y="316" width="26" height="34"/><rect x="345" y="385" width="26" height="34"/>
+  </g>
+  <g fill="#dc5e68">
+    <path d="M108 340h62v76h-62zM96 328h86v20H96z"/><path d="M181 309h60v90h-60zM169 297h84v20h-84z"/><path d="M257 350h59v75h-59zM245 338h83v20h-83z"/>
+  </g>
+  <g fill="#713f58"><rect x="123" y="366" width="16" height="50"/><rect x="198" y="337" width="16" height="62"/><rect x="273" y="376" width="16" height="49"/></g>
+
+  <!-- right backlit grove -->
+  <path fill="#90bc63" d="M940 192h186v34h132v56h97v73h85v235h-127v42h-145v-39h-128v-54h-90v-85h-49V315h39z"/>
+  <path fill="#588d5c" d="M1021 229h48v76h-48zM1168 258h51v91h-51zM1286 304h48v89h-48zM1092 454h46v96h-46zM1241 473h43v94h-43z"/>
+  <g fill="#2d8064"><circle cx="1046" cy="224" r="55"/><circle cx="1193" cy="248" r="65"/><circle cx="1310" cy="294" r="62"/><circle cx="1116" cy="439" r="61"/><circle cx="1263" cy="458" r="62"/></g>
+  <g fill="#65c78c"><rect x="1018" y="186" width="25" height="30"/><rect x="1184" y="205" width="28" height="32"/><rect x="1300" y="254" width="26" height="30"/><rect x="1104" y="395" width="28" height="32"/><rect x="1253" y="418" width="27" height="30"/></g>
+  <g fill="#ccb0e6"><rect x="978" y="334" width="12" height="12"/><rect x="1150" y="371" width="13" height="13"/><rect x="1342" y="420" width="13" height="13"/><rect x="1191" y="524" width="12" height="12"/></g>
+
+  <!-- central tidal road -->
+  <path fill="#f0c780" d="M596 262h245v86h76v95h-58v112h-92v93H637v-80h-71V443h-53v-95h83z"/>
+  <path fill="#bd8167" d="M626 297h184v44H626zM625 386h207v48H625zM609 481h210v49H609z"/>
+  <path fill="#e4e9d6" d="M703 214h30v467h-30z"/>
+  <path fill="#5d6a6d" d="M696 214h44v31h-44zM696 323h44v25h-44zM696 432h44v25h-44zM696 540h44v25h-44zM696 650h44v31h-44z"/>
+  <path fill="#7ce3cf" d="M670 344h22v42h-22zM744 462h22v42h-22z"/>
+
+  <!-- lower shaping desk sanctuary -->
+  <path fill="#d9e4d4" d="M415 622h117v-45h371v44h133v61h89v137h-89v81H404v-68h-92V693h103z"/>
+  <path fill="#b8d4c8" d="M454 650h515v184H454z"/>
+  <path fill="#405a65" d="M535 694h357v94H535z"/>
+  <path fill="#8de5d4" d="M569 716h289v50H569z"/>
+  <path fill="#f5cb72" d="M697 730h34v23h-34z"/>
+  <path fill="#ef7274" d="M473 676h42v99h-42zM912 676h42v99h-42z"/>
+  <g fill="#6a7f7e"><rect x="369" y="738" width="45" height="45"/><rect x="1017" y="738" width="45" height="45"/><rect x="435" y="842" width="56" height="30"/><rect x="949" y="842" width="56" height="30"/></g>
+
+  <!-- connecting roads -->
+  <path fill="#f4ead2" d="M422 392h159v28H422zM839 392h125v28H839zM718 583h28v94h-28zM331 520h117v25H331zM991 548h109v25H991z"/>
+  <path fill="#52636c" d="M422 385h159v9H422zM422 418h159v9H422zM839 385h125v9H839zM839 418h125v9H839z"/>
+
+  <!-- scattered toy-world detail -->
+  <g fill="#f1d078"><rect x="175" y="445" width="14" height="14"/><rect x="236" y="462" width="10" height="10"/><rect x="1070" y="360" width="12" height="12"/><rect x="1211" y="401" width="10" height="10"/><rect x="801" y="181" width="11" height="11"/></g>
+  <g fill="#227b86" opacity=".7"><rect x="76" y="620" width="88" height="12"/><rect x="1237" y="684" width="111" height="12"/><rect x="1118" y="80" width="93" height="12"/></g>
+</svg>

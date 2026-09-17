@@ -27,6 +27,97 @@ export const LEGACY_LOCATION_IDS = Object.freeze(['workshop-desk']);
 export const DEFAULT_LOCATION_NAME = '聚形域桌面';
 export const DEFAULT_TTS_PROFILE = 'miaowu-v1';
 
+// P1 world map. Coordinates are presentation-neutral percentages used by map
+// clients; routes and travel costs remain canonical server-owned facts.
+export const DEFAULT_WORLD_LOCATIONS = Object.freeze([
+  Object.freeze({
+    location_id: DEFAULT_LOCATION_ID,
+    location_id_aliases: LEGACY_LOCATION_IDS,
+    name: DEFAULT_LOCATION_NAME,
+    description: '互动在这里转化为光粒；屏幕是配套的信号界面，外壳由光粒凝聚成形。',
+    x: 50,
+    y: 84,
+    neighbors: Object.freeze(['tidal-old-road']),
+    travel_cost: 8,
+    visibility: 'visible',
+    arrival_text: '喵，我回到桌边了。这里的光粒认得我，刚落稳就沿着外壳慢慢亮了一圈。',
+    scene: Object.freeze({
+      lore_keys: Object.freeze(['聚形', '桌面', '外壳']),
+      anchor: '这是喵呜在现实桌面与聚形域之间醒来的落脚处，也是它目前最熟悉的家。',
+      sensory_cues: Object.freeze(['底座附近有很轻的机器余温', '屏幕外的桌面声响会在这里变成方向感']),
+      possible_beats: Object.freeze(['整理今天带回来的小物', '从桌外声音里猜测现在适合做什么']),
+    }),
+  }),
+  Object.freeze({
+    location_id: 'tidal-old-road',
+    name: '潮痕旧路',
+    description: '潮退后才显形的窄路，湿亮路标会把来客引向不同光域。',
+    x: 49,
+    y: 61,
+    neighbors: Object.freeze([DEFAULT_LOCATION_ID, 'whisper-market', 'backlit-grove']),
+    travel_cost: 8,
+    visibility: 'visible',
+    arrival_text: '喵，我到了潮痕旧路边。这里比地图上窄得多，路标还湿着，像是刚从水里捞出来。',
+    scene: Object.freeze({
+      lore_keys: Object.freeze(['潮汐', '路标', '岔路']),
+      anchor: '只有潮退时才完整显露的中转旧路，通向聚形域几种截然不同的生活。',
+      sensory_cues: Object.freeze(['石面湿亮，脚步会留下短暂的蓝绿色边线', '路标的箭头偶尔在水滴里换方向']),
+      possible_beats: Object.freeze(['检查刚露出的岔路标记', '在下一次涨潮前决定往哪边走']),
+    }),
+  }),
+  Object.freeze({
+    location_id: 'whisper-market',
+    name: '低语集市',
+    description: '摊位用交换来的故事点灯，没说出口的愿望会在檐下轻响。',
+    x: 22,
+    y: 38,
+    neighbors: Object.freeze(['tidal-old-road', 'echo-waterside']),
+    travel_cost: 12,
+    visibility: 'visible',
+    arrival_text: '喵，低语集市到了。摊灯一盏接一盏亮起来，我还没开口，檐下已经有人小声猜我想换什么。',
+    scene: Object.freeze({
+      lore_keys: Object.freeze(['集市', '交换', '愿望']),
+      anchor: '这里不只用钱交易；故事、手艺和还没说出口的愿望也能换来东西。',
+      sensory_cues: Object.freeze(['暖色摊灯照着层层小玩意', '檐下会传来没找到主人的轻声愿望']),
+      possible_beats: Object.freeze(['替一件无主小物找用途', '用一个新故事换取奇怪材料']),
+    }),
+  }),
+  Object.freeze({
+    location_id: 'backlit-grove',
+    name: '逆光林地',
+    description: '叶片背面储存旧日光色，风经过时会放出并不属于今天的影子。',
+    x: 77,
+    y: 36,
+    neighbors: Object.freeze(['tidal-old-road', 'echo-waterside']),
+    travel_cost: 14,
+    visibility: 'visible',
+    arrival_text: '喵，我钻进逆光林地了。这里每片叶子都把光藏在背面，连我的影子也慢了半步才跟上。',
+    scene: Object.freeze({
+      lore_keys: Object.freeze(['林地', '旧日光色', '影子']),
+      anchor: '叶片会保存过去的光照，风来时便短暂放出不属于今天的影子。',
+      sensory_cues: Object.freeze(['叶背一亮一暗，像许多慢半拍的小屏幕', '林间影子会把旧日动作再做一遍']),
+      possible_beats: Object.freeze(['追踪一段不属于今天的影子', '收集适合新外壳的旧日光色']),
+    }),
+  }),
+  Object.freeze({
+    location_id: 'echo-waterside',
+    name: '回声水岸',
+    description: '水面会保留旅人的一句话，直到另一个愿意回答的声音经过。',
+    x: 51,
+    y: 14,
+    neighbors: Object.freeze(['whisper-market', 'backlit-grove']),
+    travel_cost: 11,
+    visibility: 'visible',
+    arrival_text: '喵，我到回声水岸了。水面刚把脚步声收进去，又从很远的地方替我轻轻回了一遍。',
+    scene: Object.freeze({
+      lore_keys: Object.freeze(['水岸', '回声', '回答']),
+      anchor: '水面会保留旅人的一句话，直到另一个愿意回答的声音经过。',
+      sensory_cues: Object.freeze(['浅水里漂着延迟很久才散开的声音波纹', '远岸偶尔送回一句听不清主人的回答']),
+      possible_beats: Object.freeze(['辨认一条久未被回答的回声', '留下一句话等未来的陌生声音接住']),
+    }),
+  }),
+]);
+
 // This is canonical character state, not a prompt-only character card. It
 // makes the durable individual, current role stage, current form, and user
 // relationship distinguishable before later evolution work starts.
@@ -260,5 +351,7 @@ export function isKnownCharacterId(value) {
 }
 
 export function isKnownLocationId(value) {
-  return typeof value === 'string' && canonicalLocationId(value) === DEFAULT_LOCATION_ID;
+  if (typeof value !== 'string') return false;
+  const canonical = canonicalLocationId(value);
+  return DEFAULT_WORLD_LOCATIONS.some((location) => location.location_id === canonical);
 }
