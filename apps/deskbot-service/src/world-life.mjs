@@ -38,6 +38,17 @@ const NPC_PROFILES = Object.freeze({
     speech_style: '句子很短，经常先观察对方的影子再回答',
     accent: 'grove',
   }),
+  'echo-postcarrier-001': Object.freeze({
+    npc_id: 'echo-postcarrier-001',
+    display_name: '波果',
+    role: 'echo_postcarrier',
+    location_id: 'echo-waterside',
+    status: '正在给没寄出的声音排队',
+    bio: '背着半透明圆邮包的回声邮差。它不替谁解释没说完的话，只帮它们找到一个可以先停一会儿的地方。',
+    temperament: '话多一点但不逼问，保护停顿，也喜欢把关系说清楚',
+    speech_style: '先指出手边的信纸、邮包或岸边声音，再给等待与投递的选择',
+    accent: 'waterside',
+  }),
 });
 
 const NPC_ROLE_DIRECTIONS = Object.freeze({
@@ -53,6 +64,12 @@ const NPC_ROLE_DIRECTIONS = Object.freeze({
     life: '收集不同日子的光与影子，试穿它们带来的奇异生活',
     cues: Object.freeze(['旧光', '影子', '试穿', '外壳']),
   }),
+  echo_postcarrier: Object.freeze({
+    direction_id: 'echo_message_keeper',
+    label: '回声寄存者',
+    life: '替没寄出的声音保留空位，慢慢听出它们愿意去向哪里',
+    cues: Object.freeze(['邮包', '信纸', '回声', '等待']),
+  }),
 });
 
 const NPC_ROUTINES = Object.freeze({
@@ -65,6 +82,11 @@ const NPC_ROUTINES = Object.freeze({
     route: Object.freeze(['backlit-grove', 'echo-waterside', 'whisper-market', 'tidal-old-road']),
     purpose: '沿途收集不属于今天的光与影子',
     offset: 1,
+  }),
+  'echo-postcarrier-001': Object.freeze({
+    route: Object.freeze(['echo-waterside', 'whisper-market', 'echo-waterside', 'shaping-field-desk']),
+    purpose: '收集没有收件人的话，并把愿意出发的句子送到合适的桌边',
+    offset: 2,
   }),
 });
 
@@ -90,9 +112,9 @@ const LIFE_SCENES = Object.freeze({
     Object.freeze({ id: 'grove-second-shadow', bands: ['evening', 'night'], title: '林地里多出一层不肯重合的影子', narration: '天色变暗后，一层更淡的影子仍停在叶间；旁边放着一只空叶筒，没有谁催它靠近。', cue: '两层影子之间隔着半步距离', opportunity: '等它自己决定要不要靠近', participant_overrides: Object.freeze({ 'shade-collector-001': Object.freeze({ narration: '天色变暗后，一层更淡的影子仍停在叶间，影栖没有去抓，只在旁边放了一个空叶筒。', opportunity: '陪影栖等它自己决定要不要靠近' }) }), npc_actions: Object.freeze({ 'shade-collector-001': Object.freeze({ action_name: 'wait_for_wild_shadow', status: '守着一只空叶筒安静等待' }) }) }),
   ]),
   'echo-waterside': Object.freeze([
-    Object.freeze({ id: 'waterside-old-reply', bands: ['morning', 'day'], title: '一条旧回答被水推回来了', narration: '水面把一句模糊的回答推到岸边，喵呜用爪尖碰了碰，发现它还在等一个很久没出现的人。', cue: '声音波纹碰到石头才显出文字形状', opportunity: '猜一猜它原本在回答什么问题' }),
-    Object.freeze({ id: 'waterside-voice-drift', bands: ['day', 'evening'], title: '陌生声音排着队散步', narration: '几句互不认识的声音因为速度一样，暂时并排走在浅水里。喵呜跟了其中一句一会儿，没有追问它从哪里来。', cue: '每句话脚下都有一圈不会打湿岸边的水纹', opportunity: '跟其中一句同行一小段，不追问主人' }),
-    Object.freeze({ id: 'waterside-night-message', bands: ['evening', 'night'], title: '夜色替一条留言藏起署名', narration: '水面保留了内容，却把名字折进最深的回声里。喵呜听完没有催，只把一颗亮珠放在岸边。', cue: '只有句末还留着一点犹豫的亮光', opportunity: '留下一句不需要立刻得到回答的话' }),
+    Object.freeze({ id: 'waterside-old-reply', bands: ['morning', 'day'], title: '波果把旧回答放回岸边', narration: '水面把一句模糊的回答推到岸边，波果把它折进半透明邮包，却没有急着找收件人。', cue: '声音波纹碰到石头才显出文字形状', opportunity: '猜一猜它原本在回答什么问题', participant_overrides: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ title: '波果替旧回答留一个空位', narration: '波果把那句模糊回答压在信纸下面，先在邮包里留出一个空位，等它自己决定要不要出发。', opportunity: '替这句旧回答留一句不需要立刻得到回应的话' }) }), npc_actions: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ action_name: 'hold_old_reply', status: '给一条旧回答留着空位' }) }) }),
+    Object.freeze({ id: 'waterside-voice-drift', bands: ['day', 'evening'], title: '波果给陌生声音排队', narration: '几句互不认识的声音因为速度一样，暂时并排走在浅水里。波果给它们编了号码，却把第三个号码空着。', cue: '每句话脚下都有一圈不会打湿岸边的水纹', opportunity: '跟其中一句同行一小段，不追问主人', participant_overrides: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ title: '波果给陌生声音排队', narration: '波果蹲在浅水边给陌生声音排队：先听完，再决定要不要投递。', opportunity: '替其中一句选一个临时收件处' }) }), npc_actions: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ action_name: 'sort_drifting_voices', status: '正在给陌生声音排队' }) }) }),
+    Object.freeze({ id: 'waterside-night-message', bands: ['evening', 'night'], title: '波果把署名折回水里', narration: '水面保留了内容，却把名字折进最深的回声里。波果把邮包放在岸边，等一句话自己决定要不要被听见。', cue: '只有句末还留着一点犹豫的亮光', opportunity: '留下一句不需要立刻得到回答的话', participant_overrides: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ title: '波果守着一条没有署名的留言', narration: '波果把没有署名的留言压在邮包底下，没有替它补名字，只把岸边的位置擦干净。', opportunity: '留下一句不需要立刻得到回答的话' }) }), npc_actions: Object.freeze({ 'echo-postcarrier-001': Object.freeze({ action_name: 'guard_unsigned_message', status: '守着一条没有署名的留言' }) }) }),
   ]),
 });
 
@@ -393,6 +415,16 @@ function npcResponse(npc, intent, idea) {
       suggest: `${npc.display_name}把${quoted}对着光看了一会儿：“这个想法有影子。我先不替它定形，让它自己多走两步。”`,
       help: `${npc.display_name}分给你一只空叶筒：“不用抓。等那段旧光自己靠近，再把筒口转过去。”`,
       invite: `${npc.display_name}往林地深处让出半步：“可以同行。但遇见不肯重合的影子，先问它，不要问我。”`,
+    }[intent];
+  }
+  if (npc.role === 'echo_postcarrier') {
+    return {
+      observe: `${npc.display_name}把半透明邮包放在岸边：“这句还没寄出。我先替它留个空位。”`,
+      greet: `${npc.display_name}从邮包里探出一张皱信纸：“来得正好。先听完，再决定今天要不要投递。”`,
+      chat: `${npc.display_name}把邮包往旁边挪了挪：“我听着。你不用急着把最后一句补上。”`,
+      suggest: `${npc.display_name}捏住${quoted}的信纸边角：“可以试，但先别替它找收件人。让它在这里待一会儿。”`,
+      help: `${npc.display_name}递来一只空邮袋：“帮我听这一句。它愿意出发时，我会提醒你。”`,
+      invite: `${npc.display_name}背好邮包：“同行可以。你走岸边，我走浅水，遇到没署名的声音就一起停。”`,
     }[intent];
   }
   return {

@@ -101,7 +101,7 @@ DeskBot 最终形态 → 木桌/软材质/摆件零件 + 少量高对比 HUD 标
 
 ## 6. 当前迁移状态
 
-- 已完成：桌面摆件地图第一版、左上故事卡、底部输入、NPC 人物面板、NPC Markdown 作者卡、Persona Agent、Scene/Lorebook/Character 分层、NPC 回复可读性护栏。
+- 已完成：桌面摆件地图第一版、左上故事卡、底部输入、三位 NPC 人物面板、NPC Markdown 作者卡、Persona Agent、Scene/Lorebook/Character 分层、NPC 回复可读性护栏。
 - 本轮新增：`npcReplyNeedsGrounding()` 对设定说明/客服套话进行窄范围检测；必要时触发一次基于原 Scene 的改写；若二次改写仍不合格则回退 authored persona 台词；第一屏 NPC 角色名改为中文生活称谓；首次相遇会把 NPC 的 Scene opener 放进故事流。
 - 待完成：更多有关系的 NPC 族群、可跨日的生活史、角色阶段档案、真实 TTS/屏幕表情和外壳变化。
 

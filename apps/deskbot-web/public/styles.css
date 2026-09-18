@@ -202,25 +202,34 @@ body { overflow-x:hidden; background:#0b2430; }
 .world-stage .world-warning { position:absolute; z-index:31; top:76px; left:50%; width:min(560px,calc(100% - 32px)); margin:0; border-radius:8px; transform:translateX(-50%); }
 .game-map.world-map { position:absolute; inset:68px 0 0; z-index:1; min-height:0; border:0; border-radius:0; background:transparent; overflow:hidden; }
 .game-map .map-stage { inset:0; }
-.game-map .map-caption { position:absolute; z-index:3; top:18px; left:22px; display:grid; gap:3px; max-width:250px; padding:9px 12px; border:1px solid rgba(42,93,95,.16); border-radius:9px; color:#31545a; background:rgba(255,252,232,.78); box-shadow:0 3px 0 rgba(42,91,92,.12); pointer-events:none; }
+.game-map .map-caption { position:absolute; z-index:3; top:18px; left:22px; display:grid; gap:3px; max-width:250px; padding:10px 13px 9px; border:1px solid rgba(42,93,95,.19); border-radius:9px 9px 9px 3px; color:#31545a; background:rgba(255,252,232,.84); box-shadow:0 3px 0 rgba(42,91,92,.12),0 12px 24px rgba(42,91,92,.1); pointer-events:none; }
 .game-map .map-caption strong { font-size:12px; }
 .game-map .map-caption span { color:#6b8385; font-size:9px; line-height:1.35; }
-.game-map .map-routes { opacity:.76; }
-.game-map .map-route { stroke:rgba(30,64,65,.4); stroke-width:4; stroke-dasharray:8 9; }
-.game-map .map-route.reachable { stroke:#fff7d5; stroke-width:6; filter:drop-shadow(0 2px 0 rgba(53,75,72,.45)); }
+.game-map .map-routes { opacity:.86; }
+.game-map .map-route { stroke:rgba(30,64,65,.34); stroke-width:3.4; stroke-dasharray:3 5; stroke-linecap:round; }
+.game-map .map-route.reachable { stroke:#fff7d5; stroke-width:5.5; stroke-dasharray:1 0; filter:drop-shadow(0 2px 0 rgba(53,75,72,.45)); }
 .game-map .map-location { z-index:4; width:128px; color:#173c43; text-shadow:0 1px 0 rgba(255,255,255,.75); }
-.game-map .map-location i { width:17px; height:17px; border:3px solid #355d62; background:#f6f1d5; box-shadow:0 0 0 5px rgba(255,255,255,.65),0 4px 0 rgba(33,75,78,.28); }
+.game-map .map-location i { position:relative; display:grid; place-items:center; width:34px; height:30px; border:3px solid #355d62; border-radius:11px 11px 13px 13px; background:#f6f1d5; box-shadow:0 0 0 5px rgba(255,255,255,.65),0 4px 0 rgba(33,75,78,.28); transition:transform .18s ease,filter .18s ease; }
 .game-map .map-location span { border:1px solid rgba(37,80,83,.2); border-radius:5px; margin-top:9px; padding:4px 7px; color:#234d52; background:rgba(255,252,232,.88); font-size:11px; font-weight:700; box-shadow:0 3px 0 rgba(42,91,92,.17); }
 .game-map .map-location small { margin-top:3px; color:#254c51; font-size:9px; font-weight:600; }
 .game-map .map-location.reachable i { border-color:#167e7e; background:#ecffdb; box-shadow:0 0 0 6px rgba(237,255,222,.72),0 0 0 9px rgba(21,125,125,.24); }
-.game-map .map-location.current i { width:23px; height:23px; border-color:#fff6d5; background:#e84f61; box-shadow:0 0 0 6px rgba(255,255,255,.82),0 5px 0 rgba(94,42,52,.25); }
+.game-map .map-location.distant { opacity:.78; }
+.game-map .map-location.distant i { filter:saturate(.7); }
+.game-map .map-location.current i { width:40px; height:36px; border-color:#fff6d5; background:#e84f61; box-shadow:0 0 0 6px rgba(255,255,255,.82),0 5px 0 rgba(94,42,52,.25); }
 .game-map .map-location.current span { color:#7b2534; background:#fff1cf; }
-.game-map .map-location i::before { display:block; color:#547174; font-size:11px; font-style:normal; line-height:11px; text-align:center; }
+.game-map .map-location i::before { display:block; color:#547174; font-size:16px; font-style:normal; line-height:16px; text-align:center; }
+.game-map .map-location.current i::before { color:#fff6d5; }
 .game-map .map-shaping-field-desk i::before { content:'⌂'; }
 .game-map .map-tidal-old-road i::before { content:'↝'; }
 .game-map .map-whisper-market i::before { content:'✿'; }
 .game-map .map-backlit-grove i::before { content:'❧'; }
 .game-map .map-echo-waterside i::before { content:'≈'; }
+.game-map .map-shaping-field-desk i { border-color:#6d9c94; background:#d7ead1; }
+.game-map .map-tidal-old-road i { border-color:#b28659; background:#f4dfb0; }
+.game-map .map-whisper-market i { border-color:#c76c64; background:#ffd4a4; }
+.game-map .map-backlit-grove i { border-color:#659369; background:#c5dc91; }
+.game-map .map-echo-waterside i { border-color:#6654aa; background:#d7d2f3; }
+.game-map .map-location.current.map-shaping-field-desk i,.game-map .map-location.current.map-tidal-old-road i,.game-map .map-location.current.map-whisper-market i,.game-map .map-location.current.map-backlit-grove i,.game-map .map-location.current.map-echo-waterside i { border-color:#fff6d5; background:#e84f61; }
 
 .world-stage .card,.map-inspector { border:1px solid rgba(73,98,104,.24); border-radius:8px; color:#223f47; background:rgba(251,252,245,.92); box-shadow:0 10px 28px rgba(39,70,72,.22); backdrop-filter:blur(12px); }
 .world-stage .card-heading h2 { color:#25434a; font-size:14px; letter-spacing:0; }
@@ -337,7 +346,7 @@ body { overflow-x:hidden; background:#0b2430; }
 .npc-mini-avatar { position:relative; display:block; flex:0 0 24px; width:24px; height:24px; border:2px solid rgba(255,255,255,.78); border-radius:50%; background:#44a9ad; box-shadow:0 0 0 1px rgba(42,93,95,.18); }
 .npc-mini-avatar::before,.npc-mini-avatar::after { position:absolute; top:-4px; width:8px; height:9px; background:inherit; content:""; clip-path:polygon(50% 0,100% 100%,0 100%); }
 .npc-mini-avatar::before { left:1px; transform:rotate(-14deg); }.npc-mini-avatar::after { right:1px; transform:rotate(14deg); }
-.npc-mini-avatar.grove { background:#7d9d59; }.npc-mini-avatar.tide { background:#3d9db2; }
+.npc-mini-avatar.grove { background:#7d9d59; }.npc-mini-avatar.tide { background:#3d9db2; }.npc-mini-avatar.waterside { background:#6252b8; box-shadow:0 0 0 1px rgba(89,70,174,.28),0 0 10px rgba(98,82,184,.18); }
 .npc-empty { margin-top:14px; border-left:3px solid rgba(42,93,95,.18); padding:8px 10px; color:#6c8588; font-size:10px; line-height:1.55; }
 .npc-empty[hidden],.npc-profile[hidden] { display:none; }
 .npc-profile { margin-top:14px; }
@@ -346,7 +355,7 @@ body { overflow-x:hidden; background:#0b2430; }
 .npc-profile-head p { margin:0; color:#6e8588; font-size:9px; }
 .npc-role { color:#8065b8; font-size:8px; letter-spacing:.06em; text-transform:uppercase; }
 .npc-portrait { position:relative; flex:0 0 58px; width:58px; height:58px; border:3px solid rgba(255,255,255,.82); border-radius:50%; background:#42a8b1; box-shadow:0 0 0 1px rgba(42,93,95,.18),0 5px 14px rgba(43,85,87,.18); }
-.npc-portrait.grove { background:#7fa45e; }.npc-portrait.tide { background:#399eb6; }
+.npc-portrait.grove { background:#7fa45e; }.npc-portrait.tide { background:#399eb6; }.npc-portrait.waterside { background:#6252b8; box-shadow:0 0 0 1px rgba(89,70,174,.28),0 5px 14px rgba(71,55,139,.24); }
 .npc-portrait i,.npc-portrait span { position:absolute; display:block; }
 .npc-portrait i { top:-8px; left:7px; width:18px; height:21px; background:inherit; clip-path:polygon(50% 0,100% 100%,0 100%); transform:rotate(-15deg); }
 .npc-portrait i::after { position:absolute; top:2px; left:25px; width:18px; height:21px; background:inherit; content:""; clip-path:polygon(50% 0,100% 100%,0 100%); transform:rotate(30deg); }
@@ -384,6 +393,8 @@ body { overflow-x:hidden; background:#0b2430; }
 .npc-result { min-height:17px; margin-top:8px; color:#6b8386; font-size:8px; }.npc-result.ok { color:#207d72; }.npc-result.bad { color:#b54e55; }.npc-result.pending { color:#9a7035; }
 .world-stage + .research-only,.world-stage ~ .research-only { width:min(1420px,calc(100% - 44px)); margin-right:auto; margin-left:auto; }
 .research-mode .world-stage { min-height:100svh; }
+#state-revision,#world-revision { display:none; }
+.research-mode #state-revision,.research-mode #world-revision { display:inline-flex; }
 
 @media (max-width:900px) {
   .game-topbar .topbar-link,.game-topbar .status-pill { display:none; }

@@ -35,6 +35,7 @@ test('NPC Persona Markdown cards remain an authoring artifact with required sect
   const cards = {
     'pathfinder-001': 'research/npcs/pathfinder-001.md',
     'shade-collector-001': 'research/npcs/shade-collector-001.md',
+    'echo-postcarrier-001': 'research/npcs/echo-postcarrier-001.md',
   };
   for (const filename of Object.values(cards)) {
     const absolute = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', filename);

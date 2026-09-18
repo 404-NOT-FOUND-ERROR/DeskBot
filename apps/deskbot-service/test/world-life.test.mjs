@@ -40,12 +40,12 @@ test('world life seeds bounded NPCs and one replayable scene per wall-clock slot
   const { world, life, advance } = fixture();
   const first = life.tick();
   assert.equal(first.encounters.length, 0);
-  assert.equal(world.get().npcs.length, 2);
+  assert.equal(world.get().npcs.length, 3);
   assert.equal(world.get().life.current_scene.location_id, 'shaping-field-desk');
-  assert.deepEqual(world.listMutations().map((item) => item.action), ['upsert_npc', 'upsert_npc', 'set_life_scene']);
+  assert.deepEqual(world.listMutations().map((item) => item.action), ['upsert_npc', 'upsert_npc', 'upsert_npc', 'set_life_scene']);
 
   life.tick();
-  assert.equal(world.listMutations().length, 3);
+  assert.equal(world.listMutations().length, 4);
 
   const firstSceneId = world.get().life.current_scene.scene_id;
   advance(SLOT_MS);
@@ -322,8 +322,8 @@ test('seeded NPCs and the current scene survive a persistence restart without co
     const second = fixture('2026-09-17T02:00:00.000Z', secondPersistence);
     assert.doesNotThrow(() => second.life.tick());
     assert.equal(second.world.get().life.current_scene.scene_id, sceneId);
-    assert.equal(second.world.get().npcs.length, 2);
-    assert.equal(second.world.listMutations().length, 3);
+    assert.equal(second.world.get().npcs.length, 3);
+    assert.equal(second.world.listMutations().length, 4);
     secondPersistence.close();
   } finally {
     rmSync(directory, { recursive: true, force: true });
