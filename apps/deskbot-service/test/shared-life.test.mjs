@@ -44,6 +44,19 @@ test('older relevant memory is retrieved and memory boundary survives SQLite res
   } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('branch experiences are searchable without entering confirmed relationship memory', () => {
+  const world = createPersistentWorld();
+  world.ingest({ event_id: 'npc-seed', type: 'world.mutation', payload: { action: 'upsert_npc', npc: { npc_id: 'pathfinder-001', display_name: '潮痕巡路员', location_id: 'shaping-field-desk', status: 'waiting' } } });
+  world.ingest({ event_id: 'scene-seed', type: 'world.mutation', payload: { action: 'set_life_scene', scene: { scene_id: 'scene-old-route', location_id: 'shaping-field-desk', title: '潮路留下折痕', narration: '旧路记住了一次同行', participants: ['pathfinder-001'], branch_key: 'tide-path-shared-route', arc_id: 'tide-path-three-days-v1', cause_experience_ids: ['exp-route'], resolution_state: 'experienced' } } });
+  world.ingest({ event_id: 'interaction-seed', type: 'world.mutation', payload: { action: 'npc_interaction', interaction_id: 'exp-route', npc_id: 'pathfinder-001', intent: 'help', response: '一起看路', experience: { experience_id: 'exp-route', npc_name: '潮痕巡路员', scene_id: 'scene-old-route', summary: '在聚形域桌边与潮痕巡路员搭手帮忙', occurred_at: '2026-09-17T00:00:00.000Z' } } });
+  const life = createSharedLife({ worldSnapshot: () => world.get() });
+  const found = life.retrieveExperiences('你还记得我们和巡路员一起看路吗');
+  assert.equal(found[0].experience_id, 'exp-route');
+  assert.equal(found[0].source_type, 'npc_experience');
+  assert.deepEqual(life.recall(), []);
+  assert.deepEqual(life.retrieveExperiences('今天几点了'), []);
+});
+
 test('correction and forgetting remove old turn paraphrases from subsequent prompt', async t => {
   let time = new Date('2026-09-16T00:00:00Z');
   let captured = '';

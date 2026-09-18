@@ -47,12 +47,12 @@ export function installStoryPackage(id, { now = new Date(), plans = [], schedule
   if (!preview.installable) throw new InputError(409, 'story_package_exists', preview.reason);
   const pack = preview.package;
   const steps = [
-    { at: atDay(new Date(now), 0), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:arrival`, title: pack.days[0].title, summary: pack.days[0].summary, daily_consequence: pack.days[0].consequence, opportunity: pack.days[0].opportunity, arc_id: id, source: 'authored-story-package' } } },
+    { at: atDay(new Date(now), 0), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:arrival`, title: pack.days[0].title, summary: pack.days[0].summary, daily_consequence: pack.days[0].consequence, opportunity: pack.days[0].opportunity, arc_id: id, status: 'active', outcome: 'route_arrived', source: 'authored-story-package' } } },
     { at: atDay(new Date(now), 0), payload: { action: 'upsert_npc', npc: pack.npc } },
     { at: atDay(new Date(now), 1), payload: { action: 'npc_action', npc_id: pack.npc.npc_id, action_name: 'open_route', status: 'attentive', location_id: pack.npc.location_id, summary: pack.days[1].summary, arc_id: id } },
-    { at: atDay(new Date(now), 2), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:afterglow`, title: pack.days[2].title, summary: pack.days[2].summary, daily_consequence: pack.days[2].consequence, opportunity: pack.days[2].opportunity, arc_id: id, source: 'authored-story-package' } } },
+    { at: atDay(new Date(now), 1), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:opening`, title: pack.days[1].title, summary: pack.days[1].summary, daily_consequence: pack.days[1].consequence, opportunity: pack.days[1].opportunity, arc_id: id, status: 'active', outcome: 'route_opened', source: 'authored-story-package' } } },
+    { at: atDay(new Date(now), 2), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:afterglow`, title: pack.days[2].title, summary: pack.days[2].summary, daily_consequence: pack.days[2].consequence, opportunity: pack.days[2].opportunity, arc_id: id, status: 'resolved', outcome: 'route_recorded', source: 'authored-story-package' } } },
   ];
   const plan = schedule({ id, steps });
   return { schema: 'deskbot.story-package-installed.v0.1', package_id: id, plan, causal_chain: steps.map((step, index) => ({ step_index: index, evidence_id: `life:${id}:${index}`, source_layer: 'world_line', depends_on: index ? [`life:${id}:${index - 1}`] : [] })) };
 }
-

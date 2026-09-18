@@ -178,6 +178,7 @@ export function createDeskBotServer({
     audioArtifacts,
     activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
     relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
+    branchExperiences: (query, worldSnapshot) => sharedLife.retrieveExperiences(query, worldSnapshot),
     conversationHistoryAfter: (characterId) => sharedLife.historyAfter(characterId),
     recordRoleTrialObservation: ({ characterId, eventId, evidenceId, signal }) => {
       return roles.activeTrials({ characterId }).map((trial) => {
@@ -324,6 +325,10 @@ export function createDeskBotServer({
         sendJson(response, 200, worldLife.snapshot());
         return;
       }
+    }
+    if (url.pathname === '/api/life/experiences' && request.method === 'GET') {
+      sendJson(response, 200, { experiences: sharedLife.retrieveExperiences(url.searchParams.get('query') ?? '') });
+      return;
     }
     if (url.pathname === '/api/life/npc-interactions' && request.method === 'POST') {
       readJson(request)

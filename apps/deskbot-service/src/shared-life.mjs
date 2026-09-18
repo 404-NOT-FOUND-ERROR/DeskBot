@@ -9,6 +9,17 @@ function text(value, field) {
   return value.trim();
 }
 
+function hanNgrams(value, min = 2, max = 4) {
+  const runs = String(value ?? '').match(/[\p{Script=Han}]+/gu) ?? [];
+  const result = new Set();
+  for (const run of runs) {
+    for (let size = min; size <= Math.min(max, run.length); size++) {
+      for (let index = 0; index <= run.length - size; index++) result.add(run.slice(index, index + size));
+    }
+  }
+  return [...result];
+}
+
 // Only explicit user-confirmed notes are memories. Generated replies never enter here.
 export function createSharedLife({ persistence = null, now = () => new Date(), ingest, worldSnapshot = null, npcReserved = () => false }) {
   const memories = new Map((persistence?.list('life.memories') ?? []).map(x => [x.id, x]));
@@ -65,6 +76,62 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
       score: [...terms].filter(term => memory.text.toLowerCase().includes(term)).length,
     }));
     return scored.sort((a, b) => b.score - a.score).slice(0, 8).map(x => x.memory);
+  }
+  function retrieveExperiences(query = '', providedWorld = null) {
+    const world = providedWorld ?? worldSnapshot?.();
+    if (!world) return [];
+    const normalizedQuery = String(query).trim().toLowerCase();
+    if (!normalizedQuery) return [];
+    const temporalCue = /(刚才|上次|以前|之前|记得|那次|经历|发生|一起|去过|遇见)/u.test(normalizedQuery);
+    const locations = new Map((world.locations ?? []).map(location => [location.location_id, location.name ?? location.location_id]));
+    const experiences = (world.life?.recent_experiences ?? []).map(item => ({
+      source_type: 'npc_experience',
+      evidence_ids: [item.experience_id],
+      experience_id: item.experience_id,
+      scene_id: item.scene_id ?? null,
+      npc_id: item.npc_id ?? null,
+      npc_name: item.npc_name ?? null,
+      location_id: item.location_id ?? null,
+      location_name: locations.get(item.location_id) ?? item.location_id ?? null,
+      summary: item.summary,
+      occurred_at: item.occurred_at ?? null,
+    }));
+    const scenes = [world.life?.current_scene, ...(world.life?.recent_scenes ?? [])].filter(Boolean).map(scene => ({
+      source_type: 'scene',
+      evidence_ids: [scene.scene_id, ...(scene.cause_event_ids ?? []), ...(scene.cause_experience_ids ?? [])],
+      experience_id: null,
+      scene_id: scene.scene_id,
+      npc_id: null,
+      npc_name: null,
+      location_id: scene.location_id,
+      location_name: locations.get(scene.location_id) ?? scene.location_id ?? null,
+      summary: [scene.title, scene.narration].filter(Boolean).join('：'),
+      occurred_at: scene.ended_at ?? scene.started_at ?? null,
+      arc_id: scene.arc_id ?? null,
+      branch_key: scene.branch_key ?? null,
+      resolution_state: scene.resolution_state ?? null,
+    }));
+    const candidates = [...experiences, ...scenes];
+    const namedAnchors = new Set();
+    for (const candidate of candidates) {
+      for (const value of [candidate.npc_name, candidate.location_name, candidate.arc_id]) {
+        for (const token of hanNgrams(value)) namedAnchors.add(token.toLowerCase());
+        if (typeof value === 'string' && /[a-z0-9]/i.test(value)) namedAnchors.add(value.toLowerCase());
+      }
+    }
+    const queryAnchors = [...namedAnchors].filter(anchor => normalizedQuery.includes(anchor));
+    if (!temporalCue && queryAnchors.length === 0) return [];
+    return candidates.map((candidate, index) => {
+      const haystack = JSON.stringify(candidate).toLowerCase();
+      const score = (temporalCue ? (candidate.source_type === 'npc_experience' ? 2 : 1) : 0)
+        + queryAnchors.filter(anchor => haystack.includes(anchor)).length * 4;
+      return { candidate, score, index };
+    }).filter(item => item.score > 0)
+      .sort((left, right) => right.score - left.score
+        || String(right.candidate.occurred_at ?? '').localeCompare(String(left.candidate.occurred_at ?? ''))
+        || left.index - right.index)
+      .slice(0, queryAnchors.length ? 6 : 2)
+      .map(item => structuredClone(item.candidate));
   }
   function schedule(body) {
     const id = text(body.id, 'id');
@@ -149,6 +216,6 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
     persistence?.put('life.plans', id, plan);
     return structuredClone(plan);
   }
-  return { remember, recall, retrieve, historyAfter, forget, schedule, tick, cancel,
+  return { remember, recall, retrieve, retrieveExperiences, historyAfter, forget, schedule, tick, cancel,
     plans: () => structuredClone([...plans.values()]) };
 }

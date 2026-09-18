@@ -90,6 +90,59 @@ const LIFE_SCENES = Object.freeze({
   ]),
 });
 
+const CAUSAL_SCENE_BRANCHES = Object.freeze([
+  Object.freeze({
+    id: 'tide-path-shared-route',
+    arc_id: 'tide-path-three-days-v1',
+    experience: Object.freeze({ npc_id: 'pathfinder-001', intents: Object.freeze(['help', 'invite']) }),
+    title: '那段同行把新岔路留在了地图上',
+    narration: '缺角地图没有复述你们说过的话，只在共同停过的地方长出一枚会变色的小路标。巡路员把它圈了起来，算作一段真正走过的路。',
+    cue: '新路标的颜色和那次同行结束时一模一样',
+    opportunity: '问问巡路员，这段共同经历让哪条路变得不一样',
+    resolution_state: 'experienced',
+  }),
+  Object.freeze({
+    id: 'tide-path-route-missed',
+    arc_id: 'tide-path-three-days-v1',
+    event: Object.freeze({ outcomes: Object.freeze(['route_missed', 'stayed_home']), statuses: Object.freeze(['missed']) }),
+    title: '没赶上的潮路留下了一只空路标',
+    narration: '潮水已经合上旧路，巡路员没有假装你们去过。它只把一只空路标立在桌边，标着“这次没有发生”，等下一次路线自己出现。',
+    cue: '路标是干的，底部却沾着一点退潮后的盐',
+    opportunity: '承认这次错过，或把空路标留作下次的起点',
+    resolution_state: 'missed',
+  }),
+  Object.freeze({
+    id: 'tide-path-route-recorded',
+    arc_id: 'tide-path-three-days-v1',
+    event: Object.freeze({ event_suffix: ':afterglow', outcomes: Object.freeze(['route_recorded', 'route_opened']), statuses: Object.freeze(['resolved', 'completed']) }),
+    title: '潮路收起以后，地图记住了走法',
+    narration: '旧路已经退回潮线后面，缺角地图却多出一道猫耳形折痕。它不是新任务，而是这个世界承认：这里确实发生过一段寻路生活。',
+    cue: '折痕在光下会短暂指向上次抵达的方向',
+    opportunity: '把这段结果收进行囊，等以后某次生活再次用到它',
+    resolution_state: 'resolved',
+  }),
+  Object.freeze({
+    id: 'tide-path-opening',
+    arc_id: 'tide-path-three-days-v1',
+    event: Object.freeze({ event_suffix: ':opening', statuses: Object.freeze(['active']) }),
+    title: '旧路今天真的开了',
+    narration: '缺角地图上的湿线从传闻变成了一条能踩上去的路。巡路员先踏出一步，又回头确认喵呜是不是也看见了同一个入口。',
+    cue: '入口每隔几秒就向桌边靠近半寸',
+    opportunity: '决定靠近入口、继续观察，或明确这次不去',
+    resolution_state: 'open',
+  }),
+  Object.freeze({
+    id: 'tide-path-arrival',
+    arc_id: 'tide-path-three-days-v1',
+    event: Object.freeze({ event_suffix: ':arrival', statuses: Object.freeze(['active']) }),
+    title: '一枚湿路标被潮水推到桌边',
+    narration: '它的箭头每次被看见都会偏一点，像一条还没决定要不要邀请谁的路。巡路员没有催，只把缺角地图摊在旁边。',
+    cue: '路标底下积着一圈不往外流的浅水',
+    opportunity: '先观察路标怎样选择方向，不必立刻出发',
+    resolution_state: 'open',
+  }),
+]);
+
 function hashNumber(value) {
   return Number.parseInt(createHash('sha256').update(String(value)).digest('hex').slice(0, 8), 16);
 }
@@ -143,7 +196,87 @@ function nextHop(world, fromLocationId, destinationId) {
   return null;
 }
 
+function causalSceneConsumed(world, branch, eventIds, experienceIds) {
+  const scenes = [world.life?.current_scene, ...(world.life?.recent_scenes ?? [])].filter(Boolean);
+  return scenes.some(scene => scene.branch_key === branch.id
+    && sameStrings([...(scene.cause_event_ids ?? [])].sort(), [...eventIds].sort())
+    && sameStrings([...(scene.cause_experience_ids ?? [])].sort(), [...experienceIds].sort()));
+}
+
+function causalCause(world, branch) {
+  if (branch.experience) {
+    const experience = [...(world.life?.recent_experiences ?? [])].reverse().find(item => item.npc_id === branch.experience.npc_id
+      && branch.experience.intents.includes(item.intent));
+    return experience ? { eventIds: [], experienceIds: [experience.experience_id] } : null;
+  }
+  const event = [...(world.world_line?.recent_events ?? [])].reverse().find(item => {
+    if (item.arc_id !== branch.arc_id) return false;
+    if (branch.event.event_suffix && !item.event_id.endsWith(branch.event.event_suffix)) return false;
+    const outcomeMatch = branch.event.outcomes?.includes(item.outcome);
+    const statusMatch = branch.event.statuses?.includes(item.status);
+    return branch.event.outcomes && branch.event.statuses ? outcomeMatch || statusMatch : outcomeMatch ?? statusMatch ?? true;
+  });
+  return event ? { eventIds: [event.event_id], experienceIds: [] } : null;
+}
+
+function selectCausalScene(world, now) {
+  const locationId = world.protagonist.location_id;
+  const slot = Math.floor(now.getTime() / SLOT_MS);
+  for (const branch of CAUSAL_SCENE_BRANCHES) {
+    const cause = causalCause(world, branch);
+    if (!cause) continue;
+    const current = world.life?.current_scene ?? null;
+    const sameCurrent = current?.branch_key === branch.id
+      && sameStrings([...(current.cause_event_ids ?? [])].sort(), [...cause.eventIds].sort())
+      && sameStrings([...(current.cause_experience_ids ?? [])].sort(), [...cause.experienceIds].sort());
+    if (causalSceneConsumed(world, branch, cause.eventIds, cause.experienceIds) && !sameCurrent) continue;
+    const startSlot = sameCurrent && current.started_at ? Math.floor(Date.parse(current.started_at) / SLOT_MS) : slot;
+    if (sameCurrent && slot > startSlot) continue;
+    const participants = (world.npcs ?? []).filter(npc => npc.location_id === locationId).map(npc => npc.npc_id).sort();
+    const causeKey = [...cause.eventIds, ...cause.experienceIds].join(':');
+    const contextSuffix = createHash('sha256').update(`${LIFE_CONTENT_VERSION}:${branch.id}:${causeKey}:${locationId}`).digest('hex').slice(0, 6);
+    return {
+      scene_id: `life-causal-scene:${branch.id}:${contextSuffix}`,
+      template_id: branch.id,
+      slot_key: String(slot),
+      location_id: locationId,
+      content_version: LIFE_CONTENT_VERSION,
+      title: branch.title,
+      narration: branch.narration,
+      sensory_cue: branch.cue,
+      opportunity: branch.opportunity,
+      time_band: timeBand(world.logical_time?.minute_of_day ?? 0),
+      participants,
+      arc_id: branch.arc_id,
+      cause_event_ids: cause.eventIds,
+      cause_experience_ids: cause.experienceIds,
+      branch_key: branch.id,
+      resolution_state: branch.resolution_state,
+      source_factors: {
+        logical_day: world.logical_time?.day ?? null,
+        logical_minute: world.logical_time?.minute_of_day ?? null,
+        weather: world.weather?.snapshot?.condition ?? null,
+        world_event_id: cause.eventIds.at(-1) ?? null,
+        experience_id: cause.experienceIds.at(-1) ?? null,
+      },
+      continuity: {
+        kind: sameCurrent ? 'continued' : 'causal_branch',
+        previous_scene_id: current?.scene_id ?? null,
+        previous_template_id: current?.template_id ?? null,
+        previous_title: current?.title ?? null,
+        cooled_template_ids: [],
+      },
+      started_at: sameCurrent ? current.started_at : new Date(slot * SLOT_MS).toISOString(),
+      expires_at: new Date((slot + 1) * SLOT_MS).toISOString(),
+      npc_actions: {},
+    };
+  }
+  return null;
+}
+
 function selectScene(world, now) {
+  const causal = selectCausalScene(world, now);
+  if (causal) return causal;
   const locationId = world.protagonist.location_id;
   const catalog = LIFE_SCENES[locationId] ?? LIFE_SCENES['shaping-field-desk'];
   const band = timeBand(world.logical_time?.minute_of_day ?? 0);
@@ -299,7 +432,7 @@ export function createWorldLife({
     const world = worldSnapshot();
     const currentLocationId = world.protagonist.location_id;
     return {
-      schema: 'deskbot.world-life.v0.2',
+      schema: 'deskbot.world-life.v0.3',
       enabled,
       world_revision: world.world_revision,
       current_location_id: currentLocationId,
@@ -357,6 +490,9 @@ export function createWorldLife({
       && current.location_id === selected.location_id
       && current.template_id === selected.template_id
       && current.content_version === selected.content_version
+      && current.branch_key === (selected.branch_key ?? null)
+      && sameStrings([...(current.cause_event_ids ?? [])].sort(), [...(selected.cause_event_ids ?? [])].sort())
+      && sameStrings([...(current.cause_experience_ids ?? [])].sort(), [...(selected.cause_experience_ids ?? [])].sort())
       && sameParticipants;
     if (sameContext && current.slot_key !== selected.slot_key) {
       ingest({
@@ -477,4 +613,4 @@ export function createWorldLife({
   return { tick, snapshot, interact, seedNpcs };
 }
 
-export { INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS };
+export { CAUSAL_SCENE_BRANCHES, INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS };

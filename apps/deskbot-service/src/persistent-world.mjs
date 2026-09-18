@@ -81,10 +81,10 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action: 'dequeue_pending_item', layer: 'world_line', required: [], optional: ['item_id'], description: '按 FIFO 取出待处理事项' },
   { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC，最多 3 个' },
   { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: ['reason'], description: '沿可见且未被阻断的相邻路线移动主角，并推进旅行时间' },
-  { action: 'set_life_scene', layer: 'world_line', required: ['scene.scene_id', 'scene.location_id', 'scene.title'], optional: ['scene.content_version', 'scene.narration', 'scene.sensory_cue', 'scene.opportunity', 'scene.participants', 'scene.source_factors', 'scene.continuity', 'scene.started_at', 'scene.expires_at'], description: '由世界生活引擎切换当前可回放 Scene' },
+  { action: 'set_life_scene', layer: 'world_line', required: ['scene.scene_id', 'scene.location_id', 'scene.title'], optional: ['scene.content_version', 'scene.narration', 'scene.sensory_cue', 'scene.opportunity', 'scene.participants', 'scene.source_factors', 'scene.continuity', 'scene.started_at', 'scene.expires_at', 'scene.arc_id', 'scene.cause_event_ids', 'scene.cause_experience_ids', 'scene.branch_key', 'scene.resolution_state'], description: '由世界生活引擎切换当前可回放 Scene' },
   { action: 'continue_life_scene', layer: 'world_line', required: ['scene_id', 'slot_key', 'expires_at'], optional: ['source_factors', 'continuity'], description: '同一生活事件跨时间槽继续，不重复制造新 Scene' },
   { action: 'npc_interaction', layer: 'world_line', required: ['interaction_id', 'npc_id', 'intent', 'response'], optional: ['idea', 'occurred_at', 'experience', 'role_direction'], description: '记录同地点 NPC 对白名单互动、共同经历与有限关系变化' },
-  { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.arc_id', 'event.status', 'event.source', 'event.occurred_at'], description: '记录世界线事件、当前弧段及其可生活切片' },
+  { action: 'apply_world_line_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.arc_id', 'event.status', 'event.outcome', 'event.source', 'event.occurred_at'], description: '记录世界线事件、当前弧段、结果及其可生活切片' },
   { action: 'update_weather', layer: 'weather', required: ['snapshot'], optional: ['snapshot.location', 'snapshot.condition', 'snapshot.temperature_c', 'snapshot.humidity', 'snapshot.wind_mps', 'snapshot.observed_at', 'snapshot.provider'], description: '写入天气观测，旧观测只留审计记录' },
   { action: 'record_external_context', layer: 'external_context', required: ['item.item_id', 'item.title'], optional: ['item.summary', 'item.category', 'item.url', 'item.published_at', 'item.observed_at', 'item.provider'], description: '写入外部新闻或网络事件' },
   { action: 'advance_calendar', layer: 'calendar', required: [], optional: ['date', 'timezone', 'season', 'solar_term', 'holiday', 'observed_at'], description: '推进日历，日期不可倒退' },
@@ -254,7 +254,7 @@ function createMultisourceState() {
 
 function createInitialLifeState() {
   return {
-    schema: 'deskbot.world-life-state.v0.2',
+    schema: 'deskbot.world-life-state.v0.3',
     current_scene: null,
     recent_scenes: [],
     recent_experiences: [],
@@ -632,6 +632,7 @@ function normalizeActiveEvent(value) {
     daily_consequence: optionalText(event.daily_consequence, 'payload.event.daily_consequence', null),
     opportunity: optionalText(event.opportunity, 'payload.event.opportunity', null),
     unresolved_hook: optionalText(event.unresolved_hook, 'payload.event.unresolved_hook', null),
+    arc_id: optionalText(event.arc_id ?? event.arc, 'payload.event.arc_id', null),
     source: optionalText(event.source, 'payload.event.source', 'world.mutation'),
     blocks_travel: event.blocks_travel === true,
   };
@@ -708,6 +709,15 @@ function normalizeLifeScene(value, world) {
     participants,
     source_factors: optionalObject(scene.source_factors, 'payload.scene.source_factors', {}),
     continuity: optionalObject(scene.continuity, 'payload.scene.continuity', null),
+    arc_id: optionalText(scene.arc_id, 'payload.scene.arc_id', null),
+    cause_event_ids: Array.isArray(scene.cause_event_ids)
+      ? uniqueStrings(scene.cause_event_ids.map((item) => requireText(item, 'payload.scene.cause_event_ids[]'))).slice(0, 8)
+      : [],
+    cause_experience_ids: Array.isArray(scene.cause_experience_ids)
+      ? uniqueStrings(scene.cause_experience_ids.map((item) => requireText(item, 'payload.scene.cause_experience_ids[]'))).slice(0, 8)
+      : [],
+    branch_key: optionalText(scene.branch_key, 'payload.scene.branch_key', null),
+    resolution_state: optionalText(scene.resolution_state, 'payload.scene.resolution_state', null),
     started_at: optionalDateTime(scene.started_at, 'payload.scene.started_at', null),
     expires_at: optionalDateTime(scene.expires_at, 'payload.scene.expires_at', null),
     continuation_count: 0,
@@ -761,6 +771,7 @@ function normalizeWorldLineEvent(value) {
     unresolved_hook: optionalText(item.unresolved_hook, 'payload.event.unresolved_hook', null),
     arc_id: optionalText(item.arc_id ?? item.arc, 'payload.event.arc_id', null),
     status: optionalText(item.status, 'payload.event.status', 'active'),
+    outcome: optionalText(item.outcome, 'payload.event.outcome', null),
     source: optionalText(item.source, 'payload.event.source', 'world-engine'),
     occurred_at: optionalDateTime(item.occurred_at, 'payload.event.occurred_at', null),
   };
@@ -1056,10 +1067,20 @@ function applyExplicitMutation(world, event) {
         throw new PersistentWorldError(409, 'active_event_conflict', `active event is ${next.active_event.event_id}`);
       }
       const resolvedEvent = clone(next.active_event);
+      const outcome = optionalText(payload.outcome, 'payload.outcome', null);
       next.active_event = null;
+      const worldLineEvent = {
+        ...resolvedEvent,
+        status: 'resolved',
+        outcome,
+        occurred_at: event.occurred_at ?? null,
+      };
+      next.world_line.latest_event = worldLineEvent;
+      next.world_line.recent_events = appendUniqueWorldLineEvent(next.world_line.recent_events, worldLineEvent);
+      if (worldLineEvent.arc_id !== null && worldLineEvent.arc_id !== undefined) next.world_line.current_arc = worldLineEvent.arc_id;
       details = {
         resolved_event: resolvedEvent,
-        outcome: optionalText(payload.outcome, 'payload.outcome', null),
+        outcome,
       };
       break;
     }
@@ -1493,7 +1514,7 @@ export function getWorldSchema() {
       protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, travel_state: { type: 'object' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
       locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
       npcs: { type: 'array', item: 'npc', maximum: MAX_NPCS },
-      life: { type: 'object', schema: 'deskbot.world-life-state.v0.2', fields: ['current_scene', 'recent_scenes', 'recent_experiences'] },
+      life: { type: 'object', schema: 'deskbot.world-life-state.v0.3', fields: ['current_scene', 'recent_scenes', 'recent_experiences'] },
       active_event: { type: ['object', 'null'] },
       pending_items: { type: 'array', maximum: MAX_PENDING_ITEMS },
       shaping_field: { type: 'object', fields: clone(SHAPING_FIELD_DEFINITIONS) },

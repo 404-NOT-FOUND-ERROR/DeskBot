@@ -19,7 +19,7 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-最近一次 Node 服务回归为 `145/145`；覆盖角色方向 HTTP、结构化证据聚合、持久化试行、活动方向表达覆盖、三端 expression intent、世界生活切片、assistant 证据隔离、后台口吻近期记忆隔离和紧凑 canonical prompt 投影。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
+最近一次 Node 服务回归基线为 `145/145`；本轮新增定向覆盖世界线结果 Scene 分支、因果分支幂等、NPC 多步等待/截止/错过反馈以及支线经历检索。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。完整回归需在本轮改动后重新运行并记录实际计数。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
 
@@ -35,6 +35,9 @@
 | CosyVoice/真实 ASR | guarded live + hardware | 20 回合一次且仅一次、延迟和播放失败可回放 | proposed |
 | ESP-VoCat 真机 | hardware integration | hello、speak、expression、ACK、断线恢复 | proposed |
 | 纵向角色变化 | manual longitudinal study | P2-P4 evidence/revision/阶段档案可完整回放 | proposed |
+| 世界线结果到 Scene 分支 | automated | outcome/status 选择 authored branch；相同 cause 不重复 | implemented: targeted |
+| NPC 多步目标 | automated | 每 tick 一步；waiting/missed/failed 可重启恢复 | implemented: targeted |
+| 支线经历检索 | automated | 相关 query 返回 source/evidence；不进入 confirmed memory | implemented: targeted |
 
 ## Gaps
 

@@ -88,6 +88,36 @@ test('NPC seeding safely respects the three-NPC world bound', () => {
   assert.equal(world.get().life.current_scene.participants.length, 3);
 });
 
+test('world-line outcomes select authored causal Scenes and do not replay a consumed branch', () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('tide-recorded', {
+    action: 'apply_world_line_event',
+    event: { event_id: 'tide-path-three-days-v1:afterglow', title: '路标留下回声', arc_id: 'tide-path-three-days-v1', status: 'resolved', outcome: 'route_recorded' },
+  }));
+  const selected = life.tick({ force: true }).current_scene;
+  assert.equal(selected.branch_key, 'tide-path-route-recorded');
+  assert.deepEqual(selected.cause_event_ids, ['tide-path-three-days-v1:afterglow']);
+  const count = world.listMutations().length;
+  life.tick({ force: true });
+  assert.equal(world.listMutations().length, count);
+});
+
+test('a shared NPC experience can become a causal Scene branch', () => {
+  const { world, life } = fixture();
+  life.tick();
+  const pathfinderLocation = world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').location_id;
+  if (pathfinderLocation !== world.get().protagonist.location_id) {
+    world.ingest(mutation('join-pathfinder', { action: 'move_protagonist', location_id: pathfinderLocation }));
+  }
+  const interaction = life.interact({ interaction_id: 'shared-route', npc_id: 'pathfinder-001', intent: 'help' });
+  assert.equal(interaction.accepted, true);
+  const selected = life.tick({ force: true }).current_scene;
+  assert.equal(selected.branch_key, 'tide-path-shared-route');
+  assert.deepEqual(selected.cause_experience_ids, ['npc-interaction:pathfinder-001:shared-route']);
+  assert.equal(selected.resolution_state, 'experienced');
+});
+
 test('same-place interactions are bounded, idempotent and increase relationship state once', () => {
   const { world, life } = fixture();
   life.tick();
