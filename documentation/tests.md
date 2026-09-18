@@ -4,6 +4,8 @@
 
 ## Existing coverage
 
+| NPC Persona Agent | Persona 字段、Markdown 作者卡、Scene/关系提示词、HTTP 真实调用、fallback、重复请求幂等 | `npc-personas.test.mjs`、`world-life.test.mjs` | implemented: local fake LLM |
+
 | 用例 | 规则/预期 | 证据 | 状态 |
 |---|---|---|---|
 | 输入与聊天幂等 | 相同 event/correlation 不重复回合；冲突返回错误 | `apps/deskbot-service/test/input.test.mjs`、`persistence-restart.test.mjs` | existing |
@@ -19,11 +21,13 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-最近一次 Node 服务回归基线为 `145/145`；本轮新增定向覆盖世界线结果 Scene 分支、因果分支幂等、NPC 多步等待/截止/错过反馈以及支线经历检索。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。完整回归需在本轮改动后重新运行并记录实际计数。
+此前 Node 服务回归基线为 `145/145`；持续世界增量曾达到 `180/180`。Persona Agent、作者 Markdown 卡、NPC HTTP 接线、fallback/幂等和桌面潮玩 Scene 文案增量后的历史快照为 `186/186`；2026-09-18 新增“二次 grounding 改写仍抽象时回退 authored response”回归后，当前 Node 全量回归为 `189/189`。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
 
 2026-09-16 运行态修订：沙箱外 DeepSeek 直连最小请求返回 HTTP 200；最新服务真实聊天返回 HTTP 202。角色样本验证了融合式功能话语、猫式开场、低风险代选、情绪承接、世界生活细节和“机会/悬念未观测前不得当作事实”的规则。当前服务 PID 由启动时动态分配，验收时以 `/health` 和当次请求为准；天气仍明确为 `open-meteo / disabled`。
+
+2026-09-18 Persona Agent 修订：首轮 NPC 草稿若触发 grounding guard，会最多进行一次窄范围改写；若改写仍是设定说明、客服套话或抽象词堆叠，则丢弃两次模型草稿并使用 authored persona fallback。新增测试验证两次模型调用、具体角色台词保留和 canonical interaction 仍只写入最终正文。
 
 ## Proposed tests
 

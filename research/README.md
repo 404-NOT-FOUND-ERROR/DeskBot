@@ -38,6 +38,7 @@
 - `shell-interface-v1.md`：固定内骨架与可替换外壳的接口规范草案。
 - `mvp-2-week-checklist.md`：两周最小可行原型及记录要求。
 - `research-design-v0.1.md`：研究问题、实验变量、评价指标与阶段性实验。
+- `visual-language-v0.1.md`：桌面潮玩、持续世界、沉浸角色和电子前沿界面的视觉/文案迁移决策。
 - `hardware/esp-ditto-reproduction-guide-v0.1.md`：从开源工程到 PCBA、装配和上电的复刻流程。
 - `hardware/pcba-preorder-gate.md`：首批 PCBA 付款前的硬性检查清单。
 - `hardware/mcu-decision.md`：N8R8、N16R8 与页面 N8R4 录入值的选择结论。

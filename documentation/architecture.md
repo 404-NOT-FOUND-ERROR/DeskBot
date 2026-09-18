@@ -64,9 +64,17 @@ NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带
 
 这一版仍不是开放式自主世界：Scene 来自每地点三条有限模板，只有两个内置 NPC，NPC 回应和两小时日程由有限角色规则确定。因果分支现在通过 `arc_id + outcome/status + cause_event_ids/cause_experience_ids` 选择 authored Scene；消费过的因果分支不会重复生成，普通地点生活仍作为 fallback。`npc-goals` 同时兼容旧的 ordered alternatives 与 `steps-v1`：多步目标每次 tick 最多推进一步，状态可为 `waiting/completed/missed/failed`，每一步持久化 `decision`、`step_history`、等待条件、截止时间和可选 missed/failed 反馈事件；NPC 移动仍由 canonical world 强制相邻跳转。自动经历不进入 `life.memories`，而从 `GET /api/life/experiences?query=` 和 `branchExperiences` 只读检索，提示词明确区分用户确认记忆与世界生活痕迹。下一阶段是跨天体验校准、支线后果和主动打扰频率，不是把有限规则宣称为开放式自主世界。
 
+### NPC Persona Agent（v0.1）
+
+首发 NPC 现在有独立作者卡：`research/npcs/*.md` 是可读、可评审的创作层，`src/npc-personas.mjs` 是经过校验的运行时投影。人物卡不只描述职业，还固定了欲望、喜欢、厌恶、恐惧、关系、口癖、触发点、行为边界和示例台词。`POST /api/life/npc-interactions` 会把 Persona、当前地点、当前 Scene、关系和最近共同经历交给 LLM；LLM 只生成 NPC 当面说的正文，不能写 canonical world、移动 NPC、改天气、换外壳或改变人格。正文随后作为 `npc_interaction` mutation 的 `response` 保存，关系和共同经历仍由 Node 规则更新。
+
+NPC Agent 是可降级的：未注册 Persona、无 LLM 或 provider 异常时使用 authored fallback；同一 `interaction_id` 直接重放已有回复，不重复调用模型或增加关系。它提升的是人物表演和沉浸感，不等于已经实现开放式自主 NPC；地点日程、世界后果和角色阶段仍由 Node 的白名单 mutation 控制。
+
 ## 世界体验客户端与叙事分层
 
 默认客户端采用“世界优先”布局：地图是全屏背景；左上浮窗承载喵呜的第一人称故事和对话；底部输入框始终可达；地点、角色状态、世界事件、天气、形态与现实输入通过游戏化工具栏按需展开。研究台、原始字段、mutation 和证据仍在第二层，不能挤占普通用户的第一屏。
+
+视觉和文案的当前约束是“桌面潮玩生活”，不是抽象世界观控制台：地点表现为桌面上的小屋、湿路标、会自己挪位的摊位、旧光林地和保管悄悄话的水岸；Scene 写具体小动作、物件和欲望，聚形域规则不作为用户需要理解的说明。地图节点使用摆件区域语义、区域图标和到达反馈；研究字段仍只在研究模式出现。
 
 叙事上下文按 Character.AI 类方法拆成三层，但仍服从 DeskBot canonical state：
 
@@ -85,6 +93,8 @@ NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带
 对应关系是：Creator Guide 约束长期 Character/Soul，Lorebooks 指导按相关性检索地点与世界知识，Scene 指导“此时、此地、可观察事实和自然选择”的构造。三者都只进入叙事上下文；世界事实仍由 canonical mutation 决定。
 
 ## Related Documents
+
+- `research/visual-language-v0.1.md`：桌面潮玩、Marathon/GCORE/CSRC 信息设计与 Character.AI/Labubu 方法的迁移边界。
 
 - `documentation/flows.md`：关键数据流和副作用顺序。
 - `documentation/permissions.md`：当前权限模型与上线前缺口。

@@ -161,6 +161,7 @@ export function createDeskBotServer({
     worldSnapshot: () => persistentWorld.get(),
     ingest: event => ingestNonChatEvent(event),
     npcGoals,
+    llm,
     enabled: worldLifeEnabled,
   });
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
@@ -332,7 +333,8 @@ export function createDeskBotServer({
     }
     if (url.pathname === '/api/life/npc-interactions' && request.method === 'POST') {
       readJson(request)
-        .then((body) => sendJson(response, 200, worldLife.interact(body)))
+        .then((body) => worldLife.interactWithAgent(body))
+        .then((result) => sendJson(response, 200, result))
         .catch((error) => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
           { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'NPC interaction failed' }));
       return;

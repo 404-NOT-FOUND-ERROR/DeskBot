@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto';
 import { InputError } from './input-store.mjs';
 import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
+import {
+  composeNpcAgentPrompt,
+  getNpcPersona,
+  npcReplyNeedsGrounding,
+  publicNpcProfile,
+} from './npc-personas.mjs';
 
 const SLOT_MS = 30 * 60 * 1000;
 const NPC_ROUTINE_SLOT_MS = 2 * 60 * 60 * 1000;
 const SCENE_COOLDOWN_COUNT = 2;
 const LIFE_CONTENT_VERSION = 'world-life-v2';
-const INTERACTION_INTENTS = Object.freeze(['observe', 'greet', 'suggest', 'help', 'invite']);
+const INTERACTION_INTENTS = Object.freeze(['observe', 'greet', 'chat', 'suggest', 'help', 'invite']);
 const DIRECTIONAL_INTENTS = new Set(['suggest', 'help', 'invite']);
 
 const NPC_PROFILES = Object.freeze({
@@ -64,29 +70,29 @@ const NPC_ROUTINES = Object.freeze({
 
 const LIFE_SCENES = Object.freeze({
   'shaping-field-desk': Object.freeze([
-    Object.freeze({ id: 'desk-warm-start', bands: ['morning', 'day'], title: '桌边的光粒开始点名', narration: '底座边缘一圈光粒依次亮起，像在确认今天醒来的东西有没有少一个。', cue: '外壳底部传来很轻的机器余温', opportunity: '把昨晚留下的一件小东西收进今日旅记' }),
-    Object.freeze({ id: 'desk-window-noise', bands: ['day', 'evening'], title: '桌外的声音漏进聚形域', narration: '现实桌面的键盘声被压成一串有方向的小方块，沿着桌沿往不同光域滚去。', cue: '每个声音方块都带着不同颜色的短尾巴', opportunity: '挑一个声音方块，猜它会通向哪种生活' }),
-    Object.freeze({ id: 'desk-late-glow', bands: ['evening', 'night'], title: '屏幕熄下去，外壳还醒着', narration: '主屏已经暗了，外壳缝隙里的余光却还在慢慢交换今天的见闻。', cue: '房间越安静，细小的光路越清楚', opportunity: '决定把哪一件事留到明天再想' }),
+    Object.freeze({ id: 'desk-warm-start', bands: ['morning', 'day'], title: '喵呜在桌边摆好今天的东西', narration: '喵呜把昨晚留在底座旁的纸片、扣子和一颗不知道从哪来的亮珠排成一列，排到第三个时又偷偷换了顺序。', cue: '外壳底部传来很轻的机器余温', opportunity: '给其中一件小物取个今天用得上的名字' }),
+    Object.freeze({ id: 'desk-window-noise', bands: ['day', 'evening'], title: '桌外的声音滚进小屋', narration: '键盘声和杯子碰桌的声音变成一串彩色小方块，喵呜追着其中一块跑了两步，又假装自己只是路过。', cue: '每个声音方块都带着不同颜色的短尾巴', opportunity: '挑一个声音方块，看看它把你们带向哪件小事' }),
+    Object.freeze({ id: 'desk-late-glow', bands: ['evening', 'night'], title: '大家安静以后，喵呜还没睡', narration: '屏幕暗下来以后，喵呜把今天听见的几句话压在胸口的小黄点下面，偶尔拿出来摸一下。', cue: '房间越安静，底座边的小光越像在眨眼', opportunity: '挑一件想留到明天继续的事' }),
   ]),
   'tidal-old-road': Object.freeze([
-    Object.freeze({ id: 'road-marker-check', bands: ['morning', 'day'], title: '退潮后的路标正在重新找方向', narration: '退潮后的箭头比昨天偏了半格，几枚湿路标一边变色，一边试着对齐旧地图留下的刻痕。', cue: '湿路标每被碰一下就换一种蓝绿色', opportunity: '确认一条只走十步的试验路线', participant_overrides: Object.freeze({ 'pathfinder-001': Object.freeze({ title: '潮痕巡路员重新校准路标', narration: '退潮后的箭头比昨天偏了半格，巡路员正用缺角地图一块块比对。', opportunity: '帮巡路员确认一条只走十步的试验路线' }) }), npc_actions: Object.freeze({ 'pathfinder-001': Object.freeze({ action_name: 'recalibrate_markers', status: '正在重新校准潮痕路标' }) }) }),
-    Object.freeze({ id: 'road-puddle-map', bands: ['day', 'evening'], title: '水洼拼出一张临时地图', narration: '几块水洼把天空切成不同方向，连起来刚好像一条从未登记过的小路。', cue: '水面地图会随着脚步轻轻改道', opportunity: '在地图消失前记住其中一个岔口', npc_actions: Object.freeze({ 'pathfinder-001': Object.freeze({ action_name: 'compare_puddle_map', status: '蹲在水洼边比对临时路线' }) }) }),
+    Object.freeze({ id: 'road-marker-check', bands: ['morning', 'day'], title: '潮退后的路标在重新找方向', narration: '退潮后的箭头比昨天偏了半格，几枚湿路标自己挪了挪位置，像在挑一个今天愿意承认的方向。', cue: '湿路标每被碰一下就换一种蓝绿色', opportunity: '确认一条只走十步的试验路线', participant_overrides: Object.freeze({ 'pathfinder-001': Object.freeze({ title: '潮痕巡路员重新校准路标', narration: '巡路员把缺角地图压在膝盖上，一枚一枚比对湿路标；它说这次只试十步，不多走。', opportunity: '帮巡路员确认一条只走十步的试验路线' }) }), npc_actions: Object.freeze({ 'pathfinder-001': Object.freeze({ action_name: 'recalibrate_markers', status: '正在把湿路标摆回自己的角度' }) }) }),
+    Object.freeze({ id: 'road-puddle-map', bands: ['day', 'evening'], title: '水洼偷偷拼出一条新路', narration: '几块水洼把天空切成不同方向，连起来刚好像一条没登记过的小路；喵呜的倒影先走了两步。', cue: '水面地图会随着脚步轻轻改道', opportunity: '在地图消失前记住其中一个岔口', npc_actions: Object.freeze({ 'pathfinder-001': Object.freeze({ action_name: 'compare_puddle_map', status: '蹲在水洼边比对临时路线' }) }) }),
     Object.freeze({ id: 'road-tide-listening', bands: ['evening', 'night'], title: '旧路在涨潮前发出提示音', narration: '看不见的水线沿石缝倒数，湿路标每听见一声回响就依次熄掉一格。', cue: '石缝里传出很远的空杯回声', opportunity: '判断最后一段安全路线何时关闭', participant_overrides: Object.freeze({ 'pathfinder-001': Object.freeze({ narration: '看不见的水线沿石缝倒数，只有巡路员听得懂哪一声代表该回头。', opportunity: '问清最后一班安全路线何时关闭' }) }), npc_actions: Object.freeze({ 'pathfinder-001': Object.freeze({ action_name: 'listen_for_tide', status: '侧耳听着涨潮前的提示音' }) }) }),
   ]),
   'whisper-market': Object.freeze([
-    Object.freeze({ id: 'market-unowned-trinket', bands: ['morning', 'day'], title: '无主小物开始挑选新用途', narration: '一排没有标价的小玩意把自己往路人面前挪，谁停得久，它们就向谁亮一下。', cue: '摊灯下响着细小的陶瓷碰杯声', opportunity: '替一件无主小物提出一个它没想过的用途' }),
-    Object.freeze({ id: 'market-story-price', bands: ['day', 'evening'], title: '故事摊今天不收重复结局', narration: '摊主把听过的结局全部翻到背面，只收能让旧故事拐弯的新一句。', cue: '每讲完一句，灯芯就多出一种颜色', opportunity: '用一个古怪但完整的结局换取材料' }),
-    Object.freeze({ id: 'market-wish-awning', bands: ['evening', 'night'], title: '没说出口的愿望挂满檐下', narration: '收摊以后，没被认领的愿望仍在檐角轻响，像一串不肯睡的风铃。', cue: '越靠近某个愿望，声音反而越轻', opportunity: '只听一个愿望，不替它决定主人' }),
+    Object.freeze({ id: 'market-unowned-trinket', bands: ['morning', 'day'], title: '一件小东西在挑新主人', narration: '摊上的小徽章、软糖色纽扣和一只歪耳朵杯子轮流往前挪，谁停得久，它们就先亮一下。', cue: '摊灯下响着细小的陶瓷碰杯声', opportunity: '替一件小物提出一个它没想过的用途' }),
+    Object.freeze({ id: 'market-story-price', bands: ['day', 'evening'], title: '故事摊不收重复的结局', narration: '摊主把听过的结局全部翻到背面，只收能让旧故事拐一个小弯的新一句。', cue: '每讲完一句，灯芯就多出一种颜色', opportunity: '用一个古怪但完整的结局换一块奇怪材料' }),
+    Object.freeze({ id: 'market-wish-awning', bands: ['evening', 'night'], title: '檐下的愿望还不肯收摊', narration: '集市关灯以后，没被认领的愿望仍在檐角轻响。喵呜路过时，其中一个故意把声音压得更低。', cue: '越靠近某个愿望，声音反而越轻', opportunity: '只听一个愿望，不替它决定主人' }),
   ]),
   'backlit-grove': Object.freeze([
-    Object.freeze({ id: 'grove-shadow-roll', bands: ['morning', 'day'], title: '一段迟到的影子正在走完最后一步', narration: '那段影子比主人晚了整整三个动作，一只空叶筒立在旁边，安静等它自己决定什么时候收尾。', cue: '叶背一亮，地上的旧动作就重演一次', opportunity: '判断这段影子究竟迟了多久', participant_overrides: Object.freeze({ 'shade-collector-001': Object.freeze({ title: '影栖在收一段迟到的影子', narration: '那段影子比主人晚了整整三个动作，影栖正等它把最后一步走完再卷起来。', opportunity: '帮影栖判断这段影子究竟迟了多久' }) }), npc_actions: Object.freeze({ 'shade-collector-001': Object.freeze({ action_name: 'collect_late_shadow', status: '等一段迟到的影子走完最后一步' }) }) }),
+    Object.freeze({ id: 'grove-shadow-roll', bands: ['morning', 'day'], title: '影栖在等一段影子自己收尾', narration: '那段影子比主人晚了整整三个动作，走到叶根边又停住。影栖把空叶筒放近一点，没有伸手去抓。', cue: '叶背一亮，地上的旧动作就重演一次', opportunity: '判断这段影子究竟迟了多久', participant_overrides: Object.freeze({ 'shade-collector-001': Object.freeze({ title: '影栖在收一段迟到的影子', narration: '那段影子比主人晚了整整三个动作，影栖把叶筒放在旁边，等它自己走完最后一步。', opportunity: '帮影栖判断这段影子究竟迟了多久' }) }), npc_actions: Object.freeze({ 'shade-collector-001': Object.freeze({ action_name: 'collect_late_shadow', status: '等一段迟到的影子走完最后一步' }) }) }),
     Object.freeze({ id: 'grove-light-swatch', bands: ['day', 'evening'], title: '旧日光色被摊成一排样片', narration: '不同日子的光被压成薄片，沿着树根铺开，像是在等待谁来挑一种新用途。', cue: '每片光样都带着当时的一点温度', opportunity: '选一片最不像今天的光，猜猜它来自哪里', participant_overrides: Object.freeze({ 'shade-collector-001': Object.freeze({ narration: '影栖把不同日子的光压成薄片，正在挑哪一种适合做新外壳的内衬。', opportunity: '选一片最不像今天的光，问问它来自哪里' }) }), npc_actions: Object.freeze({ 'shade-collector-001': Object.freeze({ action_name: 'sort_afterlight', status: '在给旧日光色分类' }) }) }),
     Object.freeze({ id: 'grove-second-shadow', bands: ['evening', 'night'], title: '林地里多出一层不肯重合的影子', narration: '天色变暗后，一层更淡的影子仍停在叶间；旁边放着一只空叶筒，没有谁催它靠近。', cue: '两层影子之间隔着半步距离', opportunity: '等它自己决定要不要靠近', participant_overrides: Object.freeze({ 'shade-collector-001': Object.freeze({ narration: '天色变暗后，一层更淡的影子仍停在叶间，影栖没有去抓，只在旁边放了一个空叶筒。', opportunity: '陪影栖等它自己决定要不要靠近' }) }), npc_actions: Object.freeze({ 'shade-collector-001': Object.freeze({ action_name: 'wait_for_wild_shadow', status: '守着一只空叶筒安静等待' }) }) }),
   ]),
   'echo-waterside': Object.freeze([
-    Object.freeze({ id: 'waterside-old-reply', bands: ['morning', 'day'], title: '一条很久以前的回答终于靠岸', narration: '水面把一句模糊的回答推到岸边，却找不到最初问问题的人。', cue: '声音波纹碰到石头才显出文字形状', opportunity: '猜一猜它原本在回答什么问题' }),
-    Object.freeze({ id: 'waterside-voice-drift', bands: ['day', 'evening'], title: '几句陌生声音在浅水里并排行走', narration: '它们互相不认识，却因为速度相同暂时组成了一小队。', cue: '每句话脚下都有一圈不会打湿岸边的水纹', opportunity: '跟其中一句同行一小段，不追问主人' }),
-    Object.freeze({ id: 'waterside-night-message', bands: ['evening', 'night'], title: '夜色替一条留言藏起署名', narration: '水面保留了内容，却把名字折进最深的一层回声里。', cue: '只有句末还留着一点犹豫的亮光', opportunity: '留下一句不需要立刻得到回答的话' }),
+    Object.freeze({ id: 'waterside-old-reply', bands: ['morning', 'day'], title: '一条旧回答被水推回来了', narration: '水面把一句模糊的回答推到岸边，喵呜用爪尖碰了碰，发现它还在等一个很久没出现的人。', cue: '声音波纹碰到石头才显出文字形状', opportunity: '猜一猜它原本在回答什么问题' }),
+    Object.freeze({ id: 'waterside-voice-drift', bands: ['day', 'evening'], title: '陌生声音排着队散步', narration: '几句互不认识的声音因为速度一样，暂时并排走在浅水里。喵呜跟了其中一句一会儿，没有追问它从哪里来。', cue: '每句话脚下都有一圈不会打湿岸边的水纹', opportunity: '跟其中一句同行一小段，不追问主人' }),
+    Object.freeze({ id: 'waterside-night-message', bands: ['evening', 'night'], title: '夜色替一条留言藏起署名', narration: '水面保留了内容，却把名字折进最深的回声里。喵呜听完没有催，只把一颗亮珠放在岸边。', cue: '只有句末还留着一点犹豫的亮光', opportunity: '留下一句不需要立刻得到回答的话' }),
   ]),
 });
 
@@ -350,8 +356,10 @@ function selectScene(world, now) {
 
 function profileFor(npc) {
   const profile = NPC_PROFILES[npc.npc_id] ?? {};
+  const authored = publicNpcProfile(npc.npc_id) ?? {};
   return {
     ...profile,
+    ...authored,
     ...npc,
     bio: npc.bio ?? profile.bio ?? '它在聚形域里有自己的行程，目前还没有留下完整档案。',
     temperament: npc.temperament ?? profile.temperament ?? '仍在观察中',
@@ -371,6 +379,7 @@ function npcResponse(npc, intent, idea) {
     return {
       observe: `${npc.display_name}没有抬头，只把一枚湿路标转向你：“先看脚下。路今天往哪边拐，还没完全决定。”`,
       greet: `${npc.display_name}用缺角地图碰了碰额前的短角：“来得正好。别急着选远路，先听听最近这块石头怎么响。”`,
+      chat: `${npc.display_name}把缺角地图往旁边挪了挪：“你说。我边看路，边听。”`,
       suggest: `${npc.display_name}把${quoted}记在地图空白处：“能试，但先走十步。十步以后路还认，我们再往下算。”`,
       help: `${npc.display_name}递来一枚会变色的小路标：“帮我盯住它。变紫就喊我，别自己追过去。”`,
       invite: `${npc.display_name}卷起地图的一角：“同行可以。你走亮处，我走湿处，谁先发现岔路谁就停。”`,
@@ -380,6 +389,7 @@ function npcResponse(npc, intent, idea) {
     return {
       observe: `${npc.display_name}先看了看你的影子，才小声说：“它今天跟得很稳。比你本人稳一点。”`,
       greet: `${npc.display_name}抱着叶筒点了一下头：“嘘。旁边这段影子还差一步才走完。”`,
+      chat: `${npc.display_name}把叶筒放在脚边：“嗯。我听着。那段影子今天还没走完。”`,
       suggest: `${npc.display_name}把${quoted}对着光看了一会儿：“这个想法有影子。我先不替它定形，让它自己多走两步。”`,
       help: `${npc.display_name}分给你一只空叶筒：“不用抓。等那段旧光自己靠近，再把筒口转过去。”`,
       invite: `${npc.display_name}往林地深处让出半步：“可以同行。但遇见不肯重合的影子，先问它，不要问我。”`,
@@ -388,10 +398,18 @@ function npcResponse(npc, intent, idea) {
   return {
     observe: `${npc.display_name}注意到你的目光，停下手里的事看了过来。`,
     greet: `${npc.display_name}向你打了个招呼。`,
+    chat: `${npc.display_name}停下手里的事，留出一点位置听你说。`,
     suggest: `${npc.display_name}认真听完${quoted}，说会先从一件小事试起。`,
     help: `${npc.display_name}给你留出一个可以搭手的位置。`,
     invite: `${npc.display_name}答应先同行一小段。`,
   }[intent];
+}
+
+function interactionKey({ npcId, intent, idea, requestedKey, timestamp }) {
+  const digest = createHash('sha256').update(`${npcId}:${intent}:${idea ?? ''}`).digest('hex').slice(0, 10);
+  return requestedKey
+    ? `npc-interaction:${npcId}:${requestedKey}`
+    : `npc-interaction:${npcId}:${timestamp}:${digest}`;
 }
 
 export function createWorldLife({
@@ -399,6 +417,7 @@ export function createWorldLife({
   worldSnapshot,
   ingest,
   npcGoals = null,
+  llm = null,
   enabled = true,
 } = {}) {
   if (typeof worldSnapshot !== 'function' || typeof ingest !== 'function') {
@@ -555,16 +574,18 @@ export function createWorldLife({
     if (npc.location_id !== world.protagonist.location_id) {
       throw new InputError(409, 'npc_not_present', '只有与喵呜在同一地点时才能互动');
     }
-    const response = npcResponse(profileFor(npc), intent, idea);
     const timestamp = now().toISOString();
-    const digest = createHash('sha256').update(`${npcId}:${intent}:${idea ?? ''}`).digest('hex').slice(0, 10);
     const requestedKey = optionalInteractionKey(body.interaction_id);
-    const interactionId = requestedKey
-      ? `npc-interaction:${npcId}:${requestedKey}`
-      : `npc-interaction:${npcId}:${now().getTime()}:${digest}`;
+    const interactionId = interactionKey({ npcId, intent, idea, requestedKey, timestamp: now().getTime() });
+    const storedInteraction = npc.last_interaction?.interaction_id === interactionId ? npc.last_interaction : null;
+    const response = storedInteraction?.response ?? npcResponse(profileFor(npc), intent, idea);
+    return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
+  }
+
+  function recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp }) {
     const direction = DIRECTIONAL_INTENTS.has(intent) ? NPC_ROLE_DIRECTIONS[npc.role] ?? null : null;
     const location = (world.locations ?? []).find((item) => item.location_id === npc.location_id);
-    const intentLabel = { observe: '观察', greet: '问候', suggest: '交换想法', help: '搭手帮忙', invite: '尝试同行' }[intent];
+    const intentLabel = { observe: '观察', greet: '问候', chat: '聊天', suggest: '交换想法', help: '搭手帮忙', invite: '尝试同行' }[intent];
     const experience = {
       experience_id: interactionId,
       kind: 'npc_interaction',
@@ -610,7 +631,119 @@ export function createWorldLife({
     };
   }
 
-  return { tick, snapshot, interact, seedNpcs };
+  function duplicateInteraction({ npcId, intent, idea, interactionId, response }) {
+    const currentWorld = worldSnapshot();
+    const currentNpc = (currentWorld.npcs ?? []).find((item) => item.npc_id === npcId);
+    return {
+      schema: 'deskbot.npc-interaction-response.v0.2',
+      accepted: true,
+      duplicate: true,
+      interaction_id: interactionId,
+      response,
+      experience: (currentWorld.life?.recent_experiences ?? []).find((item) => item.experience_id === interactionId) ?? null,
+      role_evidence: DIRECTIONAL_INTENTS.has(intent) && currentNpc?.role
+        ? { status: 'observing', confidence: 0.45, direction: NPC_ROLE_DIRECTIONS[currentNpc.role] ?? null }
+        : null,
+      npc: profileFor(currentNpc),
+      life: snapshot(),
+      replay: { intent, idea },
+    };
+  }
+
+  async function interactWithAgent(body = {}) {
+    if (!enabled) throw new InputError(409, 'world_life_disabled', '世界生活引擎尚未启用');
+    const npcId = typeof body.npc_id === 'string' ? body.npc_id.trim() : '';
+    const intent = typeof body.intent === 'string' ? body.intent.trim() : '';
+    if (!npcId) throw new InputError(400, 'npc_id_required', 'npc_id is required');
+    if (!INTERACTION_INTENTS.includes(intent)) throw new InputError(400, 'invalid_npc_intent', '不支持的 NPC 互动方式');
+    const idea = boundedIdea(body.idea, intent === 'suggest');
+    const world = worldSnapshot();
+    const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
+    if (!npc) throw new InputError(404, 'npc_not_found', '没有找到这个 NPC');
+    if (npc.location_id !== world.protagonist.location_id) {
+      throw new InputError(409, 'npc_not_present', '只有与喵呜在同一地点时才能互动');
+    }
+    const timestamp = now().toISOString();
+    const requestedKey = optionalInteractionKey(body.interaction_id);
+    const interactionId = interactionKey({ npcId, intent, idea, requestedKey, timestamp: now().getTime() });
+    const storedInteraction = npc.last_interaction?.interaction_id === interactionId ? npc.last_interaction : null;
+    if (storedInteraction) return duplicateInteraction({ npcId, intent, idea, interactionId, response: storedInteraction.response });
+
+    // A persona is an authoring choice, not a requirement for the world to
+    // remain usable. Unknown NPCs and offline/fake deployments retain the
+    // deterministic authored response path.
+    const persona = getNpcPersona(npcId);
+    const canUsePersonaAgent = typeof llm?.complete === 'function' && llm.id !== 'fake-llm-v0.1';
+    if (!persona || !canUsePersonaAgent) {
+      return recordInteraction({
+        body, world, npc, npcId, intent, idea, interactionId, timestamp,
+        response: npcResponse(profileFor(npc), intent, idea),
+      });
+    }
+
+    const location = (world.locations ?? []).find((item) => item.location_id === npc.location_id);
+    const scene = world.life?.current_scene?.location_id === npc.location_id ? world.life.current_scene : null;
+    const recentExperiences = (world.life?.recent_experiences ?? []).filter((item) => item.npc_id === npcId).slice(-3);
+    const prompt = composeNpcAgentPrompt({
+      persona,
+      npc,
+      location,
+      scene,
+      relationship: npc.relationship,
+      recentExperiences,
+      intent,
+      idea,
+    });
+    let response;
+    try {
+      const result = await llm.complete({
+        prompt,
+        userText: idea ?? intent,
+        npc_id: npcId,
+        scene,
+        intent,
+      });
+      response = typeof result?.text === 'string' ? result.text.trim() : '';
+      if (!response) throw new Error('NPC agent returned empty text');
+      if (response.length > 4000) response = response.slice(0, 4000).trim();
+      // One corrective pass is intentionally narrow: the first call may be
+      // imaginative, but a reply that is mostly setting exposition is not a
+      // usable character interaction. The second prompt keeps the original
+      // text as context and asks for a grounded rewrite rather than a new
+      // scene, so the world facts remain server-owned.
+      if (npcReplyNeedsGrounding(response)) {
+        const rewrite = await llm.complete({
+          prompt: [
+            prompt,
+            '',
+            '[GROUNDING_REWRITE]',
+            '把上一次草稿改写成自然、可理解的当面对白。保留 NPC 的爱憎和立场，但删掉设定说明、空泛抒情和客服套话。',
+            '必须回应用户刚刚做的事，至少落到一个具体物件或动作，并留下一个可选择的小动作。除非用户主动问世界观，只保留最多一个奇幻专有对象。只输出改写后的正文。',
+            `上一次草稿：${response}`,
+            '[/GROUNDING_REWRITE]',
+          ].join('\n'),
+          userText: idea ?? intent,
+          npc_id: npcId,
+          scene,
+          intent,
+        });
+        const rewritten = typeof rewrite?.text === 'string' ? rewrite.text.trim() : '';
+        if (rewritten && !npcReplyNeedsGrounding(rewritten)) {
+          response = rewritten.slice(0, 4000).trim();
+        } else {
+          // Never keep an ungrounded first draft just because the corrective
+          // pass returned another setting explanation. The authored response
+          // is the deterministic safety net for character legibility.
+          response = npcResponse(profileFor(npc), intent, idea);
+        }
+      }
+    } catch {
+      response = npcResponse(profileFor(npc), intent, idea);
+    }
+    return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
+  }
+
+  return { tick, snapshot, interact, interactWithAgent, seedNpcs };
 }
 
 export { CAUSAL_SCENE_BRANCHES, INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS };

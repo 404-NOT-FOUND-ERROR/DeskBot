@@ -1,60 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" shape-rendering="crispEdges">
-  <rect width="1440" height="900" fill="#36b8bd"/>
-  <path fill="#62d3c4" d="M0 0h1440v112H0zM0 690h1440v210H0z" opacity=".58"/>
-  <path fill="#258f9d" d="M0 112h122v578H0zM1314 112h126v578h-126z" opacity=".46"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" role="img" aria-label="喵呜的桌面潮玩小世界摆件盘">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b47a"/><stop offset="1" stop-color="#b98358"/></linearGradient>
+    <linearGradient id="felt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8f1d7"/><stop offset="1" stop-color="#bed8c5"/></linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8dd8d0"/><stop offset="1" stop-color="#4ba6b1"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e8bb"/><stop offset="1" stop-color="#ddc17e"/></linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#3d5960" flood-opacity=".24"/></filter>
+    <filter id="small-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#394c4b" flood-opacity=".28"/></filter>
+    <pattern id="grain" width="140" height="70" patternUnits="userSpaceOnUse"><path d="M-20 22c38-12 62 14 124 0s88 4 132-6M-30 58c34 7 77-11 120-1s79 8 126-5" fill="none" stroke="#9d6b4e" stroke-opacity=".18" stroke-width="3"/></pattern>
+  </defs>
 
-  <!-- upper echo waterside -->
-  <path fill="#f1c27f" d="M374 0h692v52h98v92h-72v63h-88v68H823v38H616v-42H456v-56H342v-92h32z"/>
-  <path fill="#e79b6b" d="M408 0h626v28H408zM374 52h718v24H374zM342 123h750v20H342zM456 215h548v22H456z"/>
-  <path fill="#7fc45c" d="M402 0h92v44h-92zM1008 48h84v92h-84zM374 145h76v70h-76zM949 145h143v70H949z"/>
-  <path fill="#287c68" d="M433 18h18v53h-18zM1018 70h20v78h-20zM1048 87h18v60h-18z"/>
-  <circle cx="442" cy="15" r="26" fill="#32a46f"/><circle cx="1028" cy="55" r="30" fill="#32a46f"/><circle cx="1061" cy="73" r="24" fill="#2e9568"/>
-  <path fill="#d8f1d4" d="M564 82h310v82H564z"/>
-  <path fill="#addbbf" d="M592 101h254v44H592z"/>
-  <path fill="#f8dfac" d="M677 165h84v49h-84z"/>
-  <path fill="#a27055" d="M705 177h28v37h-28z"/>
+  <!-- A wooden desktop and a shallow felt display tray. -->
+  <rect width="1440" height="900" fill="url(#wood)"/><rect width="1440" height="900" fill="url(#grain)"/>
+  <rect x="28" y="24" width="1384" height="852" rx="44" fill="#a97552" opacity=".42"/>
+  <rect x="38" y="28" width="1364" height="830" rx="42" fill="#f0dfb5" stroke="#8f654f" stroke-width="9" filter="url(#soft-shadow)"/>
+  <rect x="58" y="49" width="1324" height="790" rx="33" fill="url(#felt)" stroke="#fff3d4" stroke-width="7"/>
+  <path d="M82 111h1276M82 769h1276" stroke="#7ba9a0" stroke-opacity=".18" stroke-width="2" stroke-dasharray="5 12"/>
 
-  <!-- left whisper market island -->
-  <path fill="#efb475" d="M0 236h114v-44h191v31h128v65h75v162h-50v71H332v62H188v-31H51v-68H0z"/>
-  <path fill="#da8663" d="M0 255h92v-42h198v33h126v38H0zM0 497h345v42H188v-21H0z"/>
-  <path fill="#4bab69" d="M39 287h86v61H39zM324 287h97v61h-97zM87 456h295v66H87z"/>
-  <path fill="#3b825f" d="M67 312h22v60H67zM355 312h22v62h-22zM108 468h18v72h-18z"/>
-  <g fill="#f4d77e">
-    <rect x="126" y="306" width="26" height="34"/><rect x="197" y="275" width="26" height="34"/><rect x="272" y="316" width="26" height="34"/><rect x="345" y="385" width="26" height="34"/>
-  </g>
-  <g fill="#dc5e68">
-    <path d="M108 340h62v76h-62zM96 328h86v20H96z"/><path d="M181 309h60v90h-60zM169 297h84v20h-84z"/><path d="M257 350h59v75h-59zM245 338h83v20h-83z"/>
-  </g>
-  <g fill="#713f58"><rect x="123" y="366" width="16" height="50"/><rect x="198" y="337" width="16" height="62"/><rect x="273" y="376" width="16" height="49"/></g>
+  <!-- Waterside shelf: a raised foam island with two tiny houses. -->
+  <path d="M300 59h823l76 59-37 99-109 30-41 67-169 10-73-46-185 28-108-68-147-19-76-76z" fill="url(#water)" stroke="#388d96" stroke-width="8" filter="url(#small-shadow)"/>
+  <path d="M366 103h274M721 139h249M1028 103h101" fill="none" stroke="#d8f0dc" stroke-opacity=".7" stroke-width="21" stroke-linecap="round"/>
+  <path d="M400 185c77-31 145 29 219 0s151-29 224 1 142 27 224-6" fill="none" stroke="#318f9a" stroke-width="10" stroke-linecap="round"/>
+  <path d="M450 221c54-17 94 17 147 0M854 218c63-23 111 18 181-3" fill="none" stroke="#daf2d8" stroke-width="7" stroke-linecap="round"/>
+  <g filter="url(#small-shadow)"><path d="M505 80h78v55h-78z" fill="#d49a65" stroke="#875b52" stroke-width="6"/><path d="m493 80 51-43 51 43z" fill="#f0b56e" stroke="#875b52" stroke-width="6"/><path d="M1000 119h67v49h-67z" fill="#d49a65" stroke="#875b52" stroke-width="6"/><path d="m990 119 39-35 39 35z" fill="#f0b56e" stroke="#875b52" stroke-width="6"/></g>
+  <g fill="#4e9169" stroke="#3e735e" stroke-width="5"><path d="M294 117h29v79h-29z"/><circle cx="308" cy="103" r="43"/><path d="M1136 91h28v85h-28z"/><circle cx="1150" cy="80" r="42"/></g>
 
-  <!-- right backlit grove -->
-  <path fill="#90bc63" d="M940 192h186v34h132v56h97v73h85v235h-127v42h-145v-39h-128v-54h-90v-85h-49V315h39z"/>
-  <path fill="#588d5c" d="M1021 229h48v76h-48zM1168 258h51v91h-51zM1286 304h48v89h-48zM1092 454h46v96h-46zM1241 473h43v94h-43z"/>
-  <g fill="#2d8064"><circle cx="1046" cy="224" r="55"/><circle cx="1193" cy="248" r="65"/><circle cx="1310" cy="294" r="62"/><circle cx="1116" cy="439" r="61"/><circle cx="1263" cy="458" r="62"/></g>
-  <g fill="#65c78c"><rect x="1018" y="186" width="25" height="30"/><rect x="1184" y="205" width="28" height="32"/><rect x="1300" y="254" width="26" height="30"/><rect x="1104" y="395" width="28" height="32"/><rect x="1253" y="418" width="27" height="30"/></g>
-  <g fill="#ccb0e6"><rect x="978" y="334" width="12" height="12"/><rect x="1150" y="371" width="13" height="13"/><rect x="1342" y="420" width="13" height="13"/><rect x="1191" y="524" width="12" height="12"/></g>
+  <!-- Low whisper market: three toy stalls with awnings and loose trinkets. -->
+  <path d="M61 258h208l52-45 154 34 28 94-38 89 64 57-77 107-183 15-63-54-145 4z" fill="#efb87b" stroke="#c77362" stroke-width="9" filter="url(#small-shadow)"/>
+  <g filter="url(#small-shadow)"><path d="M88 330h118v90H88z" fill="#f8d99f" stroke="#a8645b" stroke-width="6"/><path d="M225 303h120v117H225z" fill="#f8d99f" stroke="#a8645b" stroke-width="6"/><path d="M365 337h91v83h-91z" fill="#f8d99f" stroke="#a8645b" stroke-width="6"/><path d="M75 330h144l-20-39H96z" fill="#e86e77" stroke="#a24f61" stroke-width="6"/><path d="M210 303h145l-19-40H229z" fill="#e86e77" stroke="#a24f61" stroke-width="6"/><path d="M351 337h119l-17-37h-86z" fill="#e86e77" stroke="#a24f61" stroke-width="6"/><g fill="#fff0b5" stroke="#a24f61" stroke-width="4"><circle cx="122" cy="374" r="11"/><circle cx="171" cy="374" r="11"/><circle cx="265" cy="359" r="12"/><circle cx="318" cy="359" r="12"/><circle cx="395" cy="374" r="11"/><circle cx="431" cy="374" r="11"/></g></g>
+  <g fill="#79b66d" stroke="#568860" stroke-width="4"><path d="M91 541h48v64H91z"/><path d="M116 491c35 0 57 26 61 58H55c5-32 26-58 61-58z"/><path d="M408 501h40v61h-40z"/><path d="M428 465c31 0 48 25 51 51h-102c3-26 20-51 51-51z"/></g>
+  <g fill="#f1ca79" stroke="#a76d53" stroke-width="4"><circle cx="245" cy="592" r="13"/><circle cx="279" cy="604" r="9"/><rect x="156" y="210" width="39" height="22" rx="7"/></g>
 
-  <!-- central tidal road -->
-  <path fill="#f0c780" d="M596 262h245v86h76v95h-58v112h-92v93H637v-80h-71V443h-53v-95h83z"/>
-  <path fill="#bd8167" d="M626 297h184v44H626zM625 386h207v48H625zM609 481h210v49H609z"/>
-  <path fill="#e4e9d6" d="M703 214h30v467h-30z"/>
-  <path fill="#5d6a6d" d="M696 214h44v31h-44zM696 323h44v25h-44zM696 432h44v25h-44zM696 540h44v25h-44zM696 650h44v31h-44z"/>
-  <path fill="#7ce3cf" d="M670 344h22v42h-22zM744 462h22v42h-22z"/>
+  <!-- Backlit grove: plush green hill and chunky trees. -->
+  <path d="m1017 267 103-63 143 28 118 104-29 166-101 65-157-16-103-94z" fill="#b7cf83" stroke="#659369" stroke-width="9" filter="url(#small-shadow)"/>
+  <g fill="#5b9a68" stroke="#3e735d" stroke-width="8" filter="url(#small-shadow)"><path d="M1060 304h35v133h-35z"/><circle cx="1077" cy="285" r="64"/><path d="M1202 319h39v156h-39z"/><circle cx="1221" cy="292" r="75"/><path d="M1324 379h32v115h-32z"/><circle cx="1340" cy="363" r="58"/></g>
+  <g fill="#dda16f" stroke="#956453" stroke-width="5" filter="url(#small-shadow)"><path d="M1050 463h42v36h-42z"/><path d="M1190 512h51v39h-51z"/><path d="M1304 522h43v34h-43z"/></g>
+  <g fill="#ecd993" stroke="#9c855c" stroke-width="3"><circle cx="1005" cy="405" r="11"/><circle cx="1166" cy="372" r="13"/><circle cx="1284" cy="314" r="10"/><circle cx="1274" cy="576" r="12"/></g>
 
-  <!-- lower shaping desk sanctuary -->
-  <path fill="#d9e4d4" d="M415 622h117v-45h371v44h133v61h89v137h-89v81H404v-68h-92V693h103z"/>
-  <path fill="#b8d4c8" d="M454 650h515v184H454z"/>
-  <path fill="#405a65" d="M535 694h357v94H535z"/>
-  <path fill="#8de5d4" d="M569 716h289v50H569z"/>
-  <path fill="#f5cb72" d="M697 730h34v23h-34z"/>
-  <path fill="#ef7274" d="M473 676h42v99h-42zM912 676h42v99h-42z"/>
-  <g fill="#6a7f7e"><rect x="369" y="738" width="45" height="45"/><rect x="1017" y="738" width="45" height="45"/><rect x="435" y="842" width="56" height="30"/><rect x="949" y="842" width="56" height="30"/></g>
+  <!-- A padded route ribbon with stitched edges and oversized toy markers. -->
+  <path d="M674 247h123l36 113-56 67 58 93-56 87 55 106-64 125H620l-48-125 62-106-54-88 57-91-50-81z" fill="url(#cloth)" stroke="#bd9362" stroke-width="11" filter="url(#small-shadow)"/>
+  <path d="M727 275 739 388l-34 50 35 82-36 80 35 114-23 112" fill="none" stroke="#c49b67" stroke-width="17" stroke-linecap="round" stroke-dasharray="10 28"/>
+  <g fill="#3e9da1" stroke="#f7f0d0" stroke-width="6" filter="url(#small-shadow)"><path d="m685 316 44-1-21-43z"/><path d="m709 482 44-2-21-42z"/><path d="m689 647 44-1-21-43z"/></g>
+  <g fill="#e36b74" stroke="#fff0c3" stroke-width="6" filter="url(#small-shadow)"><circle cx="633" cy="394" r="14"/><circle cx="815" cy="449" r="14"/><circle cx="651" cy="563" r="14"/><circle cx="791" cy="731" r="14"/></g>
 
-  <!-- connecting roads -->
-  <path fill="#f4ead2" d="M422 392h159v28H422zM839 392h125v28H839zM718 583h28v94h-28zM331 520h117v25H331zM991 548h109v25H991z"/>
-  <path fill="#52636c" d="M422 385h159v9H422zM422 418h159v9H422zM839 385h125v9H839zM839 418h125v9H839z"/>
+  <!-- Home display base: a real little dock for the first cat form. -->
+  <path d="M327 650h217l39-57h278l42 57h223v190H327z" fill="#c9e0d1" stroke="#6d9c94" stroke-width="9" filter="url(#small-shadow)"/>
+  <rect x="421" y="681" width="598" height="122" rx="20" fill="#8bc7ba" stroke="#4c8786" stroke-width="9"/><rect x="488" y="704" width="462" height="72" rx="13" fill="#243e4a"/><rect x="525" y="719" width="388" height="43" rx="9" fill="#9be4d2"/><rect x="702" y="730" width="37" height="24" rx="5" fill="#edbd6d"/>
+  <path d="M365 693h46v92h-46zM1005 693h46v92h-46z" fill="#db6871"/><g fill="#5e7b75"><rect x="340" y="804" width="58" height="27" rx="8"/><rect x="1017" y="804" width="58" height="27" rx="8"/><rect x="448" y="814" width="92" height="20" rx="8"/><rect x="889" y="814" width="92" height="20" rx="8"/></g>
+  <path d="M598 634h246l-36-58H635z" fill="#e5b36e" stroke="#9e6b58" stroke-width="8" filter="url(#small-shadow)"/><path d="M635 576h174v59H635z" fill="#f5e0a9" stroke="#9e6b58" stroke-width="8"/><circle cx="722" cy="611" r="14" fill="#e36b74"/>
 
-  <!-- scattered toy-world detail -->
-  <g fill="#f1d078"><rect x="175" y="445" width="14" height="14"/><rect x="236" y="462" width="10" height="10"/><rect x="1070" y="360" width="12" height="12"/><rect x="1211" y="401" width="10" height="10"/><rect x="801" y="181" width="11" height="11"/></g>
-  <g fill="#227b86" opacity=".7"><rect x="76" y="620" width="88" height="12"/><rect x="1237" y="684" width="111" height="12"/><rect x="1118" y="80" width="93" height="12"/></g>
+  <!-- Stitched bridges join the pieces, making the map feel assembled by hand. -->
+  <g fill="none" stroke-linecap="round"><path d="M453 395h151M839 395h168M476 565h122M842 565h169M722 678v-59" stroke="#f7e8bd" stroke-width="28"/><path d="M453 395h151M839 395h168M476 565h122M842 565h169M722 678v-59" stroke="#a87960" stroke-width="7" stroke-dasharray="18 18"/></g>
+  <g fill="#d76f70" stroke="#fff1c6" stroke-width="4"><circle cx="248" cy="612" r="12"/><circle cx="1146" cy="616" r="12"/><circle cx="921" cy="178" r="10"/></g>
 </svg>

@@ -21,6 +21,12 @@ P1 喵呜强角色表达验收与软件基线
  -> P8 纵向体验、工程量化与论文冻结
 ```
 
+## 2026-09-18 叙事与 NPC 增量
+
+首发 NPC 已从固定台词推进到 Persona Agent v0.1：作者用 `research/npcs/*.md` 描述人物的欲望、爱憎、口癖、触发点与边界，Node 将当前 Scene、关系和共同经历编译成受限提示词，LLM 只生成当面台词，世界写入仍走 canonical mutation。地点和 Scene 同步改为桌边潮玩生活语汇，减少“世界规则说明”感。
+
+这不是 P3/P4 的完成声明。下一道门仍是：真实 DeepSeek 人物样本人工评审、`role-state.v1` 阶段档案、跨天关系后果、NPC 主动目标和形态提案；在这些证据出现前，不把 Persona Agent 称作自主生命体。
+
 世界环境、用户输入和角色状态绝不混成一团：世界事件有自己的规则；用户提供方向信号；喵呜只能经可追溯规则形成选择、记忆和阶段变化。
 
 ## 2026-09-17 持续世界空间层增量
@@ -210,7 +216,11 @@ NPC 有限目标增量（历史基线）：新增 `/api/life/npc-goals`，已有
 - `world-life` 先匹配 authored causal branch，再回退到地点日常 Scene。每个分支携带 `branch_key`、因果事件/经历 ID 与 `resolution_state`，已消费因果不会重复生成。
 - `npc-goals` 保留旧 `options` 合同，同时支持 `steps-v1`。一轮只推进一个步骤；等待、截止、错过、失败、反馈事件和 `step_history` 都是持久化状态。
 - `GET /api/life/experiences?query=` 及对话的 `DESKBOT_BRANCH_EXPERIENCES` 只读检索世界经历/Scene，不冒充用户确认记忆；无关查询返回空，时间提示最多带两条最近痕迹。
-- 串行 Node 回归为 `180/180`；前端 JS 语法检查和 `git diff --check` 通过。真实服务已重启，DeepSeek 202 smoke 通过；本次和风天气 provider 请求连续超时，服务保留 retryable 错误而不伪报实时成功。
+- 持续世界增量曾完成 Node 回归 `180/180`；NPC Persona Agent 与桌面潮玩叙事增量后，当前 Node 回归为 `186/186`，前端 JS 语法检查和 `git diff --check` 通过。真实服务的 DeepSeek/QWeather 状态仍需按当次启动检查；天气 provider 超时只能记录 retryable 错误，不能伪报实时成功。
+
+### 2026-09-18 NPC grounding 边界修订
+
+NPC Persona Agent 的首轮模型草稿若不满足“先回应、落到具体物件/动作、留下小选择”的可读性规则，会触发一次窄范围 grounding rewrite。若第二稿仍不合格，不再保留抽象草稿，而是回退到作者卡中的 deterministic authored response；这样既保留 Character.AI 式角色即兴，也不会让设定说明污染普通用户的沉浸对话。该路径已加入自动回归，当前 Node 全量为 `189/189`。
 
 ## 当前不做
 

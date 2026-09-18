@@ -152,6 +152,127 @@ test('same-place interactions are bounded, idempotent and increase relationship 
   );
 });
 
+test('story chat is a first-class NPC interaction and does not create role-direction evidence', () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('travel-to-road-for-chat', { action: 'move_protagonist', location_id: 'tidal-old-road' }));
+  life.tick({ force: true });
+  const result = life.interact({
+    interaction_id: 'story-chat-001',
+    npc_id: 'pathfinder-001',
+    intent: 'chat',
+    idea: '你今天为什么一直盯着那块水洼？',
+  });
+  assert.equal(result.accepted, true);
+  assert.match(result.response, /水洼|路/);
+  assert.equal(result.role_evidence, null);
+  assert.equal(world.get().life.recent_experiences.at(-1).kind, 'npc_interaction');
+  assert.match(world.get().life.recent_experiences.at(-1).summary, /聊天/);
+});
+
+test('NPC agent receives Persona and Scene context, then persists only its reply', async () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('agent-move-to-desk', { action: 'npc_action', npc_id: 'pathfinder-001', location_id: 'shaping-field-desk', action_name: 'return_to_desk', status: '在桌边整理地图' }));
+  const prompts = [];
+  const agent = createWorldLife({
+    now: () => new Date('2026-09-17T02:00:00.000Z'),
+    worldSnapshot: () => world.get(),
+    ingest: (event) => world.ingest(event),
+    llm: {
+      async complete(input) {
+        prompts.push(input.prompt);
+        return { text: '巡路员把缺角地图压住：“喵？先走十步，我不替这条路回答。”' };
+      },
+    },
+  });
+  const result = await agent.interactWithAgent({
+    interaction_id: 'agent-001',
+    npc_id: 'pathfinder-001',
+    intent: 'suggest',
+    idea: '去看看那条会变色的小岔路',
+  });
+  assert.equal(result.accepted, true);
+  assert.match(result.response, /先走十步/);
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /desires=.*安全岔路/);
+  assert.match(prompts[0], /scene_title=/);
+  assert.match(prompts[0], /改天气/);
+  assert.match(prompts[0], /换外壳/);
+  assert.equal(world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').last_response, result.response);
+  assert.equal(world.get().life.recent_experiences.length, 1);
+});
+
+test('NPC agent retry is idempotent and does not call the model twice', async () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('agent-retry-move-to-desk', { action: 'npc_action', npc_id: 'pathfinder-001', location_id: 'shaping-field-desk', action_name: 'return_to_desk', status: '在桌边整理地图' }));
+  let calls = 0;
+  const agent = createWorldLife({
+    now: () => new Date('2026-09-17T02:00:00.000Z'),
+    worldSnapshot: () => world.get(),
+    ingest: (event) => world.ingest(event),
+    llm: { async complete() { calls += 1; return { text: '喵呜，先看脚下。' }; } },
+  });
+  const body = { interaction_id: 'agent-retry-001', npc_id: 'pathfinder-001', intent: 'greet' };
+  const first = await agent.interactWithAgent(body);
+  const mutationCount = world.listMutations().length;
+  const repeated = await agent.interactWithAgent(body);
+  assert.equal(calls, 1);
+  assert.equal(repeated.duplicate, true);
+  assert.equal(repeated.response, first.response);
+  assert.equal(world.listMutations().length, mutationCount);
+});
+
+test('NPC agent failure falls back to authored response and still records the interaction', async () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('agent-fallback-move-to-desk', { action: 'npc_action', npc_id: 'pathfinder-001', location_id: 'shaping-field-desk', action_name: 'return_to_desk', status: '在桌边整理地图' }));
+  const agent = createWorldLife({
+    now: () => new Date('2026-09-17T02:00:00.000Z'),
+    worldSnapshot: () => world.get(),
+    ingest: (event) => world.ingest(event),
+    llm: { async complete() { throw new Error('provider unavailable'); } },
+  });
+  const result = await agent.interactWithAgent({ interaction_id: 'agent-fallback-001', npc_id: 'pathfinder-001', intent: 'greet' });
+  assert.equal(result.accepted, true);
+  assert.match(result.response, /潮痕巡路员/);
+  assert.equal(result.experience.npc_id, 'pathfinder-001');
+});
+
+test('NPC grounding rewrite falls back to authored response when both drafts remain abstract', async () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('agent-grounding-fallback-move-to-desk', {
+    action: 'npc_action',
+    npc_id: 'pathfinder-001',
+    location_id: 'shaping-field-desk',
+    action_name: 'return_to_desk',
+    status: '在桌边整理地图',
+  }));
+  const prompts = [];
+  const agent = createWorldLife({
+    now: () => new Date('2026-09-17T02:00:00.000Z'),
+    worldSnapshot: () => world.get(),
+    ingest: (event) => world.ingest(event),
+    llm: {
+      async complete(input) {
+        prompts.push(input.prompt);
+        return { text: '在聚形域里，光粒漂移，光域凝聚成形，世界规则因此改变。' };
+      },
+    },
+  });
+  const result = await agent.interactWithAgent({
+    interaction_id: 'agent-grounding-fallback-001',
+    npc_id: 'pathfinder-001',
+    intent: 'greet',
+  });
+  assert.equal(prompts.length, 2);
+  assert.match(result.response, /缺角地图|湿路标|路今天往哪边拐/);
+  assert.doesNotMatch(result.response, /光粒漂移|世界规则/);
+  assert.equal(world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').last_response, result.response);
+});
+
 test('same-slot outward and return travel create distinct replayable scenes', () => {
   const { world, life } = fixture();
   life.tick();
@@ -232,7 +353,13 @@ test('bounded NPC routines use the goal engine, move one adjacent hop and refres
 
 test('world-life HTTP endpoints expose encounters and reject remote NPC interaction', async (t) => {
   const now = () => new Date('2026-09-17T02:00:00.000Z');
-  const server = createDeskBotServer({ now, websocket: false, worldLifeEnabled: true });
+  const prompts = [];
+  const server = createDeskBotServer({
+    now,
+    websocket: false,
+    worldLifeEnabled: true,
+    llm: { async complete(input) { prompts.push(input.prompt); return { text: '巡路员歪了歪头：“喵？先看看这条路。”' }; } },
+  });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
@@ -261,6 +388,8 @@ test('world-life HTTP endpoints expose encounters and reject remote NPC interact
   assert.equal(interactionBody.npc.relationship.encounters, 1);
   assert.equal(interactionBody.experience.npc_id, 'pathfinder-001');
   assert.equal(interactionBody.role_evidence.direction.direction_id, 'tide_route_explorer');
+  assert.match(interactionBody.response, /先看看这条路/);
+  assert.equal(prompts.length, 1);
 
   const pulls = await (await fetch(`${origin}/api/roles/pulls?character_id=shaping-001`)).json();
   const routePull = pulls.pulls.find((pull) => pull.direction_id === 'tide_route_explorer');

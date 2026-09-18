@@ -172,6 +172,11 @@ function composeRoleTrialDesire(activeRoleTrials = []) {
     ?? `你最近对“${active.life ?? '一种新的生活方式'}”有些在意。猫型外壳仍未改变；相关时从第一人称说出这份兴趣，不解释后台分类。`;
 }
 
+function settingDiscussionRequested(userText = '') {
+  const text = typeof userText === 'string' ? userText : '';
+  return /(聚形域|世界观|世界线|世界事件|外壳|形态|换壳|变身|角色方向|想成为什么|光域|光粒|凝聚成形|潮玩生命)/.test(text);
+}
+
 function relevantLoreLocations(worldSnapshot, userText, current) {
   const query = typeof userText === 'string' ? userText.toLowerCase() : '';
   if (!query) return [];
@@ -194,8 +199,9 @@ function composeLivedWorld(worldSnapshot, activeRoleTrials = [], userText = '') 
     .slice(0, 3);
   const npcContextRequested = nearbyNpcs.some((npc) => userText.includes(npc.display_name))
     || /(刚才|那位|这个人|这个角色|NPC|npc|巡路员|影栖)/.test(userText);
+  const settingRequested = settingDiscussionRequested(userText);
   const lines = [
-    `- 你现在以猫型潮玩第一形态生活在${location?.name ?? '聚形域桌面'}。`,
+    `- 你现在以猫型潮玩第一形态生活在${location?.name ?? '聚形域桌面'}。只有用户问近况、位置或世界时，才主动提到这些背景。`,
   ];
   if (lifeScene) {
     lines.push(`- 世界生活引擎已经发生并记录的当前 Scene：${lifeScene.title}。${lifeScene.narration ?? ''}`);
@@ -238,6 +244,9 @@ function composeLivedWorld(worldSnapshot, activeRoleTrials = [], userText = '') 
     lines.push('- 当前没有生效的世界线生活事件；不要为了显得奇幻而临时编一个。');
   }
   lines.push(`- 此刻唯一的角色倾向：${composeRoleTrialDesire(activeRoleTrials)}`);
+  if (!settingRequested) {
+    lines.push('- 普通聊天模式：把世界当作角色生活的背景，不主动讲光粒、光域、凝聚成形、漂移或世界规则；优先说一个桌面上的具体东西、正在做的小动作或真实可执行的下一步。');
+  }
   lines.push('- 这是按当前位置检索出的 Lorebook 切片与当前 Scene，不是要向用户朗读的设定卡。只取一两个与本轮相关的具体细节；possible_beats 尚未发生，Scene opportunity 同样尚未发生；除非 canonical mutation 已记录结果，否则只能作为想法、邀请或选择。NPC 有自己的行程和判断，不要承诺它会按用户要求改写世界。');
   return lines.join('\n');
 }
@@ -290,11 +299,17 @@ export function composePrompt({
   );
   const interactionBlock = composeInteractionGuide(interactionDecision, proactiveCandidates);
   const livedWorldBlock = composeLivedWorld(worldSnapshot, activeRoleTrials, userText);
+  const settingTerms = settingDiscussionRequested(userText)
+    ? WORLD_SETTING.core_terms.join(', ')
+    : '常规对话不主动注入设定术语；仅在用户主动讨论世界观时检索。';
+  const roleplayExamplesBlock = CHARACTER_SEED.roleplay_examples
+    .map((example) => `- ${example}`)
+    .join('\n');
   const settingBlock = [
     `setting_id=${WORLD_SETTING.setting_id}`,
     `setting_version=${WORLD_SETTING.version}`,
     `world_name=${WORLD_SETTING.display_name}`,
-    `core_terms=${WORLD_SETTING.core_terms.join(', ')}`,
+    `core_terms=${settingTerms}`,
     `narrative_style=${WORLD_SETTING.narrative_style.join(', ')}`,
     `avoid_terms=${WORLD_SETTING.prohibited_terms.join(', ')}`,
     'The current role-stage name is 喵呜. It is not a permanent legal name: do not invent a new stage name unless the user explicitly discusses a role-stage change.',
@@ -349,6 +364,12 @@ export function composePrompt({
     characterSeedBlock,
     '这是角色的长期底色，不是每轮都要复述的故事。让它通过选择重点、节奏和措辞自然露出来。',
     '[/DESKBOT_CHARACTER_SEED]',
+    '',
+    '[DESKBOT_ROLEPLAY_EXAMPLES]',
+    roleplayExamplesBlock,
+    `叙事护栏：${CHARACTER_SEED.narrative_guard}`,
+    '这些是表达方式的示范，不是固定台词。保持事实准确，换用当前 Scene 中真实存在的物件和动作。',
+    '[/DESKBOT_ROLEPLAY_EXAMPLES]',
     '',
     '[DESKBOT_CHARACTER_PROFILE]',
     JSON.stringify(characterProfile),
@@ -417,6 +438,7 @@ export function composePrompt({
     '聚形域是角色的背景、视觉形态和长期世界线，不是每一句话都必须使用的修辞。只有用户主动讨论世界观、角色形态/演变、世界事件，或明确邀请象征性表达时，才可适量使用光粒、光域、凝聚成形或漂移等词。',
     '不要为了安慰而虚构可见的光、粒子、环境变化或用户内心状态。面对难过、疲惫、愤怒或沉默，除非用户主动在谈世界观，否则禁止把光粒、光域、漂移或凝聚成形作为回应主题；先给简短而真实的回应，再按需要提供陪伴或下一步。',
     '角色表达可以随当前 interaction_stance 轻微变化：supportive 更温和并给选择，engaged 更有活力，reflective 更愿意说出判断和不确定性，alert 更直接，attentive 更简洁清楚；不要把这些标签说出来。',
+    '普通对话不要写成抽象抒情独白。除非用户明确要求世界观诗性描写，否则禁止连续使用“光粒/光域/漂移/凝聚/影子”作为情绪隐喻，禁止把用户情绪写成看得见的环境变化。优先给出一个具体对象、一个角色选择和一个能继续的动作。',
     'real_time 是服务器此刻的真实本地时间；它是角色可感知的情境，不是一个应原样吐出的系统字段。问及时间、日期或星期时，必须以它为准，并用自然对话回答；禁止只输出日期、时间、时区或固定系统模板。它只说明服务器所在时区的时间，不知道用户所在地；若用户问“我那里几点”，须先说明这一边界，并仅在用户同处该时区时给出条件性判断。比如“我这里已经下午五点多了；你那边要看所在时区，如果也在中国标准时间，就是同一时间。”calendar 是叙事/逻辑时间，不能替代真实时间。',
     '外部事实只能引用已提供且带 provider/provenance 的记录；未配置的数据源必须明确说未接入，不能补造天气、新闻或设备状态。',
     '当用户明确要求“最新/实时/刷新天气”时，系统会先执行一次天气 provider 请求；回复应自然使用刷新后的快照，不要说没有刷新入口。其他天气问题优先使用已有快照，并说明观测时间。',

@@ -980,7 +980,7 @@ function applyNpcInteraction(next, payload) {
   const interactionId = requireText(payload.interaction_id, 'payload.interaction_id');
   const npcId = requireText(payload.npc_id, 'payload.npc_id');
   const intent = requireText(payload.intent, 'payload.intent');
-  if (!['observe', 'greet', 'suggest', 'help', 'invite'].includes(intent)) {
+  if (!['observe', 'greet', 'chat', 'suggest', 'help', 'invite'].includes(intent)) {
     throw new PersistentWorldError(400, 'invalid_npc_interaction', `unsupported NPC intent ${intent}`);
   }
   const index = next.npcs.findIndex((npc) => npc.npc_id === npcId);
@@ -989,8 +989,8 @@ function applyNpcInteraction(next, payload) {
   if (npc.location_id !== next.protagonist.location_id) {
     throw new PersistentWorldError(409, 'npc_not_present', `NPC ${npcId} is not at the protagonist location`);
   }
-  const familiarityGain = { observe: 1, greet: 2, suggest: 3, help: 4, invite: 3 }[intent];
-  const trustGain = { observe: 0, greet: 1, suggest: 1, help: 2, invite: 1 }[intent];
+  const familiarityGain = { observe: 1, greet: 2, chat: 2, suggest: 3, help: 4, invite: 3 }[intent];
+  const trustGain = { observe: 0, greet: 1, chat: 1, suggest: 1, help: 2, invite: 1 }[intent];
   const relationship = npc.relationship && typeof npc.relationship === 'object' ? npc.relationship : {};
   npc.relationship = {
     familiarity: Math.min(100, Math.max(0, Number(relationship.familiarity) || 0) + familiarityGain),

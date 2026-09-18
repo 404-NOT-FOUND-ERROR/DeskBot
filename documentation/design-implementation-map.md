@@ -23,6 +23,13 @@
 
 ## 当前可验证状态
 
+## 2026-09-18 NPC 与桌面潮玩叙事增量
+
+- `npc-personas.mjs` 与 `research/npcs/*.md` 建立了“作者 Markdown -> 运行时 Persona 投影”的人物构造边界；首发 NPC 的欲望、爱憎、恐惧、口癖和触发点不再只存在于固定回复函数里。
+- NPC HTTP 互动已接入 `llm.complete()`，提示词包含当前 Scene、地点、关系和最近共同经历；模型只返回台词，世界事实仍由 `npc_interaction` mutation 写入。重复互动直接重放，不二次调用模型。
+- NPC Agent 有明确 fallback，因此 fake/offline 环境仍可运行，但真实 DeepSeek 人物质量仍需人工长对话验收。
+- 首发地点与 Scene 已改写为桌边潮玩生活语言；客户端地图节点增加“小世界/摆件区域”语义与地点图标。此增量改善视觉和叙事方向，但还不是完整美术重制。
+
 - Node 服务默认绑定 `127.0.0.1:4311`，Web 默认绑定 `127.0.0.1:4322`。
 - 直接执行 `npm.cmd start` 时，若没有 `DESKBOT_LLM_*`，LLM 会合法地退回 `fake-llm-v0.1`；这不是 DeepSeek 失败响应。
 - DeepSeek 可从 `DESKBOT_LLM_CONFIG` 指向的本地 JSON 读取；API key 不得进入源码、网页、日志或 Git。

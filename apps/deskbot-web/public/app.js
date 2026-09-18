@@ -1,5 +1,9 @@
 import { mountNpcGoalEditor } from './npc-goal-editor.js';
 const CHARACTER_ID = 'shaping-001';
+const NPC_ROLE_LABELS = Object.freeze({
+  route_keeper: '潮痕巡路员',
+  afterlight_collector: '旧光采集者',
+});
 // Shared-life records are deliberately separate from chat and world authoring.
 let lifeMemories = [];
 async function refreshLife() {
@@ -56,7 +60,7 @@ function initializeLife() {
   lifeAction(async () => {});
 }
 window.addEventListener('DOMContentLoaded', initializeLife);
-const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
+const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, npcChatTargetId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
 const emptyState = $('#empty-state');
@@ -340,6 +344,56 @@ function openNpcPanel(npcId, { automatic = false } = {}) {
   syncGameDock();
 }
 
+function appendNpcArrivalMessage(npc) {
+  if (!npc?.scene_opener) return;
+  const existing = [...document.querySelectorAll('.message.npc')]
+    .some((item) => item.dataset.npcId === npc.npc_id && item.dataset.arrival === '1');
+  if (existing) return;
+  emptyState?.remove();
+  const item = document.createElement('article');
+  item.className = 'message npc';
+  item.dataset.npcId = npc.npc_id;
+  item.dataset.arrival = '1';
+  item.innerHTML = `<div class="message-avatar">遇</div><div><div class="message-bubble">${escapeHtml(npc.scene_opener)}</div><div class="message-meta npc-meta">刚在${escapeHtml(state.world?.locations?.find((location) => location.location_id === npc.location_id)?.name || '这里')}遇见 · ${escapeHtml(npc.display_name)}</div></div>`;
+  messageList.append(item);
+  messageList.scrollTop = messageList.scrollHeight;
+}
+
+function renderNpcChatContext() {
+  const banner = $('#npc-chat-context');
+  const target = localEncounters().find((npc) => npc.npc_id === state.npcChatTargetId);
+  const active = Boolean(target);
+  if (banner) banner.hidden = !active;
+  if (active) {
+    setText('#npc-chat-name', target.display_name);
+    input.placeholder = `对${target.display_name}说点什么…`;
+    sendButton.querySelector('span:first-child').textContent = '说给它听';
+  } else {
+    input.placeholder = '想对喵呜说什么，或者想让它做什么？';
+    sendButton.querySelector('span:first-child').textContent = '发送';
+  }
+}
+
+function enterNpcChat(npcId) {
+  const target = localEncounters().find((npc) => npc.npc_id === npcId);
+  if (!target) return;
+  state.selectedNpcId = npcId;
+  state.npcChatTargetId = npcId;
+  markEncounterSeen(npcId);
+  document.querySelectorAll('.floating-panel[data-game-panel]').forEach((other) => { other.hidden = true; });
+  const story = document.querySelector('[data-game-panel="story"]');
+  if (story) story.hidden = false;
+  renderNpcChatContext();
+  syncGameDock();
+  input.focus();
+}
+
+function exitNpcChat() {
+  state.npcChatTargetId = null;
+  renderNpcChatContext();
+  input.focus();
+}
+
 function renderEncounterStrip() {
   const strip = $('#encounter-strip');
   const encounters = localEncounters();
@@ -368,12 +422,17 @@ function renderNpcPanel() {
   const relationship = npc.relationship || {};
   profile.hidden = false;
   $('#npc-portrait').className = `npc-portrait ${npc.accent || 'neutral'}`;
-  setText('#npc-role', npc.role || '身份仍在观察');
+  setText('#npc-role', npc.role_label || NPC_ROLE_LABELS[npc.role] || '聚形域居民');
   setText('#npc-name', npc.display_name);
   setText('#npc-status', npc.status || '正在做自己的事');
   setText('#npc-bio', npc.bio || '它还没有留下完整档案。');
   setText('#npc-temperament', `性情 · ${npc.temperament || '仍在观察'}`);
   setText('#npc-speech-style', `说话 · ${npc.speech_style || '直接回应眼前的事'}`);
+  const signature = $('#npc-signature');
+  if (signature) {
+    signature.hidden = !npc.signature;
+    signature.textContent = npc.signature ? `它常说：${npc.signature}` : '';
+  }
   const familiarity = Math.max(0, Math.min(100, Number(relationship.familiarity) || 0));
   const trust = Math.max(0, Math.min(100, Number(relationship.trust) || 0));
   setText('#npc-familiarity', familiarity);
@@ -392,6 +451,7 @@ function renderNpcPanel() {
   experienceBox.hidden = experiences.length === 0;
   experienceBox.querySelector('ol').innerHTML = experiences.map((experience) => `<li><span>${escapeHtml(experience.summary)}</span>${experience.role_direction ? `<small>留下方向痕迹 · ${escapeHtml(experience.role_direction.label)}</small>` : ''}</li>`).join('');
   $('#npc-profile').querySelectorAll('button, input').forEach((control) => { control.disabled = state.npcBusy; });
+  renderNpcChatContext();
 }
 
 function updateWorldLife(life, { allowAutoOpen = true } = {}) {
@@ -415,7 +475,10 @@ function updateWorldLife(life, { allowAutoOpen = true } = {}) {
   }
   if (allowAutoOpen) {
     const firstUnseen = encounters.find((npc) => !encounterSeen(npc.npc_id));
-    if (firstUnseen) openNpcPanel(firstUnseen.npc_id, { automatic: true });
+    if (firstUnseen) {
+      openNpcPanel(firstUnseen.npc_id, { automatic: true });
+      appendNpcArrivalMessage(firstUnseen);
+    }
   }
 }
 
@@ -466,7 +529,7 @@ function renderWorldMap(map) {
   const nodeMarkup = locations.map((location) => {
     const selected = location.location_id === state.mapSelectedLocationId;
     const stateClass = location.current ? 'current' : location.reachable ? 'reachable' : 'distant';
-    return `<button class="map-location ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"></i><span>${escapeHtml(location.name)}</span>${location.current ? '<small>喵呜在这里</small>' : location.reachable ? `<small>${escapeHtml(location.travel_cost || '—')} 分钟</small>` : '<small>尚不能直达</small>'}</button>`;
+    return `<button class="map-location map-${escapeHtml(location.location_id)} ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"></i><span>${escapeHtml(location.name)}</span>${location.current ? '<small>喵呜的落脚处</small>' : location.reachable ? `<small>走 ${escapeHtml(location.travel_cost || '—')} 分钟</small>` : '<small>要从相邻小路绕过去</small>'}</button>`;
   }).join('');
   const arrivalLocation = locations.find((location) => location.location_id === state.mapArrivalLocationId && location.current);
   const mapTarget = $('#world-map');
@@ -476,7 +539,7 @@ function renderWorldMap(map) {
     mapTarget.style.setProperty('--focus-y', `${Number(arrivalLocation.y)}%`);
   }
   const arrivalToast = arrivalLocation ? `<div class="map-arrival-toast"><span>已抵达</span><strong>${escapeHtml(arrivalLocation.name)}</strong></div>` : '';
-  mapTarget.innerHTML = `<div class="map-stage"><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
+  mapTarget.innerHTML = `<div class="map-stage"><div class="map-caption"><strong>喵呜的桌边摆件地图</strong><span>点一块区域，看看谁在那里、今天在忙什么</span></div><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
   const pill = $('#map-status');
   const blocked = map.active_event?.blocks_travel === true;
   pill.className = `mini-pill ${blocked ? 'warn' : 'ok'}`;
@@ -1156,10 +1219,52 @@ async function submitMutation() {
 }
 
 async function sendMessage(text) {
-  if (!text || state.busy) return; state.busy = true; sendButton.disabled = true; input.disabled = true; appendMessage('user', text); const pending = appendPending(); const eventId = `web-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-  try { const payload = await postJson('/api/chat', { event_id: eventId, character_id: CHARACTER_ID, source: 'deskbot-web', message: text }); pending.remove(); const turn = payload.turn || payload; const reply = turn.reply || turn.reply_event?.payload?.text || '这次没有收到可显示的回复。'; const style = turn.state?.interaction?.tts_style || turn.output_plan?.find((entry) => entry.type === 'speak')?.tts_style; const intent = turn.expression_intent || turn.state?.interaction?.expression_intent; appendMessage('assistant', reply, intent?.mode ? `表达计划 · ${intent.mode} · ${intent.pace || 'natural'}` : style ? `表达计划 · ${style}` : '表达计划 · balanced'); updateTrace(turn); if (payload.state || turn.state) updateShortState({ state: payload.state || turn.state }); if (turn.expression_intent) updateExpressionIntent(turn.expression_intent); if (payload.canonical_world?.snapshot) updateWorld(payload.canonical_world.snapshot); else if (payload.canonical_world?.world) updateWorld(payload.canonical_world.world); await refreshDashboard(); }
-  catch (error) { pending.remove(); appendMessage('assistant', `这次连接没有完成：${error.message}`, '错误不会写入角色世界'); }
-  finally { state.busy = false; sendButton.disabled = false; input.disabled = false; input.focus(); }
+  if (!text || state.busy) return;
+  state.busy = true;
+  sendButton.disabled = true;
+  input.disabled = true;
+  const npcTarget = localEncounters().find((npc) => npc.npc_id === state.npcChatTargetId);
+  appendMessage('user', text, npcTarget ? `对 ${npcTarget.display_name}` : '对喵呜');
+  const pending = appendPending();
+  const eventId = `web-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  try {
+    if (npcTarget) {
+      const payload = await postJson('/api/life/npc-interactions', {
+        interaction_id: eventId,
+        npc_id: npcTarget.npc_id,
+        intent: 'chat',
+        idea: text,
+        source: 'deskbot-web-story-chat',
+      });
+      pending.remove();
+      appendNpcMessage(payload.npc, payload.response);
+      updateWorldLife(payload.life, { allowAutoOpen: false });
+      await refreshDashboard({ allowEncounterAutoOpen: false });
+    } else {
+      const payload = await postJson('/api/chat', { event_id: eventId, character_id: CHARACTER_ID, source: 'deskbot-web', message: text });
+      pending.remove();
+      const turn = payload.turn || payload;
+      const reply = turn.reply || turn.reply_event?.payload?.text || '这次没有收到可显示的回复。';
+      const style = turn.state?.interaction?.tts_style || turn.output_plan?.find((entry) => entry.type === 'speak')?.tts_style;
+      const intent = turn.expression_intent || turn.state?.interaction?.expression_intent;
+      appendMessage('assistant', reply, intent?.mode ? `表达计划 · ${intent.mode} · ${intent.pace || 'natural'}` : style ? `表达计划 · ${style}` : '表达计划 · balanced');
+      updateTrace(turn);
+      if (payload.state || turn.state) updateShortState({ state: payload.state || turn.state });
+      if (turn.expression_intent) updateExpressionIntent(turn.expression_intent);
+      if (payload.canonical_world?.snapshot) updateWorld(payload.canonical_world.snapshot);
+      else if (payload.canonical_world?.world) updateWorld(payload.canonical_world.world);
+      await refreshDashboard();
+    }
+  } catch (error) {
+    pending.remove();
+    appendMessage(npcTarget ? 'npc' : 'assistant', `这次连接没有完成：${error.message}`, '错误不会写入角色世界');
+  } finally {
+    state.busy = false;
+    sendButton.disabled = false;
+    input.disabled = false;
+    renderNpcChatContext();
+    input.focus();
+  }
 }
 
 $('#chat-form').addEventListener('submit', (event) => { event.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = ''; sendMessage(text); });
@@ -1207,7 +1312,9 @@ document.addEventListener('click', (event) => {
 $('#npc-profile').addEventListener('click', (event) => {
   const action = event.target.closest('[data-npc-intent]');
   if (action) interactWithNpc(action.dataset.npcIntent);
+  if (event.target.closest('#npc-chat-start')) enterNpcChat(state.selectedNpcId);
 });
+$('#npc-chat-exit').addEventListener('click', exitNpcChat);
 $('#npc-suggest-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const idea = $('#npc-idea').value.trim();
