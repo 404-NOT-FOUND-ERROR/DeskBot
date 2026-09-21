@@ -117,6 +117,36 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
         }),
       }));
   }
+  function currentStages({ characterId = null, limit = 1 } = {}) {
+    const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 1, 1), 10);
+    const accepted = [...proposals.values()]
+      .filter((item) => !characterId || item.character_id === characterId)
+      .filter((item) => item.status === 'accepted')
+      .sort((a, b) => String(a.decided_at ?? a.proposed_at).localeCompare(String(b.decided_at ?? b.proposed_at)));
+    return accepted.slice(-bounded).map((item) => {
+      const overlay = ROLE_TRIAL_OVERLAYS[item.direction_id] ?? {
+        direction_id: item.direction_id,
+        label: item.label,
+        presence: '保持当前角色底色，只在日常表达中留下这个方向的兴趣。',
+        speech: '先完成任务，再让当前生活兴趣自然露出。',
+        preferences: item.life,
+        boundary: '角色阶段只改变表达与愿望，不改变世界事实。',
+      };
+      const acceptedHistory = [...(item.stage_history ?? [])].reverse().find((entry) => entry.to === 'accepted');
+      return {
+        schema: 'deskbot.role-state.v1',
+        stage_id: `${item.direction_id}-v1`,
+        proposal_id: item.proposal_id,
+        character_id: item.character_id,
+        direction_id: item.direction_id,
+        label: item.label,
+        life: item.life,
+        accepted_at: acceptedHistory?.at ?? item.decided_at ?? item.proposed_at,
+        stage_history: [...(item.stage_history ?? [])],
+        overlay: clone(overlay),
+      };
+    });
+  }
   function choose(proposalId, choice, { reason = null } = {}) {
     if (!CHOICES.has(choice)) throw new TypeError('choice must be try, later, or reject');
     const proposal = proposals.get(proposalId);
@@ -191,7 +221,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     return [...decisions.values()].filter((item) => !proposalId || item.proposal_id === proposalId).slice(-bounded).map(clone);
   }
-  return { propose, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
+  return { propose, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
 }
 
 export { ROLE_TRIAL_OVERLAYS };

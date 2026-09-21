@@ -42,7 +42,7 @@ Node deskbot-service :4311
 - 天气 connector 的实时观测与 minutely/hourly/daily 预报使用独立缓存和 TTL。未显式加载 `DESKBOT_WEATHER_*` 时，当前状态是 disabled；历史 SQLite 快照不等于 provider 当前可用。
 - DeepSeek 出站可用性取决于运行 PowerShell/网络策略；`fetch failed` 不代表角色规则失败。
 - 当前 voice-sidecar 是 fake/model-free baseline，不代表真实中文 ASR/TTS 性能。
-- 角色演化的 fantasy-pull、提案和有限试行已在 P2-P4 接入；当前仍不是长期 `role-state.v1`，也不会自动换壳。
+- 角色演化的 fantasy-pull、提案、有限试行和 accepted `role-state.v1` 阶段档案已在 P2-P4 接入。accepted 阶段会进入普通对话的生活倾向和 `expression-intent.v1`，但仍不会自动换壳；外壳变化要等独立的视觉语义、机械约束和用户确认闭环。
 
 ## 持续世界地图与旅行
 
@@ -50,7 +50,7 @@ Node deskbot-service :4311
 
 `POST /api/world/travel` 会把出发请求转换成标准 `world.mutation / move_protagonist`，再走现有 input、world、evidence 和 ledger 管线。服务端校验：目的地存在、与当前位置相邻、当前世界事件没有阻断旅行、事件 ID 幂等。成功后一次性写入当前位置、抵达状态和旅行耗时；失败不改地点和逻辑时间。LLM 回复仍是只读输出，文本里声称“去了某地”不能移动角色。
 
-当前地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。世界生活 V1 已让世界事件、天气、逻辑时间段和当前位置从有限目录中选择在地生活切片，并让同地 NPC 留下当前行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
+当前地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。每个地点同时有摆件区域、材质、代表性物件、可见动作和可继续选择；这些字段既供地图读模型做视觉语义，也供 Lorebook/Scene 只按相关性召回。世界生活 V1 已让世界事件、天气、逻辑时间段和当前位置从有限目录中选择在地生活切片，并让同地 NPC 留下当前行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
 
 ## 世界自动生活与 NPC 相遇
 
@@ -62,7 +62,7 @@ NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带
 
 `GET /api/life/world` 是只读相遇视图，不会因为刷新网页推进世界；`POST /api/life/npc-interactions` 是唯一普通用户 NPC 互动入口。Web 在故事窗显示已发生 Scene，在“可以试试”前明确保留未发生语义；同地点 NPC 通过横排入口和人物面板出现，首次相遇每个浏览器会话只自动呼出一次。NPC 回应使用独立署名进入故事流，不伪装成喵呜发言。
 
-这一版仍不是开放式自主世界：Scene 来自每地点三条有限模板，当前有三个内置 NPC，NPC 回应和两小时日程由有限角色规则确定。因果分支现在通过 `arc_id + outcome/status + cause_event_ids/cause_experience_ids` 选择 authored Scene；消费过的因果分支不会重复生成，普通地点生活仍作为 fallback。`npc-goals` 同时兼容旧的 ordered alternatives 与 `steps-v1`：多步目标每次 tick 最多推进一步，状态可为 `waiting/completed/missed/failed`，每一步持久化 `decision`、`step_history`、等待条件、截止时间和可选 missed/failed 反馈事件；NPC 移动仍由 canonical world 强制相邻跳转。自动经历不进入 `life.memories`，而从 `GET /api/life/experiences?query=` 和 `branchExperiences` 只读检索，提示词明确区分用户确认记忆与世界生活痕迹。下一阶段是跨天体验校准、支线后果和主动打扰频率，不是把有限规则宣称为开放式自主世界。
+这一版仍不是开放式自主世界：Scene 来自每地点三条有限模板，当前有三个内置 NPC，NPC 回应和两小时日程由有限角色规则确定。因果分支现在通过 `arc_id + outcome/status + cause_event_ids/cause_experience_ids` 选择 authored Scene；消费过的因果分支不会重复生成，普通地点生活仍作为 fallback。`npc-goals` 同时兼容旧的 ordered alternatives 与 `steps-v1`：多步目标每次 tick 最多推进一步，状态可为 `waiting/completed/missed/failed`，每一步持久化 `decision`、`step_history`、等待条件、截止时间和可选 missed/failed 反馈事件；NPC 移动仍由 canonical world 强制相邻跳转。自动经历不进入 `life.memories`，而从 `GET /api/life/experiences?query=` 和 `branchExperiences` 只读检索，提示词明确区分用户确认记忆与世界生活痕迹。当前已具备 accepted role-state 的普通表达投影，但仍缺跨天主动性校准、更多有关系的 NPC 族群、角色阶段对世界行动的稳定影响和角色方向到外壳的真实生成；这些不能用有限规则或一次好看的回复冒充完成。
 
 ### NPC Persona Agent（v0.1）
 
@@ -70,11 +70,15 @@ NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带
 
 NPC Agent 是可降级的：未注册 Persona、无 LLM 或 provider 异常时使用 authored fallback；同一 `interaction_id` 直接重放已有回复，不重复调用模型或增加关系。它提升的是人物表演和沉浸感，不等于已经实现开放式自主 NPC；地点日程、世界后果和角色阶段仍由 Node 的白名单 mutation 控制。
 
+NPC 当面回复采用统一可读性合同：默认 `60-180` 个中文字符、`1-2` 个短段落，允许“一句具体动作描写 + 当面对白”，但必须同时包含直接回应、一个眼前物件或动作、人物自己的判断和一个可接住的小选择。过短、过长、超过两段、客服式、连续抽象设定或缺少上述要素的首稿会触发一次 grounding rewrite；二稿仍不合格则丢弃模型草稿并使用 authored fallback。长度约束服务于日常互动，不截断事实型长任务；NPC 世界写权限始终不变。
+
 ## 世界体验客户端与叙事分层
 
 默认客户端采用“世界优先”布局：地图是全屏背景；左上浮窗承载喵呜的第一人称故事和对话；底部输入框始终可达；地点、角色状态、世界事件、天气、形态与现实输入通过游戏化工具栏按需展开。研究台、原始字段、mutation 和证据仍在第二层，不能挤占普通用户的第一屏。
 
-视觉和文案的当前约束是“桌面潮玩生活”，不是抽象世界观控制台：地点表现为桌面上的小屋、湿路标、会自己挪位的摊位、旧光林地和保管悄悄话的水岸；Scene 写具体小动作、物件和欲望，聚形域规则不作为用户需要理解的说明。地图节点使用摆件区域语义、区域图标和到达反馈；研究字段仍只在研究模式出现。
+视觉和文案的当前约束是“桌面潮玩生活”，不是抽象世界观控制台：地点表现为桌面上的小屋、湿路标、会自己挪位的摊位、旧光林地和保管悄悄话的水岸；Scene 写具体小动作、物件和欲望，聚形域规则不作为用户需要理解的说明。地图读模型提供 `prop_icon`，Web 将五类地点分别画成小屋、路标、摊位、叶丛和水盘，仍保留当前/可达/远方三种状态及抵达反馈；移动端 NPC 卡改为底部抽屉，研究字段仍只在研究模式出现。
+
+视觉 token v0.2 已固定为可执行的实现约束：背景采用木桌/软垫/半透明彩胶的暖色底，正文保持深青灰高对比，紫色和珊瑚色只作方向或关系强调；标题、正文、辅助信息和 HUD 使用明确字号层级；间距统一采用 `4/8/12/18/24px`；游玩层卡片保持轻边框、低阴影、8px 左右圆角，研究层才允许更密集的网格和等宽字段。每个地点至少要有一个摆件语义、一个具体动作和一个可继续选择；“光粒、能量、凝聚”等抽象词不能单独承担世界表达。完整 token 见 `research/visual-language-v0.1.md`。
 
 叙事上下文按 Character.AI 类方法拆成三层，但仍服从 DeskBot canonical state：
 

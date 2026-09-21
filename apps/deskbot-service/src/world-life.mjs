@@ -750,7 +750,7 @@ export function createWorldLife({
             '',
             '[GROUNDING_REWRITE]',
             '把上一次草稿改写成自然、可理解的当面对白。保留 NPC 的爱憎和立场，但删掉设定说明、空泛抒情和客服套话。',
-            '必须回应用户刚刚做的事，至少落到一个具体物件或动作，并留下一个可选择的小动作。除非用户主动问世界观，只保留最多一个奇幻专有对象。只输出改写后的正文。',
+            '改成 60 至 180 个中文字符、1 至 2 个短段落。必须同时有直接回应、一个具体物件或动作、NPC 自己的判断、一个可选择的小动作。除非用户主动问世界观，只保留最多一个奇幻专有对象。只输出改写后的正文。',
             `上一次草稿：${response}`,
             '[/GROUNDING_REWRITE]',
           ].join('\n'),
@@ -761,7 +761,7 @@ export function createWorldLife({
         });
         const rewritten = typeof rewrite?.text === 'string' ? rewrite.text.trim() : '';
         if (rewritten && !npcReplyNeedsGrounding(rewritten)) {
-          response = rewritten.slice(0, 4000).trim();
+          response = rewritten;
         } else {
           // Never keep an ungrounded first draft just because the corrective
           // pass returned another setting explanation. The authored response

@@ -55,6 +55,7 @@ export function createChatOrchestrator({
   refreshWeather = null,
   refreshWeatherForecast = null,
   activeRoleTrials = null,
+  currentRoleStages = null,
   relationshipMemories = null,
   branchExperiences = null,
   conversationHistoryAfter = null,
@@ -211,11 +212,13 @@ export function createChatOrchestrator({
     }) ?? [];
     const recentConversation = recentConversationFor(userEvent.character_id);
     const roleTrials = activeRoleTrials?.(userEvent.character_id) ?? [];
+    const roleStages = currentRoleStages?.(userEvent.character_id) ?? [];
     const expressionIntent = applyRoleTrialExpressionIntent(
       normalizeExpressionIntent(stateResult.state?.interaction?.expression_intent, {
         evidenceRefs: stateResult.state?.last_event_id ? [stateResult.state.last_event_id] : [],
       }),
       roleTrials,
+      roleStages,
     );
     const runtimePromptContext = {
       ...(runtimeContext ?? {}),
@@ -240,6 +243,7 @@ export function createChatOrchestrator({
       relationshipMemories: relationshipMemories?.(userEvent.character_id, userEvent.payload.text) ?? [],
       branchExperiences: branchExperiences?.(userEvent.payload.text, currentWorldSnapshot()) ?? [],
       activeRoleTrials: roleTrials,
+      currentRoleStages: roleStages,
       userText: userEvent.payload.text,
     });
     // Runtime sources inform the character's reply. They must not replace the
@@ -394,6 +398,7 @@ export function createChatOrchestrator({
       interaction_decision: interactionDecision,
       proactive_candidates: proactiveCandidates,
       active_role_trials: composed.active_role_trials ?? [],
+      current_role_stages: composed.current_role_stages ?? [],
       trial_observations: trialObservations,
       expression_intent: expressionIntent,
       weather_refresh: weatherRefreshResult

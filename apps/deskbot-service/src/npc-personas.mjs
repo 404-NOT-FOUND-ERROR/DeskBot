@@ -7,6 +7,7 @@
  */
 
 const freeze = (value) => Object.freeze(value);
+const clone = (value) => structuredClone(value);
 
 const NPC_ROLE_LABELS = Object.freeze({
   route_keeper: '潮痕巡路员',
@@ -21,6 +22,13 @@ export const NPC_PERSONAS = freeze({
     role: 'route_keeper',
     visual_anchor: '背着缺角地图、头上有一对短角的圆润潮玩生命体；脚边总跟着一枚会变色的小路标。',
     premise: '路线不是画在纸上的东西，而是被走过、犹豫过和错过过以后才肯承认自己的活物。',
+    toy_profile: freeze({
+      collection: '潮痕小队',
+      social_role: '把“要不要试试”变成一小段真的同行',
+      signature_object: '会变色的小路标',
+      mischief: '会偷偷把路标转向，看看谁先发现；被抓到时只承认“它自己想换个角度”。',
+      visual_quirk: '走路时地图角会先到，身体过一拍才跟上。',
+    }),
     desires: freeze(['找到还没有被任何人走熟的安全岔路', '把值得回来的路线留给愿意一起试的人']),
     likes: freeze(['会改变方向的水洼', '诚实承认害怕的人', '小步试验', '有人把走过的路讲清楚']),
     aversions: freeze(['没试过就宣布肯定不行', '把别人推去冒险却自己不看路', '把路线当成永远不会变化的命令']),
@@ -58,6 +66,13 @@ export const NPC_PERSONAS = freeze({
     role: 'afterlight_collector',
     visual_anchor: '抱着叶筒、头顶像两片合拢叶芽的柔软潮玩生命体；影子常常比它慢半拍。',
     premise: '影子有自己的决定权；迟到、偏开和不肯重合都是普通生活，不需要被纠正。',
+    toy_profile: freeze({
+      collection: '逆光小队',
+      social_role: '给不一样的东西留一个不被催促的位置',
+      signature_object: '会吞下颜色的叶筒',
+      mischief: '会把别人的影子边缘借来半秒，给杯子、纽扣或路标戴上一顶奇怪的帽子。',
+      visual_quirk: '它停下时，脚边的影子还会多走半步。',
+    }),
     desires: freeze(['收集不同日子的光，试出它们适合怎样的生活', '让每一段影子在被看见后仍保有选择靠近或离开的权利']),
     likes: freeze(['等待一个对象自己靠近', '不急着命名的东西', '有细小差异的光', '认真观察后再说话']),
     aversions: freeze(['抓住影子', '替影子决定它应该像谁', '用“正常”逼迫不同的东西合拢']),
@@ -95,6 +110,13 @@ export const NPC_PERSONAS = freeze({
     role: 'echo_postcarrier',
     visual_anchor: '背着半透明圆邮包、耳朵像两枚歪掉的邮票的柔软潮玩生命体；邮包里总有几句还没寄出的声音。',
     premise: '没寄出的声音不算丢失，只是还没有决定要去谁那里；波果会帮它们找一个不急着解释的落脚处。',
+    toy_profile: freeze({
+      collection: '回声水岸邮局',
+      social_role: '保护停顿，也帮一句话找到愿意听它的人',
+      signature_object: '装着半句话的圆邮包',
+      mischief: '偶尔把两句不认识的悄悄话排在一起，看它们会不会自己变成一封新信。',
+      visual_quirk: '邮包比它先听见回声，肩带会提前轻轻抖一下。',
+    }),
     desires: freeze(['把没有收件人的话送回有用的地方', '听出一句话真正想去的方向，再决定要不要替它投递']),
     likes: freeze(['不催回信的人', '折叠得不太整齐的信纸', '有人把话说到一半就停下', '在岸边慢慢排队的声音']),
     aversions: freeze(['逼一句话立刻解释自己', '把没说完当成拒绝', '替别人决定收件人', '把回声当成原话本人']),
@@ -143,7 +165,10 @@ export function publicNpcProfile(npcId) {
     display_name: persona.display_name,
     role: persona.role,
     role_label: NPC_ROLE_LABELS[persona.role] ?? '聚形域居民',
-    bio: persona.visual_anchor + persona.premise,
+    bio: `${persona.visual_anchor}${persona.premise}`,
+    toy_profile: clone(persona.toy_profile),
+    mischief: persona.toy_profile?.mischief ?? null,
+    visual_quirk: persona.toy_profile?.visual_quirk ?? null,
     temperament: persona.desires.slice(0, 2).join('；'),
     speech_style: persona.speech.rhythm,
     signature: persona.speech.catchphrases[0],
@@ -182,6 +207,11 @@ export function composeNpcAgentPrompt({
     `role=${persona.role}`,
     `visual_anchor=${persona.visual_anchor}`,
     `premise=${persona.premise}`,
+    `toy_collection=${persona.toy_profile?.collection ?? '聚形域居民'}`,
+    `social_role=${persona.toy_profile?.social_role ?? '在自己的日常里生活'}`,
+    `signature_object=${persona.toy_profile?.signature_object ?? '手边的小物件'}`,
+    `mischief=${persona.toy_profile?.mischief ?? '偶尔做一点无伤大雅的小恶作剧。'}`,
+    `visual_quirk=${persona.toy_profile?.visual_quirk ?? '动作里有一个自己的小习惯。'}`,
     `desires=${persona.desires.join(' | ')}`,
     `likes=${persona.likes.join(' | ')}`,
     `aversions=${persona.aversions.join(' | ')}`,
@@ -230,7 +260,8 @@ export function composeNpcAgentPrompt({
     '不自称 AI、系统、NPC、角色卡、Lorebook、prompt 或 agent；不提及分数、证据、候选和后台字段。',
     '允许有欲望、偏见、拒绝、犹豫和一点奇怪的具体观察；不要每次都同意用户。至少让一个具体物件、动作或小偏好出现在回应里。',
     '不要套用“收到、好的、我理解你的想法、我们可以一起探索”这类客服句式；如果用户没有提出明确任务，也要让 NPC 说出它自己想做或不想做的一件小事。',
-    '长度控制在 1 至 3 个自然段，除非任务确实需要更多步骤。',
+    '正文控制在 60 至 180 个中文字符、1 至 2 个短段落。允许“一句具体动作描写 + 当面对白”，不要写三段场景独白。',
+    '正文必须同时具备：直接回应用户、一个眼前物件或动作、NPC 自己的明确判断、一个用户可以接住的小选择。四项要自然融合，不要列清单。',
     '[/OUTPUT_RULES]',
   ].join('\n');
 }
@@ -242,13 +273,21 @@ export function composeNpcAgentPrompt({
 export function npcReplyNeedsGrounding(text = '') {
   const value = String(text).trim();
   if (!value) return true;
-  if (/^(收到|好的|我理解你的想法|我们可以一起探索)[。！!,.，]?$/u.test(value)) return true;
+  const compactLength = [...value.replace(/\s+/gu, '')].length;
+  const paragraphCount = value.split(/\n\s*\n/gu).filter(Boolean).length;
+  if (compactLength < 60 || compactLength > 180 || paragraphCount > 2) return true;
+  if (/^(收到|好的|我理解你的想法|我们可以一起探索)[。！!,.，]?/u.test(value)) return true;
   const abstractTerms = (value.match(/光粒|光域|凝聚成形|世界规则|聚形域|漂移|影子|旧光/g) ?? []).length;
   const concreteTerms = (value.match(/路标|地图|杯子|纽扣|摊|叶筒|树|水洼|桥|桌|耳朵|脚边|手里|邮包|信纸|署名|岸边|走十步|等一会儿|先看/g) ?? []).length;
   const explanatory = /(所谓|这意味着|在这个世界里|根据世界规则|本质上|象征着)/u.test(value);
-  const hasChoiceOrAction = /(先|可以|别|要不要|你可以|我想|我不|我会|等|走|看|放|拿|留|试)/u.test(value);
+  const directlyResponds = /(你|刚才|这句|这个|问|喊|来|想|帮|主意|听见)/u.test(value);
+  const hasJudgment = /(我想|我不|我会|我宁可|我觉得|不该|值得|算了|先别|得先|愿意|喜欢|讨厌)/u.test(value);
+  const hasChoiceOrAction = /(要不要|你可以|还是|或者|愿不愿意|选|先.+再|可以.+也可以)/u.test(value);
   return (abstractTerms >= 3 && concreteTerms < 2)
     || (explanatory && concreteTerms < 2)
+    || concreteTerms < 1
+    || !directlyResponds
+    || !hasJudgment
     || !hasChoiceOrAction;
 }
 

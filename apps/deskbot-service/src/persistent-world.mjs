@@ -1454,6 +1454,10 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       npc_summary: npcs,
       arrival_text: location.arrival_text || null,
       scene_preview: location.scene ? {
+        toy_zone: location.scene.toy_zone ?? null,
+        prop_icon: location.scene.prop_icon ?? null,
+        material: location.scene.material ?? null,
+        signature_props: clone(location.scene.signature_props ?? []),
         anchor: location.scene.anchor ?? null,
         sensory_cues: clone(location.scene.sensory_cues ?? []),
         possible_beats: clone(location.scene.possible_beats ?? []),

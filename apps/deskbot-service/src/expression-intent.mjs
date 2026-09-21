@@ -9,12 +9,18 @@ const PROFILES = Object.freeze({
   surprised: Object.freeze({ mode: 'curious', intensity: 0.8, pace: 'quick', prosody: 'bright_rising', tts_profile: 'miaowu-lively-v1', speed: 1.1, pitch_semitones: 0.8, energy: 0.78 }),
 });
 
+// These profiles are intentionally shared by a live trial and an accepted
+// stage. The trial is temporary evidence; the stage is the durable answer to
+// that evidence. Keeping one projection prevents text, screen and voice from
+// drifting when a direction is accepted.
 const ROLE_TRIAL_PROFILES = Object.freeze({
   wetland_frog: Object.freeze({ mode: 'playful', intensity_floor: 0.62, pace: 'springy', prosody: 'light_bouncy', screen_motif: 'ripple', screen_motion: 'bounce', speed: 1.06, pitch_semitones: 0.4, energy: 0.65 }),
   starry_observer: Object.freeze({ mode: 'curious', intensity_floor: 0.5, pace: 'measured', prosody: 'curious_with_pauses', screen_motif: 'star_glint', screen_motion: 'slow_blink', speed: 0.94, pitch_semitones: 0.1, energy: 0.48 }),
   workshop_maker: Object.freeze({ mode: 'attentive', intensity_floor: 0.6, pace: 'precise', prosody: 'crisp_focused', screen_motif: 'gear_tick', screen_motion: 'focus', speed: 1.02, pitch_semitones: -0.1, energy: 0.62 }),
   dream_cloud: Object.freeze({ mode: 'playful', intensity_floor: 0.58, pace: 'floating', prosody: 'airy_associative', screen_motif: 'cloud_drift', screen_motion: 'float', speed: 0.96, pitch_semitones: 0.35, energy: 0.52 }),
 });
+
+const ROLE_STAGE_PROFILES = ROLE_TRIAL_PROFILES;
 
 const clone = (value) => structuredClone(value);
 
@@ -81,35 +87,42 @@ export function normalizeExpressionIntent(value, { evidenceRefs = [] } = {}) {
   };
 }
 
-export function applyRoleTrialExpressionIntent(value, activeTrials = []) {
+export function applyRoleTrialExpressionIntent(value, activeTrials = [], currentStages = []) {
   const base = normalizeExpressionIntent(value);
   const trial = Array.isArray(activeTrials) ? activeTrials.find((item) => item?.trial?.status === 'active') : null;
-  const profile = trial ? ROLE_TRIAL_PROFILES[trial.direction_id] : null;
-  if (!trial || !profile) return base;
+  const stage = !trial && Array.isArray(currentStages)
+    ? currentStages.find((item) => item?.schema === 'deskbot.role-state.v1' || item?.direction_id)
+    : null;
+  const directionId = trial?.direction_id ?? stage?.direction_id ?? null;
+  const profile = directionId ? ROLE_STAGE_PROFILES[directionId] : null;
+  if (!directionId || !profile) return base;
   const restrained = ['supportive', 'boundary'].includes(base.mode)
     || ['concerned', 'alert', 'tired'].includes(base.expression);
-  const roleTrial = {
-    proposal_id: trial.proposal_id,
-    direction_id: trial.direction_id,
-    label: trial.label,
+  const roleOverlay = {
+    proposal_id: trial?.proposal_id ?? stage?.proposal_id ?? null,
+    stage_id: stage?.stage_id ?? null,
+    direction_id: directionId,
+    label: trial?.label ?? stage?.label ?? null,
+    lifecycle: trial ? 'trial' : 'accepted',
     applied: !restrained,
-    reason: restrained ? 'short_state_requires_restrained_expression' : 'active_role_trial',
+    reason: restrained ? 'short_state_requires_restrained_expression' : trial ? 'active_role_trial' : 'accepted_role_stage',
   };
-  if (restrained) return { ...base, role_trial: roleTrial };
+  if (restrained) return { ...base, role_trial: roleOverlay, role_stage: stage ? roleOverlay : undefined };
   return {
     ...base,
     mode: profile.mode,
     intensity: Math.max(base.intensity, profile.intensity_floor),
     pace: profile.pace,
     prosody: profile.prosody,
-    role_trial: roleTrial,
+    role_trial: trial ? roleOverlay : undefined,
+    role_stage: stage ? roleOverlay : undefined,
     consumers: {
       ...base.consumers,
-      text: { ...base.consumers.text, mode: profile.mode, role_trial_direction: trial.direction_id },
-      screen: { ...base.consumers.screen, intensity: Math.max(base.intensity, profile.intensity_floor), motif: profile.screen_motif, motion: profile.screen_motion },
-      tts: { ...base.consumers.tts, speed: profile.speed, pitch_semitones: profile.pitch_semitones, energy: profile.energy, role_trial_direction: trial.direction_id },
+      text: { ...base.consumers.text, mode: profile.mode, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
+      screen: { ...base.consumers.screen, intensity: Math.max(base.intensity, profile.intensity_floor), motif: profile.screen_motif, motion: profile.screen_motion, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
+      tts: { ...base.consumers.tts, speed: profile.speed, pitch_semitones: profile.pitch_semitones, energy: profile.energy, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
     },
   };
 }
 
-export { EXPRESSION_INTENT_SCHEMA, ROLE_TRIAL_PROFILES };
+export { EXPRESSION_INTENT_SCHEMA, ROLE_STAGE_PROFILES, ROLE_TRIAL_PROFILES };

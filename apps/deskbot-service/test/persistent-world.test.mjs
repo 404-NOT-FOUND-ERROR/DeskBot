@@ -115,6 +115,10 @@ test('world map exposes canonical routes and travel advances time through one mu
   const road = initialMap.locations.find((location) => location.location_id === 'tidal-old-road');
   assert.equal(desk.location_id, 'shaping-field-desk');
   assert.equal(road.reachable, true);
+  assert.equal(road.scene_preview.toy_zone, '会改道的布带跑道');
+  assert.equal(road.scene_preview.prop_icon, 'signpost');
+  assert.equal(road.scene_preview.material, '湿亮软胶路面、布带护栏和会变色的小路标');
+  assert.deepEqual(road.scene_preview.signature_props, ['缺角地图', '蓝绿路标', '十步刻度']);
   assert.equal(road.scene_preview.possible_beats.length, 2);
   assert.ok(initialMap.paths.some((path) => path.reachable && path.to_location_id === 'tidal-old-road'));
 

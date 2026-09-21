@@ -96,6 +96,20 @@ test('active trial exposes a direction-specific expression overlay', () => {
   assert.equal(trial.trial.status, 'active');
 });
 
+test('accepted role becomes a durable role-state without changing the shell', () => {
+  const store = createRoleProposalStore({ now: () => new Date('2026-09-14T00:00:00.000Z') });
+  const proposal = store.propose({ status: 'candidate', direction_id: 'wetland_frog', label: '荷叶青蛙', life: '潮湿生活', fantasy_pull: 0.8, evidence_ids: ['e1', 'e2', 'e3'] }, { characterId: 'shaping-001' });
+  store.choose(proposal.proposal_id, 'try');
+  store.startTrial(proposal.proposal_id, { windowTurns: 1 });
+  store.recordTrialObservation(proposal.proposal_id, { eventId: 'evt-role-state-1', signal: 'positive', evidenceId: 'ev-role-state-1' });
+  store.completeTrial(proposal.proposal_id, { decision: 'accepted', reason: '想把这段生活留下来' });
+  const [stage] = store.currentStages({ characterId: 'shaping-001' });
+  assert.equal(stage.schema, 'deskbot.role-state.v1');
+  assert.equal(stage.direction_id, 'wetland_frog');
+  assert.match(stage.overlay.presence, /亲水/);
+  assert.match(stage.stage_id, /wetland_frog/);
+});
+
 test('one character cannot run two role trials at once', () => {
   const store = createRoleProposalStore({ now: () => new Date('2026-09-14T00:00:00.000Z') });
   const first = store.propose({ status: 'candidate', direction_id: 'wetland_frog', label: '荷叶青蛙', life: '潮湿生活', fantasy_pull: 0.8, evidence_ids: ['e1', 'e2', 'e3'] }, { characterId: 'shaping-001' });

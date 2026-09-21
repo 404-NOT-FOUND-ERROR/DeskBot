@@ -178,6 +178,7 @@ export function createDeskBotServer({
     ttsFormat,
     audioArtifacts,
     activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
+    currentRoleStages: (characterId) => roles.currentStages({ characterId }),
     relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
     branchExperiences: (query, worldSnapshot) => sharedLife.retrieveExperiences(query, worldSnapshot),
     conversationHistoryAfter: (characterId) => sharedLife.historyAfter(characterId),

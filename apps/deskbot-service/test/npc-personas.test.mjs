@@ -24,6 +24,10 @@ test('authored NPC personas expose desires, boundaries, speech hooks and example
     assert.ok(persona.scene_openers.length >= 1);
     assert.ok(persona.dialogue_examples.length >= 1);
     assert.ok(persona.conversation_moves.length >= 1);
+    assert.ok(persona.toy_profile?.collection);
+    assert.ok(persona.toy_profile?.signature_object);
+    assert.ok(persona.toy_profile?.mischief);
+    assert.ok(persona.toy_profile?.visual_quirk);
     assert.ok(publicNpcProfile(npcId).display_name);
     assert.ok(publicNpcProfile(npcId).signature);
     assert.ok(publicNpcProfile(npcId).role_label);
@@ -65,13 +69,20 @@ test('NPC prompt keeps character performance separate from canonical world autho
   assert.match(prompt, /不能把机会说成已经完成/);
   assert.match(prompt, /不能.*改天气.*换外壳.*改变人格/);
   assert.match(prompt, /dialogue_examples=/);
+  assert.match(prompt, /toy_collection=/);
+  assert.match(prompt, /mischief=/);
   assert.match(prompt, /relationship_stage=初遇/);
   assert.match(prompt, /不要套用“收到、好的/);
   assert.match(prompt, /默认把奇幻对象当作这个角色生活里的普通东西/);
+  assert.match(prompt, /60 至 180 个中文字符/);
+  assert.match(prompt, /1 至 2 个短段落/);
+  assert.match(prompt, /NPC 自己的明确判断/);
 });
 
 test('NPC grounding guard rejects setting exposition but keeps concrete character lines', () => {
   assert.equal(npcReplyNeedsGrounding('在聚形域里，光粒漂移，光域凝聚成形，世界规则因此改变。'), true);
   assert.equal(npcReplyNeedsGrounding('收到。'), true);
-  assert.equal(npcReplyNeedsGrounding('它今天迟了三步。先别替它决定，你可以等一会儿。'), false);
+  assert.equal(npcReplyNeedsGrounding('它今天迟了三步。先别替它决定，我不喜欢别人替一段路催答案。你可以在路标边等十步，也可以先绕过去；十步以后，我们再看它愿不愿意把箭头转回来。'), false);
+  assert.equal(npcReplyNeedsGrounding(`你问得很直接，我把缺角地图压在杯子旁边，先看那枚路标会不会转向。我不想替它决定。\n\n${'你可以先等一会儿，也可以跟我走十步再回来。'.repeat(10)}`), true);
+  assert.equal(npcReplyNeedsGrounding('你问得很直接，我觉得这件事可以再想一想。你可以先等，也可以离开。'), true);
 });

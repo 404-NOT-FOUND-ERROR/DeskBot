@@ -421,6 +421,11 @@ function renderNpcPanel() {
   const npc = encounters.find((item) => item.npc_id === state.selectedNpcId);
   const relationship = npc.relationship || {};
   profile.hidden = false;
+  let toyIdentity = $('#npc-toy-identity');
+  if (!toyIdentity) {
+    profile.querySelector('.npc-traits')?.insertAdjacentHTML('afterend', '<div id="npc-toy-identity" class="npc-toy-identity" hidden><div><span id="npc-collection"></span><strong id="npc-object"></strong></div><p id="npc-quirk"></p></div>');
+    toyIdentity = $('#npc-toy-identity');
+  }
   $('#npc-portrait').className = `npc-portrait ${npc.accent || 'neutral'}`;
   setText('#npc-role', npc.role_label || NPC_ROLE_LABELS[npc.role] || '聚形域居民');
   setText('#npc-name', npc.display_name);
@@ -428,6 +433,14 @@ function renderNpcPanel() {
   setText('#npc-bio', npc.bio || '它还没有留下完整档案。');
   setText('#npc-temperament', `性情 · ${npc.temperament || '仍在观察'}`);
   setText('#npc-speech-style', `说话 · ${npc.speech_style || '直接回应眼前的事'}`);
+  const toyProfile = npc.toy_profile || {};
+  if (toyIdentity) {
+    const hasToyProfile = Boolean(toyProfile.collection || toyProfile.signature_object || npc.mischief || npc.visual_quirk);
+    toyIdentity.hidden = !hasToyProfile;
+    setText('#npc-collection', toyProfile.collection ? `族群 · ${toyProfile.collection}` : '');
+    setText('#npc-object', toyProfile.signature_object || '手边的小物件');
+    setText('#npc-quirk', npc.mischief || npc.visual_quirk || '它有一个只属于自己的小习惯。');
+  }
   const signature = $('#npc-signature');
   if (signature) {
     signature.hidden = !npc.signature;
@@ -508,6 +521,10 @@ function worldMapLocation(locationId) {
   return (state.worldMap?.locations || []).find((location) => location.location_id === locationId) || null;
 }
 
+function mapPropClass(value) {
+  return ['dock', 'signpost', 'market', 'grove', 'waterside'].includes(value) ? `prop-${value}` : 'prop-dock';
+}
+
 function renderWorldMap(map) {
   if (!map) return;
   state.worldMap = map;
@@ -529,7 +546,11 @@ function renderWorldMap(map) {
   const nodeMarkup = locations.map((location) => {
     const selected = location.location_id === state.mapSelectedLocationId;
     const stateClass = location.current ? 'current' : location.reachable ? 'reachable' : 'distant';
-    return `<button class="map-location map-${escapeHtml(location.location_id)} ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"></i><span>${escapeHtml(location.name)}</span>${location.current ? '<small>喵呜的小窝</small>' : location.reachable ? `<small>沿布路线 · ${escapeHtml(location.travel_cost || '—')} 分钟</small>` : '<small>要从邻近摆件区绕过去</small>'}</button>`;
+    const zone = location.scene_preview?.toy_zone || location.description || '桌边摆件区';
+    const propClass = mapPropClass(location.scene_preview?.prop_icon);
+    const props = (location.scene_preview?.signature_props || []).slice(0, 2).join(' · ');
+    const residentCount = location.npc_summary?.length ?? 0;
+    return `<button class="map-location map-${escapeHtml(location.location_id)} ${propClass} ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"><b></b></i><span><strong>${escapeHtml(location.name)}</strong><em>${escapeHtml(zone)}</em></span><small>${location.current ? '喵呜正在这里' : location.reachable ? `${escapeHtml(location.travel_cost || '—')} 分钟可到` : residentCount ? `${residentCount} 位居民在这里` : props || '还要绕一段路'}</small></button>`;
   }).join('');
   const arrivalLocation = locations.find((location) => location.location_id === state.mapArrivalLocationId && location.current);
   const mapTarget = $('#world-map');
@@ -539,7 +560,7 @@ function renderWorldMap(map) {
     mapTarget.style.setProperty('--focus-y', `${Number(arrivalLocation.y)}%`);
   }
   const arrivalToast = arrivalLocation ? `<div class="map-arrival-toast"><span>喵呜到了</span><strong>${escapeHtml(arrivalLocation.name)}</strong></div>` : '';
-  mapTarget.innerHTML = `<div class="map-stage"><div class="map-caption"><strong>桌边摆件盘</strong><span>点一块小区域，看看谁在那里、今天在忙什么</span></div><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
+  mapTarget.innerHTML = `<div class="map-stage"><div class="map-caption"><span class="map-caption-index">桌边小世界 · 01</span><strong>今天的摆件盘</strong><span>每件摆件里，都有人在过自己的日子</span></div><div class="map-status-rail" aria-hidden="true"><span>世界还在走</span><i></i><b>第 ${escapeHtml(map.logical_time?.day ?? '—')} 天 · ${escapeHtml(String(Math.floor((map.logical_time?.minute_of_day ?? 0) / 60)).padStart(2, '0'))}:${escapeHtml(String((map.logical_time?.minute_of_day ?? 0) % 60).padStart(2, '0'))}</b></div><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
   const pill = $('#map-status');
   const blocked = map.active_event?.blocks_travel === true;
   pill.className = `mini-pill ${blocked ? 'warn' : 'ok'}`;
@@ -577,12 +598,15 @@ function renderMapDetail() {
   const npcs = location.npc_summary?.length ? `<span class="map-npc-note">在这里 · ${location.npc_summary.map((npc) => location.current ? `<button type="button" data-open-npc="${escapeHtml(npc.npc_id)}">${escapeHtml(npc.display_name)}</button>` : escapeHtml(npc.display_name)).join('、')}</span>` : '';
   const sceneCueValue = localLifeScene?.sensory_cue || location.scene_preview?.sensory_cues?.[0];
   const possibleBeatValue = localLifeScene?.opportunity || location.scene_preview?.possible_beats?.[0];
+  const toyZone = location.scene_preview?.toy_zone ? `<span class="map-zone-note">摸起来 · ${escapeHtml(location.scene_preview.toy_zone)}</span>` : '';
+  const material = location.scene_preview?.material ? `<span class="map-material-note">摆着 · ${escapeHtml(location.scene_preview.material)}</span>` : '';
+  const props = location.scene_preview?.signature_props?.length ? `<span class="map-prop-note">眼前 · ${location.scene_preview.signature_props.map(escapeHtml).join('、')}</span>` : '';
   const sceneCue = sceneCueValue ? `<span class="map-scene-note">眼前 · ${escapeHtml(sceneCueValue)}</span>` : '';
-  const possibleBeat = possibleBeatValue ? `<span class="map-possibility-note">可以试试 · ${escapeHtml(possibleBeatValue)}</span>` : '';
+  const possibleBeat = possibleBeatValue ? `<span class="map-possibility-note">喵呜惦记 · ${escapeHtml(possibleBeatValue)}</span>` : '';
   let action = '<span class="map-current-label">喵呜现在就在这里</span>';
   if (!location.current && location.reachable) action = `<button class="map-travel-button" type="button" data-travel-location="${escapeHtml(location.location_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>前往这里 <span>${escapeHtml(location.travel_cost || '—')} 分钟</span></button>`;
   if (!location.current && !location.reachable) action = '<span class="map-distant-label">要先经过相邻地点</span>';
-  target.innerHTML = `<div><strong>${escapeHtml(location.name)}</strong><p>${escapeHtml(location.description || '这里还没有留下描述。')}</p>${sceneCue}${possibleBeat}${currentEvent}${npcs}</div>${action}`;
+  target.innerHTML = `<div><strong>${escapeHtml(location.name)}</strong><p>${escapeHtml(location.description || '这里还没有留下描述。')}</p>${toyZone}${material}${props}${sceneCue}${possibleBeat}${currentEvent}${npcs}</div>${action}`;
 }
 
 async function travelTo(locationId) {
@@ -646,7 +670,7 @@ async function interactWithNpc(intent, idea = null) {
     updateWorldLife(payload.life, { allowAutoOpen: false });
     appendNpcMessage(payload.npc, payload.response);
     resultTarget.className = 'npc-result ok';
-    resultTarget.textContent = '这次相遇已经写进世界记录。';
+    resultTarget.textContent = '这次碰面，喵呜记住了。';
     if (intent === 'suggest') $('#npc-idea').value = '';
     await refreshDashboard({ allowEncounterAutoOpen: false });
   } catch (error) {

@@ -182,7 +182,7 @@ test('NPC agent receives Persona and Scene context, then persists only its reply
     llm: {
       async complete(input) {
         prompts.push(input.prompt);
-        return { text: '巡路员把缺角地图压住：“喵？先走十步，我不替这条路回答。”' };
+        return { text: '巡路员把缺角地图压在杯子旁：“你想看那条岔路，我也想试，但我不赞成一口气走到底。先跟我走十步；路标若还认得脚印，我们继续，不认就回来。你选现在走，还是等水退一点？”' };
       },
     },
   });
@@ -193,7 +193,7 @@ test('NPC agent receives Persona and Scene context, then persists only its reply
     idea: '去看看那条会变色的小岔路',
   });
   assert.equal(result.accepted, true);
-  assert.match(result.response, /先走十步/);
+  assert.match(result.response, /走十步/);
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /desires=.*安全岔路/);
   assert.match(prompts[0], /scene_title=/);
@@ -212,7 +212,7 @@ test('NPC agent retry is idempotent and does not call the model twice', async ()
     now: () => new Date('2026-09-17T02:00:00.000Z'),
     worldSnapshot: () => world.get(),
     ingest: (event) => world.ingest(event),
-    llm: { async complete() { calls += 1; return { text: '喵呜，先看脚下。' }; } },
+    llm: { async complete() { calls += 1; return { text: '巡路员用脚尖压住会转向的小路标：“你来得正好。我不喜欢边走边猜，先看脚下这条湿线。你可以跟我试十步，也可以替我守住地图；选一个，别让杯子把岔口占了。”' }; } },
   });
   const body = { interaction_id: 'agent-retry-001', npc_id: 'pathfinder-001', intent: 'greet' };
   const first = await agent.interactWithAgent(body);
@@ -358,7 +358,7 @@ test('world-life HTTP endpoints expose encounters and reject remote NPC interact
     now,
     websocket: false,
     worldLifeEnabled: true,
-    llm: { async complete(input) { prompts.push(input.prompt); return { text: '巡路员歪了歪头：“喵？先看看这条路。”' }; } },
+    llm: { async complete(input) { prompts.push(input.prompt); return { text: '巡路员把缺角地图压在杯子旁：“你想找新岔路，我也好奇，但我不赞成追着变色跑。先看看这条路，再跟路标走十步；它若还认得脚印，我们继续。你选现在走，还是等水退一点？”' }; } },
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');

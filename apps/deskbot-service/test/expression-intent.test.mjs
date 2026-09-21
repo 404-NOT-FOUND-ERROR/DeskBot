@@ -45,3 +45,29 @@ test('role trial expression yields to concerned and boundary states', () => {
   assert.equal(intent.expression, 'concerned');
   assert.equal(intent.consumers.screen.motif, undefined);
 });
+
+test('accepted role stage shares its expression overlay across text, screen and TTS', () => {
+  const intent = applyRoleTrialExpressionIntent(
+    createExpressionIntent({ expression: 'neutral' }),
+    [],
+    [{ schema: 'deskbot.role-state.v1', stage_id: 'wetland_frog-v1', direction_id: 'wetland_frog', label: '荷叶青蛙' }],
+  );
+  assert.equal(intent.role_stage.direction_id, 'wetland_frog');
+  assert.equal(intent.role_stage.lifecycle, 'accepted');
+  assert.equal(intent.pace, 'springy');
+  assert.equal(intent.consumers.text.role_stage_direction, 'wetland_frog');
+  assert.equal(intent.consumers.screen.motif, 'ripple');
+  assert.equal(intent.consumers.tts.speed, 1.06);
+});
+
+test('accepted role stage yields to concerned state while retaining audit identity', () => {
+  const intent = applyRoleTrialExpressionIntent(
+    createExpressionIntent({ expression: 'concerned' }),
+    [],
+    [{ schema: 'deskbot.role-state.v1', stage_id: 'wetland_frog-v1', direction_id: 'wetland_frog', label: '荷叶青蛙' }],
+  );
+  assert.equal(intent.role_stage.direction_id, 'wetland_frog');
+  assert.equal(intent.role_stage.applied, false);
+  assert.equal(intent.expression, 'concerned');
+  assert.equal(intent.consumers.screen.motif, undefined);
+});

@@ -160,6 +160,35 @@ test('recent assistant replies that expose role backend language are not imitate
   assert.match(prompts[1], /旧助手回复若带后台方向或审计口吻会被隔离/);
 });
 
+test('accepted role stage reaches the ordinary prompt without exposing backend fields', async () => {
+  let prompt;
+  const orchestrator = createChatOrchestrator({
+    inputStore: createInputStore({ now: () => fixedTime }),
+    stateEngine: createStateEngine({ now: () => fixedTime }),
+    worldContext: createWorldContext({ now: () => fixedTime }),
+    currentRoleStages: () => [{
+      schema: 'deskbot.role-state.v1',
+      stage_id: 'wetland_frog-v1',
+      direction_id: 'wetland_frog',
+      label: '荷叶青蛙',
+      life: '在水边轻快地生活',
+      overlay: { presence: '轻快、亲水', speech: '句子短一点', preferences: '雨和池塘', boundary: '只改变表达与愿望' },
+    }],
+    llm: {
+      async complete({ prompt: composed }) {
+        prompt = composed;
+        return { provider: 'test', model: 'test', text: '喵，我先把第一步做好。', trace: {} };
+      },
+    },
+    now: () => fixedTime,
+  });
+  await orchestrator.run({ event_id: 'turn-role-state-001', character_id: 'shaping-001', message: '你现在想做什么？' });
+  assert.match(prompt, /\[DESKBOT_CURRENT_ROLE_STAGE\]/);
+  assert.match(prompt, /轻快、亲水/);
+  assert.match(prompt, /在水边轻快地生活/);
+  assert.doesNotMatch(prompt, /stage_id.*向用户/);
+});
+
 test('an explicit latest-weather request refreshes the provider before LLM completion', async () => {
   let refreshCalls = 0;
   let prompt;

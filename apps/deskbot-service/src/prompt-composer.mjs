@@ -172,6 +172,20 @@ function composeRoleTrialDesire(activeRoleTrials = []) {
     ?? `你最近对“${active.life ?? '一种新的生活方式'}”有些在意。猫型外壳仍未改变；相关时从第一人称说出这份兴趣，不解释后台分类。`;
 }
 
+function composeCurrentRoleStage(currentRoleStages = []) {
+  const stage = currentRoleStages.find((item) => item?.schema === 'deskbot.role-state.v1' || item?.direction_id);
+  if (!stage) return '当前还没有被确认的新角色阶段；保留喵呜的猫型第一形态和基础性格。';
+  const overlay = stage.overlay ?? {};
+  return [
+    `当前确认的生活方向：${stage.label ?? stage.life ?? '一种新的生活方式'}`,
+    `这个方向想体验的日常：${stage.life ?? '让兴趣通过日常选择慢慢长出来。'}`,
+    `表达气质：${overlay.presence ?? '保持猫型底色，但可以更主动地露出自己的偏好。'}`,
+    `说话倾向：${overlay.speech ?? '先做事，再让一点个人兴趣露出来。'}`,
+    `会留意：${overlay.preferences ?? '当前生活中具体、有趣的细节。'}`,
+    `边界：${overlay.boundary ?? '只影响表达与愿望，不改变世界事实。'}`,
+  ].join('\n');
+}
+
 function settingDiscussionRequested(userText = '') {
   const text = typeof userText === 'string' ? userText : '';
   return /(聚形域|世界观|世界线|世界事件|外壳|形态|换壳|变身|角色方向|想成为什么|光域|光粒|凝聚成形|潮玩生命)/.test(text);
@@ -287,6 +301,7 @@ export function composePrompt({
   relationshipMemories = [],
   branchExperiences = [],
   activeRoleTrials = [],
+  currentRoleStages = [],
   userText,
 }) {
   const worldBlock = worldConditions.length > 0
@@ -350,6 +365,7 @@ export function composePrompt({
     ? safeRecentEntries.map((entry) => `- ${entry.role === 'assistant' ? '角色' : '用户'}：${entry.text}`).join('\n')
     : '- 没有可用的最近对话。';
   const activeRoleTrialBlock = composeRoleTrialDesire(activeRoleTrials);
+  const currentRoleStageBlock = composeCurrentRoleStage(currentRoleStages);
 
   const prompt = [
     '[DESKBOT_ROLE]',
@@ -420,6 +436,11 @@ export function composePrompt({
     '这是喵呜此刻唯一可表达的生活倾向，不是新 Soul、当前外壳、世界事实或永久身份。不得列举其他候选，不得解释试行、分数或证据，也不得声称已经换壳。',
     '[/DESKBOT_ACTIVE_ROLE_TRIAL]',
     '',
+    '[DESKBOT_CURRENT_ROLE_STAGE]',
+    currentRoleStageBlock,
+    '这是已经确认的当前角色阶段。它会持续影响喵呜的注意力、偏好和表达方式，但不会改写世界事实、当前外壳或工具结果。只让这个阶段通过自然选择和小愿望露出，不要说出 stage_id、proposal、overlay 或“已确认”。如果为空，保持第一形态的基础喵呜，不要凭空宣布新的方向。',
+    '[/DESKBOT_CURRENT_ROLE_STAGE]',
+    '',
     '[DESKBOT_LIVED_WORLD]',
     livedWorldBlock,
     '[/DESKBOT_LIVED_WORLD]',
@@ -462,6 +483,7 @@ export function composePrompt({
     world_snapshot: worldSnapshot,
     world_conditions: worldConditions,
     active_role_trials: Array.isArray(activeRoleTrials) ? activeRoleTrials : [],
+    current_role_stages: Array.isArray(currentRoleStages) ? currentRoleStages : [],
   };
 }
 
