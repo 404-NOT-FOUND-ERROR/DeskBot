@@ -27,7 +27,7 @@ $stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ('deskbot-source-' + [guid]:
 
 # Build from the working tree so the package is useful before the first commit.
 # Explicit exclusions are intentional: a public package must not depend on .gitignore being correct.
-$excludedDirectoryNames = @('.git', '.pnpm-store', 'node_modules', 'tmp', 'dist', 'build', 'coverage', '__pycache__', '.venv', 'venv', 'models', 'model-cache', 'checkpoints')
+$excludedDirectoryNames = @('.git', '.pnpm-store', 'node_modules', 'tmp', 'dist', 'dist-server', 'build', 'coverage', '__pycache__', '.venv', 'venv', '.vercel', 'models', 'model-cache', 'checkpoints')
 $excludedFileNames = @('config\llm_config.json', 'config\weather.env')
 $excludedExtensions = @('.sqlite', '.sqlite-shm', '.sqlite-wal', '.log', '.wav', '.mp3', '.ogg', '.pyc', '.bin', '.onnx', '.pt', '.pth', '.safetensors')
 
@@ -81,7 +81,7 @@ try {
     "archive=$([IO.Path]::GetFileName($archivePath))"
     "sha256=$hash"
     "file_count=$($files.Count)"
-    'excluded=.git,.pnpm-store,node_modules,tmp,dist,build,coverage,Python caches,SQLite/WAL,logs,audio,models,local configs'
+    'excluded=.git,.pnpm-store,node_modules,tmp,dist,dist-server,build,coverage,.vercel,Python caches,SQLite/WAL,logs,audio,models,local configs'
   ) | Set-Content -LiteralPath $manifestPath -Encoding utf8
 
   Write-Output "Source archive: $archivePath"

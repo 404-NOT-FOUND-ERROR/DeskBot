@@ -10,6 +10,7 @@
     "start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1 -StartWeb",
     "start:service": "npm.cmd --prefix apps/deskbot-service start",
     "start:web": "npm.cmd --prefix apps/deskbot-web start",
+    "start:world": "npm.cmd --prefix apps/jev-town-client run dev:deskbot",
     "stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local.ps1",
     "test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1",
     "test:service": "npm.cmd --prefix apps/deskbot-service test",

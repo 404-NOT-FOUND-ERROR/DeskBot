@@ -1,0 +1,136 @@
+.deskbot-mode {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding: clamp(18px, 3vw, 42px);
+  color: var(--ink);
+  background: var(--cream);
+}
+
+.deskbot-mode__header,
+.deskbot-mode__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 1500px;
+  margin: 0 auto 18px;
+}
+
+.deskbot-mode__header h1 { margin: 6px 0 4px; font-size: clamp(1.6rem, 3vw, 2.8rem); }
+.deskbot-mode__header p { max-width: 58rem; margin: 0; color: var(--ink-soft); }
+.deskbot-mode__header > *,
+.deskbot-mode__grid > * { min-width: 0; }
+.deskbot-mode__header p { overflow-wrap: anywhere; }
+.deskbot-mode__eyebrow { display: block; color: var(--forest-dark); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.deskbot-mode__status { display: grid; justify-items: end; gap: 4px; white-space: nowrap; }
+.deskbot-mode__status span,
+.deskbot-mode__footer code { color: var(--ink-soft); font-size: 0.78rem; }
+
+.deskbot-mode button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 11px;
+  color: var(--ink);
+  background: rgba(255, 253, 247, 0.8);
+  font: inherit;
+  cursor: pointer;
+}
+
+.deskbot-mode button:hover,
+.deskbot-mode button.is-active { border-color: var(--forest); background: rgba(60, 110, 71, 0.1); }
+.deskbot-mode button:disabled { cursor: wait; opacity: 0.65; }
+
+.deskbot-mode__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 18px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.deskbot-mode__stage {
+  position: relative;
+  min-height: 620px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--parchment);
+  box-shadow: 0 18px 45px rgba(43, 38, 32, 0.1);
+}
+
+.deskbot-mode__stage .town-map { min-height: 620px; }
+
+.deskbot-mode__scene-card {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px 16px;
+  border: 1px solid rgba(216, 200, 163, 0.9);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.9);
+  box-shadow: 0 10px 25px rgba(43, 38, 32, 0.14);
+}
+
+.deskbot-mode__scene-card span { color: var(--terracotta-dark); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.deskbot-mode__scene-card h2 { margin: 5px 0 6px; font-size: 1.05rem; }
+.deskbot-mode__scene-card p { margin: 0; line-height: 1.5; }
+.deskbot-mode__scene-card em { display: block; margin-top: 8px; color: var(--ink-soft); font-size: 0.82rem; }
+.deskbot-mode__side { display: grid; align-content: start; gap: 14px; }
+.deskbot-mode__panel { padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 253, 247, 0.76); }
+.deskbot-mode__npc-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.deskbot-mode__npc-tabs button { padding: 6px 9px; font-size: 0.82rem; }
+.deskbot-mode__npc h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.deskbot-mode__npc p { margin: 10px 0 6px; line-height: 1.45; }
+.deskbot-mode__npc small { color: var(--ink-soft); }
+.deskbot-mode__candidates { display: grid; gap: 8px; margin-top: 12px; }
+.deskbot-mode__candidates button { display: grid; gap: 5px; width: 100%; text-align: left; }
+.deskbot-mode__candidates span { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.35; }
+.deskbot-mode__confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.deskbot-mode__confirm p { margin: 0 0 10px; color: var(--ink-soft); font-size: 0.8rem; line-height: 1.4; }
+.deskbot-mode__confirm button { width: 100%; color: #fff; border-color: var(--forest-dark); background: var(--forest); }
+.deskbot-mode__footer { align-items: center; margin-top: 14px; color: var(--ink-soft); font-size: 0.8rem; }
+.deskbot-mode__footer a { color: var(--forest-dark); font-weight: 700; }
+
+@media (max-width: 900px) {
+  .deskbot-mode__grid { grid-template-columns: 1fr; }
+  .deskbot-mode__stage,
+  .deskbot-mode__stage .town-map { min-height: 520px; }
+}
+
+@media (max-width: 620px) {
+  .deskbot-mode { padding: 14px; }
+  .deskbot-mode__header,
+  .deskbot-mode__footer { display: grid; justify-content: stretch; }
+  .deskbot-mode__status { justify-items: start; }
+  .deskbot-mode__stage,
+  .deskbot-mode__stage .town-map { min-height: 460px; }
+  .deskbot-mode__scene-card { position: static; width: auto; margin: 12px; }
+  .deskbot-mode__stage .map-controls {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    flex-wrap: wrap;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .deskbot-mode__stage .map-controls__text {
+    flex: 0 0 28px;
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+    white-space: nowrap;
+  }
+  .deskbot-mode__stage .map-controls__text::before {
+    display: block;
+    font-size: 0.82rem;
+    line-height: 28px;
+  }
+  .deskbot-mode__stage .map-controls__text[aria-label="Fit town"]::before { content: "⌂"; }
+  .deskbot-mode__stage .map-controls__text[aria-label="Reset view"]::before { content: "↺"; }
+  .deskbot-mode__stage .map-controls__text[aria-label="Show decisions"]::before { content: "◉"; }
+}

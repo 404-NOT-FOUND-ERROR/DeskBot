@@ -14,6 +14,7 @@
 
 - `apps/deskbot-service`：唯一在线状态源、SQLite 持久化、世界逻辑、LLM 编排、天气连接器和设备桥。
 - `apps/deskbot-web`：研究与体验界面，只读取和调用服务端 API，不保存第二份世界状态。
+- `apps/jev-town-client`：基于 CeciliaW888/jev-town 的 3D 世界体验客户端；读取 canonical map 和 life Scene，并通过受验证事件提交 NPC 行动。
 - `voice-sidecar`：无状态 ASR/TTS 边界；当前基线不代表真实中文模型性能。
 - `research`：研究协议、实验设计与接口说明。
 - `tmp`：源码审阅副本、下载和临时产物，不进入 Git。
@@ -67,7 +68,15 @@ Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot'
 .\scripts\start-local.ps1 -StartWeb
 ```
 
-脚本会从本地 `llm_config.json` 启用 DeepSeek，检查 `4311/4322` 端口，启动后确认两个进程各自持有监听端口并通过 `/health`。需要天气时使用：
+要同时启动 Jev Town 世界体验客户端，使用 `-StartWorld`：
+
+```powershell
+.\scripts\start-local.ps1 -StartWeb -StartWorld
+```
+
+Jev Town 客户端地址是 <http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311>。它使用 `apps/jev-town-client` 的 3D 地图和 NPC 面板，但不保存第二份世界状态；接入来源、授权范围和发布清单见 [`documentation/jev-town-adoption.md`](documentation/jev-town-adoption.md)。
+
+脚本会从本地 `llm_config.json` 启用 DeepSeek，检查 `4311/4322` 端口；使用 `-StartWorld` 时还会检查 `5173`，启动后确认每个进程各自持有监听端口并通过健康检查。需要天气时使用：
 
 ```powershell
 .\scripts\start-local.ps1 -StartWeb -WeatherEnvFile (Resolve-Path config\weather.env)

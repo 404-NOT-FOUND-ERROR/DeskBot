@@ -20,4 +20,16 @@ try {
   Pop-Location
 }
 
+Push-Location (Join-Path $repoRoot 'apps\jev-town-client')
+try {
+  & npm.cmd run typecheck
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  & npm.cmd exec vitest run tests/deskbotBridge.test.ts
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  & npm.cmd run build
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} finally {
+  Pop-Location
+}
+
 Write-Output 'DeskBot test suites passed.'

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$StartWeb,
+  [switch]$StartWorld,
   [string]$LlmConfigPath,
   [string]$WeatherEnvFile
 )
@@ -9,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $serviceRoot = Join-Path $repoRoot 'apps\deskbot-service'
 $webRoot = Join-Path $repoRoot 'apps\deskbot-web'
+$worldRoot = Join-Path $repoRoot 'apps\jev-town-client'
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 
 if ([string]::IsNullOrWhiteSpace($LlmConfigPath)) {
@@ -58,6 +60,13 @@ function Test-PortOwned([int]$Port, [int]$ProcessId) {
 
 Assert-PortFree 4311 'DeskBot service'
 if ($StartWeb) { Assert-PortFree 4322 'DeskBot web' }
+if ($StartWorld) { Assert-PortFree 5173 'Jev Town world client' }
+if ($StartWorld) {
+  $viteEntry = Join-Path $worldRoot 'node_modules\vite\bin\vite.js'
+  if (-not (Test-Path -LiteralPath $viteEntry -PathType Leaf)) {
+    throw "Jev Town dependencies not installed: $viteEntry. Run npm.cmd install in apps\jev-town-client."
+  }
+}
 
 if ($WeatherEnvFile) {
   if (-not (Test-Path -LiteralPath $WeatherEnvFile -PathType Leaf)) {
@@ -80,6 +89,8 @@ $serviceLog = Join-Path $env:TEMP 'deskbot-service.log'
 $serviceErrorLog = Join-Path $env:TEMP 'deskbot-service.error.log'
 $webLog = Join-Path $env:TEMP 'deskbot-web.log'
 $webErrorLog = Join-Path $env:TEMP 'deskbot-web.error.log'
+$worldLog = Join-Path $env:TEMP 'deskbot-jev-town.log'
+$worldErrorLog = Join-Path $env:TEMP 'deskbot-jev-town.error.log'
 $service = Start-Process -FilePath $node -WorkingDirectory $serviceRoot -ArgumentList 'src/index.mjs' -RedirectStandardOutput $serviceLog -RedirectStandardError $serviceErrorLog -PassThru -WindowStyle Hidden
 Write-Output "DeskBot service started: PID=$($service.Id) http://127.0.0.1:4311"
 Write-Output "Service log: $serviceLog"
@@ -90,6 +101,13 @@ if ($StartWeb) {
   Write-Output "DeskBot web started: PID=$($web.Id) http://127.0.0.1:4322/"
   Write-Output "Web log: $webLog"
 Write-Output "Web error log: $webErrorLog"
+}
+
+if ($StartWorld) {
+  $world = Start-Process -FilePath $node -WorkingDirectory $worldRoot -ArgumentList @($viteEntry, '--host', '127.0.0.1', '--port', '5173') -RedirectStandardOutput $worldLog -RedirectStandardError $worldErrorLog -PassThru -WindowStyle Hidden
+  Write-Output "Jev Town world client started: PID=$($world.Id) http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311"
+  Write-Output "World log: $worldLog"
+  Write-Output "World error log: $worldErrorLog"
 }
 
 Write-Output ("LLM provider requested: {0}; weather token present in this process: {1}" -f $env:DESKBOT_LLM_PROVIDER, [bool]($env:DESKBOT_WEATHER_TOKEN))
@@ -111,5 +129,7 @@ function Wait-ForHealth([string]$Uri, [int]$Port, [System.Diagnostics.Process]$P
 
 Wait-ForHealth 'http://127.0.0.1:4311/health' 4311 $service 'DeskBot service'
 if ($StartWeb) { Wait-ForHealth 'http://127.0.0.1:4322/health' 4322 $web 'DeskBot web' }
+if ($StartWorld) { Wait-ForHealth 'http://127.0.0.1:5173/' 5173 $world 'Jev Town world client' }
 Write-Output 'Health check: service ready'
 if ($StartWeb) { Write-Output 'Health check: web ready' }
+if ($StartWorld) { Write-Output 'Health check: Jev Town world client ready' }

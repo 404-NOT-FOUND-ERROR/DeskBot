@@ -5,7 +5,7 @@ DeskBot 是一个绑定本机回环地址的小型持续世界服务。Node `des
 ## 运行结构
 
 ```text
-Web / 固件 / RisuAI 对照适配器
+DeskBot Web / Jev Town 3D client / 固件 / RisuAI 对照适配器
           |
           v
 Node deskbot-service :4311
@@ -23,6 +23,8 @@ Node deskbot-service :4311
 ```
 
 技术栈：Node.js 24+、内置 `node:sqlite`、HTTP/自实现受限 WebSocket bridge、原生静态 Web、Python 3.10+ 标准库 sidecar。默认服务绑定 `127.0.0.1`；`DESKBOT_HOST` 或 `DESKBOT_WEB_HOST` 改成局域网地址前必须先补认证、设备认证和网络隔离。
+
+`apps/jev-town-client` 是基于 CeciliaW888/jev-town 的独立 React/Three.js 投影客户端。它读取 `/api/world/map` 和 `/api/life/world`，并只通过标准事件入口提交 NPC 行动；地图 revision、合法移动、SQLite 和 mutation ledger 仍由 `deskbot-service` 管理。来源、授权记录和发布清单见 `documentation/jev-town-adoption.md`。
 
 ## 信任边界
 

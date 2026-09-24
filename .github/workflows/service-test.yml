@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/deskbot-service/**"
+      - "apps/jev-town-client/**"
       - "voice-sidecar/**"
       - "config/**"
       - "documentation/**"
@@ -15,6 +16,7 @@ on:
   push:
     paths:
       - "apps/deskbot-service/**"
+      - "apps/jev-town-client/**"
       - "voice-sidecar/**"
       - "config/**"
       - "documentation/**"
@@ -59,3 +61,27 @@ jobs:
           python-version: '3.12'
       - name: Run sidecar contract tests
         run: python -m unittest discover -s tests
+
+  jev-town-client:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/jev-town-client
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/jev-town-client/package-lock.json
+      - name: Install world-client dependencies
+        run: npm.cmd ci --ignore-scripts
+      - name: Type-check world client
+        run: npm.cmd run typecheck
+      - name: Run DeskBot bridge tests
+        run: npm.cmd exec vitest run tests/deskbotBridge.test.ts
+      - name: Build world client
+        run: npm.cmd run build
