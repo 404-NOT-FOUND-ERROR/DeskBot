@@ -28,5 +28,5 @@ Scene 不是一段孤立的长提示词，而是角色、地点、当前冲突�
 
 ## 本轮实现
 
-`/api/life/story-packages` 提供 `GET` 列表，以及 `POST {operation: "preview"|"install", package_id}`。当前内置「潮后寻路：三日共同经历」：潮痕出现、巡路员开放旧路、收摊留下回声。预览不写存档；安装产生四个 canonical 步骤（世界事件、NPC 创建、NPC 行动、世界后果）和证据链。
+`/api/life/story-packages` 提供 `GET` 列表，以及 `POST {operation: "preview"|"install", package_id}`。故事目录现在由 `src/content-packages.mjs` 编译 `world-content/settlements/morrowmere/stories.json` 得到，同时保留「潮后寻路：三日共同经历」兼容包。首个内容驱动包是「雾灯镇第一天：先听灯声」：喵呜听见偏移的灯声、巡路员带来缺角地图、第一天留下一个尚未决定的方向。预览不写存档；安装产生五个 canonical 步骤（世界事件、NPC 创建、NPC 行动、世界进展、世界后果）和证据链。内容编译器只读校验，不是第二事实源。
 

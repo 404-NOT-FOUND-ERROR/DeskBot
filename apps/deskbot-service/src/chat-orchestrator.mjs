@@ -58,6 +58,7 @@ export function createChatOrchestrator({
   currentRoleStages = null,
   relationshipMemories = null,
   branchExperiences = null,
+  continuityContext = null,
   conversationHistoryAfter = null,
   recordRoleTrialObservation = null,
 }) {
@@ -242,6 +243,7 @@ export function createChatOrchestrator({
       recentConversation,
       relationshipMemories: relationshipMemories?.(userEvent.character_id, userEvent.payload.text) ?? [],
       branchExperiences: branchExperiences?.(userEvent.payload.text, currentWorldSnapshot()) ?? [],
+      continuityContext: continuityContext?.(userEvent.character_id, currentWorldSnapshot()) ?? null,
       activeRoleTrials: roleTrials,
       currentRoleStages: roleStages,
       userText: userEvent.payload.text,

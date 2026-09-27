@@ -2,11 +2,27 @@ import type {
   DeskBotActionCandidate,
   DeskBotLifeWorld,
   DeskBotNpc,
+  DeskBotNpcInteractionRequest,
+  DeskBotNpcInteractionResponse,
+  DeskBotChatResult,
+  DeskBotWorldTravelResponse,
+  DeskBotWorldRouteResponse,
   DeskBotWorldMap,
+  DeskBotPresentationPoint,
 } from "./types.ts";
 
 function cleanBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+class DeskBotHttpError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "DeskBotHttpError";
+    this.code = code;
+  }
 }
 
 export function deskbotBaseUrl(): string {
@@ -16,8 +32,31 @@ export function deskbotBaseUrl(): string {
 
 async function getJson<T>(baseUrl: string, path: string): Promise<T> {
   const response = await fetch(`${cleanBaseUrl(baseUrl)}${path}`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`DeskBot ${path} returned HTTP ${response.status}`);
-  return response.json() as Promise<T>;
+  return responseJson<T>(response, `DeskBot ${path} returned HTTP ${response.status}`);
+}
+
+export async function fetchWorldRoute(
+  destinationLocationId: string,
+  baseUrl = deskbotBaseUrl(),
+): Promise<DeskBotWorldRouteResponse> {
+  const query = new URLSearchParams({ destination_location_id: destinationLocationId });
+  return getJson<DeskBotWorldRouteResponse>(baseUrl, `/api/world/route?${query.toString()}`);
+}
+
+async function responseJson<T>(response: Response, fallback: string): Promise<T> {
+  const body = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+  if (!response.ok) throw new DeskBotHttpError(body?.error || "http_error", body?.message || body?.error || fallback);
+  if (body === null) throw new Error("DeskBot 返回了无法解析的响应。");
+  return body as T;
+}
+
+async function postJson<T>(baseUrl: string, path: string, payload: unknown, fallback: string): Promise<T> {
+  const response = await fetch(`${cleanBaseUrl(baseUrl)}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return responseJson<T>(response, fallback);
 }
 
 export async function fetchDeskBotWorld(baseUrl = deskbotBaseUrl()): Promise<{
@@ -114,4 +153,169 @@ export async function executeCandidate(
   const body = await response.json() as { duplicate?: boolean; error?: string; message?: string };
   if (!response.ok) throw new Error(body.message || body.error || `DeskBot write returned HTTP ${response.status}`);
   return { duplicate: body.duplicate === true, map: await getJson<DeskBotWorldMap>(baseUrl, "/api/world/map") };
+}
+
+export async function interactWithNpc(
+  request: DeskBotNpcInteractionRequest,
+  baseUrl = deskbotBaseUrl(),
+): Promise<DeskBotNpcInteractionResponse> {
+  const idea = request.idea?.trim();
+  const interactionId = request.interactionId || `jev-town-interaction-${crypto.randomUUID()}`;
+  return postJson<DeskBotNpcInteractionResponse>(baseUrl, "/api/life/npc-interactions", {
+      interaction_id: interactionId,
+      npc_id: request.npcId,
+      intent: request.intent,
+      ...(idea ? { idea } : {}),
+      source: "jev-town-world-client",
+  }, "DeskBot NPC interaction failed");
+}
+
+export async function sendChat(
+  request: { eventId: string; characterId: string; message: string },
+  baseUrl = deskbotBaseUrl(),
+): Promise<DeskBotChatResult> {
+  const payload = await postJson<{
+    turn?: {
+      reply?: string;
+      reply_event?: { payload?: { text?: string } };
+      expression_intent?: { mode?: string; pace?: string };
+      state?: { interaction?: { expression_intent?: { mode?: string; pace?: string } } };
+    };
+    reply?: string;
+    reply_event?: { payload?: { text?: string } };
+    expression_intent?: { mode?: string; pace?: string };
+    state?: { interaction?: { expression_intent?: { mode?: string; pace?: string } } };
+  }>(baseUrl, "/api/chat", {
+    event_id: request.eventId,
+    character_id: request.characterId,
+    source: "jev-town-world-client",
+    message: request.message,
+  }, "DeskBot chat failed");
+  const turn = payload.turn ?? payload;
+  const reply = turn.reply?.trim() || turn.reply_event?.payload?.text?.trim();
+  if (!reply) throw new Error("DeskBot 没有返回可显示的回复。");
+  const expressionIntent = turn.expression_intent ?? turn.state?.interaction?.expression_intent;
+  return { reply, ...(expressionIntent ? { expressionIntent } : {}) };
+}
+
+export async function travelToLocation(
+  request: { locationId: string; eventId: string; reason?: string; expectedWorldRevision?: number; expectedFromLocationId?: string },
+  baseUrl = deskbotBaseUrl(),
+): Promise<DeskBotWorldTravelResponse> {
+  const latest = await getJson<DeskBotWorldMap>(baseUrl, "/api/world/map");
+  const destination = latest.locations.find((location) => location.location_id === request.locationId);
+  if (!destination) throw new Error("这个地点已不在最新世界地图中，请重新选择。");
+  if (destination.current) throw new Error("喵呜已经在这里了。");
+  if (request.expectedWorldRevision !== undefined && latest.world_revision !== request.expectedWorldRevision) {
+    throw new DeskBotHttpError("world_revision_changed", "世界状态刚刚改变，正在重新规划路线。");
+  }
+  if (request.expectedFromLocationId !== undefined) {
+    const origin = latest.locations.find((location) => location.location_id === request.expectedFromLocationId);
+    if (latest.protagonist.location_id !== request.expectedFromLocationId) {
+      throw new DeskBotHttpError("world_location_changed", "喵呜的位置刚刚改变，正在重新规划路线。");
+    }
+    if (!origin?.neighbors.includes(destination.location_id)) {
+      throw new DeskBotHttpError("route_step_changed", "这一步已经不再是当前地点的相邻路线，请重新规划。");
+    }
+  } else if (!destination.reachable) {
+    throw new Error("这个地点目前不可直达，请先前往相邻地点。");
+  }
+
+  const result = await postJson<DeskBotWorldTravelResponse>(baseUrl, "/api/world/travel", {
+    event_id: request.eventId,
+    character_id: latest.protagonist.character_id,
+    location_id: destination.location_id,
+    reason: request.reason ?? `从地图确认前往${destination.name}`,
+    ...(request.expectedWorldRevision !== undefined ? { expected_world_revision: request.expectedWorldRevision } : {}),
+    ...(request.expectedFromLocationId !== undefined ? { expected_from_location_id: request.expectedFromLocationId } : {}),
+    source: "jev-town-world-client",
+  }, "DeskBot travel failed");
+  if (!result.accepted && !result.duplicate) throw new Error("DeskBot 世界没有接受这次旅行。");
+  return result;
+}
+
+/**
+ * Walk a canonical route one hop at a time.  Route and map are re-read before
+ * every mutation, so a world revision or an event changing adjacency pauses
+ * the walk instead of allowing the browser to move the protagonist locally.
+ */
+export async function travelRouteToLocation(
+  request: { destinationLocationId: string; eventIdPrefix?: string; reason?: string },
+  baseUrl = deskbotBaseUrl(),
+  onStep?: (state: {
+    step: number;
+    total: number;
+    destinationName: string;
+    fromLocationId: string;
+    toLocationId: string;
+    travelCostMinutes: number;
+    presentationSpace?: string;
+    presentationPoints?: DeskBotPresentationPoint[];
+    map: DeskBotWorldMap;
+  }) => unknown | PromiseLike<unknown>,
+): Promise<{ map: DeskBotWorldMap; route: DeskBotWorldRouteResponse["route"]; completed: boolean; stepsCompleted: number }> {
+  let completed = 0;
+  // Re-planning after every canonical hop must not change the progress
+  // denominator shown to the user for the current trip.
+  let plannedTotal: number | null = null;
+  let finalRoute: DeskBotWorldRouteResponse["route"] | null = null;
+  let latestMap: DeskBotWorldMap | null = null;
+  while (true) {
+    const routeResponse = await fetchWorldRoute(request.destinationLocationId, baseUrl);
+    finalRoute = routeResponse.route;
+    latestMap = routeResponse.map;
+    if (routeResponse.world_revision !== latestMap.world_revision
+      || routeResponse.route.world_revision !== latestMap.world_revision
+      || routeResponse.route.current_location_id !== latestMap.protagonist.location_id) {
+      throw new Error("世界状态刚刚改变，路线已暂停；请重新规划。 ");
+    }
+    if (plannedTotal === null) plannedTotal = routeResponse.route.steps.length;
+    if (routeResponse.route.blocked) {
+      throw new Error(routeResponse.route.blocked_reason || "当前世界事件暂时阻断旅行。 ");
+    }
+    if (!routeResponse.route.found) throw new Error("当前世界没有可行路线，请稍后重新规划。 ");
+    const next = routeResponse.route.steps[0];
+    if (!next) {
+      return { map: latestMap, route: finalRoute, completed: true, stepsCompleted: completed };
+    }
+    const origin = latestMap.locations.find((location) => location.location_id === next.from_location_id);
+    const destination = latestMap.locations.find((location) => location.location_id === next.to_location_id);
+    if (next.from_location_id !== latestMap.protagonist.location_id
+      || !origin?.neighbors.includes(next.to_location_id)
+      || !destination) {
+      throw new Error("路线与最新地图不一致，旅行已暂停；请重新规划。 ");
+    }
+    if (latestMap.active_event?.blocks_travel) {
+      throw new Error(`事件阻断：${latestMap.active_event.title || latestMap.active_event.event_id || "道路暂不可通行"}`);
+    }
+    const stepEventId = `${request.eventIdPrefix || "jev-town-route"}-${next.from_location_id}-${next.to_location_id}`;
+    try {
+      const result = await travelToLocation({
+        locationId: next.to_location_id,
+        eventId: stepEventId,
+        reason: request.reason || `沿路线前往${routeResponse.route.destination_location_id}`,
+        expectedWorldRevision: routeResponse.world_revision,
+        expectedFromLocationId: next.from_location_id,
+      }, baseUrl);
+      latestMap = result.map;
+      completed += 1;
+      await onStep?.({
+        step: completed,
+        total: plannedTotal,
+        destinationName: next.to_name,
+        fromLocationId: next.from_location_id,
+        toLocationId: next.to_location_id,
+        travelCostMinutes: next.travel_cost_minutes,
+        presentationSpace: next.presentation_space,
+        presentationPoints: next.presentation_points,
+        map: latestMap,
+      });
+    } catch (error) {
+      if (error instanceof DeskBotHttpError && ["world_revision_changed", "world_location_changed"].includes(error.code)) {
+        throw new Error(`${error.message}旅行已暂停。`);
+      }
+      throw error;
+    }
+    if (completed >= 50) throw new Error("路线已行进 50 段仍未抵达，旅行已暂停以避免无限绕行。 ");
+  }
 }

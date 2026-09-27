@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { InputError } from './input-store.mjs';
 import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
+import { loadMorrowmereContent } from './content-packages.mjs';
 import {
   composeNpcAgentPrompt,
   getNpcPersona,
@@ -12,44 +13,43 @@ const SLOT_MS = 30 * 60 * 1000;
 const NPC_ROUTINE_SLOT_MS = 2 * 60 * 60 * 1000;
 const SCENE_COOLDOWN_COUNT = 2;
 const LIFE_CONTENT_VERSION = 'world-life-v2';
+const WORLD_REPLAY_MAX_MINUTES = 7 * 24 * 60;
 const INTERACTION_INTENTS = Object.freeze(['observe', 'greet', 'chat', 'suggest', 'help', 'invite']);
 const DIRECTIONAL_INTENTS = new Set(['suggest', 'help', 'invite']);
+const SETTLEMENT_CONTENT = loadMorrowmereContent();
 
-const NPC_PROFILES = Object.freeze({
+const NPC_PERSONA_ENRICHMENTS = Object.freeze({
   'pathfinder-001': Object.freeze({
-    npc_id: 'pathfinder-001',
-    display_name: '潮痕巡路员',
-    role: 'route_keeper',
-    location_id: 'tidal-old-road',
-    status: '正在检查退潮后的路标',
     bio: '背着缺角地图的短角巡路员。相信路线会记住走过它的人，但从不保证同一条路第二次还通向原处。',
     temperament: '谨慎、务实，对新路线有压不住的好奇心',
     speech_style: '先提醒风险，再给一条能立刻试的小路',
     accent: 'tide',
   }),
   'shade-collector-001': Object.freeze({
-    npc_id: 'shade-collector-001',
-    display_name: '影栖',
-    role: 'afterlight_collector',
-    location_id: 'backlit-grove',
-    status: '正把一段旧影子卷进叶筒',
     bio: '住在逆光林地的旧光采集者，头顶像两片合拢的叶芽。它收集没有跟上主人的影子，偶尔把其中一段借给别人试穿。',
     temperament: '安静但不疏远，讨厌别人替影子决定它该像谁',
     speech_style: '句子很短，经常先观察对方的影子再回答',
     accent: 'grove',
   }),
   'echo-postcarrier-001': Object.freeze({
-    npc_id: 'echo-postcarrier-001',
-    display_name: '波果',
-    role: 'echo_postcarrier',
-    location_id: 'echo-waterside',
-    status: '正在给没寄出的声音排队',
     bio: '背着半透明圆邮包的回声邮差。它不替谁解释没说完的话，只帮它们找到一个可以先停一会儿的地方。',
     temperament: '话多一点但不逼问，保护停顿，也喜欢把关系说清楚',
     speech_style: '先指出手边的信纸、邮包或岸边声音，再给等待与投递的选择',
     accent: 'waterside',
   }),
 });
+
+const NPC_PROFILES = Object.freeze(Object.fromEntries(SETTLEMENT_CONTENT.npcs.map((npc) => [npc.npc_id, Object.freeze({
+  npc_id: npc.npc_id,
+  display_name: npc.identity,
+  role: npc.role,
+  location_id: npc.location_id,
+  status: npc.status,
+  desire: npc.desire,
+  conditions: Object.freeze([...npc.conditions]),
+  legal_actions: Object.freeze([...npc.legal_actions]),
+  ...(NPC_PERSONA_ENRICHMENTS[npc.npc_id] ?? {}),
+})])));
 
 const NPC_ROLE_DIRECTIONS = Object.freeze({
   route_keeper: Object.freeze({
@@ -72,23 +72,12 @@ const NPC_ROLE_DIRECTIONS = Object.freeze({
   }),
 });
 
-const NPC_ROUTINES = Object.freeze({
-  'pathfinder-001': Object.freeze({
-    route: Object.freeze(['tidal-old-road', 'shaping-field-desk', 'tidal-old-road', 'whisper-market', 'echo-waterside', 'backlit-grove']),
-    purpose: '巡查会随生活变化的公共路线',
-    offset: 0,
-  }),
-  'shade-collector-001': Object.freeze({
-    route: Object.freeze(['backlit-grove', 'echo-waterside', 'whisper-market', 'tidal-old-road']),
-    purpose: '沿途收集不属于今天的光与影子',
-    offset: 1,
-  }),
-  'echo-postcarrier-001': Object.freeze({
-    route: Object.freeze(['echo-waterside', 'whisper-market', 'echo-waterside', 'shaping-field-desk']),
-    purpose: '收集没有收件人的话，并把愿意出发的句子送到合适的桌边',
-    offset: 2,
-  }),
-});
+const NPC_ROUTINES = Object.freeze(Object.fromEntries(SETTLEMENT_CONTENT.schedules.schedules.map((schedule) => [schedule.npc_id, Object.freeze({
+  route: Object.freeze([...schedule.route]),
+  purpose: schedule.purpose,
+  slot_minutes: SETTLEMENT_CONTENT.schedules.slot_minutes,
+})])));
+const NPC_ROUTINE_SLOT_MINUTES = SETTLEMENT_CONTENT.schedules.slot_minutes;
 
 const LIFE_SCENES = Object.freeze({
   'shaping-field-desk': Object.freeze([
@@ -448,6 +437,7 @@ export function createWorldLife({
   now = () => new Date(),
   worldSnapshot,
   ingest,
+  listMutations = null,
   npcGoals = null,
   llm = null,
   enabled = true,
@@ -495,15 +485,31 @@ export function createWorldLife({
     };
   }
 
+  // Explicit replays are durable events. Reading the persisted mutation lets
+  // a retry reconstruct the original event timestamp after a restart or a
+  // wall-clock advance, so the event fingerprint remains byte-for-byte stable.
+  function persistedReplayMutation(eventId) {
+    if (typeof listMutations !== 'function') return null;
+    try {
+      return listMutations({ eventId, limit: 1 })[0] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   function scheduleNpcRoutines() {
     if (!npcGoals || typeof npcGoals.add !== 'function' || typeof npcGoals.tick !== 'function') return;
-    const timestamp = now();
-    const routineSlot = Math.floor(timestamp.getTime() / NPC_ROUTINE_SLOT_MS);
+    const worldAtStart = worldSnapshot();
+    const minutesPerDay = 24 * 60;
+    const routineSlot = (Math.max(1, worldAtStart.logical_time?.day ?? 1) - 1) * (minutesPerDay / NPC_ROUTINE_SLOT_MINUTES)
+      + Math.floor((worldAtStart.logical_time?.minute_of_day ?? 0) / NPC_ROUTINE_SLOT_MINUTES);
     for (const [npcId, routine] of Object.entries(NPC_ROUTINES)) {
       const world = worldSnapshot();
       const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
       if (!npc || npcGoals.reserved?.(npcId)) continue;
-      const destinationId = routine.route[(routineSlot + routine.offset) % routine.route.length];
+      const profile = NPC_PROFILES[npcId];
+      if (!profile?.legal_actions.includes('move_to_adjacent_location')) continue;
+      const destinationId = routine.route[routineSlot % routine.route.length];
       if (!destinationId || destinationId === npc.location_id) continue;
       const hop = nextHop(world, npc.location_id, destinationId);
       if (!hop) continue;
@@ -517,7 +523,7 @@ export function createWorldLife({
           origin: 'world-life-engine',
           options: [{
             when: { kind: 'npc_status', value: npc.status },
-            action_name: `travel_to_${hop}`,
+            action_name: 'move_to_adjacent_location',
             status: `刚到${destination?.name ?? hop}，正在继续自己的行程`,
             location_id: hop,
           }],
@@ -529,12 +535,13 @@ export function createWorldLife({
     npcGoals.tick();
   }
 
-  function tick({ force = false } = {}) {
+  function tick({ force = false, replayNow = null } = {}) {
     if (!enabled) return snapshot();
     seedNpcs();
     scheduleNpcRoutines();
     let world = worldSnapshot();
-    const selected = selectScene(world, now());
+    const effectiveNow = replayNow instanceof Date && !Number.isNaN(replayNow.getTime()) ? replayNow : now();
+    const selected = selectScene(world, effectiveNow);
     const current = world.life?.current_scene;
     const sameParticipants = sameStrings([...(current?.participants ?? [])].sort(), selected.participants);
     const sameContext = current
@@ -591,6 +598,100 @@ export function createWorldLife({
       }
     }
     return snapshot();
+  }
+
+  function replay({ minutes, replay_id: requestedReplayId } = {}) {
+    if (!enabled) throw new InputError(409, 'world_life_disabled', '世界生活引擎尚未启用');
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > WORLD_REPLAY_MAX_MINUTES) {
+      throw new InputError(400, 'invalid_world_replay_minutes', `minutes must be an integer between 1 and ${WORLD_REPLAY_MAX_MINUTES}`);
+    }
+    const replayId = requestedReplayId === undefined || requestedReplayId === null || String(requestedReplayId).trim() === ''
+      ? `auto-${now().getTime()}-${hashNumber(JSON.stringify(worldSnapshot().logical_time ?? {})).toString(36)}`
+      : String(requestedReplayId).trim();
+    if (replayId.length > 96 || !/^[a-zA-Z0-9._:-]+$/.test(replayId)) {
+      throw new InputError(400, 'invalid_world_replay_id', 'replay_id 只能包含字母、数字、点、冒号、下划线和短横线，且最多 96 个字符');
+    }
+
+    const explicitReplay = requestedReplayId !== undefined
+      && requestedReplayId !== null
+      && String(requestedReplayId).trim() !== '';
+    const persistedFirst = explicitReplay
+      ? persistedReplayMutation(`world-life-replay:${replayId}:0`)
+      : null;
+    const persistedStartedAt = persistedFirst?.occurred_at && Number.isFinite(Date.parse(persistedFirst.occurred_at))
+      ? new Date(persistedFirst.occurred_at)
+      : null;
+    const startedAt = persistedStartedAt ?? now();
+    const initial = worldSnapshot();
+    const steps = [];
+    let remaining = minutes;
+    let elapsed = 0;
+    let stepIndex = 0;
+    while (remaining > 0) {
+      const chunk = Math.min(remaining, NPC_ROUTINE_SLOT_MINUTES);
+      const eventId = `world-life-replay:${replayId}:${stepIndex}`;
+      const persistedStep = explicitReplay ? persistedReplayMutation(eventId) : null;
+      const occurredAt = persistedStep?.occurred_at && Number.isFinite(Date.parse(persistedStep.occurred_at))
+        ? persistedStep.occurred_at
+        : new Date(startedAt.getTime() + elapsed * 60 * 1000).toISOString();
+      const result = ingest({
+        event_id: eventId,
+        type: 'world.mutation',
+        source: 'world-life-replay',
+        source_kind: 'world_engine',
+        layer: 'calendar',
+        character_id: DEFAULT_CHARACTER_ID,
+        occurred_at: occurredAt,
+        correlation_id: `world-life-replay:${replayId}`,
+        payload: {
+          action: 'advance_time',
+          minutes: chunk,
+          replay_id: replayId,
+          replay_minutes: minutes,
+          step_index: stepIndex,
+        },
+      });
+      const mutationResult = result?.worldMutation ?? result;
+      // A duplicate replay step already ran (or was durably committed) in an
+      // earlier request. Skipping its tick keeps a repeated replay idempotent,
+      // including the wall-clock scene slot used by authored Scenes.
+      const duplicate = Boolean(result?.duplicate || mutationResult?.duplicate);
+      let life = snapshot();
+      if (!duplicate && mutationResult?.applied) {
+        const replayClock = new Date(startedAt.getTime() + (elapsed + chunk) * 60 * 1000);
+        life = tick({ force: true, replayNow: replayClock });
+      }
+      const after = worldSnapshot();
+      steps.push({
+        index: stepIndex,
+        event_id: eventId,
+        minutes: chunk,
+        applied: Boolean(mutationResult?.applied),
+        duplicate,
+        mutation_id: mutationResult?.mutation?.mutation_id ?? null,
+        logical_time_before: mutationResult?.mutation?.logical_time_before ?? null,
+        logical_time_after: mutationResult?.mutation?.logical_time_after ?? after.logical_time,
+        scene_id: life.current_scene?.scene_id ?? after.life?.current_scene?.scene_id ?? null,
+        current_location_id: after.protagonist?.location_id ?? null,
+        encounter_ids: life.encounters.map((npc) => npc.npc_id),
+      });
+      remaining -= chunk;
+      elapsed += chunk;
+      stepIndex += 1;
+    }
+    const finalWorld = worldSnapshot();
+    return {
+      schema: 'deskbot.world-life-replay.v0.1',
+      replay_id: replayId,
+      minutes,
+      chunk_minutes: NPC_ROUTINE_SLOT_MINUTES,
+      max_minutes: WORLD_REPLAY_MAX_MINUTES,
+      started_at: startedAt.toISOString(),
+      logical_time_before: initial.logical_time ?? null,
+      logical_time_after: finalWorld.logical_time ?? null,
+      steps,
+      life: snapshot(),
+    };
   }
 
   function interact(body = {}) {
@@ -775,7 +876,7 @@ export function createWorldLife({
     return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
   }
 
-  return { tick, snapshot, interact, interactWithAgent, seedNpcs };
+  return { tick, replay, snapshot, interact, interactWithAgent, seedNpcs };
 }
 
-export { CAUSAL_SCENE_BRANCHES, INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS };
+export { CAUSAL_SCENE_BRANCHES, INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MINUTES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS, WORLD_REPLAY_MAX_MINUTES };

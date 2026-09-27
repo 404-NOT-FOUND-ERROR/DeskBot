@@ -1,0 +1,17 @@
+{
+  "schema": "deskbot.settlement-content.v0.1",
+  "settlement_id": "morrowmere",
+  "display_name": "雾灯镇",
+  "english_name": "Morrowmere",
+  "setting_id": "shaping-field-v2.1",
+  "type": "town",
+  "status": "active",
+  "description": "聚形域中一座收留迷路光粒与漂移者的生活聚落；每盏雾灯只照亮眼前一小段日常。",
+  "narrative_anchor": "喵呜从桌边凝聚成形后，先在雾灯镇学会了怎样把一天过成自己的样子。",
+  "tone": ["轻奇幻", "可触碰", "有一点潮玩式的古怪"],
+  "rules": [
+    "小镇有自己的日常，不等待用户触发才存在。",
+    "用户可以影响喵呜和 NPC 的选择方向，但不能直接命令世界改写。",
+    "已发生的行动必须有 canonical mutation；故事文本不能单独制造事实。"
+  ]
+}

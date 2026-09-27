@@ -40,9 +40,28 @@ The point of the game is the moment the answers land: one call, fifty typed deci
 
 ### DeskBot remains canonical in the integration mode
 
-The optional DeskBot prototype treats this Three.js town as a projection and interaction surface. `GET /api/world/map` supplies locations, coordinates and NPCs; `GET /api/life/world` supplies the current Scene. The Jev Town browser does not copy its original 50-citizen simulation into DeskBot and does not claim proposed actions have occurred.
+The optional DeskBot prototype treats this Three.js town as a projection and interaction surface. `GET /api/world/map` supplies locations, coordinates and NPCs; `GET /api/life/world` supplies the current Scene, same-place encounters and recent shared experiences. The Jev Town browser does not copy its original 50-citizen simulation into DeskBot and does not claim proposed actions have occurred.
 
 Before a proposed NPC action is submitted, the adapter fetches a fresh world map, rejects a stale revision or moved NPC, checks the destination against the NPC location's neighbors, and then sends a regular `npc_action` event. DeskBot performs the authoritative validation, persistence, idempotency and mutation-ledger write. This keeps the useful Jev pattern—choosing among typed legal actions—without allowing model prose or a browser broadcast to rewrite world facts.
+
+Natural NPC interaction has a separate boundary. Only NPCs returned in `life.encounters` can be greeted, observed, chatted with, offered an idea, helped or invited to travel. The client submits a stable idempotency key to `POST /api/life/npc-interactions`; it never composes an NPC reply locally. DeskBot validates co-location, produces the in-character reply, updates the relationship, persists a shared experience and returns any limited role-direction evidence. Evidence with `status: observing` is displayed as a clue only: it is not a completed identity, Soul or shell change. Scene `opportunity` text is similarly shown as an unfulfilled possibility until a canonical mutation records an outcome.
+
+The resulting user path is:
+
+```text
+canonical Scene and encounter
+  -> user chooses a typed interaction
+  -> DeskBot validates and responds
+  -> canonical npc_interaction mutation
+  -> persisted shared experience and relationship
+  -> later Scene context and role-direction evidence
+```
+
+In DeskBot mode, location labels are real HTML buttons projected into the Three.js scene. Selecting one focuses the camera and opens a detail panel; the client displays DeskBot's current and adjacent `reachable` state, then requires an explicit travel confirmation. `POST /api/world/travel` is sent only for a currently reachable destination, with an idempotent event ID. The service revalidates adjacency and active travel constraints, advances canonical logical time, records the mutation and returns the arrival text. A stale client-side map can therefore reject an action early, but cannot authorize or create a world change.
+
+The render layer keeps one presentation projection for the canonical map. `src/deskbot/canonicalGeometry.ts` maps a known `location_id` to a stable Jev Town road anchor; `routeVisual.ts` then builds the segment polyline, endpoint positions and bounded animation duration from that projection. Labels, protagonist/NPC positions, route highlights and arrival animation therefore agree visually. This geometry is deliberately render-only: the service response still owns the ordered location steps, travel cost, adjacency and mutation, and an unknown location falls back to its bounded canonical coordinates until an intentional scene anchor is authored.
+
+The bottom composer sends ordinary conversation to `POST /api/chat`; it does not turn chat text into a map mutation. The first-person story overlay is a presentation of DeskBot's current Scene plus this page's recent replies. On refresh, map and Scene state are reread from DeskBot rather than restored from browser-only story state. The 3D town remains a visual projection, while DeskBot retains sole ownership of location, travel, NPC presence, Scene and persistence.
 
 ### One batched Jev request per round
 

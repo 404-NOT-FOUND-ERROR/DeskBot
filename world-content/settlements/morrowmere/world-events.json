@@ -1,0 +1,18 @@
+{
+  "schema": "deskbot.world-event-content.v0.1",
+  "settlement_id": "morrowmere",
+  "events": [
+    {
+      "event_id": "morrowmere-lamp-drift-v1",
+      "title": "雾灯开始向同一条路偏移",
+      "kind": "world_line",
+      "status": "template",
+      "summary": "镇上的灯没有熄灭，只是连续几晚把光投向同一个尚未登记的岔口。",
+      "daily_consequence": "潮痕旧路的路标更容易被看见，但不代表道路已经开放。",
+      "opportunity": "观察一晚灯光，再决定是否让巡路员做十步试走。",
+      "unresolved_hook": "第一盏偏移的灯是谁移动的？",
+      "allowed_actions": ["observe_current_location", "recalibrate_markers", "move_to_adjacent_location"]
+    }
+  ],
+  "ingestion_boundary": "外部新闻、天气和用户输入只能先形成 evidence；解释器通过世界规则后才可激活事件。"
+}

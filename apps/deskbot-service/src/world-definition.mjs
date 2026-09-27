@@ -27,9 +27,24 @@ export const LEGACY_LOCATION_IDS = Object.freeze(['workshop-desk']);
 export const DEFAULT_LOCATION_NAME = '聚形域桌面';
 export const DEFAULT_TTS_PROFILE = 'miaowu-v1';
 
+// 雾灯镇是聚形域中的一个可观察聚落，而不是另起一套世界观。它只给
+// 地图、故事和后续内容包提供稳定的空间归属；世界事实仍由 canonical
+// world 和 world-life engine 写入。
+export const DEFAULT_SETTLEMENT = Object.freeze({
+  schema: 'deskbot.settlement.v0.1',
+  settlement_id: 'morrowmere',
+  display_name: '雾灯镇',
+  english_name: 'Morrowmere',
+  setting_id: WORLD_SETTING.setting_id,
+  type: 'town',
+  status: 'active',
+  description: '聚形域中一座收留迷路光粒与漂移者的生活聚落；每盏雾灯只照亮眼前一小段日常。',
+  narrative_anchor: '喵呜从桌边凝聚成形后，先在雾灯镇学会了怎样把一天过成自己的样子。',
+});
+
 // P1 world map. Coordinates are presentation-neutral percentages used by map
 // clients; routes and travel costs remain canonical server-owned facts.
-export const DEFAULT_WORLD_LOCATIONS = Object.freeze([
+const BASE_WORLD_LOCATIONS = Object.freeze([
   Object.freeze({
     location_id: DEFAULT_LOCATION_ID,
     location_id_aliases: LEGACY_LOCATION_IDS,
@@ -137,6 +152,20 @@ export const DEFAULT_WORLD_LOCATIONS = Object.freeze([
     }),
   }),
 ]);
+
+const LOCATION_CONTENT_METADATA = Object.freeze({
+  'shaping-field-desk': Object.freeze({ region_id: 'morrowmere-inner-ring', location_kind: 'home', world_role: 'protagonist_home', lore_keys: Object.freeze(['雾灯镇', '聚形域', '喵呜']) }),
+  'tidal-old-road': Object.freeze({ region_id: 'morrowmere-east-road', location_kind: 'route', world_role: 'public_route', lore_keys: Object.freeze(['雾灯镇', '潮痕旧路', '巡路员']) }),
+  'whisper-market': Object.freeze({ region_id: 'morrowmere-market-quarter', location_kind: 'market', world_role: 'exchange_place', lore_keys: Object.freeze(['雾灯镇', '低语集市', '交换']) }),
+  'backlit-grove': Object.freeze({ region_id: 'morrowmere-west-grove', location_kind: 'grove', world_role: 'memory_place', lore_keys: Object.freeze(['雾灯镇', '逆光林地', '旧日光色']) }),
+  'echo-waterside': Object.freeze({ region_id: 'morrowmere-north-water', location_kind: 'waterside', world_role: 'message_place', lore_keys: Object.freeze(['雾灯镇', '回声水岸', '回声']) }),
+});
+
+export const DEFAULT_WORLD_LOCATIONS = Object.freeze(BASE_WORLD_LOCATIONS.map((location) => Object.freeze({
+  ...location,
+  settlement_id: DEFAULT_SETTLEMENT.settlement_id,
+  ...LOCATION_CONTENT_METADATA[location.location_id],
+})));
 
 // This is canonical character state, not a prompt-only character card. It
 // makes the durable individual, current role stage, current form, and user

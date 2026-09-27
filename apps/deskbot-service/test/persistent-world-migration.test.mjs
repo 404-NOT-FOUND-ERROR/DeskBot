@@ -72,6 +72,9 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
 
   assert.equal(migrated.name, '聚形域');
   assert.equal(migrated.setting.setting_id, 'shaping-field-v2.1');
+  assert.equal(migrated.settlement.settlement_id, 'morrowmere');
+  assert.equal(migrated.settlement.display_name, '雾灯镇');
+  assert.equal(migrated.settlement.setting_id, 'shaping-field-v2.1');
   assert.equal(migrated.protagonist.character_id, 'shaping-001');
   assert.equal(migrated.protagonist.display_name, '喵呜');
   assert.equal(migrated.protagonist.display_name_status, 'active_role_stage');
@@ -86,6 +89,8 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
   assert.equal(migrated.protagonist.character_profile.roleplay_contract.version, 'miaowu-roleplay-v2');
   assert.deepEqual(migrated.protagonist.character_id_aliases, ['ember-001']);
   assert.deepEqual(migrated.locations[0].location_id_aliases, ['workshop-desk']);
+  assert.equal(migrated.locations[0].settlement_id, 'morrowmere');
+  assert.equal(migrated.locations[0].location_kind, 'home');
   assert.equal(migrated.shaping_field.measurement_status, 'unmeasured');
   assert.equal(migrated.world_revision, 9);
   assert.equal(migrated.logical_time.tick, 9);

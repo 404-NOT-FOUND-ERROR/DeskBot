@@ -1,11 +1,13 @@
 .deskbot-mode {
+  box-sizing: border-box;
   width: 100%;
   min-height: 100vh;
   overflow-x: hidden;
-  padding: clamp(18px, 3vw, 42px);
+  padding: clamp(16px, 2.5vw, 34px);
   color: var(--ink);
   background: var(--cream);
 }
+.deskbot-mode *, .deskbot-mode *::before, .deskbot-mode *::after { box-sizing: border-box; }
 
 .deskbot-mode__header,
 .deskbot-mode__footer {
@@ -14,122 +16,216 @@
   align-items: flex-start;
   gap: 18px;
   max-width: 1500px;
-  margin: 0 auto 18px;
+  margin: 0 auto 16px;
 }
 
-.deskbot-mode__header h1 { margin: 6px 0 4px; font-size: clamp(1.6rem, 3vw, 2.8rem); }
-.deskbot-mode__header p { max-width: 58rem; margin: 0; color: var(--ink-soft); }
-.deskbot-mode__header > *,
-.deskbot-mode__grid > * { min-width: 0; }
+.deskbot-mode__header h1 { margin: 5px 0 4px; font-size: 2.2rem; }
+.deskbot-mode__header p { max-width: 60rem; margin: 0; color: var(--ink-soft); line-height: 1.45; }
+.deskbot-mode__header > *, .deskbot-mode__grid > * { min-width: 0; }
 .deskbot-mode__header p { overflow-wrap: anywhere; }
-.deskbot-mode__eyebrow { display: block; color: var(--forest-dark); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.deskbot-mode__eyebrow { display: block; color: var(--forest-dark); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .deskbot-mode__status { display: grid; justify-items: end; gap: 4px; white-space: nowrap; }
-.deskbot-mode__status span,
-.deskbot-mode__footer code { color: var(--ink-soft); font-size: 0.78rem; }
+.deskbot-mode__status span, .deskbot-mode__footer code { color: var(--ink-soft); font-size: 0.76rem; }
 
 .deskbot-mode button {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 11px;
   color: var(--ink);
-  background: rgba(255, 253, 247, 0.8);
+  background: rgba(255, 253, 247, 0.84);
   font: inherit;
   cursor: pointer;
 }
+.deskbot-mode button:hover, .deskbot-mode button.is-active { border-color: var(--forest); background: rgba(60, 110, 71, 0.1); }
+.deskbot-mode button:focus-visible, .deskbot-mode textarea:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 2px; }
+.deskbot-mode button:disabled { cursor: wait; opacity: 0.62; }
 
-.deskbot-mode button:hover,
-.deskbot-mode button.is-active { border-color: var(--forest); background: rgba(60, 110, 71, 0.1); }
-.deskbot-mode button:disabled { cursor: wait; opacity: 0.65; }
+.deskbot-mode .place-label--interactive { appearance: none; cursor: pointer; pointer-events: auto; }
+.deskbot-mode .place-label--interactive:hover, .deskbot-mode .place-label--interactive:focus-visible { border-color: var(--terracotta); outline: 2px solid rgba(178, 91, 61, 0.38); outline-offset: 1px; }
+.deskbot-mode .map-legend { display: none; }
+.deskbot-mode .map-controls { top: 12px; right: 12px; bottom: auto; left: auto; z-index: 5; padding: 4px; border: 1px solid rgba(90, 110, 70, 0.24); border-radius: 8px; background: rgba(255, 253, 247, 0.9); box-shadow: 0 4px 12px rgba(43, 38, 32, 0.1); }
+.deskbot-mode .map-controls__text[aria-label="Show decisions"] { display: none; }
 
 .deskbot-mode__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  align-items: start;
   gap: 18px;
   max-width: 1500px;
   margin: 0 auto;
 }
+.deskbot-mode__grid, .deskbot-mode__stage, .deskbot-mode__stage .town-map { width: 100%; min-width: 0; }
 
 .deskbot-mode__stage {
   position: relative;
-  min-height: 620px;
+  height: min(78vh, 840px);
+  min-height: 640px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--parchment);
   box-shadow: 0 18px 45px rgba(43, 38, 32, 0.1);
 }
+.deskbot-mode__stage .town-map { min-height: 100%; }
 
-.deskbot-mode__stage .town-map { min-height: 620px; }
-
-.deskbot-mode__scene-card {
+/* The map is the scene; narrative and input float above it in stable zones. */
+.deskbot-mode__story {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
-  width: min(360px, calc(100% - 32px));
+  z-index: 5;
+  top: 14px;
+  left: 14px;
+  width: min(390px, calc(100% - 28px));
+  max-height: min(48%, 360px);
+  overflow: auto;
   padding: 14px 16px;
-  border: 1px solid rgba(216, 200, 163, 0.9);
+  border: 1px solid rgba(73, 111, 80, 0.48);
   border-radius: 10px;
-  background: rgba(255, 253, 247, 0.9);
+  background: rgba(247, 252, 240, 0.94);
   box-shadow: 0 10px 25px rgba(43, 38, 32, 0.14);
+  backdrop-filter: blur(5px);
 }
+.deskbot-mode__story-scene > span { color: var(--forest-dark); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.deskbot-mode__story h2 { margin: 5px 0 6px; font-size: 1.08rem; }
+.deskbot-mode__story p { margin: 0; line-height: 1.5; }
+.deskbot-mode__story em { display: block; margin-top: 8px; color: var(--ink-soft); font-size: 0.8rem; }
+.deskbot-mode__story-scene small, .deskbot-mode__story-note { display: block; margin-top: 8px; color: var(--forest-dark); font-size: 0.76rem; line-height: 1.4; }
+.deskbot-mode__story-lines { display: grid; gap: 7px; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid rgba(73, 111, 80, 0.2); list-style: none; }
+.deskbot-mode__story-lines li { display: grid; gap: 2px; }
+.deskbot-mode__story-lines li.is-user { color: var(--ink-soft); }
+.deskbot-mode__story-lines strong { font-size: 0.74rem; }
+.deskbot-mode__story-lines p { font-size: 0.82rem; line-height: 1.4; }
 
-.deskbot-mode__scene-card span { color: var(--terracotta-dark); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-.deskbot-mode__scene-card h2 { margin: 5px 0 6px; font-size: 1.05rem; }
-.deskbot-mode__scene-card p { margin: 0; line-height: 1.5; }
-.deskbot-mode__scene-card em { display: block; margin-top: 8px; color: var(--ink-soft); font-size: 0.82rem; }
+.deskbot-mode__place-card {
+  position: absolute;
+  z-index: 6;
+  top: 14px;
+  right: 14px;
+  width: min(300px, calc(100% - 28px));
+  padding: 15px 16px;
+  border: 1px solid rgba(167, 111, 76, 0.45);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.95);
+  box-shadow: 0 10px 25px rgba(43, 38, 32, 0.14);
+  backdrop-filter: blur(5px);
+}
+.deskbot-mode__place-card h2 { margin: 6px 28px 6px 0; font-size: 1.18rem; }
+.deskbot-mode__place-card p { margin: 0; line-height: 1.45; font-size: 0.84rem; }
+.deskbot-mode__place-card small { display: block; margin-top: 10px; color: var(--ink-soft); line-height: 1.4; }
+.deskbot-mode__route-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0;
+  padding: 0;
+  list-style: none;
+  align-items: center;
+}
+.deskbot-mode__route-preview li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: rgba(33, 53, 44, 0.82);
+  font-size: 0.78rem;
+}
+.deskbot-mode__route-preview li:not(:last-child)::after {
+  content: "→";
+  margin-left: 0.1rem;
+  color: var(--forest);
+}
+.deskbot-mode__route-preview li > span {
+  display: inline-grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border: 1px solid rgba(58, 112, 89, 0.52);
+  border-radius: 50%;
+  color: var(--forest-dark);
+  font-size: 0.68rem;
+}
+.deskbot-mode__route-preview .is-transfer > strong { color: #946c25; }
+.deskbot-mode__route-preview .is-destination > strong { color: var(--forest-dark); }
+.deskbot-mode__place-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 1.2rem; }
+.deskbot-mode__travel-button { width: 100%; margin-top: 12px; color: #fff !important; border-color: var(--forest-dark) !important; background: var(--forest) !important; }
+.deskbot-mode__arrival { position: absolute; z-index: 6; left: 14px; bottom: 92px; width: min(430px, calc(100% - 28px)); padding: 9px 12px; border-left: 3px solid var(--terracotta); border-radius: 6px; color: var(--ink); background: rgba(255, 253, 247, 0.94); box-shadow: 0 5px 16px rgba(43, 38, 32, 0.12); font-size: 0.82rem; line-height: 1.4; }
+
+.deskbot-mode__composer {
+  position: absolute;
+  z-index: 7;
+  right: auto;
+  bottom: 14px;
+  left: 50%;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(690px, calc(100% - 28px));
+  transform: translateX(-50%);
+  padding: 8px;
+  border: 1px solid rgba(90, 110, 70, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.95);
+  box-shadow: 0 10px 25px rgba(43, 38, 32, 0.14);
+  backdrop-filter: blur(5px);
+}
+.deskbot-mode__composer textarea { flex: 1; min-width: 0; min-height: 24px; max-height: 110px; resize: vertical; border: 0; padding: 6px 7px; color: var(--ink); background: transparent; font: inherit; line-height: 1.4; }
+.deskbot-mode__composer textarea:focus { outline: none; }
+.deskbot-mode__composer button { flex: 0 0 auto; color: #fff; border-color: var(--forest-dark); background: var(--forest); }
+
 .deskbot-mode__side { display: grid; align-content: start; gap: 14px; }
 .deskbot-mode__panel { padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 253, 247, 0.76); }
 .deskbot-mode__npc-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
 .deskbot-mode__npc-tabs button { padding: 6px 9px; font-size: 0.82rem; }
+.deskbot-mode__npc-tabs button span { display: block; margin-top: 2px; color: var(--ink-soft); font-size: 0.68rem; }
 .deskbot-mode__npc h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .deskbot-mode__npc p { margin: 10px 0 6px; line-height: 1.45; }
-.deskbot-mode__npc small { color: var(--ink-soft); }
+.deskbot-mode__npc small { color: var(--ink-soft); line-height: 1.4; }
+.deskbot-mode__relationship { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; color: var(--ink-soft); font-size: 0.76rem; }
+.deskbot-mode__relationship span { padding: 4px 7px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 253, 247, 0.7); }
+.deskbot-mode__interactions { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.deskbot-mode__interaction-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.deskbot-mode__interaction-actions button { padding: 7px 5px; font-size: 0.78rem; }
+.deskbot-mode__idea-label { color: var(--ink-soft); font-size: 0.78rem; }
+.deskbot-mode__interactions textarea { width: 100%; min-height: 64px; box-sizing: border-box; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px; color: var(--ink); background: rgba(255, 253, 247, 0.85); font: inherit; font-size: 0.82rem; }
+.deskbot-mode__idea-count { text-align: right; font-size: 0.68rem; }
+.deskbot-mode__not-present { margin: 0 !important; color: var(--ink-soft); font-size: 0.8rem; }
 .deskbot-mode__candidates { display: grid; gap: 8px; margin-top: 12px; }
 .deskbot-mode__candidates button { display: grid; gap: 5px; width: 100%; text-align: left; }
 .deskbot-mode__candidates span { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.35; }
 .deskbot-mode__confirm { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .deskbot-mode__confirm p { margin: 0 0 10px; color: var(--ink-soft); font-size: 0.8rem; line-height: 1.4; }
 .deskbot-mode__confirm button { width: 100%; color: #fff; border-color: var(--forest-dark); background: var(--forest); }
+.deskbot-mode__experiences { display: grid; gap: 9px; margin: 12px 0 0; padding: 0; list-style: none; }
+.deskbot-mode__experiences li { display: grid; gap: 2px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+.deskbot-mode__experiences li:last-child { padding-bottom: 0; border-bottom: 0; }
+.deskbot-mode__experiences strong { font-size: 0.8rem; }
+.deskbot-mode__experiences span { line-height: 1.35; font-size: 0.78rem; }
+.deskbot-mode__experiences time { color: var(--ink-soft); font-size: 0.68rem; }
+.deskbot-mode__empty-experiences { margin: 12px 0 0; color: var(--ink-soft); font-size: 0.8rem; line-height: 1.4; }
 .deskbot-mode__footer { align-items: center; margin-top: 14px; color: var(--ink-soft); font-size: 0.8rem; }
 .deskbot-mode__footer a { color: var(--forest-dark); font-weight: 700; }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .deskbot-mode__grid { grid-template-columns: 1fr; }
-  .deskbot-mode__stage,
-  .deskbot-mode__stage .town-map { min-height: 520px; }
+  .deskbot-mode__stage { height: min(76vh, 760px); min-height: 620px; }
+  .deskbot-mode__stage .town-map { min-height: 100%; }
+  .deskbot-mode__side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 620px) {
-  .deskbot-mode { padding: 14px; }
-  .deskbot-mode__header,
-  .deskbot-mode__footer { display: grid; justify-content: stretch; }
+  .deskbot-mode { padding: 12px; }
+  .deskbot-mode__header, .deskbot-mode__footer { display: grid; justify-content: stretch; }
+  .deskbot-mode__header h1 { font-size: 1.65rem; }
   .deskbot-mode__status { justify-items: start; }
-  .deskbot-mode__stage,
-  .deskbot-mode__stage .town-map { min-height: 460px; }
-  .deskbot-mode__scene-card { position: static; width: auto; margin: 12px; }
-  .deskbot-mode__stage .map-controls {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    max-width: calc(100% - 16px);
-    flex-wrap: wrap;
-    gap: 2px;
-    overflow: hidden;
-  }
-  .deskbot-mode__stage .map-controls__text {
-    flex: 0 0 28px;
-    width: 28px;
-    min-width: 28px;
-    padding: 0;
-    overflow: hidden;
-    font-size: 0;
-    white-space: nowrap;
-  }
-  .deskbot-mode__stage .map-controls__text::before {
-    display: block;
-    font-size: 0.82rem;
-    line-height: 28px;
-  }
+  .deskbot-mode__stage { height: 72vh; min-height: 520px; }
+  .deskbot-mode__stage .town-map { min-height: 100%; }
+  .deskbot-mode__story { max-height: 42%; }
+  .deskbot-mode__place-card { top: auto; right: 12px; bottom: 116px; left: 12px; width: auto; }
+  .deskbot-mode__arrival { bottom: 103px; }
+  .deskbot-mode__composer { right: 10px; bottom: 10px; left: 10px; width: auto; transform: none; }
+  .deskbot-mode__side { grid-template-columns: 1fr; }
+  .deskbot-mode__interaction-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deskbot-mode__stage .map-controls { top: auto; left: 8px; right: 8px; bottom: 72px; max-width: calc(100% - 16px); flex-wrap: wrap; gap: 2px; overflow: hidden; }
+  .deskbot-mode__stage .map-controls__text { flex: 0 0 28px; width: 28px; min-width: 28px; padding: 0; overflow: hidden; font-size: 0; white-space: nowrap; }
+  .deskbot-mode__stage .map-controls__text::before { display: block; font-size: 0.82rem; line-height: 28px; }
   .deskbot-mode__stage .map-controls__text[aria-label="Fit town"]::before { content: "⌂"; }
   .deskbot-mode__stage .map-controls__text[aria-label="Reset view"]::before { content: "↺"; }
   .deskbot-mode__stage .map-controls__text[aria-label="Show decisions"]::before { content: "◉"; }

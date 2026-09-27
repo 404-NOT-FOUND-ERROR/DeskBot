@@ -1,0 +1,12 @@
+{
+  "schema": "deskbot.npc-schedule-content.v0.1",
+  "settlement_id": "morrowmere",
+  "time_basis": "logical_world_time",
+  "slot_minutes": 120,
+  "schedules": [
+    { "npc_id": "pathfinder-001", "route": ["tidal-old-road", "shaping-field-desk", "tidal-old-road", "whisper-market", "shaping-field-desk", "backlit-grove"], "purpose": "巡查会随生活变化的公共路线" },
+    { "npc_id": "shade-collector-001", "route": ["backlit-grove", "echo-waterside", "whisper-market", "tidal-old-road"], "purpose": "沿途收集不属于今天的光与影子" },
+    { "npc_id": "echo-postcarrier-001", "route": ["echo-waterside", "whisper-market", "echo-waterside", "shaping-field-desk"], "purpose": "收集没有收件人的话，并把愿意出发的句子送到合适的桌边" }
+  ],
+  "execution_boundary": "路线只是候选；每次移动必须由 world-life engine 生成并经 canonical npc_action mutation 验证。"
+}

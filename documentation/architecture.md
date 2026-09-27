@@ -26,6 +26,14 @@ Node deskbot-service :4311
 
 `apps/jev-town-client` 是基于 CeciliaW888/jev-town 的独立 React/Three.js 投影客户端。它读取 `/api/world/map` 和 `/api/life/world`，并只通过标准事件入口提交 NPC 行动；地图 revision、合法移动、SQLite 和 mutation ledger 仍由 `deskbot-service` 管理。来源、授权记录和发布清单见 `documentation/jev-town-adoption.md`。
 
+### 雾灯镇内容基线
+
+雾灯镇（Morrowmere）是聚形域中的一个具体聚落，不替代聚形域世界观，也不创建第二个运行时世界。`world-content/settlements/morrowmere/` 是可评审的内容合同：它把聚落、地点 Lore key、Scene 起点、NPC 作者字段、有限日程和世界事件模板放在一起；运行时仍只读取/写入 `deskbot-service` 的 canonical world。内容包里的 `opportunity`、事件模板和日程路线都是候选或作者意图，必须经过 world-life 调度器和白名单 mutation 才能成为事实。
+
+`src/content-packages.mjs` 是作者内容到运行时的只读编译层。它在加载时校验聚落/setting 归属、地点是否覆盖 canonical map、NPC 的 NevaMind 字段、日程路线、故事包版本和世界事件模板，并输出带 `source` 的编译对象；它不写 SQLite，也不允许客户端直接把 JSON 当成世界状态。`story-packages.mjs` 使用该编译结果生成有限故事计划，因此“雾灯镇第一天”可以回放，但每一步仍须通过 `shared-life`、`persistent-world` 和 mutation ledger 执行。
+
+首版 NPC 继续采用 NevaMind 式结构化代理边界：身份、角色、欲望、日程、条件、状态与合法行动。它是作者层和运行时 Persona 的输入，不允许客户端、LLM 台词或内容包直接改写位置、关系、世界事件或喵呜的角色阶段。这样可以先复用 Jev Town 的中性小镇舞台，再逐步把聚形域的多源输入、世界线和角色选择接到同一个可审计的生活循环里。
+
 ## 信任边界
 
 - 浏览器/固件 -> Node：输入是不可信事件；服务端做 schema、大小、幂等、设备绑定和世界 mutation 校验。
@@ -58,11 +66,19 @@ Node deskbot-service :4311
 
 `world-life.mjs` 是 canonical world 之上的有限、确定、可回放调度器，不是第二个世界状态源。正式服务启动时播种有档案的首发 NPC，并立即生成当前地点 Scene；之后每分钟检查，默认以 30 分钟真实时间槽选择生活片段。Scene 选择只读取当前位置、逻辑时间段、最新世界线和天气，结果必须通过 `set_life_scene` mutation 写回 canonical world。相同事件跨槽时使用 `continue_life_scene` 延长同一个 Scene，不重复制造旁白；同地点最近两个模板进入冷却，只有时段约束没有可用替代时才继续当前事件。当前 Scene、最近 12 个已结束 Scene、NPC 当前行动、共同经历和互动关系都能在 SQLite 重启后恢复。
 
-首版用户与 NPC 的互动只开放 `observe/greet/suggest/help/invite` 五种意图。`suggest` 可以携带最多 500 字想法，但服务端决定 NPC 的回应；NPC 必须与喵呜同地，远方 NPC 不能互动。每次互动带幂等 ID，通过 `npc_interaction` mutation 增加有限的熟悉度、信任和相遇次数，并在 `life.recent_experiences` 留下一条可归因共同经历。`suggest/help/invite` 可附带由 NPC 身份规则决定的低置信角色方向提示；它只进入多源证据聚合的 `observing` 阶段，仍需跨来源、重复证据才能成为候选，不能直接修改 Soul、身份或外壳。
+首版用户与 NPC 的互动只开放 `observe/greet/chat/suggest/help/invite` 六种意图。`suggest` 可以携带最多 500 字想法，但服务端决定 NPC 的回应；NPC 必须与喵呜同地，远方 NPC 不能互动。每次互动带幂等 ID，通过 `npc_interaction` mutation 增加有限的熟悉度、信任和相遇次数，并在 `life.recent_experiences` 留下一条可归因共同经历。`suggest/help/invite` 可附带由 NPC 身份规则决定的低置信角色方向提示；它只进入多源证据聚合的 `observing` 阶段，仍需跨来源、重复证据才能成为候选，不能直接修改 Soul、身份或外壳。
 
 NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带 `location_id`，但 canonical world 强制 NPC 每次只能走一个相邻地点；世界生活引擎每两小时最多为内置 NPC 安排一个有限日程，手工创建且尚未结束的目标优先。目标决策先持久化再执行，NPC 抵达或离开会改变同地点 encounters 和 Scene 参与者；用户对话、LLM 文本和人物面板按钮都不能直接移动 NPC。
 
 `GET /api/life/world` 是只读相遇视图，不会因为刷新网页推进世界；`POST /api/life/npc-interactions` 是唯一普通用户 NPC 互动入口。Web 在故事窗显示已发生 Scene，在“可以试试”前明确保留未发生语义；同地点 NPC 通过横排入口和人物面板出现，首次相遇每个浏览器会话只自动呼出一次。NPC 回应使用独立署名进入故事流，不伪装成喵呜发言。
+
+`GET /api/life/content-packages` 只暴露已编译内容包目录，浏览器不读取作者 JSON 文件。
+
+### 真实墙钟与逻辑世界时间
+
+canonical world 的 `logical_time` 仍是唯一可回放的世界时间；它不直接被浏览器时钟或 LLM 文本改写。使用 SQLite 持久化运行时，`persistent-world` 会在服务监听时和每分钟调度时读取服务端墙钟，并把已完成的整分钟转换为白名单 `advance_time` mutation。首次启动只建立 `canonical-world.wall-clock` 锚点，不凭空推进第一天；每次追赶最多处理 120 分钟，剩余区间在下次调度继续，秒级余数保留在 marker 中。
+
+墙钟同步采用 marker-first 的可恢复步骤：先持久化待执行区间，再用稳定的 `world-clock:<world>:<from-ms>:<to-ms>` event ID 写入 canonical state/ledger，最后推进 marker。进程在第二步或第三步中断时，重启会重放同一 event 并依靠世界 mutation 幂等性避免重复推进。墙钟倒退不会回拨世界；没有 persistence 的单元测试/内存实例关闭该同步，以保持确定性。墙钟只负责时间推进，NPC 日程、Scene、关系和候选方向仍由各自调度器读取 canonical mutation，不能借墙钟绕过世界规则。
 
 这一版仍不是开放式自主世界：Scene 来自每地点三条有限模板，当前有三个内置 NPC，NPC 回应和两小时日程由有限角色规则确定。因果分支现在通过 `arc_id + outcome/status + cause_event_ids/cause_experience_ids` 选择 authored Scene；消费过的因果分支不会重复生成，普通地点生活仍作为 fallback。`npc-goals` 同时兼容旧的 ordered alternatives 与 `steps-v1`：多步目标每次 tick 最多推进一步，状态可为 `waiting/completed/missed/failed`，每一步持久化 `decision`、`step_history`、等待条件、截止时间和可选 missed/failed 反馈事件；NPC 移动仍由 canonical world 强制相邻跳转。自动经历不进入 `life.memories`，而从 `GET /api/life/experiences?query=` 和 `branchExperiences` 只读检索，提示词明确区分用户确认记忆与世界生活痕迹。当前已具备 accepted role-state 的普通表达投影，但仍缺跨天主动性校准、更多有关系的 NPC 族群、角色阶段对世界行动的稳定影响和角色方向到外壳的真实生成；这些不能用有限规则或一次好看的回复冒充完成。
 

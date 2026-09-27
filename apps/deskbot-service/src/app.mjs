@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { createSharedLife } from './shared-life.mjs';
+import { createSharedLifeReports } from './shared-life-reports.mjs';
 import { createNpcGoals } from './npc-goals.mjs';
 import { createWorldLife } from './world-life.mjs';
 
@@ -11,17 +12,18 @@ import { createChatOrchestrator } from './chat-orchestrator.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
 import { createOutputRouter, OutputRouterError } from './output-router.mjs';
 import { createDeviceRegistry, DeviceRegistryError } from './device-registry.mjs';
-import { createPersistentWorld, getWorldMap, getWorldSchema, PersistentWorldError } from './persistent-world.mjs';
+import { createPersistentWorld, getWorldMap, getWorldRoute, getWorldSchema, PersistentWorldError } from './persistent-world.mjs';
 import { createAudioArtifactStore, AudioArtifactError } from './audio-artifacts.mjs';
 import { createVoiceIngress, VoiceIngressError } from './voice-ingress.mjs';
 import { VoiceSidecarError } from './voice-sidecar-client.mjs';
 import { createWebSocketBridge } from './websocket-bridge.mjs';
 import { createContextSourceRegistry } from './context-sources.mjs';
-import { createInteractionPolicy } from './interaction-policy.mjs';
+import { createInteractionPolicy, InteractionPolicyError } from './interaction-policy.mjs';
 import { WeatherConnectorError } from './weather-connector.mjs';
 import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
+import { listContentPackages } from './content-packages.mjs';
 import {
   getResearchScenarioCatalog,
   ResearchScenarioError,
@@ -154,12 +156,19 @@ export function createDeskBotServer({
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
   let npcGoals;
   const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
+  const sharedLifeReports = createSharedLifeReports({
+    now,
+    persistence,
+    worldSnapshot: () => persistentWorld.get(),
+    listMutations: options => persistentWorld.listMutations(options),
+  });
   npcGoals = createNpcGoals({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event),
     reserved: id => sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending', 'failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === id)) });
   const worldLife = createWorldLife({
     now,
     worldSnapshot: () => persistentWorld.get(),
     ingest: event => ingestNonChatEvent(event),
+    listMutations: options => persistentWorld.listMutations(options),
     npcGoals,
     llm,
     enabled: worldLifeEnabled,
@@ -182,6 +191,7 @@ export function createDeskBotServer({
     relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
     branchExperiences: (query, worldSnapshot) => sharedLife.retrieveExperiences(query, worldSnapshot),
     conversationHistoryAfter: (characterId) => sharedLife.historyAfter(characterId),
+    continuityContext: (characterId) => sharedLifeReports.promptContinuity({ characterId }),
     recordRoleTrialObservation: ({ characterId, eventId, evidenceId, signal }) => {
       return roles.activeTrials({ characterId }).map((trial) => {
         const result = roles.recordTrialObservation(trial.proposal_id, { eventId, evidenceId, signal });
@@ -313,6 +323,17 @@ export function createDeskBotServer({
         return;
       }
     }
+    if (url.pathname === '/api/life/content-packages' && request.method === 'GET') {
+      try {
+        sendJson(response, 200, { schema: 'deskbot.content-package-list.v0.1', packages: listContentPackages() });
+      } catch (error) {
+        sendJson(response, error instanceof InputError ? error.statusCode : 500, {
+          error: error.code ?? 'content_package_error',
+          message: error.message ?? 'Content package failed',
+        });
+      }
+      return;
+    }
     if (url.pathname === '/api/life/npc-goals') {
       if (request.method === 'GET') { sendJson(response, 200, { goals: npcGoals.list() }); return; }
       if (request.method === 'POST') {
@@ -328,6 +349,16 @@ export function createDeskBotServer({
         return;
       }
     }
+    if (url.pathname === '/api/life/world/replay' && request.method === 'POST') {
+      readJson(request)
+        .then(body => worldLife.replay(body))
+        .then(result => sendJson(response, 200, result))
+        .catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500, {
+          error: error.code ?? 'internal_error',
+          message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'World life replay failed',
+        }));
+      return;
+    }
     if (url.pathname === '/api/life/experiences' && request.method === 'GET') {
       sendJson(response, 200, { experiences: sharedLife.retrieveExperiences(url.searchParams.get('query') ?? '') });
       return;
@@ -338,6 +369,68 @@ export function createDeskBotServer({
         .then((result) => sendJson(response, 200, result))
         .catch((error) => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
           { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'NPC interaction failed' }));
+      return;
+    }
+    if (url.pathname === '/api/life/commitments') {
+      if (request.method === 'GET') {
+        sendJson(response, 200, { commitments: sharedLifeReports.listCommitments({
+          characterId: url.searchParams.get('character_id'),
+          status: url.searchParams.get('status'),
+        }) });
+        return;
+      }
+      if (request.method === 'POST') {
+        readJson(request)
+          .then(body => body.operation === 'resolve' || body.operation === 'cancel'
+            ? sharedLifeReports.updateCommitment(body)
+            : sharedLifeReports.createCommitment(body))
+          .then(result => sendJson(response, 200, result))
+          .catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500, {
+            error: error instanceof InputError ? error.code : 'internal_error',
+            message: error instanceof InputError ? error.message : 'Commitment operation failed',
+          }));
+        return;
+      }
+    }
+    if (url.pathname === '/api/life/relationship-trends' && request.method === 'GET') {
+      sendJson(response, 200, { trends: sharedLifeReports.relationshipTrends({
+        npcId: url.searchParams.get('npc_id'),
+        day: url.searchParams.get('day'),
+      }) });
+      return;
+    }
+    if (url.pathname === '/api/life/daily-summary') {
+      if (request.method === 'GET') {
+        const summary = sharedLifeReports.getDailySummary({
+          day: url.searchParams.get('day'),
+          characterId: url.searchParams.get('character_id') ?? undefined,
+          materialize: url.searchParams.get('materialize') === 'true',
+        });
+        sendJson(response, 200, { summary });
+        return;
+      }
+      if (request.method === 'POST') {
+        readJson(request)
+          .then(body => body.operation === 'preview'
+            ? sharedLifeReports.previewDailySummary(body)
+            : sharedLifeReports.materializeDailySummary(body))
+          .then(summary => sendJson(response, 200, { summary }))
+          .catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500, {
+            error: error instanceof InputError ? error.code : 'internal_error',
+            message: error instanceof InputError ? error.message : 'Daily summary operation failed',
+          }));
+        return;
+      }
+    }
+    if (url.pathname === '/api/life/daily-summaries' && request.method === 'GET') {
+      sendJson(response, 200, { summaries: sharedLifeReports.listDailySummaries({ characterId: url.searchParams.get('character_id') }) });
+      return;
+    }
+    if (url.pathname === '/api/life/continuity' && request.method === 'GET') {
+      sendJson(response, 200, sharedLifeReports.promptContinuity({
+        day: url.searchParams.get('day'),
+        characterId: url.searchParams.get('character_id') ?? undefined,
+      }));
       return;
     }
     if (url.pathname === '/api/life/memories' || url.pathname === '/api/life/plans') {
@@ -759,6 +852,89 @@ export function createDeskBotServer({
       return;
     }
 
+    if (url.pathname === '/api/interaction/candidates') {
+      if (request.method === 'GET') {
+        const characterId = url.searchParams.get('character_id') ?? null;
+        sendJson(response, 200, {
+          schema: 'foundry.interaction-candidate-list.v0.1',
+          policy_version: interactionPolicy.policyVersion,
+          character_id: characterId,
+          candidates: interactionPolicy.listCandidates({
+            characterId,
+            status: url.searchParams.get('status') ?? null,
+            route: url.searchParams.get('route') ?? 'proactive_candidate',
+            limit: url.searchParams.get('limit') ?? 50,
+          }),
+          settings: interactionPolicy.getSettings(characterId),
+        });
+        return;
+      }
+    }
+
+    const candidateActionMatch = url.pathname.match(/^\/api\/interaction\/candidates\/([^/]+)$/);
+    if (request.method === 'POST' && candidateActionMatch) {
+      const eventId = decodeURIComponent(candidateActionMatch[1]);
+      readJson(request, 64 * 1024)
+        .then((body) => {
+          const candidate = interactionPolicy.resolveCandidate(eventId, {
+            characterId: body.character_id ?? null,
+            action: body.action,
+            deferredUntil: body.deferred_until ?? null,
+            reason: body.reason ?? null,
+          });
+          sendJson(response, 200, {
+            schema: 'foundry.interaction-candidate-action.v0.1',
+            accepted: true,
+            candidate,
+          });
+        })
+        .catch((error) => {
+          const expected = error instanceof InputError || error instanceof InteractionPolicyError;
+          sendJson(response, expected ? (error.statusCode ?? 400) : 500, {
+            error: expected ? error.code : 'interaction_candidate_action_failed',
+            message: expected ? error.message : 'interaction candidate action failed',
+          });
+        });
+      return;
+    }
+
+    if (url.pathname === '/api/interaction/settings') {
+      if (request.method === 'GET') {
+        const characterId = url.searchParams.get('character_id') ?? null;
+        sendJson(response, 200, {
+          schema: 'foundry.interaction-settings-response.v0.1',
+          settings: interactionPolicy.getSettings(characterId),
+        });
+        return;
+      }
+      if (request.method === 'POST' || request.method === 'PUT') {
+        readJson(request, 64 * 1024)
+          .then((body) => {
+            if (body.character_id === undefined && body.characterId === undefined) {
+              throw new InputError(400, 'character_id_required', 'character_id is required');
+            }
+            const settings = interactionPolicy.updateSettings({
+              characterId: body.character_id ?? body.characterId,
+              proactiveEnabled: body.proactive_enabled ?? body.proactiveEnabled,
+              quietUntil: body.quiet_until === undefined ? body.quietUntil : body.quiet_until,
+            });
+            sendJson(response, 200, {
+              schema: 'foundry.interaction-settings-response.v0.1',
+              accepted: true,
+              settings,
+            });
+          })
+          .catch((error) => {
+            const expected = error instanceof InputError || error instanceof InteractionPolicyError;
+            sendJson(response, expected ? (error.statusCode ?? 400) : 500, {
+              error: expected ? error.code : 'interaction_settings_update_failed',
+              message: expected ? error.message : 'interaction settings update failed',
+            });
+          });
+        return;
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/roles/pulls') {
       const characterId = url.searchParams.get('character_id') ?? null;
       sendJson(response, 200, {
@@ -1037,6 +1213,33 @@ export function createDeskBotServer({
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/world/route') {
+      const worldId = url.searchParams.get('world_id') ?? undefined;
+      const world = persistentWorld.get(worldId);
+      if (!world) {
+        sendJson(response, 404, { error: 'world_not_found', message: `world ${worldId} does not exist` });
+        return;
+      }
+      const destinationLocationId = url.searchParams.get('destination_location_id');
+      if (typeof destinationLocationId !== 'string' || destinationLocationId.trim() === '') {
+        sendJson(response, 400, { error: 'invalid_route_request', message: 'destination_location_id is required' });
+        return;
+      }
+      const characterId = url.searchParams.get('character_id') ?? world.protagonist?.character_id;
+      const route = getWorldRoute(world, { destinationLocationId, characterId });
+      if (!route) {
+        sendJson(response, 404, { error: 'route_location_not_found', message: 'origin or destination is not present in this world' });
+        return;
+      }
+      sendJson(response, 200, {
+        schema: 'deskbot.world-route-response.v0.1',
+        world_revision: world.world_revision,
+        route,
+        map: getWorldMap(world, { characterId }),
+      });
+      return;
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/world/travel') {
       readJson(request, 64 * 1024)
         .then((body) => {
@@ -1047,6 +1250,19 @@ export function createDeskBotServer({
           const eventId = typeof body.event_id === 'string' && body.event_id.trim() !== ''
             ? body.event_id.trim()
             : `travel-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+          if (body.expected_world_revision !== undefined) {
+            if (!Number.isInteger(body.expected_world_revision) || body.expected_world_revision < 0) {
+              throw new InputError(400, 'invalid_travel_request', 'expected_world_revision must be a non-negative integer');
+            }
+            const latestWorld = persistentWorld.get();
+            if (latestWorld.world_revision !== body.expected_world_revision) {
+              throw new PersistentWorldError(409, 'world_revision_changed', 'world changed after route planning; re-plan before travel');
+            }
+            if (typeof body.expected_from_location_id === 'string'
+              && latestWorld.protagonist?.location_id !== body.expected_from_location_id) {
+              throw new PersistentWorldError(409, 'world_location_changed', 'current location changed after route planning; re-plan before travel');
+            }
+          }
           const event = {
             event_id: eventId,
             type: 'world.mutation',
@@ -1364,12 +1580,27 @@ export function createDeskBotServer({
     });
   server.websocketBridge = deviceBridge;
   server.sharedLife = sharedLife;
+  server.sharedLifeReports = sharedLifeReports;
   server.worldLife = worldLife;
   server.once('listening', () => {
+    try {
+      persistentWorld.syncWallClock?.();
+    } catch (error) {
+      console.error(`[world-clock] startup catch-up failed: ${error.message}`);
+    }
     sharedLife.tick();
     npcGoals.tick();
     worldLife.tick();
-    const timer = setInterval(() => { sharedLife.tick(); npcGoals.tick(); worldLife.tick(); }, 60_000);
+    const timer = setInterval(() => {
+      try {
+        persistentWorld.syncWallClock?.();
+      } catch (error) {
+        console.error(`[world-clock] scheduled catch-up failed: ${error.message}`);
+      }
+      sharedLife.tick();
+      npcGoals.tick();
+      worldLife.tick();
+    }, 60_000);
     timer.unref();
     server.once('close', () => clearInterval(timer));
   });

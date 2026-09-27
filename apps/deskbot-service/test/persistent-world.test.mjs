@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   createPersistentWorld,
   getWorldMap,
+  getWorldRoute,
   PersistentWorldError,
 } from '../src/persistent-world.mjs';
 
@@ -28,6 +29,10 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
 
   assert.equal(initial.world_id, 'deskbot-small-world');
   assert.equal(initial.world_revision, 0);
+  assert.equal(initial.settlement.settlement_id, 'morrowmere');
+  assert.equal(initial.settlement.display_name, '雾灯镇');
+  assert.equal(initial.settlement.english_name, 'Morrowmere');
+  assert.equal(initial.settlement.setting_id, 'shaping-field-v2.1');
   assert.equal(initial.protagonist.character_id, 'shaping-001');
   assert.equal(initial.protagonist.display_name, '喵呜');
   assert.equal(initial.protagonist.display_name_status, 'active_role_stage');
@@ -111,10 +116,18 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
 test('world map exposes canonical routes and travel advances time through one mutation', () => {
   const persistentWorld = createPersistentWorld({ now: () => fixedTime });
   const initialMap = getWorldMap(persistentWorld.get());
+  assert.equal(initialMap.world_setting.display_name, '聚形域');
+  assert.equal(initialMap.settlement.settlement_id, 'morrowmere');
+  assert.equal(initialMap.settlement.display_name, '雾灯镇');
   const desk = initialMap.locations.find((location) => location.current);
   const road = initialMap.locations.find((location) => location.location_id === 'tidal-old-road');
   assert.equal(desk.location_id, 'shaping-field-desk');
   assert.equal(road.reachable, true);
+  assert.equal(road.settlement_id, 'morrowmere');
+  assert.equal(road.region_id, 'morrowmere-east-road');
+  assert.equal(road.location_kind, 'route');
+  assert.equal(road.world_role, 'public_route');
+  assert.deepEqual(road.lore_keys, ['雾灯镇', '潮痕旧路', '巡路员']);
   assert.equal(road.scene_preview.toy_zone, '会改道的布带跑道');
   assert.equal(road.scene_preview.prop_icon, 'signpost');
   assert.equal(road.scene_preview.material, '湿亮软胶路面、布带护栏和会变色的小路标');
@@ -146,6 +159,120 @@ test('world map exposes canonical routes and travel advances time through one mu
     () => persistentWorld.ingest(event({ event_id: 'travel-same-place', payload: { action: 'move_protagonist', location_id: 'tidal-old-road' } })),
     (error) => error instanceof PersistentWorldError && error.code === 'already_at_location',
   );
+});
+
+test('world route chooses minimum travel time even when it uses more hops', () => {
+  const world = {
+    world_id: 'route-cost-test',
+    world_revision: 0,
+    protagonist: { location_id: 'origin' },
+    locations: [
+      { location_id: 'origin', name: 'Origin', neighbors: ['quick-a', 'slow'], travel_cost: 0 },
+      { location_id: 'slow', name: 'Slow', neighbors: ['origin', 'destination'], travel_cost: 100 },
+      { location_id: 'quick-a', name: 'Quick A', neighbors: ['origin', 'quick-b'], travel_cost: 1 },
+      { location_id: 'quick-b', name: 'Quick B', neighbors: ['quick-a', 'destination'], travel_cost: 1 },
+      { location_id: 'destination', name: 'Destination', neighbors: ['slow', 'quick-b'], travel_cost: 1 },
+    ],
+  };
+
+  const route = getWorldRoute(world, { destinationLocationId: 'destination' });
+  assert.equal(route.found, true);
+  assert.deepEqual(route.locations.map((location) => location.location_id), ['origin', 'quick-a', 'quick-b', 'destination']);
+  assert.equal(route.total_cost_minutes, 3);
+});
+
+test('world route resolves equal-cost paths by stable location ID sequence', () => {
+  const world = {
+    world_id: 'route-tie-test',
+    world_revision: 0,
+    protagonist: { location_id: 'origin' },
+    locations: [
+      { location_id: 'origin', name: 'Origin', neighbors: ['via-z', 'via-a'], travel_cost: 1 },
+      { location_id: 'via-z', name: 'Via Z', neighbors: ['origin', 'destination'], travel_cost: 10 },
+      { location_id: 'via-a', name: 'Via A', neighbors: ['origin', 'destination'] },
+      { location_id: 'destination', name: 'Destination', neighbors: ['via-z', 'via-a'], travel_cost: 3 },
+    ],
+  };
+
+  const first = getWorldRoute(world, { destinationLocationId: 'destination' });
+  const second = getWorldRoute(world, { destinationLocationId: 'destination' });
+  assert.equal(first.total_cost_minutes, 13);
+  assert.deepEqual(first.locations.map((location) => location.location_id), ['origin', 'via-a', 'destination']);
+  assert.deepEqual(second.locations, first.locations);
+});
+
+test('known Morrowmere routes expose render-only presentation points and reverse cleanly', () => {
+  const persistentWorld = createPersistentWorld({ now: () => fixedTime });
+  const forward = getWorldRoute(persistentWorld.get(), { destinationLocationId: 'echo-waterside' });
+  assert.deepEqual(forward.steps[0].presentation_points, [
+    { x: 50, y: 90 },
+    { x: 50, y: 70 },
+  ]);
+  assert.equal(forward.steps[0].presentation_space, 'jev-town-map-v1');
+  assert.deepEqual(forward.steps.at(-1).presentation_points, [
+    { x: 30, y: 50 },
+    { x: 50, y: 50 },
+    { x: 50, y: 10 },
+  ]);
+
+  persistentWorld.ingest(event({
+    event_id: 'route-presentation-move-1',
+    payload: { action: 'move_protagonist', location_id: 'tidal-old-road' },
+  }));
+  persistentWorld.ingest(event({
+    event_id: 'route-presentation-move-2',
+    payload: { action: 'move_protagonist', location_id: 'whisper-market' },
+  }));
+  const moved = persistentWorld.ingest(event({
+    event_id: 'route-presentation-move-3',
+    payload: { action: 'move_protagonist', location_id: 'echo-waterside' },
+  }));
+  assert.equal(moved.applied, true);
+  const reverse = getWorldRoute(moved.world, { destinationLocationId: 'shaping-field-desk' });
+  assert.deepEqual(reverse.steps[0].presentation_points, [
+    { x: 50, y: 10 },
+    { x: 50, y: 50 },
+    { x: 30, y: 50 },
+  ]);
+  assert.deepEqual(reverse.steps.at(-1).presentation_points, [
+    { x: 50, y: 70 },
+    { x: 50, y: 90 },
+  ]);
+});
+
+test('synthetic locations retain canonical routing without a presentation contract', () => {
+  const world = {
+    world_id: 'route-presentation-unknown-test',
+    world_revision: 0,
+    protagonist: { location_id: 'origin' },
+    locations: [
+      { location_id: 'origin', name: 'Origin', neighbors: ['destination'], travel_cost: 1 },
+      { location_id: 'destination', name: 'Destination', neighbors: ['origin'], travel_cost: 1 },
+    ],
+  };
+  const route = getWorldRoute(world, { destinationLocationId: 'destination' });
+  assert.equal(route.found, true);
+  assert.equal('presentation_points' in route.steps[0], false);
+  assert.equal('presentation_space' in route.steps[0], false);
+});
+
+test('world route reports a destination with no connecting path as unreachable', () => {
+  const world = {
+    world_id: 'route-disconnected-test',
+    world_revision: 0,
+    protagonist: { location_id: 'origin' },
+    locations: [
+      { location_id: 'origin', name: 'Origin', neighbors: ['nearby'], travel_cost: 5 },
+      { location_id: 'nearby', name: 'Nearby', neighbors: ['origin'], travel_cost: 6 },
+      { location_id: 'island', name: 'Island', neighbors: [], travel_cost: 7 },
+    ],
+  };
+
+  const route = getWorldRoute(world, { destinationLocationId: 'island' });
+  assert.equal(route.found, false);
+  assert.deepEqual(route.locations, []);
+  assert.deepEqual(route.steps, []);
+  assert.equal(route.total_cost_minutes, 0);
 });
 
 test('active world events can block travel without changing location or time', () => {

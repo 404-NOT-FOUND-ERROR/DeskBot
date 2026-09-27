@@ -6,6 +6,7 @@ import {
   DEFAULT_CHARACTER_ID,
   DEFAULT_LOCATION_ID,
   DEFAULT_LOCATION_NAME,
+  DEFAULT_SETTLEMENT,
   DEFAULT_WORLD_LOCATIONS,
   LEGACY_CHARACTER_IDS,
   LEGACY_LOCATION_IDS,
@@ -26,7 +27,48 @@ const MAX_PENDING_ITEMS = 20;
 const MAX_CONTEXT_ITEMS = 20;
 const PREFERENCE_STABLE_OBSERVATIONS = 3;
 const MINUTES_PER_DAY = 24 * 60;
+const WALL_CLOCK_NAMESPACE = 'canonical-world.wall-clock';
+const WALL_CLOCK_SCHEMA = 'deskbot.world-wall-clock.v0.1';
+const WALL_CLOCK_DEFAULT_CATCH_UP_MINUTES = 120;
 const WORLD_RULE_VERSION = 'canonical-world-rules-v0.4';
+
+// Presentation geometry is deliberately separate from canonical world facts.
+// The service owns the legal hop and its endpoints; this table only keeps the
+// Jev Town renderer on the same street polyline as the authored Morrowmere map.
+const PRESENTATION_SPACE = 'jev-town-map-v1';
+const PRESENTATION_ROUTES = Object.freeze({
+  'shaping-field-desk->tidal-old-road': Object.freeze([
+    Object.freeze({ x: 50, y: 90 }),
+    Object.freeze({ x: 50, y: 70 }),
+  ]),
+  'tidal-old-road->whisper-market': Object.freeze([
+    Object.freeze({ x: 50, y: 70 }),
+    Object.freeze({ x: 50, y: 50 }),
+    Object.freeze({ x: 30, y: 50 }),
+  ]),
+  'tidal-old-road->backlit-grove': Object.freeze([
+    Object.freeze({ x: 50, y: 70 }),
+    Object.freeze({ x: 50, y: 50 }),
+    Object.freeze({ x: 90, y: 50 }),
+  ]),
+  'whisper-market->echo-waterside': Object.freeze([
+    Object.freeze({ x: 30, y: 50 }),
+    Object.freeze({ x: 50, y: 50 }),
+    Object.freeze({ x: 50, y: 10 }),
+  ]),
+  'backlit-grove->echo-waterside': Object.freeze([
+    Object.freeze({ x: 90, y: 50 }),
+    Object.freeze({ x: 50, y: 50 }),
+    Object.freeze({ x: 50, y: 10 }),
+  ]),
+});
+
+function presentationRouteFor(fromLocationId, toLocationId) {
+  const direct = PRESENTATION_ROUTES[`${fromLocationId}->${toLocationId}`];
+  if (direct) return clone(direct);
+  const reverse = PRESENTATION_ROUTES[`${toLocationId}->${fromLocationId}`];
+  return reverse ? clone(reverse).reverse() : null;
+}
 
 const MULTISOURCE_LAYERS = Object.freeze([
   {
@@ -268,6 +310,7 @@ function createDefaultWorld(now) {
     world_id: DEFAULT_WORLD_ID,
     name: WORLD_SETTING.display_name,
     setting: createWorldSettingMetadata(),
+    settlement: clone(DEFAULT_SETTLEMENT),
     setting_migration: null,
     world_revision: 0,
     created_at: timestamp,
@@ -377,6 +420,13 @@ function migrateWorldToCurrentSetting(world, now) {
   }
   if (next.name !== WORLD_SETTING.display_name) {
     next.name = WORLD_SETTING.display_name;
+    changed = true;
+  }
+  const mergedSettlement = next.settlement && typeof next.settlement === 'object' && !Array.isArray(next.settlement)
+    ? { ...clone(DEFAULT_SETTLEMENT), ...next.settlement, setting_id: DEFAULT_SETTLEMENT.setting_id }
+    : clone(DEFAULT_SETTLEMENT);
+  if (!valuesEqual(next.settlement, mergedSettlement)) {
+    next.settlement = mergedSettlement;
     changed = true;
   }
 
@@ -1256,6 +1306,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   const countedTurns = new Map(
     (persistence?.list('canonical-world.turns') ?? []).map((turn) => [turn.turn_key, turn]),
   );
+  let wallClockMarker = persistence?.get?.(WALL_CLOCK_NAMESPACE, DEFAULT_WORLD_ID) ?? null;
   let nextSequence = storedMutations.reduce(
     (highest, mutation) => Math.max(highest, mutation.sequence ?? 0),
     0,
@@ -1266,11 +1317,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     return world ? clone(world) : null;
   }
 
-  function listMutations({ worldId = DEFAULT_WORLD_ID, afterSequence = 0, limit = 50 } = {}) {
+  function listMutations({ worldId = DEFAULT_WORLD_ID, afterSequence = 0, limit = 50, eventId = null } = {}) {
     const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     const parsedAfter = Math.max(Number.parseInt(afterSequence, 10) || 0, 0);
     return storedMutations
-      .filter((mutation) => mutation.world_id === worldId && mutation.sequence > parsedAfter)
+      .filter((mutation) => mutation.world_id === worldId
+        && mutation.sequence > parsedAfter
+        && (eventId === null || mutation.event_id === eventId))
       .slice(0, boundedLimit)
       .map(clone);
   }
@@ -1289,6 +1342,147 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     };
     if (persistence?.transaction) persistence.transaction(operation);
     else operation();
+  }
+
+  function persistWallClockMarker(marker) {
+    const operation = () => persistence.put(WALL_CLOCK_NAMESPACE, DEFAULT_WORLD_ID, marker);
+    if (persistence?.transaction) persistence.transaction(operation);
+    else operation();
+    wallClockMarker = clone(marker);
+  }
+
+  function syncWallClock({ maxCatchUpMinutes = WALL_CLOCK_DEFAULT_CATCH_UP_MINUTES } = {}) {
+    if (!persistence?.get || !persistence?.put) {
+      return { enabled: false, reason: 'persistence_required' };
+    }
+    if (!Number.isInteger(maxCatchUpMinutes) || maxCatchUpMinutes < 1 || maxCatchUpMinutes > 7 * MINUTES_PER_DAY) {
+      throw new TypeError(`maxCatchUpMinutes must be an integer between 1 and ${7 * MINUTES_PER_DAY}`);
+    }
+
+    const currentTime = now();
+    const currentMs = currentTime instanceof Date ? currentTime.getTime() : Date.parse(currentTime);
+    if (!Number.isFinite(currentMs)) throw new TypeError('now() must return a valid date');
+    const currentIso = new Date(currentMs).toISOString();
+    let marker = persistence.get(WALL_CLOCK_NAMESPACE, DEFAULT_WORLD_ID) ?? wallClockMarker;
+
+    if (!marker) {
+      marker = {
+        schema: WALL_CLOCK_SCHEMA,
+        world_id: DEFAULT_WORLD_ID,
+        last_wall_at: currentIso,
+        last_sync_at: currentIso,
+        pending: null,
+      };
+      persistWallClockMarker(marker);
+      return {
+        enabled: true,
+        anchored: true,
+        advanced_minutes: 0,
+        pending_minutes: 0,
+        remainder_ms: 0,
+        marker: clone(marker),
+      };
+    }
+
+    const lastWallMs = Date.parse(marker.last_wall_at);
+    if (marker.schema !== WALL_CLOCK_SCHEMA
+      || marker.world_id !== DEFAULT_WORLD_ID
+      || !Number.isFinite(lastWallMs)) {
+      throw new PersistentWorldError(500, 'invalid_world_clock_marker', 'persisted world clock marker is invalid');
+    }
+
+    let pending = marker.pending ?? null;
+    const recoveredPendingStep = Boolean(pending);
+    if (!pending) {
+      const elapsedMs = currentMs - lastWallMs;
+      if (elapsedMs < 0) {
+        return {
+          enabled: true,
+          anchored: false,
+          clock_moved_backwards: true,
+          advanced_minutes: 0,
+          pending_minutes: 0,
+          remainder_ms: 0,
+          marker: clone(marker),
+        };
+      }
+      const wholeMinutes = Math.floor(elapsedMs / 60_000);
+      const minutes = Math.min(wholeMinutes, maxCatchUpMinutes);
+      if (minutes < 1) {
+        return {
+          enabled: true,
+          anchored: false,
+          advanced_minutes: 0,
+          pending_minutes: 0,
+          remainder_ms: elapsedMs,
+          marker: clone(marker),
+        };
+      }
+      const toMs = lastWallMs + minutes * 60_000;
+      const from = new Date(lastWallMs).toISOString();
+      const to = new Date(toMs).toISOString();
+      pending = {
+        event_id: `world-clock:${DEFAULT_WORLD_ID}:${lastWallMs}:${toMs}`,
+        from,
+        to,
+        minutes,
+      };
+      marker = { ...marker, pending };
+      persistWallClockMarker(marker);
+    }
+
+    if (!pending || typeof pending.event_id !== 'string'
+      || !Number.isInteger(pending.minutes) || pending.minutes < 1
+      || !Number.isFinite(Date.parse(pending.from)) || !Number.isFinite(Date.parse(pending.to))
+      || pending.from !== marker.last_wall_at
+      || Date.parse(pending.to) - Date.parse(pending.from) !== pending.minutes * 60_000
+      || pending.event_id !== `world-clock:${DEFAULT_WORLD_ID}:${Date.parse(pending.from)}:${Date.parse(pending.to)}`) {
+      throw new PersistentWorldError(500, 'invalid_world_clock_marker', 'persisted pending world clock step is invalid');
+    }
+
+    const result = ingest({
+      event_id: pending.event_id,
+      type: 'world.mutation',
+      source: 'world-wall-clock',
+      source_kind: 'world_engine',
+      layer: 'calendar',
+      character_id: DEFAULT_CHARACTER_ID,
+      correlation_id: pending.event_id,
+      occurred_at: pending.to,
+      observed_at: pending.to,
+      payload: {
+        action: 'advance_time',
+        minutes: pending.minutes,
+        clock_start_at: pending.from,
+        clock_end_at: pending.to,
+      },
+    });
+    if (!result.applied && !result.duplicate) {
+      throw new PersistentWorldError(500, 'world_clock_step_rejected', 'world clock step was not applied');
+    }
+
+    const completed = {
+      schema: WALL_CLOCK_SCHEMA,
+      world_id: DEFAULT_WORLD_ID,
+      last_wall_at: pending.to,
+      last_sync_at: currentIso,
+      pending: null,
+    };
+    persistWallClockMarker(completed);
+    const remainingMs = Math.max(0, currentMs - Date.parse(completed.last_wall_at));
+    return {
+      enabled: true,
+      anchored: false,
+      recovered_pending_step: recoveredPendingStep,
+      event_id: pending.event_id,
+      duplicate: Boolean(result.duplicate),
+      advanced_minutes: result.duplicate ? 0 : pending.minutes,
+      segment_minutes: pending.minutes,
+      pending_minutes: Math.floor(remainingMs / 60_000),
+      remainder_ms: remainingMs % 60_000,
+      logical_time: clone(result.world.logical_time),
+      marker: clone(completed),
+    };
   }
 
   function ingest(event) {
@@ -1425,6 +1619,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     get,
     ingest,
     listMutations,
+    syncWallClock,
   };
 }
 
@@ -1441,6 +1636,11 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       .map((npc) => ({ npc_id: npc.npc_id, display_name: npc.display_name, role: npc.role, status: npc.status }));
     return {
       location_id: location.location_id,
+      settlement_id: location.settlement_id || DEFAULT_SETTLEMENT.settlement_id,
+      region_id: location.region_id || null,
+      location_kind: location.location_kind || null,
+      world_role: location.world_role || null,
+      lore_keys: clone(location.lore_keys ?? []),
       name: location.name,
       description: location.description,
       x: Number.isFinite(location.x) ? location.x : null,
@@ -1498,10 +1698,152 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       location_id: currentLocationId,
       travel_state: clone(protagonist.travel_state || { status: 'idle' }),
     },
+    world_setting: clone(world.setting || WORLD_SETTING),
+    settlement: clone(world.settlement || DEFAULT_SETTLEMENT),
     locations,
     paths: routes,
     npcs: clone(Array.isArray(world.npcs) ? world.npcs : []),
     active_event: activeEvent ? clone(activeEvent) : null,
+  };
+}
+
+// Read-only route projection for map clients.  The world still authorizes only
+// one adjacent move at a time; this helper merely tells a client which legal
+// hops would be needed to reach a farther location.  It deliberately rebuilds
+// from the canonical snapshot so a caller must re-plan after every mutation.
+function compareLocationPaths(first, second) {
+  const commonLength = Math.min(first.length, second.length);
+  for (let index = 0; index < commonLength; index += 1) {
+    if (first[index] === second[index]) continue;
+    return first[index] < second[index] ? -1 : 1;
+  }
+  return first.length - second.length;
+}
+
+export function getWorldRoute(world, { destinationLocationId, characterId = DEFAULT_CHARACTER_ID } = {}) {
+  if (!world || typeof world !== 'object') return null;
+  const protagonist = world.protagonist || {};
+  const currentLocationId = canonicalLocationId(protagonist.location_id);
+  const destinationId = canonicalLocationId(destinationLocationId);
+  const locations = Array.isArray(world.locations) ? world.locations : [];
+  const byId = new Map(locations.map((location) => [location.location_id, location]));
+  const origin = byId.get(currentLocationId);
+  const destination = byId.get(destinationId);
+  if (!origin || !destination) return null;
+
+  const activeEvent = world.active_event || null;
+  const blocked = activeEvent?.blocks_travel === true;
+  const blockedReason = blocked ? `事件阻断：${activeEvent.title || activeEvent.event_id}` : null;
+  if (currentLocationId === destinationId) {
+    return {
+      schema: 'deskbot.world-route.v0.1',
+      world_id: world.world_id,
+      world_revision: world.world_revision,
+      character_id: characterId,
+      current_location_id: currentLocationId,
+      destination_location_id: destinationId,
+      found: true,
+      blocked,
+      blocked_reason: blockedReason,
+      locations: [{ location_id: currentLocationId, name: origin.name }],
+      steps: [],
+      total_cost_minutes: 0,
+    };
+  }
+
+  const travelCostTo = (location) => Number.isInteger(location?.travel_cost) && location.travel_cost > 0
+    ? location.travel_cost
+    : 10;
+  const costs = new Map([[currentLocationId, 0]]);
+  const paths = new Map([[currentLocationId, [currentLocationId]]]);
+  const unsettled = new Set([currentLocationId]);
+  const settled = new Set();
+
+  // The map is deliberately small, so selecting the next lowest-cost node by
+  // scan keeps this simple while preserving a deterministic full-path tie-break.
+  while (unsettled.size) {
+    let locationId = null;
+    for (const candidateId of unsettled) {
+      if (locationId === null
+        || costs.get(candidateId) < costs.get(locationId)
+        || (costs.get(candidateId) === costs.get(locationId)
+          && compareLocationPaths(paths.get(candidateId), paths.get(locationId)) < 0)) {
+        locationId = candidateId;
+      }
+    }
+    unsettled.delete(locationId);
+    if (locationId === destinationId) break;
+    settled.add(locationId);
+
+    const location = byId.get(locationId);
+    const neighbors = Array.isArray(location?.neighbors)
+      ? location.neighbors.map(canonicalLocationId).sort((first, second) => first < second ? -1 : first > second ? 1 : 0)
+      : [];
+    for (const neighborId of neighbors) {
+      const neighbor = byId.get(neighborId);
+      if (!neighbor || settled.has(neighborId)) continue;
+      const nextCost = costs.get(locationId) + travelCostTo(neighbor);
+      const nextPath = [...paths.get(locationId), neighborId];
+      const bestCost = costs.get(neighborId);
+      if (bestCost === undefined
+        || nextCost < bestCost
+        || (nextCost === bestCost && compareLocationPaths(nextPath, paths.get(neighborId)) < 0)) {
+        costs.set(neighborId, nextCost);
+        paths.set(neighborId, nextPath);
+        unsettled.add(neighborId);
+      }
+    }
+  }
+  if (!paths.has(destinationId)) {
+    return {
+      schema: 'deskbot.world-route.v0.1',
+      world_id: world.world_id,
+      world_revision: world.world_revision,
+      character_id: characterId,
+      current_location_id: currentLocationId,
+      destination_location_id: destinationId,
+      found: false,
+      blocked,
+      blocked_reason: blockedReason,
+      locations: [],
+      steps: [],
+      total_cost_minutes: 0,
+    };
+  }
+
+  const path = paths.get(destinationId);
+  const pathLocations = path.map((locationId) => ({ location_id: locationId, name: byId.get(locationId)?.name ?? locationId }));
+  const steps = path.slice(1).map((toLocationId, index) => {
+    const fromLocationId = path[index];
+    const to = byId.get(toLocationId);
+    const travelCost = travelCostTo(to);
+    const presentationPoints = presentationRouteFor(fromLocationId, toLocationId);
+    return {
+      index,
+      from_location_id: fromLocationId,
+      from_name: byId.get(fromLocationId)?.name ?? fromLocationId,
+      to_location_id: toLocationId,
+      to_name: to?.name ?? toLocationId,
+      travel_cost_minutes: travelCost,
+      ...(presentationPoints ? {
+        presentation_space: PRESENTATION_SPACE,
+        presentation_points: presentationPoints,
+      } : {}),
+    };
+  });
+  return {
+    schema: 'deskbot.world-route.v0.1',
+    world_id: world.world_id,
+    world_revision: world.world_revision,
+    character_id: characterId,
+    current_location_id: currentLocationId,
+    destination_location_id: destinationId,
+    found: true,
+    blocked,
+    blocked_reason: blockedReason,
+    locations: pathLocations,
+    steps,
+    total_cost_minutes: steps.reduce((total, step) => total + step.travel_cost_minutes, 0),
   };
 }
 
@@ -1516,7 +1858,8 @@ export function getWorldSchema() {
       world_revision: { type: 'integer', minimum: 0, writer: 'accepted world mutation' },
       logical_time: { type: 'object', fields: { day: { type: 'integer', minimum: 1 }, minute_of_day: { type: 'integer', minimum: 0, maximum: MINUTES_PER_DAY - 1 }, tick: { type: 'integer', minimum: 0 } } },
       protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, travel_state: { type: 'object' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
-      locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
+      settlement: { type: 'object', schema: DEFAULT_SETTLEMENT.schema, immutable: true },
+      locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'settlement_id', 'region_id', 'location_kind', 'world_role', 'lore_keys', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
       npcs: { type: 'array', item: 'npc', maximum: MAX_NPCS },
       life: { type: 'object', schema: 'deskbot.world-life-state.v0.3', fields: ['current_scene', 'recent_scenes', 'recent_experiences'] },
       active_event: { type: ['object', 'null'] },

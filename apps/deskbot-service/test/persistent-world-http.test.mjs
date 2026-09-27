@@ -64,6 +64,30 @@ test('world state and append-only mutation ledger are readable over HTTP', async
   assert.deepEqual(ledger.mutations.map((record) => record.action), ['advance_time']);
 });
 
+test('content catalog and story preview expose the Morrowmere first-day replay without mutating world state', async () => {
+  const before = await (await fetch(`${baseUrl}/api/world/state`)).json();
+  const contentResponse = await fetch(`${baseUrl}/api/life/content-packages`);
+  assert.equal(contentResponse.status, 200);
+  const content = await contentResponse.json();
+  assert.equal(content.packages[0].display_name, '雾灯镇');
+  assert.equal(content.packages[0].id, 'morrowmere');
+
+  const previewResponse = await post('/api/life/story-packages', {
+    operation: 'preview',
+    package_id: 'morrowmere-first-day-v1',
+  });
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json();
+  assert.equal(preview.installable, true);
+  assert.deepEqual(preview.steps.map(step => step.at), [
+    '2026-09-01T00:00:00.000Z',
+    '2026-09-01T03:00:00.000Z',
+    '2026-09-01T08:00:00.000Z',
+  ]);
+  const after = await (await fetch(`${baseUrl}/api/world/state`)).json();
+  assert.equal(after.world.world_revision, before.world.world_revision);
+});
+
 test('ASR stages and repeated chat correlation count once, and LLM text cannot mutate the world', async () => {
   const shared = {
     source: 'voice-sidecar',
@@ -180,8 +204,28 @@ test('world schema and event filters expose the multisource research contract', 
 test('world map and travel endpoints expose routes while chat remains location read-only', async () => {
   const initial = await (await fetch(`${baseUrl}/api/world/map`)).json();
   assert.equal(initial.schema, 'deskbot.world-map.v0.1');
+  assert.equal(initial.world_setting.display_name, '聚形域');
+  assert.equal(initial.settlement.settlement_id, 'morrowmere');
+  assert.equal(initial.settlement.display_name, '雾灯镇');
+  assert.equal(initial.settlement.english_name, 'Morrowmere');
   assert.equal(initial.protagonist.location_id, 'shaping-field-desk');
-  assert.ok(initial.locations.some((location) => location.location_id === 'tidal-old-road' && location.reachable));
+  assert.ok(initial.locations.some((location) => location.location_id === 'tidal-old-road'
+    && location.reachable
+    && location.settlement_id === 'morrowmere'
+    && location.location_kind === 'route'
+    && location.scene_preview.prop_icon === 'signpost'));
+
+  const routeResponse = await fetch(`${baseUrl}/api/world/route?destination_location_id=echo-waterside&character_id=shaping-001`);
+  assert.equal(routeResponse.status, 200);
+  const routeBody = await routeResponse.json();
+  assert.equal(routeBody.schema, 'deskbot.world-route-response.v0.1');
+  assert.equal(routeBody.route.schema, 'deskbot.world-route.v0.1');
+  assert.equal(routeBody.route.current_location_id, 'shaping-field-desk');
+  assert.equal(routeBody.route.destination_location_id, 'echo-waterside');
+  assert.equal(routeBody.route.found, true);
+  assert.equal(routeBody.route.steps[0].to_location_id, 'tidal-old-road');
+  assert.ok(routeBody.route.steps.length > 1);
+  assert.equal(routeBody.route.world_revision, routeBody.map.world_revision);
 
   const travel = await post('/api/world/travel', {
     event_id: 'http-travel-001',

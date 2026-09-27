@@ -1,4 +1,5 @@
 import { InputError } from './input-store.mjs';
+import { loadMorrowmereContent } from './content-packages.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -18,13 +19,50 @@ const PACKAGES = Object.freeze({
   }),
 });
 
+function compileMorrowmerePackages() {
+  const content = loadMorrowmereContent();
+  const npcById = new Map(content.npcs.map(npc => [npc.npc_id, npc]));
+  return content.stories.story_packages.reduce((packages, authored) => {
+    const npc = npcById.get(authored.npc_id);
+    packages[authored.id] = {
+      id: authored.id,
+      schema: 'deskbot.story-package.v0.1',
+      title: authored.title,
+      premise: authored.premise,
+      source: content.source,
+      settlement_id: content.settlement.settlement_id,
+      npc_location_id: authored.npc_location_id,
+      step_offsets_hours: authored.step_offsets_hours,
+      npc: {
+        npc_id: npc.npc_id,
+        display_name: npc.identity,
+        role: npc.role,
+        location_id: npc.location_id,
+        status: npc.status,
+      },
+      days: authored.days,
+    };
+    return packages;
+  }, {});
+}
+
+function packageCatalog() {
+  return { ...PACKAGES, ...compileMorrowmerePackages() };
+}
+
 function clone(value) { return structuredClone(value); }
 function atDay(start, index) { return new Date(start.getTime() + index * DAY).toISOString(); }
+function atStoryStep(pack, start, index) {
+  const hours = pack.step_offsets_hours?.[index];
+  return typeof hours === 'number'
+    ? new Date(start.getTime() + hours * 60 * 60 * 1000).toISOString()
+    : atDay(start, index);
+}
 
-export function listStoryPackages() { return Object.values(PACKAGES).map(clone); }
+export function listStoryPackages() { return Object.values(packageCatalog()).map(clone); }
 
 export function getStoryPackage(id) {
-  const pack = PACKAGES[id];
+  const pack = packageCatalog()[id];
   if (!pack) throw new InputError(404, 'story_package_not_found', 'Story package not found');
   return clone(pack);
 }
@@ -38,7 +76,7 @@ export function previewStoryPackage(id, { now = new Date(), plans = [], world = 
     installable: !existing,
     reason: existing ? (existing.cancelled_at ? '同一故事包已取消，需使用新版本 ID 重装。' : '同一故事包已经安装，不能重复注入。') : '预览不会写入世界；确认安装后才会登记步骤。',
     current_world_revision: world?.world_revision ?? null,
-    steps: pack.days.map((day, index) => ({ index, at: atDay(new Date(now), index), day: day.key, title: day.title, action: index === 0 ? 'world_event' : index === 1 ? 'npc_action' : 'world_consequence' })),
+    steps: pack.days.map((day, index) => ({ index, at: atStoryStep(pack, new Date(now), index), day: day.key, title: day.title, action: day.action ?? (index === 0 ? 'world_event' : index === 1 ? 'npc_action' : 'world_consequence') })),
   };
 }
 
@@ -46,13 +84,37 @@ export function installStoryPackage(id, { now = new Date(), plans = [], schedule
   const preview = previewStoryPackage(id, { now, plans, world });
   if (!preview.installable) throw new InputError(409, 'story_package_exists', preview.reason);
   const pack = preview.package;
+  if (pack.days.length < 3) throw new InputError(400, 'story_package_not_replayable', 'Story package needs at least three authored days for the first-day replay');
+  const authoredEvent = (day, index, fallbackStatus, fallbackOutcome) => ({
+    event_id: `${id}:${day.key}`,
+    title: day.title,
+    summary: day.summary,
+    daily_consequence: day.consequence,
+    opportunity: day.opportunity,
+    arc_id: id,
+    status: day.event?.status ?? fallbackStatus,
+    outcome: day.event?.outcome ?? fallbackOutcome,
+    source: 'authored-story-package',
+    authored_day_index: index,
+  });
+  const action = pack.days[1].npc_action ?? { action_name: 'open_route', status: 'attentive' };
+  const startedAt = new Date(now);
+  const arrivalLocationId = pack.npc_location_id ?? pack.npc.location_id;
+  const arrivalNpc = { ...pack.npc, location_id: arrivalLocationId };
   const steps = [
-    { at: atDay(new Date(now), 0), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:arrival`, title: pack.days[0].title, summary: pack.days[0].summary, daily_consequence: pack.days[0].consequence, opportunity: pack.days[0].opportunity, arc_id: id, status: 'active', outcome: 'route_arrived', source: 'authored-story-package' } } },
-    { at: atDay(new Date(now), 0), payload: { action: 'upsert_npc', npc: pack.npc } },
-    { at: atDay(new Date(now), 1), payload: { action: 'npc_action', npc_id: pack.npc.npc_id, action_name: 'open_route', status: 'attentive', location_id: pack.npc.location_id, summary: pack.days[1].summary, arc_id: id } },
-    { at: atDay(new Date(now), 1), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:opening`, title: pack.days[1].title, summary: pack.days[1].summary, daily_consequence: pack.days[1].consequence, opportunity: pack.days[1].opportunity, arc_id: id, status: 'active', outcome: 'route_opened', source: 'authored-story-package' } } },
-    { at: atDay(new Date(now), 2), payload: { action: 'apply_world_line_event', event: { event_id: `${id}:afterglow`, title: pack.days[2].title, summary: pack.days[2].summary, daily_consequence: pack.days[2].consequence, opportunity: pack.days[2].opportunity, arc_id: id, status: 'resolved', outcome: 'route_recorded', source: 'authored-story-package' } } },
+    { at: atStoryStep(pack, startedAt, 0), payload: { action: 'apply_world_line_event', event: authoredEvent(pack.days[0], 0, 'active', 'story_started') } },
+    { at: atStoryStep(pack, startedAt, 0), payload: { action: 'upsert_npc', npc: arrivalNpc } },
+    { at: atStoryStep(pack, startedAt, 1), payload: { action: 'npc_action', npc_id: pack.npc.npc_id, action_name: action.action_name, status: action.status ?? 'attentive', location_id: arrivalLocationId, summary: pack.days[1].summary, arc_id: id } },
+    { at: atStoryStep(pack, startedAt, 1), payload: { action: 'apply_world_line_event', event: authoredEvent(pack.days[1], 1, 'active', 'story_progressed') } },
+    { at: atStoryStep(pack, startedAt, 2), payload: { action: 'apply_world_line_event', event: authoredEvent(pack.days[2], 2, 'resolved', 'story_recorded') } },
   ];
   const plan = schedule({ id, steps });
-  return { schema: 'deskbot.story-package-installed.v0.1', package_id: id, plan, causal_chain: steps.map((step, index) => ({ step_index: index, evidence_id: `life:${id}:${index}`, source_layer: 'world_line', depends_on: index ? [`life:${id}:${index - 1}`] : [] })) };
+  return {
+    schema: 'deskbot.story-package-installed.v0.1',
+    package_id: id,
+    source: pack.source ?? 'service-authored-compatibility',
+    settlement_id: pack.settlement_id ?? null,
+    plan,
+    causal_chain: steps.map((step, index) => ({ step_index: index, evidence_id: `life:${id}:${index}`, source_layer: 'world_line', depends_on: index ? [`life:${id}:${index - 1}`] : [] })),
+  };
 }

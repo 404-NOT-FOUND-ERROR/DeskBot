@@ -6,6 +6,7 @@ import type { Point } from "@shared/positions.ts";
 import type { Citizen } from "@shared/citizens.ts";
 import type { LabelSpec } from "../three/sceneSpec.ts";
 import type { TownScene3DHandle } from "../three/TownScene3D.tsx";
+import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
 import { isWebglAvailable } from "../three/webgl.ts";
 import { CitizenSprite } from "./CitizenSprite.tsx";
 
@@ -18,6 +19,9 @@ export interface TownMapProps {
   confidences: Map<number, number | null>;
   focusedAction: Action | null;
   onFocusAction: (action: Action | null) => void;
+  onPlaceClick?: (locationId: string) => void;
+  travelVisual?: DeskBotTravelVisual | null;
+  routePreview?: DeskBotRoutePreview | null;
 }
 
 // Three.js is most of the bundle; load it separately so the rest of the page paints immediately.
@@ -35,7 +39,7 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, labels, positions, durations, actions, confidences, focusedAction, onFocusAction }: TownMapProps) {
+export function TownMap({ citizens = CITIZENS, labels, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
@@ -48,6 +52,10 @@ export function TownMap({ citizens = CITIZENS, labels, positions, durations, act
   }, []);
   const getHotspot = useCallback((citizenId: number) => hotspotsRef.current.get(citizenId) ?? null, []);
   const handleContextLost = useCallback(() => setSupportsWebgl(false), []);
+  const handlePlaceClick = useCallback((locationId: string) => {
+    sceneRef.current?.focusPlace(locationId);
+    onPlaceClick?.(locationId);
+  }, [onPlaceClick]);
 
   const counts = new Map<Action, number>(ACTIONS.map((a) => [a, 0]));
   for (const action of actions.values()) if (action) counts.set(action, (counts.get(action) ?? 0) + 1);
@@ -68,6 +76,9 @@ export function TownMap({ citizens = CITIZENS, labels, positions, durations, act
               focusedAction={focusedAction}
               showDecisions={showDecisions}
               getHotspot={getHotspot}
+              onPlaceClick={handlePlaceClick}
+              travelVisual={travelVisual}
+              routePreview={routePreview}
               onZoomChange={setZoom}
               onContextLost={handleContextLost}
             />

@@ -1,0 +1,38 @@
+{
+  "schema": "deskbot.npc-content.v0.1",
+  "settlement_id": "morrowmere",
+  "npc_model": "neva-mind-structured-agent-v0.1",
+  "fields": ["npc_id", "identity", "role", "desire", "location_id", "schedule", "routine", "conditions", "legal_actions", "relationships", "status"],
+  "npcs": [
+    {
+      "npc_id": "pathfinder-001",
+      "identity": "潮痕巡路员",
+      "role": "route_keeper",
+      "desire": "找到还没有被任何人走熟的安全岔路，并把值得回来的路线留给愿意一起试的人。",
+      "location_id": "tidal-old-road",
+      "conditions": ["潮线可观察", "目的地与当前位置相邻"],
+      "legal_actions": ["observe_current_location", "recalibrate_markers", "compare_puddle_map", "move_to_adjacent_location"],
+      "status": "正在检查退潮后的路标"
+    },
+    {
+      "npc_id": "shade-collector-001",
+      "identity": "影栖",
+      "role": "afterlight_collector",
+      "desire": "收集不同日子的光，让每段影子保有靠近或离开的选择。",
+      "location_id": "backlit-grove",
+      "conditions": ["旧日光色出现", "不强行替影子决定形状"],
+      "legal_actions": ["observe_current_location", "collect_late_shadow", "sort_afterlight", "move_to_adjacent_location"],
+      "status": "正把一段旧影子卷进叶筒"
+    },
+    {
+      "npc_id": "echo-postcarrier-001",
+      "identity": "波果",
+      "role": "echo_postcarrier",
+      "desire": "把没有收件人的话放到愿意听的地方，但不替它们编造答案。",
+      "location_id": "echo-waterside",
+      "conditions": ["声音尚未决定收件人", "先听完停顿"],
+      "legal_actions": ["observe_current_location", "hold_old_reply", "sort_drifting_voices", "move_to_adjacent_location"],
+      "status": "正在给没寄出的声音排队"
+    }
+  ]
+}

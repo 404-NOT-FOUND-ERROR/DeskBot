@@ -9,6 +9,23 @@ function text(value, field) {
   return value.trim();
 }
 
+// Relationship notes are not a secret store. Refuse credentials and other
+// authentication material even when the caller explicitly confirms a note.
+function rejectSensitiveText(value) {
+  const normalized = String(value).toLowerCase();
+  if (/(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|bearer\s+[a-z0-9._-]+|password|passwd|secret|private[ _-]?key|\bsk-[a-z0-9]{12,}|密码|口令|私钥|验证码|身份证号|银行卡号)/iu.test(normalized)) {
+    throw new InputError(400, 'sensitive_memory_rejected', 'Relationship memory cannot store credentials, authentication material, or identity numbers');
+  }
+}
+
+function optionalKey(value, field) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || value.length > 160 || !value.trim()) {
+    throw new InputError(400, 'invalid_shared_life', `${field} must be short text`);
+  }
+  return value.trim();
+}
+
 function hanNgrams(value, min = 2, max = 4) {
   const runs = String(value ?? '').match(/[\p{Script=Han}]+/gu) ?? [];
   const result = new Set();
@@ -36,9 +53,14 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
   function remember(body) {
     if (body.confirmed !== true) throw new InputError(400, 'confirmation_required', 'Memory needs explicit confirmation');
     const id = text(body.id, 'id');
+    const memoryText = text(body.text, 'text');
+    rejectSensitiveText(memoryText);
+    const factKey = optionalKey(body.fact_key ?? body.factKey, 'fact_key');
+    const supersedesId = optionalKey(body.supersedes_id ?? body.supersedesId, 'supersedes_id');
     const record = {
       id, character_id: canonicalCharacterId(body.character_id ?? DEFAULT_CHARACTER_ID),
-      text: text(body.text, 'text'), source: 'user_confirmed',
+      text: memoryText, source: 'user_confirmed', fact_key: factKey,
+      supersedes_id: supersedesId,
       evidence_ref: text(body.evidence_ref, 'evidence_ref'),
       updated_at: now().toISOString(), revision: (memories.get(id)?.revision ?? 0) + 1,
     };
@@ -46,15 +68,40 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
     if (previous && previous.character_id !== record.character_id) {
       throw new InputError(409, 'memory_owner_conflict', 'A memory cannot move between characters');
     }
+    if (factKey) {
+      const conflict = [...memories.values()].find((item) => item.id !== id
+        && item.character_id === record.character_id && item.fact_key === factKey && item.text !== record.text);
+      if (conflict && (supersedesId !== conflict.id || body.resolve_conflict !== true)) {
+        throw new InputError(409, 'memory_fact_conflict', `fact_key ${factKey} conflicts with memory ${conflict.id}; explicitly confirm supersedes_id and resolve_conflict`);
+      }
+    }
+    if (supersedesId) {
+      const superseded = memories.get(supersedesId);
+      if (!superseded || superseded.character_id !== record.character_id) {
+        throw new InputError(409, 'memory_supersedes_not_found', 'supersedes_id must identify an existing memory for this character');
+      }
+    }
+    const superseded = supersedesId ? memories.get(supersedesId) : null;
+    const supersededRecord = superseded && superseded.id !== record.id
+      ? { ...superseded, superseded_by: record.id, superseded_at: record.updated_at }
+      : null;
     atomic(() => {
+      if (supersededRecord) persistence?.put('life.memories', supersededRecord.id, supersededRecord);
       persistence?.put('life.memories', id, record);
-      if (previous && previous.text !== record.text) invalidateHistory(record.character_id);
+      // A correction under a new ID also invalidates old conversation turns.
+      // Otherwise the superseded note disappears from the memory read model,
+      // but its old user/assistant wording could still be recalled as recent
+      // conversation and contradict the corrected fact.
+      if (supersededRecord || (previous && previous.text !== record.text)) {
+        invalidateHistory(record.character_id);
+      }
     });
+    if (supersededRecord) memories.set(supersededRecord.id, supersededRecord);
     memories.set(id, record);
     return structuredClone(record);
   }
   function recall(characterId = DEFAULT_CHARACTER_ID, limit = 20) {
-    return structuredClone([...memories.values()].filter(x => x.character_id === canonicalCharacterId(characterId))
+    return structuredClone([...memories.values()].filter(x => x.character_id === canonicalCharacterId(characterId) && !x.superseded_by)
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id)).slice(0, limit));
   }
   function forget(id) {
@@ -71,11 +118,21 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
   }
   function retrieve(characterId, query = '') {
     // Local lexical retrieval, not semantic understanding. No external embeddings/cost.
-    const terms = new Set(String(query).toLowerCase().match(/[a-z0-9]+|[\p{Script=Han}]/gu) ?? []);
+    const normalizedQuery = String(query).trim().toLowerCase();
+    if (!normalizedQuery) return [];
+    const terms = new Set(normalizedQuery.match(/[a-z0-9]+|[\p{Script=Han}]/gu) ?? []);
+    if (!terms.size) return [];
     const scored = recall(characterId, Infinity).map(memory => ({ memory,
       score: [...terms].filter(term => memory.text.toLowerCase().includes(term)).length,
-    }));
-    return scored.sort((a, b) => b.score - a.score).slice(0, 8).map(x => x.memory);
+    })).filter(item => item.score > 0);
+    if (scored.length > 0) {
+      return scored.sort((a, b) => b.score - a.score || b.memory.updated_at.localeCompare(a.memory.updated_at)).slice(0, 8).map(x => x.memory);
+    }
+    // A direct recall request can be phrased without repeating the remembered
+    // words (for example, "你记得我的偏好吗"). Keep this fallback explicit
+    // and bounded so unrelated questions still receive no relationship data.
+    const recallCue = /(?:记得|记住|回忆|往事|以前|之前|偏好|喜欢|讨厌|我们一起|上次)/u.test(normalizedQuery);
+    return recallCue ? recall(characterId, 8) : [];
   }
   function retrieveExperiences(query = '', providedWorld = null) {
     const world = providedWorld ?? worldSnapshot?.();

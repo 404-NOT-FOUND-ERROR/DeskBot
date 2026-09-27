@@ -18,6 +18,7 @@ import {
 } from "./buildScene.ts";
 import { toCssHex } from "./palette.ts";
 import { LABEL_SPECS, type LabelKind, type LabelSpec } from "./sceneSpec.ts";
+import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
 
 export interface TownScene3DProps {
   citizens: readonly Citizen[];
@@ -29,6 +30,9 @@ export interface TownScene3DProps {
   showDecisions: boolean;
   /** Looks up the accessible HTML hotspot for a citizen, positioned over its figure every frame. */
   getHotspot: (citizenId: number) => HTMLElement | null;
+  onPlaceClick?: (locationId: string) => void;
+  travelVisual?: DeskBotTravelVisual | null;
+  routePreview?: DeskBotRoutePreview | null;
   /** Called with the zoom level (1 = the default framing) whenever it changes. */
   onZoomChange: (zoom: number) => void;
   onContextLost: () => void;
@@ -39,6 +43,7 @@ export interface TownScene3DHandle {
   fitTown: () => void;
   resetView: () => void;
   rotateBy: (radians: number) => void;
+  focusPlace: (locationId: string) => void;
 }
 
 const DEFAULT_AZIMUTH = Math.PI / 4;
@@ -79,6 +84,77 @@ function easeOutQuad(t: number): number {
   return 1 - (1 - t) * (1 - t);
 }
 
+function disposeRoutePreview(group: THREE.Group): void {
+  for (const child of [...group.children]) {
+    child.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+        object.geometry.dispose();
+        const material = object.material;
+        if (Array.isArray(material)) material.forEach((item) => item.dispose());
+        else material.dispose();
+      }
+    });
+    group.remove(child);
+  }
+}
+
+function renderRoutePreview(group: THREE.Group, preview: DeskBotRoutePreview | null | undefined): void {
+  disposeRoutePreview(group);
+  if (!preview || preview.points.length < 2) return;
+
+  const worldPoints = preview.points.map((point) => {
+    const world = mapToWorld(point.x, point.y);
+    return new THREE.Vector3(world.x, 0.35, world.z);
+  });
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(worldPoints),
+    new THREE.LineBasicMaterial({ color: 0x2f7f87, transparent: true, opacity: 0.92, depthWrite: false }),
+  );
+  line.name = "deskbot-route-line";
+  line.renderOrder = 4;
+  group.add(line);
+
+  const locationWorldPoints = preview.locationPoints.map((point) => {
+    const world = mapToWorld(point.x, point.y);
+    return new THREE.Vector3(world.x, 0.5, world.z);
+  });
+  for (let index = 1; index < preview.locationIds.length; index += 1) {
+    const isDestination = index === preview.locationIds.length - 1;
+    const markerPoint = locationWorldPoints[index] ?? worldPoints[worldPoints.length - 1]!;
+    const marker = new THREE.Mesh(
+      new THREE.CylinderGeometry(isDestination ? 1.7 : 1.15, isDestination ? 1.7 : 1.15, 0.22, 24),
+      new THREE.MeshBasicMaterial({
+        color: isDestination ? 0xd47a3f : 0xd1a443,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+      }),
+    );
+    marker.name = isDestination ? "deskbot-route-destination" : "deskbot-route-transfer";
+    marker.position.copy(markerPoint);
+    marker.position.y = 0.5;
+    marker.renderOrder = 5;
+    group.add(marker);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(isDestination ? 2.1 : 1.45, isDestination ? 2.35 : 1.7, 24),
+      new THREE.MeshBasicMaterial({
+        color: isDestination ? 0xd47a3f : 0xd1a443,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    ring.name = "deskbot-route-marker-ring";
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(markerPoint);
+    ring.position.y = 0.62;
+    ring.renderOrder = 5;
+    group.add(ring);
+  }
+}
+
 interface ViewState {
   azimuth: number;
   elevation: number;
@@ -114,15 +190,23 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, labels = LABEL_SPECS, positions, durations, actions, focusedAction, showDecisions, getHotspot, onZoomChange, onContextLost },
+  { citizens, labels = LABEL_SPECS, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
+  // World revisions replace object identities frequently. Scene construction is
+  // keyed by the actual actors/places instead, so a map refresh cannot reset a
+  // citizen halfway through an authoritative travel segment.
+  const citizenKey = citizens.map((citizen) => `${citizen.id}:${citizen.palette}`).join(",");
+  const labelKey = labels.map((label) => `${label.id}:${label.label}:${label.x}:${label.z}:${label.height}`).join("|");
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const callbacksRef = useRef({ getHotspot, onZoomChange, onContextLost });
-  callbacksRef.current = { getHotspot, onZoomChange, onContextLost };
+  const callbacksRef = useRef({ getHotspot, onPlaceClick, onZoomChange, onContextLost });
+  callbacksRef.current = { getHotspot, onPlaceClick, onZoomChange, onContextLost };
 
   const apiRef = useRef<TownScene3DHandle | null>(null);
   const entriesRef = useRef<Map<number, CitizenEntry> | null>(null);
+  const routePreviewGroupRef = useRef<THREE.Group | null>(null);
+  const routePreviewRef = useRef<DeskBotRoutePreview | null | undefined>(routePreview);
+  routePreviewRef.current = routePreview;
   const requestFrameRef = useRef<() => void>(() => {});
   const initialPositionsRef = useRef(positions);
 
@@ -131,6 +215,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     fitTown: () => apiRef.current?.fitTown(),
     resetView: () => apiRef.current?.resetView(),
     rotateBy: (radians) => apiRef.current?.rotateBy(radians),
+    focusPlace: (locationId) => apiRef.current?.focusPlace(locationId),
   }));
 
   // Mount-only: builds the scene, starts the loop, wires input. Citizens are keyed by
@@ -205,19 +290,31 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const scenery = buildTownScenery();
     scene.add(scenery.root);
 
-    const labelObjects: Array<{ object: CSS2DObject; kind: LabelKind }> = [];
+    const routePreviewGroup = new THREE.Group();
+    routePreviewGroup.name = "deskbot-route-preview";
+    routePreviewGroupRef.current = routePreviewGroup;
+    scene.add(routePreviewGroup);
+    renderRoutePreview(routePreviewGroup, routePreviewRef.current);
+
+    const labelObjects: Array<{ id: string; object: CSS2DObject; kind: LabelKind }> = [];
     for (const label of labels) {
-      const el = document.createElement("div");
-      el.className = `place-label place-label--${label.kind}`;
+      const el = document.createElement(onPlaceClick ? "button" : "div");
+      if (el instanceof HTMLButtonElement) {
+        el.type = "button";
+        el.setAttribute("aria-label", `查看地点：${label.label}`);
+        el.addEventListener("click", () => callbacksRef.current.onPlaceClick?.(label.id));
+      }
+      el.className = `place-label place-label--${label.kind}${onPlaceClick ? " place-label--interactive" : ""}`;
       el.textContent = label.label;
       const object = new CSS2DObject(el);
       object.position.set(label.x, label.height, label.z);
       object.center.set(0.5, 1);
       scene.add(object);
-      labelObjects.push({ object, kind: label.kind });
+      labelObjects.push({ id: label.id, object, kind: label.kind });
     }
 
     // --- Citizens ---
+    initialPositionsRef.current = positions;
     const entries = new Map<number, CitizenEntry>();
     const now0 = performance.now();
     for (const citizen of citizens) {
@@ -339,6 +436,11 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       resetView: () =>
         animateTo({ azimuth: DEFAULT_AZIMUTH, elevation: DEFAULT_ELEVATION, zoom: DEFAULT_ZOOM, targetX: 0, targetZ: 0 }),
       rotateBy: (radians) => animateTo({ azimuth: view.azimuth + radians }),
+      focusPlace: (locationId) => {
+        const place = labelObjects.find((item) => item.id === locationId)?.object.position;
+        if (!place) return;
+        animateTo({ zoom: clamp(Math.max(view.zoom, 4.4), MIN_ZOOM, MAX_ZOOM), targetX: place.x, targetZ: place.z });
+      },
     };
 
     const handleResize = () => {
@@ -638,6 +740,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       canvas.removeEventListener("contextmenu", handleContextMenu);
 
       scenery.dispose();
+      disposeRoutePreview(routePreviewGroup);
+      routePreviewGroupRef.current = null;
       for (const entry of entries.values()) disposeObject(entry.figure.group);
       scene.clear();
       renderer.dispose();
@@ -647,7 +751,17 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       entriesRef.current = null;
       requestFrameRef.current = () => {};
     };
-  }, [citizens, labels]);
+  }, [citizenKey, labelKey, onPlaceClick]);
+
+  // The route preview is a separate, static overlay. Keeping it out of the
+  // mount-only scene effect lets a selected destination update without
+  // rebuilding the town or interrupting a citizen's animation.
+  useEffect(() => {
+    const group = routePreviewGroupRef.current;
+    if (!group) return;
+    renderRoutePreview(group, routePreview);
+    requestFrameRef.current();
+  }, [routePreview]);
 
   // Walk each citizen along the streets to their new position whenever the game moves them.
   useEffect(() => {
@@ -667,6 +781,27 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     }
     requestFrameRef.current();
   }, [positions, durations]);
+
+  // A DeskBot route step is authoritative for the protagonist's visual segment.
+  // Keep the normal Jev Town street routing for every other citizen.
+  useEffect(() => {
+    const entries = entriesRef.current;
+    if (!entries || !travelVisual) return;
+    const entry = entries.get(travelVisual.citizenId);
+    if (!entry) return;
+    const target = travelVisual.to;
+    // Keep each server-authorized hop separate, while reusing the town's
+    // street-grid renderer so a hop does not visually cut through buildings.
+    entry.route = travelVisual.route.length >= 2
+      ? travelVisual.route.map((point) => ({ ...point }))
+      : routeBetween(travelVisual.from, target);
+    entry.routeLength = routeLength(entry.route);
+    entry.startedAt = performance.now();
+    entry.duration = travelVisual.durationMs;
+    entry.current = { ...travelVisual.from };
+    entry.target = { ...target };
+    requestFrameRef.current();
+  }, [travelVisual]);
 
   // A new set of decisions: every citizen who got one pulses, staggered a little so
   // the whole town visibly "lights up" at once.

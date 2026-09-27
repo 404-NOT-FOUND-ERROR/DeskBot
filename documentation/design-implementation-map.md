@@ -1,7 +1,7 @@
 # 设计定义与实现对照
 
-**版本：** v0.3
-**更新日期：** 2026-09-18
+**版本：** v0.5
+**更新日期：** 2026-09-27
 
 这份文件把《聚形域》的体验设计定义和软件当前实现放在同一张可审计的对照表中。设计定义是产品与论文讨论的约束；实现状态只根据仓库源码、测试和当前运行检查填写，不能把计划或旧日志当成已完成能力。
 
@@ -11,7 +11,8 @@
 |---|---|---|
 | 聚形域是持续世界背景与演化机制，不是每句话都故弄玄虚 | `world-definition.mjs`、world context、角色提示词 | 已实现基础框架；实际表达仍由 LLM 生成，需用真实 DeepSeek 做人工验收 |
 | 当前第一角色叫“喵呜”，猫型潮玩外壳只是阶段形态，不是永久身份 | canonical `protagonist`、`miaowu-expression-seed-v4`、角色 Soul/roleplay bible | 已写入角色/世界决策文档；accepted role-state 阶段档案可持久化并投影到普通表达；自动换壳仍未实现 |
-| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs`、`fantasy-pull.mjs`、`role-proposals.mjs`、`prompt-composer.mjs` | Soul、幻想吸引聚合、角色提案、有限试行、accepted 阶段和方向表达覆盖已实现；跨天主动选择和真实换壳仍未实现 |
+| 雾灯镇是聚形域中的具体小镇，地图与内容包提供第一版生活舞台 | `DEFAULT_SETTLEMENT`、`GET /api/world/map`、`src/content-packages.mjs`、`world-content/settlements/morrowmere/` | 已实现 canonical settlement、地点归属、只读内容编译和「雾灯镇第一天」有限回放；内容包不是第二事实源，NPC 仍保持 NevaMind 式结构；更丰富的世界自动生活仍需继续扩展 |
+| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs`、`fantasy-pull.mjs`、`role-proposals.mjs`、`prompt-composer.mjs`、`shared-life-reports.mjs` | Soul、幻想吸引聚合、角色提案、有限试行、accepted 阶段、方向表达、显式承诺、关系趋势和可审计日报覆盖已实现；跨天主动选择和真实换壳仍未实现 |
 | 功能信息必须内生于角色的日常嘴皮子，不能先中性回答再追加人设 | `prompt-composer.mjs`、`miaowu-expression-seed-v4`、角色圣经 v0.2 | 已实现融合式话语编译与禁止后台汇报规则；真实 DeepSeek 仍需人工验证连续体感 |
 | 持续世界要以“今日影响 / 眼前机会 / 未解钩子”进入生活，而非只存标题摘要 | world-line canonical event、interaction policy、Web 世界线编辑器、`DESKBOT_LIVED_WORLD` | 已实现可选字段、持久化、展示、编辑和 prompt 生活切片；现存旧事件需人工追加这些字段后才有强体感 |
 | 多源输入只能影响角色方向候选，不能由单句命令或角色自己的回复直接改人格、外壳或世界事实 | evidence ledger、`fantasy-pull.v0.2`、interaction policy、state engine、`/api/roles/*` | 已过滤 assistant/voice/transport/device output；历史污染提案保留审计，新候选实时按 v0.2 重算；接受方向仍不自动换壳 |
@@ -22,6 +23,13 @@
 | 固件只负责采集、播放和显示，不持有世界、人格或 API key | `interaction-contract-v0.1`、WebSocket bridge、outbox | 合同和桥接已实现；真实固件由独立 agent 维护，不能据此宣称真机闭环 |
 
 ## 当前可验证状态
+
+### 2026-09-27 P3/P3.1 路线与持续生活复核
+
+- DeskBot service 回归为 `223/223`；新增的内容包、跨日 `world-life.replay()`、NPC 有限目标、共同经历、记忆/承诺/日报和重启幂等均在隔离 SQLite 测试中通过。
+- Jev Town 客户端 `16 files / 132 tests` 通过，`npm run typecheck` 与生产 `npm run build` 通过。客户端路线定向测试覆盖 26 个用例。
+- 路线视觉代码级闭环已完成：`canonicalGeometry.ts` 为当前聚形域地点提供稳定道路锚点，`routeVisual.ts` 根据服务端路径构造完整折线、分段动画、中转点和目的地标记；地点标签、喵呜/NPC 位置、路线折线、分段动画和到达提示共用同一投影。服务端仍拥有邻接、成本、阻断和 mutation 权威；未知地点保留安全的坐标 fallback，不会改变世界事实。路线版本漂移或失效时客户端会清除预览。
+- 当前仍需人工验收桌面/移动端的路线观感与缩放，以及路线中转点、完整折线、到达提示和版本失效清除；记忆更正后的后续回调、承诺做到/错过/取消、日报预览/物化差异和关系趋势 evidence 的可读性也待人工验收。自动测试不等于证明长期生命感。
 
 ## 2026-09-18 NPC 与桌面潮玩叙事增量
 

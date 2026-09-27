@@ -1,0 +1,11 @@
+{
+  "schema": "deskbot.location-content.v0.1",
+  "settlement_id": "morrowmere",
+  "locations": [
+    { "location_id": "shaping-field-desk", "region_id": "morrowmere-inner-ring", "location_kind": "home", "world_role": "protagonist_home", "lore_keys": ["雾灯镇", "聚形域", "喵呜"] },
+    { "location_id": "tidal-old-road", "region_id": "morrowmere-east-road", "location_kind": "route", "world_role": "public_route", "lore_keys": ["雾灯镇", "潮痕旧路", "巡路员"] },
+    { "location_id": "whisper-market", "region_id": "morrowmere-market-quarter", "location_kind": "market", "world_role": "exchange_place", "lore_keys": ["雾灯镇", "低语集市", "交换"] },
+    { "location_id": "backlit-grove", "region_id": "morrowmere-west-grove", "location_kind": "grove", "world_role": "memory_place", "lore_keys": ["雾灯镇", "逆光林地", "旧日光色"] },
+    { "location_id": "echo-waterside", "region_id": "morrowmere-north-water", "location_kind": "waterside", "world_role": "message_place", "lore_keys": ["雾灯镇", "回声水岸", "回声"] }
+  ]
+}

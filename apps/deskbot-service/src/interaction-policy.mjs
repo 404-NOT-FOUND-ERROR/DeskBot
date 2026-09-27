@@ -1,8 +1,11 @@
 import { canonicalCharacterId } from './world-definition.mjs';
 
-const POLICY_VERSION = 'interaction-policy.v0.1';
+const POLICY_VERSION = 'interaction-policy.v0.2';
 const DEFAULT_PROACTIVE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_CONSIDERED_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_DEFERRED_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_MAX_PROACTIVE_PER_PROMPT = 2;
+const DEFAULT_MAX_IGNORED_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const ROUTES = Object.freeze({
   RECORD_ONLY: 'record_only',
@@ -10,6 +13,32 @@ const ROUTES = Object.freeze({
   PROACTIVE_CANDIDATE: 'proactive_candidate',
   SUPPRESS: 'suppress',
 });
+
+const PROACTIVE_STATES = Object.freeze({
+  QUEUED: 'queued',
+  CONSIDERED: 'considered',
+  DEFERRED: 'deferred',
+  DISMISSED: 'dismissed',
+  CONSUMED: 'consumed',
+  EXPIRED: 'expired',
+});
+
+const PROACTIVE_ACTIONS = Object.freeze({
+  IGNORE: 'ignore',
+  DEFER: 'defer',
+  DISMISS: 'dismiss',
+  CONSUME: 'consume',
+  REOPEN: 'reopen',
+});
+
+class InteractionPolicyError extends Error {
+  constructor(statusCode, code, message) {
+    super(message);
+    this.name = 'InteractionPolicyError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 function clone(value) {
   return value === null || value === undefined ? value : structuredClone(value);
@@ -22,6 +51,37 @@ function iso(value) {
 
 function characterKey(characterId) {
   return canonicalCharacterId(characterId) ?? 'unbound';
+}
+
+function normalizeDecision(decision) {
+  if (!decision || typeof decision !== 'object') return decision;
+  const isCandidate = decision.route === ROUTES.PROACTIVE_CANDIDATE && decision.candidate;
+  if (!isCandidate) return decision;
+  return {
+    ...decision,
+    // These two values are audit inputs for proactive ranking. They are kept
+    // separate from priority so a caller can distinguish "worth mentioning"
+    // from "safe to interrupt with" without changing world state.
+    relevance: Number.isFinite(decision.relevance)
+      ? Math.min(1, Math.max(0, Number(decision.relevance)))
+      : null,
+    interrupt_cost: Number.isFinite(decision.interrupt_cost)
+      ? Math.min(1, Math.max(0, Number(decision.interrupt_cost)))
+      : null,
+    proactive_status: decision.proactive_status ?? PROACTIVE_STATES.QUEUED,
+    surfaced_count: Number.isInteger(decision.surfaced_count) ? decision.surfaced_count : 0,
+    ignored_count: Number.isInteger(decision.ignored_count) ? decision.ignored_count : 0,
+    deferred_count: Number.isInteger(decision.deferred_count) ? decision.deferred_count : 0,
+    considered_at: decision.considered_at ?? null,
+    last_surfaced_at: decision.last_surfaced_at ?? null,
+    last_ignored_at: decision.last_ignored_at ?? null,
+    last_deferred_at: decision.last_deferred_at ?? null,
+    considered_until: decision.considered_until ?? null,
+    deferred_until: decision.deferred_until ?? null,
+    dismissed_at: decision.dismissed_at ?? null,
+    consumed_at: decision.consumed_at ?? null,
+    ignored_cooldown_ms: Number.isFinite(decision.ignored_cooldown_ms) ? decision.ignored_cooldown_ms : null,
+  };
 }
 
 function layerOf(event) {
@@ -112,8 +172,22 @@ function buildDecision({ event, worldSnapshot, worldConditions, now, proactiveTt
     reason: '记录事件，但不改变当前角色表达。',
     audience: 'none',
     candidate: null,
+    relevance: null,
+    interrupt_cost: null,
+    proactive_status: null,
+    surfaced_count: 0,
+    ignored_count: 0,
+    deferred_count: 0,
     expires_at: null,
     considered_at: null,
+    last_surfaced_at: null,
+    last_ignored_at: null,
+    last_deferred_at: null,
+    considered_until: null,
+    deferred_until: null,
+    dismissed_at: null,
+    consumed_at: null,
+    ignored_cooldown_ms: null,
   };
 
   if (event.type === 'conversation.input') {
@@ -153,6 +227,9 @@ function buildDecision({ event, worldSnapshot, worldConditions, now, proactiveTt
       reason: '世界线事件可能成为角色主动交流的话题，但不自动打断用户。',
       audience: 'proactive_queue',
       candidate,
+      relevance: 0.82,
+      interrupt_cost: 0.48,
+      proactive_status: PROACTIVE_STATES.QUEUED,
       expires_at: new Date(now().getTime() + proactiveTtlMs).toISOString(),
     };
   }
@@ -167,6 +244,9 @@ function buildDecision({ event, worldSnapshot, worldConditions, now, proactiveTt
       reason: '有可追溯来源的外部事件可在相关话题中自然提起，但不直接播报。',
       audience: 'proactive_queue',
       candidate,
+      relevance: 0.62,
+      interrupt_cost: 0.68,
+      proactive_status: PROACTIVE_STATES.QUEUED,
       expires_at: new Date(now().getTime() + proactiveTtlMs).toISOString(),
     };
   }
@@ -181,6 +261,9 @@ function buildDecision({ event, worldSnapshot, worldConditions, now, proactiveTt
       reason: '显著天气是可选的环境话题，只有在语境相关时才自然带出。',
       audience: 'proactive_queue',
       candidate,
+      relevance: 0.46,
+      interrupt_cost: 0.28,
+      proactive_status: PROACTIVE_STATES.QUEUED,
       expires_at: new Date(now().getTime() + proactiveTtlMs).toISOString(),
     };
   }
@@ -215,15 +298,66 @@ export function createInteractionPolicy({
   persistence = null,
   proactiveTtlMs = DEFAULT_PROACTIVE_TTL_MS,
   consideredCooldownMs = DEFAULT_CONSIDERED_COOLDOWN_MS,
+  deferredMs = DEFAULT_DEFERRED_MS,
+  maxProactivePerPrompt = DEFAULT_MAX_PROACTIVE_PER_PROMPT,
+  maxIgnoredCooldownMs = DEFAULT_MAX_IGNORED_COOLDOWN_MS,
 } = {}) {
   const decisions = new Map(
-    (persistence?.list('interaction.decisions') ?? []).map((decision) => [decision.event_id, decision]),
+    (persistence?.list('interaction.decisions') ?? []).map((decision) => [decision.event_id, normalizeDecision(decision)]),
+  );
+  const settings = new Map(
+    (persistence?.list('interaction.settings') ?? []).map((item) => [characterKey(item.character_id), item]),
   );
 
   function save(decision) {
-    decisions.set(decision.event_id, decision);
-    persistence?.put('interaction.decisions', decision.event_id, decision);
-    return decision;
+    const normalized = normalizeDecision(decision);
+    decisions.set(normalized.event_id, normalized);
+    persistence?.put('interaction.decisions', normalized.event_id, normalized);
+    return normalized;
+  }
+
+  function defaultSettings(characterId) {
+    return {
+      schema: 'foundry.interaction-settings.v0.1',
+      character_id: characterKey(characterId),
+      proactive_enabled: true,
+      quiet_until: null,
+      updated_at: now().toISOString(),
+    };
+  }
+
+  function getSettings(characterId = null) {
+    const key = characterKey(characterId);
+    return clone(settings.get(key) ?? defaultSettings(key));
+  }
+
+  function setSettings({ characterId = null, proactiveEnabled, quietUntil } = {}) {
+    const key = characterKey(characterId);
+    const current = settings.get(key) ?? defaultSettings(key);
+    const next = {
+      ...current,
+      character_id: key,
+      ...(proactiveEnabled === undefined ? {} : { proactive_enabled: proactiveEnabled === true }),
+      ...(quietUntil === undefined ? {} : { quiet_until: quietUntil }),
+      updated_at: now().toISOString(),
+    };
+    if (next.quiet_until !== null && (typeof next.quiet_until !== 'string' || Number.isNaN(Date.parse(next.quiet_until)))) {
+      throw new InteractionPolicyError(400, 'invalid_quiet_until', 'quiet_until must be an ISO timestamp or null');
+    }
+    settings.set(key, next);
+    persistence?.put('interaction.settings', key, next);
+    return clone(next);
+  }
+
+  function updateSettings(input = {}) {
+    return setSettings(input);
+  }
+
+  function quietReason(characterId) {
+    const current = getSettings(characterId);
+    if (current.proactive_enabled !== true) return '角色主动性已关闭。';
+    if (current.quiet_until && Date.parse(current.quiet_until) > now().getTime()) return `安静窗口持续到 ${current.quiet_until}。`;
+    return null;
   }
 
   function evaluate({ event, worldSnapshot = null, worldConditions = [], runtimeContext = null } = {}) {
@@ -250,25 +384,104 @@ export function createInteractionPolicy({
   function forPrompt({ characterId, excludeEventId = null } = {}) {
     const current = now();
     const canonicalId = characterKey(characterId);
-    const selected = [];
+    if (quietReason(canonicalId)) return [];
+    const eligible = [];
     for (const decision of decisions.values()) {
       if (decision.event_id === excludeEventId) continue;
       if (characterKey(decision.character_id) !== canonicalId) continue;
       if (decision.route !== ROUTES.PROACTIVE_CANDIDATE || !decision.candidate) continue;
-      if (decision.expires_at && Date.parse(decision.expires_at) <= current.getTime()) continue;
-      if (decision.considered_at && Date.parse(decision.considered_at) + consideredCooldownMs > current.getTime()) continue;
-      const updated = { ...decision, considered_at: current.toISOString() };
-      save(updated);
-      selected.push(clone(updated));
+      if (decision.proactive_status === PROACTIVE_STATES.DISMISSED || decision.proactive_status === PROACTIVE_STATES.CONSUMED) continue;
+      // A deferred candidate owns a later review window. Do not discard it at
+      // the original short-lived queue TTL while the user explicitly asked
+      // us to wait.
+      if (decision.proactive_status !== PROACTIVE_STATES.DEFERRED
+        && decision.expires_at && Date.parse(decision.expires_at) <= current.getTime()) {
+        if (decision.proactive_status !== PROACTIVE_STATES.EXPIRED) save({ ...decision, proactive_status: PROACTIVE_STATES.EXPIRED });
+        continue;
+      }
+      if (decision.proactive_status === PROACTIVE_STATES.DEFERRED
+        && decision.deferred_until && Date.parse(decision.deferred_until) > current.getTime()) continue;
+      const consideredUntil = decision.considered_until
+        ? Date.parse(decision.considered_until)
+        : decision.considered_at ? Date.parse(decision.considered_at) + consideredCooldownMs : 0;
+      if (consideredUntil > current.getTime()) continue;
+      eligible.push(decision);
     }
-    return selected.sort((a, b) => b.priority - a.priority || a.decided_at.localeCompare(b.decided_at));
+    return eligible
+      .sort((a, b) => b.priority - a.priority || a.decided_at.localeCompare(b.decided_at))
+      .slice(0, Math.max(1, Number.parseInt(maxProactivePerPrompt, 10) || DEFAULT_MAX_PROACTIVE_PER_PROMPT))
+      .map((decision) => {
+        const updated = {
+          ...decision,
+          proactive_status: PROACTIVE_STATES.CONSIDERED,
+          considered_at: current.toISOString(),
+          considered_until: new Date(current.getTime() + consideredCooldownMs).toISOString(),
+          last_surfaced_at: current.toISOString(),
+          surfaced_count: (decision.surfaced_count ?? 0) + 1,
+          deferred_until: null,
+        };
+        return clone(save(updated));
+      });
   }
 
-  function list({ characterId = null, route = null, limit = 50 } = {}) {
+  function act(eventId, { characterId = null, action, deferredUntil = null, reason = null } = {}) {
+    const decision = decisions.get(eventId);
+    if (!decision) throw new InteractionPolicyError(404, 'interaction_decision_not_found', 'interaction decision not found');
+    if (characterId !== null && characterKey(decision.character_id) !== characterKey(characterId)) {
+      throw new InteractionPolicyError(409, 'interaction_decision_character_mismatch', 'interaction decision belongs to another character');
+    }
+    if (decision.route !== ROUTES.PROACTIVE_CANDIDATE || !decision.candidate) {
+      throw new InteractionPolicyError(409, 'interaction_decision_not_actionable', 'only proactive candidates can be managed');
+    }
+    if (!Object.values(PROACTIVE_ACTIONS).includes(action)) {
+      throw new InteractionPolicyError(400, 'invalid_interaction_action', `unsupported interaction action: ${action}`);
+    }
+    const timestamp = now().toISOString();
+    let next = { ...decision };
+    if (action === PROACTIVE_ACTIONS.IGNORE) {
+      const ignoredCount = (next.ignored_count ?? 0) + 1;
+      const backoff = Math.min(
+        Math.max(consideredCooldownMs, 1) * (2 ** Math.max(0, ignoredCount - 1)),
+        Math.max(maxIgnoredCooldownMs, consideredCooldownMs),
+      );
+      next = { ...next, proactive_status: PROACTIVE_STATES.CONSIDERED, ignored_count: ignoredCount, ignored_cooldown_ms: backoff, last_ignored_at: timestamp, considered_at: timestamp, considered_until: new Date(now().getTime() + backoff).toISOString() };
+    } else if (action === PROACTIVE_ACTIONS.DEFER) {
+      const target = deferredUntil === null ? new Date(now().getTime() + deferredMs).toISOString() : deferredUntil;
+      if (typeof target !== 'string' || Number.isNaN(Date.parse(target))) throw new InteractionPolicyError(400, 'invalid_deferred_until', 'deferred_until must be an ISO timestamp');
+      const targetMs = Date.parse(target);
+      const existingExpiryMs = next.expires_at ? Date.parse(next.expires_at) : 0;
+      // Keep a deferred item available through its requested review time, with
+      // a small queue window afterwards for the next prompt.
+      const deferredExpiry = new Date(targetMs + proactiveTtlMs).toISOString();
+      next = {
+        ...next,
+        proactive_status: PROACTIVE_STATES.DEFERRED,
+        deferred_count: (next.deferred_count ?? 0) + 1,
+        last_deferred_at: timestamp,
+        deferred_until: target,
+        considered_at: timestamp,
+        expires_at: existingExpiryMs > targetMs ? next.expires_at : deferredExpiry,
+      };
+    } else if (action === PROACTIVE_ACTIONS.DISMISS) {
+      next = { ...next, proactive_status: PROACTIVE_STATES.DISMISSED, dismissed_at: timestamp, dismiss_reason: reason };
+    } else if (action === PROACTIVE_ACTIONS.CONSUME) {
+      next = { ...next, proactive_status: PROACTIVE_STATES.CONSUMED, consumed_at: timestamp, consume_reason: reason };
+    } else if (action === PROACTIVE_ACTIONS.REOPEN) {
+      next = { ...next, proactive_status: PROACTIVE_STATES.QUEUED, dismissed_at: null, consumed_at: null, deferred_until: null, considered_at: null, considered_until: null };
+    }
+    return clone(save(next));
+  }
+
+  function resolveCandidate(eventId, input = {}) {
+    return act(eventId, input);
+  }
+
+  function list({ characterId = null, route = null, status = null, limit = 50 } = {}) {
     const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     return [...decisions.values()]
       .filter((decision) => !characterId || characterKey(decision.character_id) === characterKey(characterId))
       .filter((decision) => !route || decision.route === route)
+      .filter((decision) => !status || decision.proactive_status === status)
       .slice(-boundedLimit)
       .map(clone);
   }
@@ -277,13 +490,53 @@ export function createInteractionPolicy({
     return clone(decisions.get(eventId) ?? null);
   }
 
+  function listCandidates({ characterId = null, status = null, route = ROUTES.PROACTIVE_CANDIDATE, limit = 50 } = {}) {
+    const current = now().getTime();
+    // GET is also a lifecycle observation point, so stale queued/considered
+    // candidates become explicitly expired even when no chat turn occurs.
+    for (const decision of decisions.values()) {
+      if (decision.route !== ROUTES.PROACTIVE_CANDIDATE || !decision.candidate) continue;
+      if (decision.proactive_status === PROACTIVE_STATES.DEFERRED) continue;
+      if (decision.expires_at && Date.parse(decision.expires_at) <= current
+        && decision.proactive_status !== PROACTIVE_STATES.EXPIRED
+        && decision.proactive_status !== PROACTIVE_STATES.DISMISSED
+        && decision.proactive_status !== PROACTIVE_STATES.CONSUMED) {
+        save({ ...decision, proactive_status: PROACTIVE_STATES.EXPIRED });
+      }
+    }
+    return list({
+      characterId,
+      route,
+      status,
+      limit,
+    });
+  }
+
   return {
     evaluate,
+    act,
     forPrompt,
+    getSettings,
     get,
     list,
+    listCandidates,
+    quietReason,
+    resolveCandidate,
+    setSettings,
+    updateSettings,
     policyVersion: POLICY_VERSION,
   };
 }
 
-export { DEFAULT_CONSIDERED_COOLDOWN_MS, DEFAULT_PROACTIVE_TTL_MS, POLICY_VERSION, ROUTES };
+export {
+  DEFAULT_CONSIDERED_COOLDOWN_MS,
+  DEFAULT_DEFERRED_MS,
+  DEFAULT_MAX_PROACTIVE_PER_PROMPT,
+  DEFAULT_MAX_IGNORED_COOLDOWN_MS,
+  DEFAULT_PROACTIVE_TTL_MS,
+  InteractionPolicyError,
+  POLICY_VERSION,
+  PROACTIVE_ACTIONS,
+  PROACTIVE_STATES,
+  ROUTES,
+};

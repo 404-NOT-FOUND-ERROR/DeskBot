@@ -10,7 +10,7 @@ if (!container) throw new Error("Missing #root element");
 const params = new URLSearchParams(window.location.search);
 const isDeskBotMode = params.get("mode") === "deskbot";
 const RootApp = isDeskBotMode ? DeskBotApp : App;
-if (isDeskBotMode) document.title = "DeskBot - 聚形域世界观测台";
+if (isDeskBotMode) document.title = "DeskBot - 雾灯镇 · 聚形域";
 
 createRoot(container).render(
   <StrictMode>

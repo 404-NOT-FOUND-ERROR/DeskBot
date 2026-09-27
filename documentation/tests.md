@@ -5,6 +5,10 @@
 ## Existing coverage
 
 | NPC Persona Agent | Persona 字段、Markdown 作者卡、Scene/关系提示词、HTTP 真实调用、fallback、重复请求幂等 | `npc-personas.test.mjs`、`world-life.test.mjs` | implemented: local fake LLM |
+| 雾灯镇内容合同 | settlement、地点归属、Lore key、NevaMind NPC 字段、日程与世界事件模板和 canonical world 对齐 | `morrowmere-content.test.mjs`、`persistent-world*.test.mjs` | existing |
+| 内容包编译与第一天回放 | 只读校验作者包、故事目录来源、预览无副作用、五步 canonical 计划 | `content-packages.test.mjs`、`story-packages.test.mjs` | existing |
+| 路线投影与旅行动画 | 统一地点锚点、完整路线折线、中转点、端点、道路拐点和分段动画时长；版本漂移清除预览；未知地点使用坐标 fallback，不改变服务端事实 | `canonicalGeometry.test.ts`、`routeVisual.test.ts`、`deskbotBridge.test.ts` | existing: 26 targeted client cases |
+| 持久化真实墙钟 | 首次锚定、分钟余数、单次追赶上限、marker 中断恢复、SQLite 重启和 replay 幂等 | `persistent-world-clock.test.mjs` | existing: 5 cases |
 
 | 用例 | 规则/预期 | 证据 | 状态 |
 |---|---|---|---|
@@ -21,7 +25,7 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-此前 Node 服务回归基线为 `145/145`；持续世界增量曾达到 `180/180`。Persona Agent、作者 Markdown 卡、NPC HTTP 接线、fallback/幂等和桌面潮玩 Scene 文案增量后的历史快照为 `186/186`，再到 `189/189`；当前源码复核为 `193/193`，其中包含地图潮玩视觉字段断言。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。历史数字只用于追溯，不代表当前代码状态。
+此前 Node 服务回归基线为 `145/145`；持续世界增量曾达到 `180/180`。Persona Agent、作者 Markdown 卡、NPC HTTP 接线、fallback/幂等和桌面潮玩 Scene 文案增量后的历史快照为 `186/186`，再到 `194/194`、`216/216`；当前源码复核为 `223/223`，其中包含 P3 共同生活、跨日回放、雾灯镇内容合同、world-life 重启幂等和 replay 幂等断言。Jev Town 客户端当前为 `16 files / 132 tests`，TypeScript 检查与生产构建通过；路线投影定向用例为 26 个。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。历史数字只用于追溯，不代表当前代码状态。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
 
@@ -44,6 +48,7 @@
 | 世界线结果到 Scene 分支 | automated | outcome/status 选择 authored branch；相同 cause 不重复 | implemented: targeted |
 | NPC 多步目标 | automated | 每 tick 一步；waiting/missed/failed 可重启恢复 | implemented: targeted |
 | 支线经历检索 | automated | 相关 query 返回 source/evidence；不进入 confirmed memory | implemented: targeted |
+| 共享生活连续性 | automated | 承诺需显式确认并可重启恢复；关系趋势要求两条 mutation 证据；日报预览无副作用、空日不造事实、物化后可回读 | implemented: `shared-life-reports.test.mjs` |
 
 ## Gaps
 

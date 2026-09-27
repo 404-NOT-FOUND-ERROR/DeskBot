@@ -142,6 +142,25 @@
         <div id="role-result" class="mutation-result" role="status">尚未操作角色方向。</div>
       </section>
 
+      <section id="interaction-lab" class="research-only interaction-lab card">
+        <div class="drawer-heading">
+          <div><p class="eyebrow">PROACTIVE QUEUE</p><h2>主动候选管理</h2></div>
+          <span id="interaction-pill" class="mini-pill muted">读取中</span>
+        </div>
+        <p class="console-intro">外部事件、天气和世界线会先成为可选候选，而不是直接打断对话。这里的操作只改变候选生命周期，不会直接改写 canonical world。</p>
+        <div class="interaction-toolbar">
+          <label>状态<select id="interaction-status-filter"><option value="">全部候选</option><option value="queued">queued · 排队</option><option value="considered">considered · 已看过</option><option value="deferred">deferred · 稍后</option><option value="dismissed">dismissed · 已关闭</option><option value="consumed">consumed · 已使用</option><option value="expired">expired · 已过期</option></select></label>
+          <button id="interaction-refresh" class="quiet-button" type="button">刷新候选</button>
+        </div>
+        <form id="interaction-settings-form" class="interaction-settings">
+          <label class="interaction-toggle"><input id="interaction-proactive-enabled" type="checkbox" checked />允许喵呜主动带出自然关联</label>
+          <label>安静到 <input id="interaction-quiet-until" type="datetime-local" /></label>
+          <button class="quiet-button" type="submit">保存主动性设置</button>
+        </form>
+        <div id="interaction-candidates" class="interaction-candidate-list"><span class="console-hint">正在读取候选…</span></div>
+        <div id="interaction-result" class="mutation-result" role="status">尚未操作候选。</div>
+      </section>
+
       <section id="scenario-lab" class="research-only scenario-lab card">
         <div class="drawer-heading">
           <div><p class="eyebrow">REPEATABLE SCENARIOS</p><h2>多源场景验证</h2></div>
@@ -213,9 +232,30 @@
           <button type="button" class="quiet-button" id="life-memory-reset">取消编辑</button>
         </form>
         <div id="life-memories" class="event-log"></div>
-        <details class="research-only"><summary>世界作者：三日事件计划</summary>
-          <p>「潮后寻路」是三日共同经历：先预览，不写入世界；确认安装后才登记世界事件与巡路员行动。它不会替喵呜做决定或自动换壳。</p>
-          <button id="life-preview" class="quiet-button" type="button">预览三日故事</button><button id="life-install" class="quiet-button" type="button" disabled>确认安装</button>
+        <div class="life-report-grid">
+          <section class="life-report-card" aria-labelledby="life-commitments-heading">
+            <div class="life-report-heading"><div><span class="trace-label">明确答应过的事</span><strong id="life-commitments-heading">承诺与回访</strong></div><span id="life-commitment-count" class="mini-pill muted">0 条</span></div>
+            <form id="life-commitment-form" class="life-inline-form">
+              <input id="life-commitment-id" type="hidden" />
+              <label>这次要记住什么<input id="life-commitment-text" maxlength="1000" placeholder="例如：明天再看看潮痕旧路" required /></label>
+              <label>回访时间<input id="life-commitment-due" type="datetime-local" /></label>
+              <button type="submit" class="quiet-button">确认承诺</button>
+            </form>
+            <div id="life-commitments" class="event-log life-report-list"><span>还没有明确承诺。</span></div>
+          </section>
+          <section class="life-report-card" aria-labelledby="life-summary-heading">
+            <div class="life-report-heading"><div><span class="trace-label">世界账本的当天切片</span><strong id="life-summary-heading">每日生活摘要</strong></div><div><button id="life-summary-preview" class="quiet-button" type="button">预览</button><button id="life-summary-materialize" class="quiet-button" type="button">保存今日摘要</button></div></div>
+            <div id="life-summary-current" class="life-summary-current"><span>还没有生成今天的摘要。</span></div>
+            <div id="life-summary-list" class="event-log life-report-list"><span>尚未保存过日报。</span></div>
+          </section>
+          <section class="life-report-card" aria-labelledby="life-trends-heading">
+            <div class="life-report-heading"><div><span class="trace-label">关系证据，不是印象分</span><strong id="life-trends-heading">关系趋势</strong></div><span id="life-trends-count" class="mini-pill muted">0 人</span></div>
+            <div id="life-relationship-trends" class="event-log life-report-list"><span>还没有足够的相遇记录。</span></div>
+          </section>
+        </div>
+        <details class="research-only"><summary>世界作者：雾灯镇第一天</summary>
+          <p>「雾灯镇第一天：先听灯声」是三段式共同经历：先预览，不写入世界；确认安装后才登记灯声、巡路员和第一天的未决方向。它不会替喵呜做决定或自动换壳。</p>
+          <button id="life-preview" class="quiet-button" type="button">预览第一天</button><button id="life-install" class="quiet-button" type="button" disabled>确认安装</button>
           <div id="life-story-preview" class="event-log" role="status">尚未预览故事。</div>
           <div id="life-plans" class="event-log"></div>
         </details>

@@ -1,28 +1,98 @@
 import { mountNpcGoalEditor } from './npc-goal-editor.js';
 const CHARACTER_ID = 'shaping-001';
+const FEATURED_STORY_PACKAGE_ID = 'morrowmere-first-day-v1';
 const NPC_ROLE_LABELS = Object.freeze({
   route_keeper: '潮痕巡路员',
   afterlight_collector: '旧光采集者',
 });
 // Shared-life records are deliberately separate from chat and world authoring.
 let lifeMemories = [];
+let lifeCommitments = [];
+let lifeDailySummaries = [];
+let lifeRelationshipTrends = [];
+
+const LIFE_COMMITMENT_STATUS_LABELS = Object.freeze({ open: '待回访', kept: '已做到', missed: '错过了', cancelled: '已取消' });
+
+function formatLifeDate(value, options = {}) {
+  if (!value) return '未设置时间';
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return String(value);
+  return date.toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short', ...options });
+}
+
+function renderLifeCommitments() {
+  const target = $('#life-commitments');
+  if (!target) return;
+  const openCount = lifeCommitments.filter(item => item.status === 'open').length;
+  setText('#life-commitment-count', `${openCount} 条待回访`);
+  target.innerHTML = lifeCommitments.map(item => {
+    const terminal = item.status !== 'open';
+    const actions = terminal ? '' : `<div class="life-report-actions"><button type="button" data-commitment-action="kept" data-commitment-id="${escapeHtml(item.id)}">做到了</button><button type="button" data-commitment-action="missed" data-commitment-id="${escapeHtml(item.id)}">错过了</button><button type="button" data-commitment-action="cancelled" data-commitment-id="${escapeHtml(item.id)}">取消</button></div>`;
+    return `<article class="life-report-item ${escapeHtml(item.status)}"><div class="life-report-item-heading"><strong>${escapeHtml(item.text)}</strong><span>${escapeHtml(LIFE_COMMITMENT_STATUS_LABELS[item.status] || item.status)}</span></div><small>${item.due_at ? `回访：${escapeHtml(formatLifeDate(item.due_at))}` : '没有硬性回访时间'} · 更新于 ${escapeHtml(formatLifeDate(item.updated_at))}</small>${actions}</article>`;
+  }).join('') || '<span>还没有明确承诺。</span>';
+}
+
+function renderDailySummary(summary, { preview = false } = {}) {
+  const target = $('#life-summary-current');
+  if (!target || !summary) return;
+  const evidence = summary.evidence_ids?.length ? `<small>证据 ${escapeHtml(summary.evidence_ids.slice(0, 4).join('、'))}${summary.evidence_ids.length > 4 ? '…' : ''}</small>` : '<small>今天还没有足够的世界账本证据。</small>';
+  target.innerHTML = `<div class="life-summary-head"><strong>${escapeHtml(summary.summary || `第 ${summary.world_day} 天`)}</strong><span>${preview ? '预览' : '已保存'} · 第 ${escapeHtml(summary.world_day)}</span></div><p>场景 ${summary.scenes?.length ?? 0} · 共同经历 ${summary.experiences?.length ?? 0} · 关系变化 ${summary.relationship_changes?.length ?? 0} · 世界变化 ${summary.world_changes?.length ?? 0}</p>${evidence}`;
+}
+
+function renderDailySummaryList() {
+  const target = $('#life-summary-list');
+  if (!target) return;
+  target.innerHTML = lifeDailySummaries.slice().reverse().map(summary => `<article class="life-report-item"><div class="life-report-item-heading"><strong>第 ${escapeHtml(summary.world_day)} 天</strong><span>${escapeHtml(summary.status === 'recorded' ? '有记录' : '空白日')}</span></div><p>${escapeHtml(summary.summary)}</p><small>保存于 ${escapeHtml(formatLifeDate(summary.generated_at))} · 证据 ${summary.evidence_ids?.length ?? 0} 条</small></article>`).join('') || '<span>尚未保存过日报。</span>';
+}
+
+function renderRelationshipTrends() {
+  const target = $('#life-relationship-trends');
+  if (!target) return;
+  setText('#life-trends-count', `${lifeRelationshipTrends.length} 人`);
+  target.innerHTML = lifeRelationshipTrends.map(trend => {
+    const direction = value => value?.direction === 'up' ? '上升' : value?.direction === 'down' ? '下降' : '持平';
+    return `<article class="life-report-item"><div class="life-report-item-heading"><strong>${escapeHtml(trend.npc_name || trend.npc_id)}</strong><span>${escapeHtml(trend.status === 'observed' ? '有连续证据' : '证据不足')}</span></div><p>熟络 ${escapeHtml(trend.familiarity?.current ?? 0)}（${escapeHtml(direction(trend.familiarity))}） · 默契 ${escapeHtml(trend.trust?.current ?? 0)}（${escapeHtml(direction(trend.trust))}）</p><small>${escapeHtml(trend.observation_count ?? 0)} 次观察 · 证据 ${escapeHtml(trend.evidence_ids?.slice(-3).join('、') || '—')}</small></article>`;
+  }).join('') || '<span>还没有足够的相遇记录。</span>';
+}
+
 async function refreshLife() {
-  const [memoryData, planData] = await Promise.all([getJson('/api/life/memories'), getJson('/api/life/plans')]);
+  const [memoryData, planData, commitmentData, summaryData, trendData] = await Promise.all([
+    getJson('/api/life/memories'),
+    getJson('/api/life/plans'),
+    getJson(`/api/life/commitments?character_id=${encodeURIComponent(CHARACTER_ID)}`),
+    getJson(`/api/life/daily-summaries?character_id=${encodeURIComponent(CHARACTER_ID)}`),
+    getJson('/api/life/relationship-trends'),
+  ]);
   lifeMemories = memoryData.memories;
+  lifeCommitments = commitmentData.commitments || [];
+  lifeDailySummaries = summaryData.summaries || [];
+  lifeRelationshipTrends = trendData.trends || [];
   $('#life-memories').innerHTML = lifeMemories.map(item => `<div><p>${escapeHtml(item.text)}</p><small>${escapeHtml(new Date(item.updated_at).toLocaleString('zh-CN'))} · 修订 ${item.revision}</small><button type="button" data-edit-memory="${escapeHtml(item.id)}">更正</button><button type="button" data-forget-memory="${escapeHtml(item.id)}">删除</button></div>`).join('') || '还没有确认保存的记忆。';
   const compactMemory = $('#game-memory-list');
   if (compactMemory) compactMemory.innerHTML = lifeMemories.slice(0, 6).map(item => `<article><p>${escapeHtml(item.text)}</p><small>${escapeHtml(new Date(item.updated_at).toLocaleDateString('zh-CN'))}</small></article>`).join('') || '<p>还没有确认保存的记忆。</p>';
   $('#life-plans').innerHTML = planData.plans.map(plan => `<div><strong>${escapeHtml(plan.id)}</strong><span>${plan.cancelled_at ? '已取消后续步骤' : '计划已登记'}</span><ol>${plan.steps.map(step => `<li>${escapeHtml(new Date(step.at).toLocaleString('zh-CN'))} · ${escapeHtml(step.payload.event?.title || step.payload.action)} · ${escapeHtml(({pending:'待发生',applied:'已发生',failed:'失败，后续阻断'})[step.status] || step.status)}</li>`).join('')}</ol>${!plan.cancelled_at && plan.steps.some(s => s.status === 'pending') ? `<button type="button" data-cancel-plan="${escapeHtml(plan.id)}">取消后续步骤</button>` : ''}</div>`).join('') || '没有世界计划。';
+  renderLifeCommitments();
+  renderDailySummaryList();
+  renderRelationshipTrends();
 }
 async function lifeAction(action) {
   if ($('#shared-life-panel').dataset.busy === 'true') return;
   $('#shared-life-panel').dataset.busy = 'true';
-  $('#shared-life-panel').querySelectorAll('button').forEach(button => { button.disabled = true; });
-  try { await action(); await refreshLife(); setText('#life-status', '记录已更新。'); }
+  const buttons = [...$('#shared-life-panel').querySelectorAll('button')];
+  const disabledBefore = new Map(buttons.map(button => [button, button.disabled]));
+  buttons.forEach(button => { button.disabled = true; });
+  let actionResult = null;
+  try { actionResult = await action(); await refreshLife(); setText('#life-status', '记录已更新。'); }
   catch (error) { setText('#life-status', error.status === 404 ? '当前后端尚未加载共同生活功能，需要更新服务。' : error.message); }
   finally {
     $('#shared-life-panel').dataset.busy = 'false';
-    $('#shared-life-panel').querySelectorAll('button').forEach(button => { button.disabled = false; });
+    const forceDisabled = new Set(actionResult?.disabled ?? []);
+    const forceEnabled = new Set(actionResult?.enabled ?? []);
+    buttons.forEach(button => {
+      button.disabled = forceDisabled.has(button.id)
+        ? true
+        : forceEnabled.has(button.id) ? false : (disabledBefore.get(button) ?? false);
+    });
   }
 }
 function initializeLife() {
@@ -43,24 +113,60 @@ function initializeLife() {
     if (edit) { $('#life-memory-id').value = edit; $('#life-memory-text').value = lifeMemories.find(m => m.id === edit).text; }
     if (forget) lifeAction(() => postJson('/api/life/memories', { operation: 'forget', id: forget }));
   });
+  $('#life-commitment-form').addEventListener('submit', event => {
+    event.preventDefault();
+    lifeAction(async () => {
+      const due = $('#life-commitment-due').value;
+      await postJson('/api/life/commitments', {
+        id: `commitment-${crypto.randomUUID()}`,
+        character_id: CHARACTER_ID,
+        text: $('#life-commitment-text').value,
+        ...(due ? { due_at: new Date(due).toISOString() } : {}),
+        evidence_ref: `web-confirmation:${crypto.randomUUID()}`,
+        confirmed: true,
+      });
+      $('#life-commitment-form').reset();
+    });
+  });
+  $('#life-commitments').addEventListener('click', event => {
+    const button = event.target.closest('[data-commitment-action]');
+    if (!button) return;
+    lifeAction(() => postJson('/api/life/commitments', {
+      operation: 'resolve',
+      id: button.dataset.commitmentId,
+      status: button.dataset.commitmentAction,
+      confirmed: true,
+      evidence_ref: `web-resolution:${crypto.randomUUID()}`,
+    }));
+  });
+  $('#life-summary-preview').addEventListener('click', () => lifeAction(async () => {
+    const result = await postJson('/api/life/daily-summary', { operation: 'preview', character_id: CHARACTER_ID });
+    renderDailySummary(result.summary, { preview: true });
+    setText('#life-status', `日报预览完成：第 ${result.summary.world_day} 天，未写入保存记录。`);
+  }));
+  $('#life-summary-materialize').addEventListener('click', () => lifeAction(async () => {
+    const result = await postJson('/api/life/daily-summary', { operation: 'materialize', character_id: CHARACTER_ID });
+    renderDailySummary(result.summary);
+    setText('#life-status', `日报已保存：第 ${result.summary.world_day} 天。`);
+  }));
   $('#life-plans').addEventListener('click', event => {
     const id = event.target.dataset.cancelPlan;
     if (id) lifeAction(() => postJson('/api/life/plans', { operation: 'cancel', id }));
   });
   $('#life-preview').addEventListener('click', () => lifeAction(async () => {
-    const result = await postJson('/api/life/story-packages', { operation: 'preview', package_id: 'tide-path-three-days-v1' });
+    const result = await postJson('/api/life/story-packages', { operation: 'preview', package_id: FEATURED_STORY_PACKAGE_ID });
     $('#life-story-preview').innerHTML = `<strong>${escapeHtml(result.package.title)}</strong> · ${escapeHtml(result.reason)}<ol>${result.steps.map(step => `<li>${escapeHtml(step.title)} · ${escapeHtml(new Date(step.at).toLocaleString('zh-CN'))}</li>`).join('')}</ol>`;
-    $('#life-install').disabled = !result.installable;
+    return result.installable === false ? { disabled: ['life-install'] } : { enabled: ['life-install'] };
   }));
   $('#life-install').addEventListener('click', () => lifeAction(async () => {
-    const result = await postJson('/api/life/story-packages', { operation: 'install', package_id: 'tide-path-three-days-v1' });
+    const result = await postJson('/api/life/story-packages', { operation: 'install', package_id: FEATURED_STORY_PACKAGE_ID });
     $('#life-story-preview').textContent = `已安装：${result.package_id}，${result.plan.steps.length} 个步骤等待世界时间推进。`;
-    $('#life-install').disabled = true;
+    return { disabled: ['life-install'] };
   }));
   lifeAction(async () => {});
 }
 window.addEventListener('DOMContentLoaded', initializeLife);
-const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, npcChatTargetId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false };
+const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, npcChatTargetId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], interactionCandidates: [], interactionSettings: null, worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false, interactionBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
 const emptyState = $('#empty-state');
@@ -1147,6 +1253,112 @@ async function refreshRoleLab() {
   if (pill) { pill.className = `mini-pill ${count ? 'ok' : 'muted'}`; pill.textContent = count ? `${count} 条阶段记录` : '等待候选'; }
 }
 
+const INTERACTION_STATUS_LABELS = Object.freeze({ queued: '排队中', considered: '已看过', deferred: '稍后再看', dismissed: '已关闭', consumed: '已使用', expired: '已过期' });
+const INTERACTION_ACTION_LABELS = Object.freeze({ ignore: '先别打扰', defer: '明天再看', dismiss: '关闭候选', consume: '标记已使用', reopen: '重新放回队列' });
+
+function interactionDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? String(value) : date.toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function interactionLocalDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function setInteractionResult(kind, title, detail = '') {
+  const target = $('#interaction-result');
+  if (!target) return;
+  target.className = `mutation-result ${kind}`;
+  target.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span>`;
+}
+
+function interactionActionsFor(status) {
+  if (status === 'queued' || status === 'considered') return ['ignore', 'defer', 'dismiss', 'consume'];
+  if (status === 'deferred') return ['reopen', 'dismiss', 'consume'];
+  return ['reopen'];
+}
+
+function renderInteractionCandidates(candidates = [], settings = null) {
+  state.interactionCandidates = Array.isArray(candidates) ? candidates : [];
+  state.interactionSettings = settings || null;
+  const target = $('#interaction-candidates');
+  if (!target) return;
+  const pill = $('#interaction-pill');
+  if (pill) {
+    pill.className = `mini-pill ${state.interactionCandidates.length ? 'ok' : 'muted'}`;
+    pill.textContent = state.interactionCandidates.length ? `${state.interactionCandidates.length} 条候选` : '没有候选';
+  }
+  const enabled = $('#interaction-proactive-enabled');
+  if (enabled && settings) enabled.checked = settings.proactive_enabled !== false;
+  const quietUntil = $('#interaction-quiet-until');
+  if (quietUntil && settings) quietUntil.value = interactionLocalDateTime(settings.quiet_until);
+  if (!state.interactionCandidates.length) {
+    target.innerHTML = '<span class="console-hint">当前筛选下没有候选。世界仍在运行，输入只会在自然关联时被带进表达。</span>';
+    return;
+  }
+  target.innerHTML = state.interactionCandidates.map((decision) => {
+    const candidate = decision.candidate || {};
+    const status = decision.proactive_status || 'queued';
+    const title = candidate.title || candidate.summary || candidate.topic || decision.event_type || '未命名候选';
+    const summary = candidate.summary || candidate.daily_consequence || '没有额外摘要。';
+    const detail = [candidate.daily_consequence && `今天的后果：${candidate.daily_consequence}`, candidate.opportunity && `可尝试：${candidate.opportunity}`, candidate.unresolved_hook && `未解钩子：${candidate.unresolved_hook}`].filter(Boolean).join(' · ');
+    const actions = interactionActionsFor(status).map((action) => `<button class="quiet-button interaction-action" type="button" data-interaction-action="${action}" data-interaction-event-id="${escapeHtml(decision.event_id)}">${INTERACTION_ACTION_LABELS[action]}</button>`).join('');
+    return `<article class="interaction-candidate ${escapeHtml(status)}"><div class="interaction-candidate-head"><div><span class="interaction-candidate-kicker">${escapeHtml(decision.layer || 'unclassified')} · ${escapeHtml(decision.source || 'unknown')}</span><strong>${escapeHtml(title)}</strong></div><b>${escapeHtml(INTERACTION_STATUS_LABELS[status] || status)}</b></div><p>${escapeHtml(summary)}</p>${detail ? `<p class="interaction-candidate-detail">${escapeHtml(detail)}</p>` : ''}<div class="interaction-candidate-meta"><span>${escapeHtml(decision.event_type || 'event')}</span><span>发生 ${escapeHtml(interactionDate(decision.occurred_at))}</span><span>过期 ${escapeHtml(interactionDate(decision.expires_at))}</span></div><div class="interaction-candidate-stats"><span>忽略 ${decision.ignored_count ?? 0}</span><span>延后 ${decision.deferred_count ?? 0}</span><span>出现 ${decision.surfaced_count ?? 0}</span>${decision.deferred_until ? `<span>重看 ${escapeHtml(interactionDate(decision.deferred_until))}</span>` : ''}</div><div class="interaction-candidate-actions">${actions}</div></article>`;
+  }).join('');
+}
+
+async function refreshInteractionLab() {
+  const status = $('#interaction-status-filter')?.value || '';
+  const params = new URLSearchParams({ character_id: CHARACTER_ID, limit: '100' });
+  if (status) params.set('status', status);
+  try {
+    const result = await getJson(`/api/interaction/candidates?${params.toString()}`);
+    renderInteractionCandidates(result.candidates || [], result.settings || null);
+  } catch (error) {
+    const pill = $('#interaction-pill');
+    if (pill) { pill.className = 'mini-pill warn'; pill.textContent = '接口不可用'; }
+    const target = $('#interaction-candidates');
+    if (target) target.innerHTML = `<span class="console-hint">候选接口暂时不可用：${escapeHtml(error.message)}</span>`;
+  }
+}
+
+async function resolveInteractionCandidate(button) {
+  if (state.interactionBusy) return;
+  state.interactionBusy = true;
+  button.disabled = true;
+  try {
+    const action = button.dataset.interactionAction;
+    const eventId = button.dataset.interactionEventId;
+    const result = await postJson(`/api/interaction/candidates/${encodeURIComponent(eventId)}`, { character_id: CHARACTER_ID, action, reason: `研究台操作：${INTERACTION_ACTION_LABELS[action] || action}` });
+    const candidate = result.candidate || {};
+    setInteractionResult('ok', '候选状态已更新', `${candidate.event_id || eventId} · ${INTERACTION_STATUS_LABELS[candidate.proactive_status] || candidate.proactive_status}`);
+    await refreshInteractionLab();
+  } catch (error) {
+    setInteractionResult('bad', '候选操作失败', error.message);
+  } finally {
+    state.interactionBusy = false;
+    button.disabled = false;
+  }
+}
+
+async function saveInteractionSettings() {
+  const enabled = $('#interaction-proactive-enabled')?.checked !== false;
+  const inputValue = $('#interaction-quiet-until')?.value || '';
+  const quietUntil = inputValue ? new Date(inputValue).toISOString() : null;
+  try {
+    const result = await postJson('/api/interaction/settings', { character_id: CHARACTER_ID, proactive_enabled: enabled, quiet_until: quietUntil });
+    renderInteractionCandidates(state.interactionCandidates, result.settings || result);
+    setInteractionResult('ok', '主动性设置已保存', enabled ? (quietUntil ? `安静到 ${interactionDate(quietUntil)}` : '喵呜会在自然关联时自行决定是否带出候选') : '主动带出已暂停；候选仍会继续记录');
+  } catch (error) {
+    setInteractionResult('bad', '设置没有保存', error.message);
+  }
+}
+
 async function handleRoleAction(actionTarget) {
   if (state.roleBusy) return;
   state.roleBusy = true;
@@ -1199,6 +1411,9 @@ async function refreshDashboard({ allowEncounterAutoOpen = true } = {}) {
   if (worldMap.status === 'fulfilled') renderWorldMap(worldMap.value); else { $('#map-status').className = 'mini-pill warn'; $('#map-status').textContent = '地图不可用'; }
   if (worldLife.status === 'fulfilled') updateWorldLife(worldLife.value, { allowAutoOpen: allowEncounterAutoOpen });
   if (runtimeContext.status === 'fulfilled') updateRuntimeContext(runtimeContext.value); else refreshRuntimeContext(); if (shortState.status === 'fulfilled') updateShortState(shortState.value); if (voice.status === 'fulfilled') updateVoice(voice.value); else updateVoice({ status: 'unavailable', error: voice.reason?.body?.error || 'voice_sidecar_not_configured' }); renderEventLog(events.status === 'fulfilled' ? events.value.events || [] : []); renderEvidenceLog(evidence.status === 'fulfilled' ? evidence.value.evidence || [] : []); if (schema.status === 'fulfilled') updateWorldSchema(schema.value); else { $('#schema-pill').className = 'mini-pill muted'; $('#schema-pill').textContent = '契约不可用'; } state.multisourceMutations = mutations.status === 'fulfilled' ? mutations.value.mutations || [] : []; renderMutationLedger(state.multisourceMutations); renderContextWorkbench(state.world, state.multisourceMutations); if (scenarios.status === 'fulfilled') renderScenarioCatalog(scenarios.value); else { $('#scenario-pill').className = 'mini-pill muted'; $('#scenario-pill').textContent = '场景不可用'; } if (probes.status === 'fulfilled') renderProbeCatalog(probes.value); else { $('#probe-pill').className = 'mini-pill muted'; $('#probe-pill').textContent = '探针不可用'; } renderProbeObservations(probeObservations.status === 'fulfilled' ? probeObservations.value.observations || [] : []);
+  // Candidate read model is intentionally independent from the dashboard
+  // batch: a missing management endpoint must not hide world/weather data.
+  await refreshInteractionLab();
 }
 
 async function submitMutation() {
@@ -1359,3 +1574,10 @@ $('#role-lab').addEventListener('click', (event) => {
   const target = event.target.closest('[data-role-action]');
   if (target) handleRoleAction(target);
 });
+$('#interaction-refresh').addEventListener('click', refreshInteractionLab);
+$('#interaction-status-filter').addEventListener('change', refreshInteractionLab);
+$('#interaction-candidates').addEventListener('click', (event) => {
+  const target = event.target.closest('[data-interaction-action]');
+  if (target) resolveInteractionCandidate(target);
+});
+$('#interaction-settings-form').addEventListener('submit', (event) => { event.preventDefault(); saveInteractionSettings(); });

@@ -9,7 +9,8 @@ import { createDeskBotServer } from '../src/app.mjs';
 import { createSqlitePersistence } from '../src/persistence.mjs';
 import { createPersistentWorld } from '../src/persistent-world.mjs';
 import { createNpcGoals } from '../src/npc-goals.mjs';
-import { createWorldLife, NPC_ROUTINE_SLOT_MS, SLOT_MS } from '../src/world-life.mjs';
+import { createWorldLife, NPC_ROUTINE_SLOT_MINUTES, NPC_ROUTINE_SLOT_MS, NPC_ROUTINES, SLOT_MS, WORLD_REPLAY_MAX_MINUTES } from '../src/world-life.mjs';
+import { loadMorrowmereContent } from '../src/content-packages.mjs';
 
 function mutation(eventId, payload, occurredAt = '2026-09-17T02:00:00.000Z') {
   return {
@@ -28,7 +29,7 @@ function fixture(initial = '2026-09-17T02:00:00.000Z', persistence = null) {
   let clock = new Date(initial);
   const now = () => new Date(clock);
   const world = createPersistentWorld({ now, persistence });
-  const life = createWorldLife({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event) });
+  const life = createWorldLife({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event), listMutations: options => world.listMutations(options) });
   return {
     world,
     life,
@@ -319,7 +320,9 @@ test('seeded NPCs and the current scene survive a persistence restart without co
     firstPersistence.close();
 
     const secondPersistence = createSqlitePersistence({ filename });
-    const second = fixture('2026-09-17T02:00:00.000Z', secondPersistence);
+    // Simulate a restart after wall time has moved; the persisted replay
+    // timestamp must still make every retry step fingerprint-identical.
+    const second = fixture('2026-09-17T02:17:00.000Z', secondPersistence);
     assert.doesNotThrow(() => second.life.tick());
     assert.equal(second.world.get().life.current_scene.scene_id, sceneId);
     assert.equal(second.world.get().npcs.length, 3);
@@ -330,25 +333,109 @@ test('seeded NPCs and the current scene survive a persistence restart without co
   }
 });
 
-test('bounded NPC routines use the goal engine, move one adjacent hop and refresh local encounters', () => {
+test('content-authored NPC schedules use logical world time and move only one legal adjacent hop', () => {
   let clock = new Date('2026-09-17T02:00:00.000Z');
   const now = () => new Date(clock);
   const world = createPersistentWorld({ now });
   const goals = createNpcGoals({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event) });
   const life = createWorldLife({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event), npcGoals: goals });
+  const content = loadMorrowmereContent();
+  const pathfinderSchedule = content.schedules.schedules.find((schedule) => schedule.npc_id === 'pathfinder-001');
+  assert.deepEqual(NPC_ROUTINES['pathfinder-001'].route, pathfinderSchedule.route);
+  assert.equal(NPC_ROUTINES['pathfinder-001'].purpose, pathfinderSchedule.purpose);
 
   life.tick();
   const pathfinder = world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001');
   assert.equal(pathfinder.location_id, 'shaping-field-desk');
-  assert.equal(life.snapshot().encounters[0].npc_id, 'pathfinder-001');
-  assert.equal(goals.list().find((goal) => goal.npc_id === 'pathfinder-001').origin, 'world-life-engine');
-  assert.equal(goals.list().find((goal) => goal.npc_id === 'pathfinder-001').state, 'completed');
+  assert.equal(pathfinder.last_action, 'move_to_adjacent_location');
+  let routineGoal = goals.list().find((goal) => goal.npc_id === 'pathfinder-001');
+  assert.equal(routineGoal.origin, 'world-life-engine');
+  assert.equal(routineGoal.purpose, pathfinderSchedule.purpose);
+  assert.equal(routineGoal.state, 'completed');
 
+  // Wall-clock time does not move an authored logical-world schedule.
   clock = new Date(clock.getTime() + NPC_ROUTINE_SLOT_MS);
   life.tick();
+  assert.equal(world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').location_id, 'shaping-field-desk');
+
+  world.ingest(mutation('advance-authored-schedule', { action: 'advance_time', minutes: NPC_ROUTINE_SLOT_MINUTES }));
+  life.tick();
   assert.equal(world.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').location_id, 'tidal-old-road');
+  routineGoal = goals.list().filter((goal) => goal.npc_id === 'pathfinder-001').at(-1);
+  assert.equal(routineGoal.state, 'completed');
   assert.equal(life.snapshot().encounters.some((npc) => npc.npc_id === 'pathfinder-001'), false);
   assert.ok(world.get().life.current_scene.participants.every((npcId) => npcId !== 'pathfinder-001'));
+});
+
+test('bounded world-life replay advances logical time across days and moves NPCs by adjacent hops', () => {
+  let clock = new Date('2026-09-17T02:00:00.000Z');
+  const now = () => new Date(clock);
+  const world = createPersistentWorld({ now });
+  const goals = createNpcGoals({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event) });
+  const life = createWorldLife({ now, worldSnapshot: () => world.get(), ingest: (event) => world.ingest(event), npcGoals: goals });
+  life.tick();
+  const before = world.get();
+  const beforeLocations = new Map(before.npcs.map((npc) => [npc.npc_id, npc.location_id]));
+  const replay = life.replay({ minutes: 24 * 60 + 1, replay_id: 'cross-day-001' });
+  const after = world.get();
+  assert.equal(replay.schema, 'deskbot.world-life-replay.v0.1');
+  assert.equal(replay.steps.length, Math.ceil((24 * 60 + 1) / NPC_ROUTINE_SLOT_MINUTES));
+  assert.equal(after.logical_time.day, before.logical_time.day + 1);
+  assert.equal(after.logical_time.minute_of_day, before.logical_time.minute_of_day + 1);
+  assert.deepEqual(replay.steps.map((step) => step.event_id), replay.steps.map((_, index) => `world-life-replay:cross-day-001:${index}`));
+  assert.ok(replay.steps.every((step) => step.mutation_id && step.logical_time_after));
+  const locations = new Map(after.npcs.map((npc) => [npc.npc_id, npc.location_id]));
+  for (const npc of after.npcs) {
+    if (npc.npc_id === 'pathfinder-001') {
+      const previous = beforeLocations.get(npc.npc_id);
+      const previousLocation = after.locations.find((location) => location.location_id === previous);
+      assert.ok(npc.location_id === previous || previousLocation?.neighbors.includes(npc.location_id));
+    }
+  }
+  assert.ok(new Set(replay.steps.map((step) => step.scene_id)).size > 1, 'replay should cross authored scene slots');
+  assert.throws(() => life.replay({ minutes: WORLD_REPLAY_MAX_MINUTES + 1, replay_id: 'too-large' }), /between 1/);
+  assert.deepEqual(locations.size, after.npcs.length);
+});
+
+test('world-life replay is idempotent for a replay id', () => {
+  const { world, life, advance } = fixture('2026-09-17T02:00:00.000Z');
+  life.tick();
+  const first = life.replay({ minutes: 240, replay_id: 'repeatable-001' });
+  const revision = world.get().world_revision;
+  const mutationCount = world.listMutations().length;
+  // A retry may arrive after wall time has advanced. It must reuse the
+  // persisted event timestamps instead of conflicting on its fingerprint.
+  advance(17 * 60 * 1000);
+  const repeated = life.replay({ minutes: 240, replay_id: 'repeatable-001' });
+  assert.equal(world.get().logical_time.day, first.logical_time_after.day);
+  assert.equal(world.get().logical_time.minute_of_day, first.logical_time_after.minute_of_day);
+  assert.equal(world.get().world_revision, revision);
+  assert.equal(world.listMutations().length, mutationCount);
+  assert.ok(repeated.steps.every((step) => step.duplicate === true));
+  assert.deepEqual(repeated.steps.map((step) => step.event_id), first.steps.map((step) => step.event_id));
+});
+
+test('world-life replay remains idempotent after SQLite restart', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deskbot-world-replay-'));
+  const filename = join(directory, 'world-replay.sqlite');
+  try {
+    const firstPersistence = createSqlitePersistence({ filename });
+    const first = fixture('2026-09-17T02:00:00.000Z', firstPersistence);
+    first.life.tick();
+    const firstReplay = first.life.replay({ minutes: 240, replay_id: 'restartable-001' });
+    const firstLogicalTime = first.world.get().logical_time;
+    firstPersistence.close();
+
+    const secondPersistence = createSqlitePersistence({ filename });
+    const second = fixture('2026-09-17T02:00:00.000Z', secondPersistence);
+    const secondReplay = second.life.replay({ minutes: 240, replay_id: 'restartable-001' });
+    assert.deepEqual(second.world.get().logical_time, firstLogicalTime);
+    assert.ok(secondReplay.steps.every((step) => step.duplicate === true));
+    assert.deepEqual(second.world.listMutations().filter((item) => item.event_id.startsWith('world-life-replay:restartable-001:')).map((item) => item.event_id), firstReplay.steps.map((step) => step.event_id));
+    secondPersistence.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('world-life HTTP endpoints expose encounters and reject remote NPC interaction', async (t) => {
@@ -395,4 +482,23 @@ test('world-life HTTP endpoints expose encounters and reject remote NPC interact
   const routePull = pulls.pulls.find((pull) => pull.direction_id === 'tide_route_explorer');
   assert.equal(routePull.status, 'observing');
   assert.deepEqual(routePull.evidence_ids, ['evidence-npc-interaction:pathfinder-001:http-idea']);
+});
+
+test('world-life HTTP replay endpoint returns bounded deterministic steps', async (t) => {
+  const now = () => new Date('2026-09-17T02:00:00.000Z');
+  const server = createDeskBotServer({ now, websocket: false, worldLifeEnabled: true });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const body = JSON.stringify({ minutes: 240, replay_id: 'http-replay-001' });
+  const first = await fetch(`${origin}/api/life/world/replay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+  assert.equal(first.status, 200);
+  const firstBody = await first.json();
+  assert.equal(firstBody.steps.length, 2);
+  const repeated = await fetch(`${origin}/api/life/world/replay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+  assert.equal(repeated.status, 200);
+  const repeatedBody = await repeated.json();
+  assert.ok(repeatedBody.steps.every((step) => step.duplicate));
+  assert.deepEqual(repeatedBody.logical_time_after, firstBody.logical_time_after);
 });

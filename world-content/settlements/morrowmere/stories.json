@@ -1,0 +1,52 @@
+{
+  "schema": "deskbot.scene-content.v0.1",
+  "settlement_id": "morrowmere",
+  "scene_layers": ["place", "time_slot", "participants", "causal_branch"],
+  "authoring_rule": "Scene 描述此时此地可观察的生活，不替角色规定内心，也不把 opportunity 说成已发生。",
+  "starter_arc": {
+    "arc_id": "morrowmere-first-days-v1",
+    "title": "雾灯镇的第一盏灯",
+    "premise": "喵呜刚在桌边凝聚成猫型外壳；小镇没有等它拯救什么，只在每天的路线、摊位和回声里给它留下可选择的生活。",
+    "first_person_anchor": "喵呜能从自己的位置看到、听到并判断眼前的事情，但不是世界唯一的主角。"
+  },
+  "story_packages": [
+    {
+      "id": "morrowmere-first-day-v1",
+      "schema": "deskbot.story-package-content.v0.1",
+      "title": "雾灯镇第一天：先听灯声",
+      "premise": "喵呜在桌边听见雾灯镇的第一声偏移。潮痕巡路员把一张缺角地图带到桌边，但小镇没有替喵呜决定要不要同行。",
+      "npc_id": "pathfinder-001",
+      "npc_location_id": "shaping-field-desk",
+      "step_offsets_hours": [0, 3, 8],
+      "days": [
+        {
+          "key": "lamp-heard",
+          "title": "喵呜第一次听见雾灯镇的灯声",
+          "summary": "桌边的光没有变亮，只在同一条看不见的路上停得久了一点。喵呜能听见灯声，却还不知道它在邀请谁。",
+          "consequence": "雾灯镇的一条未登记岔口进入近期世界线，仍不可视为开放道路。",
+          "opportunity": "可以先观察灯光偏向，再决定要不要让巡路员试走十步。",
+          "action": "world_event",
+          "event": { "status": "active", "outcome": "lamp_heard" }
+        },
+        {
+          "key": "route-keeper-arrives",
+          "title": "巡路员把缺角地图带到桌边",
+          "summary": "潮痕巡路员沿着灯光偏移的方向来到桌边，摊开一张缺角地图。它只把地图推近，没有替喵呜把爪子放上去。",
+          "consequence": "潮痕巡路员成为当前世界线中可观察、可问候的在场 NPC。",
+          "opportunity": "可以观察、问候，或提出一起做十步试走的想法。",
+          "action": "npc_action",
+          "npc_action": { "action_name": "bring_corner_map", "status": "把缺角地图摊在桌边，等喵呜先看一眼" }
+        },
+        {
+          "key": "first-choice",
+          "title": "第一天没有结论，只有一个方向",
+          "summary": "灯光仍然偏向那条未登记岔口。喵呜可以留下，也可以把第一步交给巡路员；无论如何，小镇会继续过自己的下一小时。",
+          "consequence": "第一天被记录为一次共同观察，路线是否开放仍等待规则允许的行动。",
+          "opportunity": "把这次共同观察留作喵呜第一次选择方向的起点。",
+          "action": "world_consequence",
+          "event": { "status": "resolved", "outcome": "first_choice_waiting" }
+        }
+      ]
+    }
+  ]
+}
