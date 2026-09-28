@@ -67,12 +67,17 @@ export function createOpenAiCompatibleLlm({
   base_url: baseUrl,
   api_key: apiKey,
   model,
+  temperature = 0.55,
   fetchImpl = globalThis.fetch,
   timeoutMs = 60_000,
+  emptyResponseRetries = 1,
 } = {}) {
   const endpoint = completionUrl(baseUrl);
   const secret = requireText(apiKey, 'api_key');
   const modelId = requireText(model, 'model');
+  const samplingTemperature = Number.isFinite(Number(temperature))
+    ? Math.min(1, Math.max(0, Number(temperature)))
+    : 0.55;
   if (typeof fetchImpl !== 'function') {
     throw new LlmConfigurationError('fetchImpl must be a function');
   }
@@ -81,56 +86,69 @@ export function createOpenAiCompatibleLlm({
     id: 'openai-compatible-v0.1',
     async complete({ prompt }) {
       const promptText = requireText(prompt, 'prompt');
-      let response;
-      try {
-        response = await fetchImpl(endpoint, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${secret}`,
-            'content-type': 'application/json',
+      const attempts = Math.max(0, Number(emptyResponseRetries)) + 1;
+      let lastError = null;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        let response;
+        try {
+          response = await fetchImpl(endpoint, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${secret}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: 'user', content: promptText }],
+              stream: false,
+              temperature: samplingTemperature,
+            }),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+        } catch (error) {
+          lastError = new LlmProviderError('llm_transport_error', 'LLM request failed before a provider response was received', {
+            retryable: true,
+          });
+          continue;
+        }
+
+        if (!response.ok) {
+          const error = new LlmProviderError(
+            'llm_http_error',
+            `LLM endpoint returned HTTP ${response.status}`,
+            { status: response.status },
+          );
+          if (error.retryable && attempt < attempts - 1) {
+            lastError = error;
+            continue;
+          }
+          throw error;
+        }
+
+        let body;
+        try {
+          body = await response.json();
+        } catch {
+          lastError = new LlmProviderError('llm_invalid_response', 'LLM endpoint returned invalid JSON');
+          continue;
+        }
+        const text = body?.choices?.[0]?.message?.content;
+        if (typeof text !== 'string' || text.trim() === '') {
+          lastError = new LlmProviderError('llm_invalid_response', 'LLM endpoint returned no assistant text');
+          continue;
+        }
+
+        return {
+          provider: this.id,
+          model: modelId,
+          text: text.trim(),
+          trace: {
+            finish_reason: body.choices[0].finish_reason ?? null,
+            usage: body.usage ?? null,
           },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [{ role: 'user', content: promptText }],
-            stream: false,
-            temperature: 0.2,
-          }),
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-      } catch (error) {
-        throw new LlmProviderError('llm_transport_error', 'LLM request failed before a provider response was received', {
-          retryable: true,
-        });
+        };
       }
-
-      if (!response.ok) {
-        throw new LlmProviderError(
-          'llm_http_error',
-          `LLM endpoint returned HTTP ${response.status}`,
-          { status: response.status },
-        );
-      }
-
-      let body;
-      try {
-        body = await response.json();
-      } catch {
-        throw new LlmProviderError('llm_invalid_response', 'LLM endpoint returned invalid JSON');
-      }
-      const text = body?.choices?.[0]?.message?.content;
-      if (typeof text !== 'string' || text.trim() === '') {
-        throw new LlmProviderError('llm_invalid_response', 'LLM endpoint returned no assistant text');
-      }
-
-      return {
-        provider: this.id,
-        model: modelId,
-        text: text.trim(),
-        trace: {
-          finish_reason: body.choices[0].finish_reason ?? null,
-          usage: body.usage ?? null,
-        },
-      };
+      throw lastError ?? new LlmProviderError('llm_invalid_response', 'LLM endpoint returned no assistant text');
     },
   };
 }
@@ -139,7 +157,11 @@ export function createConfiguredLlm(options = {}) {
   const configuration = loadLlmConfiguration(options);
   return configuration.provider === 'fake'
     ? createFakeLlm()
-    : createOpenAiCompatibleLlm({ ...configuration, fetchImpl: options.fetchImpl });
+    : createOpenAiCompatibleLlm({
+      ...configuration,
+      temperature: options.temperature ?? process.env.DESKBOT_LLM_TEMPERATURE ?? 0.55,
+      fetchImpl: options.fetchImpl,
+    });
 }
 
 export function createFakeLlm() {

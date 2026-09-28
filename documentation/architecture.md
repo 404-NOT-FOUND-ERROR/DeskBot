@@ -10,6 +10,7 @@ DeskBot Web / Jev Town 3D client / 固件 / RisuAI 对照适配器
           v
 Node deskbot-service :4311
   input -> world/state/evidence -> prompt -> LLM
+  input-runtime      -> source schedule/retry/cache recovery
   canonical world    -> derived map -> validated travel mutation
   world-life engine  -> timed Scene + bounded NPC actions
   weather connector  -> canonical mutation
@@ -43,6 +44,20 @@ Node deskbot-service :4311
 - Node -> 设备：只发送白名单命令和版本化状态；设备回 ACK，不能直接写角色 trait 或 canonical world。
 - SQLite：应用服务可写，Web 不直接访问文件；WAL 文件属于运行数据，不提交 Git。
 
+### P4-1 多源输入运行层
+
+`input-runtime.mjs` 是 provider 采集和 canonical world 之间的运行层。它维护来源注册表、到期判断、成功/失败状态、指数退避和 `input-runtime.sources` 持久化；当前服务启动时注册天气实时观测，以及小实时、小时、每日三个相互独立的天气预报缓存来源，并通过 `GET /api/input-runtime` 暴露安全状态。默认每 5 分钟检查一次，实际请求仍由各 connector 的 TTL 决定；某一种预报失败不会拖垮其他预报或世界生活调度。
+
+天气 connector 的实时快照和 minutely/hourly/daily 预报现在写入 SQLite `connector.weather/state`，进程重启可恢复缓存、时间、新鲜度和错误摘要。token 不进入状态、事件或日志。实时天气成功后仍必须由 `ingestNonChatEvent()` 进入 `input-store -> persistent-world`；预报来源只更新 connector 缓存，不覆盖 canonical 当前天气。重复事件依靠既有 event ID 幂等，旧观测仍只进入审计而不覆盖较新的世界快照。
+
+输入运行层可以注册新闻、日历、设备等后续 adapter，但本阶段不把 observation 自动解释为世界事件；后续 provider 必须先规范化来源、时间、可信度和 provenance，再通过统一事件入口，P4-2 才负责把证据聚合成世界线候选或合法 mutation。
+
+### P4-2 角色方向演化闭环
+
+`role-evolution.mjs` 从已持久化且符合资格的多源事件中调用 `fantasy-pull.v0.3`，保存候选、运行记录和冷却状态；达到候选阈值时自动创建一条 `proposed` 提案。HTTP 事件入口、成功的用户聊天回合、服务启动和每分钟调度都会触发幂等同步。同步接口 `GET /api/roles/evolution` 提供候选、运行、提案、活动试行和 accepted 阶段；`POST /api/roles/evolution/sync` 返回本次新建的 `created` 列表。相同证据指纹会复用已有运行记录，不重复建提案；聊天重试和重复 event ID 不重复计入试行观察。
+
+角色状态仍由 `role-proposals.mjs` 管理：候选只生成提案，用户必须明确选择 `try`，试行窗口完成后再明确接受、拒绝或延后。accepted 阶段通过普通提示词、`expression_intent` 和 `world-life` 的 Scene 决策上下文产生有限表达/生活倾向；`GET /api/life/world` 兼容保留 `role_stages`，并提供 `role_context.current_stage/stages`。该投影不是新的世界写权限：角色台词不能直接变更 canonical world，角色阶段也不会自动修改 Soul 或外壳。
+
 ## 已知风险 / 假设
 
 - 当前没有用户认证、会话、设备密钥或速率限制；只适合本机研究，不适合直接暴露公网或未经隔离的局域网。
@@ -64,11 +79,21 @@ Node deskbot-service :4311
 
 ## 世界自动生活与 NPC 相遇
 
-`world-life.mjs` 是 canonical world 之上的有限、确定、可回放调度器，不是第二个世界状态源。正式服务启动时播种有档案的首发 NPC，并立即生成当前地点 Scene；之后每分钟检查，默认以 30 分钟真实时间槽选择生活片段。Scene 选择只读取当前位置、逻辑时间段、最新世界线和天气，结果必须通过 `set_life_scene` mutation 写回 canonical world。相同事件跨槽时使用 `continue_life_scene` 延长同一个 Scene，不重复制造旁白；同地点最近两个模板进入冷却，只有时段约束没有可用替代时才继续当前事件。当前 Scene、最近 12 个已结束 Scene、NPC 当前行动、共同经历和互动关系都能在 SQLite 重启后恢复。
+`world-life.mjs` 是 canonical world 之上的有限、确定、可回放调度器，不是第二个世界状态源。正式服务启动时播种有档案的首发 NPC，并立即生成当前地点 Scene；之后每分钟检查世界时间，NPC 行动以作者定义的 120 分钟逻辑槽调度。Scene 选择只读取当前位置、逻辑时间段、最新世界线和天气，结果必须通过 `set_life_scene` mutation 写回 canonical world。相同事件跨槽时使用 `continue_life_scene` 延长同一个 Scene，不重复制造旁白；同地点最近两个模板进入冷却，只有时段约束没有可用替代时才继续当前事件。当前 Scene、最近 12 个已结束 Scene、NPC 当前行动、共同经历和互动关系都能在 SQLite 重启后恢复。
 
 首版用户与 NPC 的互动只开放 `observe/greet/chat/suggest/help/invite` 六种意图。`suggest` 可以携带最多 500 字想法，但服务端决定 NPC 的回应；NPC 必须与喵呜同地，远方 NPC 不能互动。每次互动带幂等 ID，通过 `npc_interaction` mutation 增加有限的熟悉度、信任和相遇次数，并在 `life.recent_experiences` 留下一条可归因共同经历。`suggest/help/invite` 可附带由 NPC 身份规则决定的低置信角色方向提示；它只进入多源证据聚合的 `observing` 阶段，仍需跨来源、重复证据才能成为候选，不能直接修改 Soul、身份或外壳。
 
 NPC 自动日程与作者目标共用 `npc-goals.mjs`。目标备选行动可带 `location_id`，但 canonical world 强制 NPC 每次只能走一个相邻地点；世界生活引擎每两小时最多为内置 NPC 安排一个有限日程，手工创建且尚未结束的目标优先。目标决策先持久化再执行，NPC 抵达或离开会改变同地点 encounters 和 Scene 参与者；用户对话、LLM 文本和人物面板按钮都不能直接移动 NPC。
+
+### NevaMind 风格 NPC Agent Loop（v0.1）
+
+`npc-agent-loop.mjs` 是日程与 NPC 行动之间的决策层：每个 NPC 每个逻辑两小时槽只生成一次决策，先从作者路线、当前地点邻接点、Scene 动作和原地观察中构造候选，再按优先级和稳定哈希选择一个候选。路线目标可以跨多个地点，但 Agent 只会取通往目标的一个相邻 hop；因此它借鉴 NevaMind 的“感知/候选/选择/执行”分层，同时不引入第二套世界事实。
+
+决策记录写入 `life.npc-agent-decisions`，包含合法候选、选中动作、世界 revision、`planned/executed/failed` 状态、`selection_mode`、关联 goal ID 和执行事件 ID。决策日志保留最近 120 条，清理会同步删除 SQLite 记录。实际写入仍由 `npc-goals` 调度，并最终通过 `persistent-world.ingest()` 的白名单 `npc_action` mutation 验证；LLM 或外部 `decisionProvider` 只能返回候选 ID，非法返回会回退到确定性策略，不能移动 NPC 或写世界。无作者路线命中时，Agent 以低频稳定哈希脉冲从已验证的相邻地点中挑选一次探索；它不能生成传送、跨越邻接图或绕过 goal 验证。
+
+创建 goal 后，决策会保存 `goal_id`；每次 goal tick 结束后统一 reconcile 持久化 goal。服务在“决策已保存、目标尚未执行”阶段中断并重启时，会先由 `npc-goals` 执行 canonical mutation，再把决策恢复为 `executed/failed`，避免 Agent 日志与世界事实分叉。
+
+`GET /api/life/npc-agents` 是只读观测接口，可按 `npc_id` 和 `limit` 查看最近决策。旧的 `world-life-routine:*` 目标 ID 和 replay 语义保持兼容。当前版本仍是有限、可回放的 Agent Loop：没有自主生成无限目标、没有跨天人格成长，也不会因为一次选择自动改变聚形域、角色阶段或外壳。
 
 `GET /api/life/world` 是只读相遇视图，不会因为刷新网页推进世界；`POST /api/life/npc-interactions` 是唯一普通用户 NPC 互动入口。Web 在故事窗显示已发生 Scene，在“可以试试”前明确保留未发生语义；同地点 NPC 通过横排入口和人物面板出现，首次相遇每个浏览器会话只自动呼出一次。NPC 回应使用独立署名进入故事流，不伪装成喵呜发言。
 

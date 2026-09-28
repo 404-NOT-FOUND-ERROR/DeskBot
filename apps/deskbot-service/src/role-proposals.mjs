@@ -50,7 +50,16 @@ export function createRoleProposal(pull, { proposalId = null, characterId = null
     label: pull.label,
     life: pull.life,
     fantasy_pull: pull.fantasy_pull,
+    score: pull.score ?? null,
     evidence_ids: [...pull.evidence_ids],
+    sources: [...(pull.sources ?? [])],
+    evidence_fingerprint: JSON.stringify({
+      evidenceIds: [...(pull.evidence_ids ?? [])].sort(),
+      sources: [...(pull.sources ?? [])].sort(),
+      score: pull.score ?? null,
+      fantasyPull: pull.fantasy_pull ?? null,
+    }),
+    evidence_revision: 1,
     proposed_at: new Date(now).toISOString(),
     cooldown_until: new Date(new Date(now).getTime() + cooldownMs).toISOString(),
     status: 'proposed',
@@ -93,6 +102,28 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     proposals.set(proposal.proposal_id, proposal);
     persistence?.put('role.proposals', proposal.proposal_id, proposal);
     return clone(proposal);
+  }
+  function refreshEvidence(proposalId, pull, { now: refreshedAt = now() } = {}) {
+    const proposal = proposals.get(proposalId);
+    if (!proposal || !pull || typeof pull !== 'object') return null;
+    const evidenceIds = Array.isArray(pull.evidence_ids) ? [...new Set(pull.evidence_ids)] : proposal.evidence_ids ?? [];
+    const sources = Array.isArray(pull.sources) ? [...new Set(pull.sources)] : proposal.sources ?? [];
+    const nextFingerprint = JSON.stringify({ evidenceIds: [...evidenceIds].sort(), sources: [...sources].sort(), score: pull.score ?? null, fantasyPull: pull.fantasy_pull ?? null });
+    const previousFingerprint = proposal.evidence_fingerprint ?? JSON.stringify({ evidenceIds: [...(proposal.evidence_ids ?? [])].sort(), sources: [...(proposal.sources ?? [])].sort(), score: proposal.score ?? null, fantasyPull: proposal.fantasy_pull ?? null });
+    if (nextFingerprint === previousFingerprint) return clone(proposal);
+    const updated = {
+      ...proposal,
+      fantasy_pull: pull.fantasy_pull ?? proposal.fantasy_pull,
+      score: pull.score ?? proposal.score,
+      evidence_ids: evidenceIds,
+      sources,
+      evidence_fingerprint: nextFingerprint,
+      evidence_updated_at: new Date(refreshedAt).toISOString(),
+      evidence_revision: (proposal.evidence_revision ?? 0) + 1,
+    };
+    proposals.set(proposalId, updated);
+    persistence?.put('role.proposals', proposalId, updated);
+    return clone(updated);
   }
   function activeTrials({ characterId = null, limit = 10 } = {}) {
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 10, 1), 50);
@@ -221,7 +252,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     return [...decisions.values()].filter((item) => !proposalId || item.proposal_id === proposalId).slice(-bounded).map(clone);
   }
-  return { propose, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
+  return { propose, refreshEvidence, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
 }
 
 export { ROLE_TRIAL_OVERLAYS };

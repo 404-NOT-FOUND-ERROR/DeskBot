@@ -73,6 +73,5 @@ test('context endpoint gives the LLM a live server clock without replacing the c
   assert.equal(chat.turn.canonical_world.snapshot.logical_time.day, 1);
   assert.ok(capturedPrompt);
   assert.match(capturedPrompt, /2026年09月04日 星期五 16:00/);
-  assert.match(capturedPrompt, /禁止只输出日期、时间、时区或固定系统模板/);
-  assert.match(capturedPrompt, /不?知道用户所在地/);
+  assert.match(capturedPrompt, /天气、时间、世界经历、共同记忆、现实感知和已执行动作，以本轮提供的证据为准/);
 });

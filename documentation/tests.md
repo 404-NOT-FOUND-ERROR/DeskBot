@@ -18,6 +18,8 @@
 | 旧世界迁移 | `ember-001`/旧名迁移到 canonical ID/喵呜且保留历史 | `persistent-world-migration.test.mjs` | existing |
 | 多源隔离 | 世界线、天气、用户偏好和设备事件按 route 分类，不自动播报 | `interaction-policy.test.mjs`、`multisource-prompt.test.mjs` | existing |
 | 天气缓存 | TTL、force、观测时间单调、v7/v1 字段和错误不泄密 | `weather-connector.test.mjs`、`context-sources.test.mjs` | existing |
+| P4-1 输入运行层 | 来源注册、TTL 到期判断、SQLite 状态恢复、失败退避、持久化失败隔离、canonical ingest callback 不被调度异常打断 | `input-runtime.test.mjs`、`weather-persistence.test.mjs` | implemented: 5 cases |
+| P4 角色演化闭环 | 独立来源聚合、候选/提案幂等物化、显式试行、聊天 neutral 观察、accepted 阶段提示词/表达/世界投影、SQLite 重启恢复、单句变形不越权 | `role-evolution.test.mjs`、`p4-acceptance.test.mjs`、`role-proposals-http.test.mjs`、`chat-orchestrator.test.mjs`、`world-life.test.mjs` | implemented |
 | LLM 错误 | 不回显 provider body/secret；缺配置拒绝启动 | `llm.test.mjs` | existing |
 | 设备 outbox/ACK | 白名单命令、重复 ACK、冲突 ACK 和失败可解释 | `output-router*.test.mjs`、`device-*.test.mjs` | existing |
 | WebSocket/音频协议 | hello、能力协商、序列、hash、重连和播放边界 | `websocket-bridge.test.mjs`、`app-websocket.test.mjs`、`protocol-regression.test.mjs` | existing |
@@ -25,7 +27,7 @@
 | voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
 | CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
 
-此前 Node 服务回归基线为 `145/145`；持续世界增量曾达到 `180/180`。Persona Agent、作者 Markdown 卡、NPC HTTP 接线、fallback/幂等和桌面潮玩 Scene 文案增量后的历史快照为 `186/186`，再到 `194/194`、`216/216`；当前源码复核为 `223/223`，其中包含 P3 共同生活、跨日回放、雾灯镇内容合同、world-life 重启幂等和 replay 幂等断言。Jev Town 客户端当前为 `16 files / 132 tests`，TypeScript 检查与生产构建通过；路线投影定向用例为 26 个。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。历史数字只用于追溯，不代表当前代码状态。
+此前 Node 服务回归基线为 `145/145`；持续世界增量曾达到 `180/180`。Persona Agent、作者 Markdown 卡、NPC HTTP 接线、fallback/幂等和桌面潮玩 Scene 文案增量后的历史快照为 `186/186`，再到 `194/194`、`216/216`、`223/223`；本次 P4 收口后的当前源码复核为 `244/244`，其中包含角色方向候选、提案物化、有限试行、accepted 阶段投影和重启恢复。Jev Town 客户端当前为 `16 files / 132 tests`，TypeScript 检查与生产构建通过；路线投影定向用例为 26 个。Python sidecar 回归为 `16/16`（以本地记录为准，未把 provider 网络调用算作自动通过）。历史数字只用于追溯，不代表当前代码状态。
 
 2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
 

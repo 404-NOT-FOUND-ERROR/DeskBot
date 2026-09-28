@@ -2,7 +2,7 @@
 
 本地研究服务，是最终系统唯一的输入收口、状态真相、LLM 和输出编排核心。RisuAI 只提供“文本 -> 情绪标签 -> 立绘”参考，SillyTavern 只提供“条件触发 -> prompt 选择性注入”参考；两者均为可选对照，不是运行依赖、主入口或回复来源。
 
-当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge、SQLite 启动恢复，以及可回放的 fantasy-pull/角色提案/有限试行 API。它仍未实现长期 `role-state.v1` 演化和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 已完成本机真实 API 和完整 `/api/chat` smoke。
+当前 `v0.1.0` 包含健康检查、统一输入层、词典情绪分析、带 TTL 的世界条件匹配、短时 CAPS-inspired 状态、evidence ledger、prompt 组合、Fake/显式 OpenAI-compatible LLM、受白名单约束的小型持续世界、运行时上下文源、幂等设备 outbox、音频工件存储、语音 sidecar 边界、服务端 WebSocket bridge、SQLite 启动恢复，以及可回放的 fantasy-pull/角色提案/有限试行 API。P4 已实现可恢复的 accepted `role-state.v1` 阶段档案，但仍未实现开放式长期自主演化、自动换壳和真实 VoCat 固件联调；语音 sidecar 当前是可替换的 fake/model-free baseline，不代表真实中文 ASR/TTS 能力。默认启动使用 Fake LLM，只有显式本地配置才会调用外部模型；DeepSeek provider 已完成本机真实 API 和完整 `/api/chat` smoke。
 
 ## 运行
 
@@ -23,7 +23,7 @@ $env:DESKBOT_DB_PATH = 'D:\deskbot-data\deskbot.sqlite'
 npm start
 ```
 
-同一 `event_id` 在服务重启后仍保持幂等；已完成的聊天回合不会再次调用 LLM。SQLite 是当前“小型持续世界”的运行事实源，不等同于尚未实现的长期 `role-state.v1` 演化提交。
+同一 `event_id` 在服务重启后仍保持幂等；已完成的聊天回合不会再次调用 LLM。SQLite 是当前“小型持续世界”的运行事实源，也持久化 P4 的候选、提案、试行和 accepted `role-state.v1` 阶段历史；这仍不是开放式自主世界的无限记忆。
 
 ## 测试
 
@@ -31,7 +31,22 @@ npm start
 npm test
 ```
 
-当前 Node 回归测试为 `145/145`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
+当前 Node 回归测试为 `244/244`；服务默认绑定 `127.0.0.1`；需要让局域网设备访问时可显式设置 `DESKBOT_HOST`，并先按设备合同完成网络隔离和认证配置。使用 `src/index.mjs` 正式启动时数据写入本地 SQLite；测试和直接调用 `createDeskBotServer()` 时若不注入 persistence，仍使用隔离的内存模式。默认 Fake LLM 不上传数据；启用 `DESKBOT_LLM_PROVIDER=deepseek` 或 `openai-compatible` 后，提示文本会发送到你配置的端点，密钥只从本地配置/环境变量读取，不写入响应或日志。
+
+## NPC Agent Loop
+
+世界生活中的 NPC 使用一个有限、可回放的 NevaMind 风格决策层。每个逻辑两小时槽，Agent 根据作者日程、当前地点的邻接路线、Scene 动作和原地观察生成合法候选，并稳定地选出一个动作；低频自主探索也只能从这些合法相邻候选中选择。跨地点路线只会转换成一个相邻 hop；动作仍交给 `npc-goals`，再由 `persistent-world` 的 `npc_action` mutation 验证和落盘。
+
+决策与目标通过 `goal_id` 关联，进程重启后会 reconcile 已持久化的 goal，保证 `planned/executed/failed` 与实际 mutation 一致。决策日志最多保留 120 条，淘汰时同步清理 SQLite。
+
+查看最近决策：
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:4311/api/life/npc-agents?limit=24'
+Invoke-RestMethod 'http://127.0.0.1:4311/api/life/npc-agents?npc_id=pathfinder-001&limit=6'
+```
+
+返回的 `legal_candidates`、`selected`、`status` 和 `executed_event_id` 用于调试和验收，不是客户端直接写世界的入口。当前实现不宣称开放式自主 NPC：Agent 不生成无限任务，不直接修改世界、关系、人格、角色阶段或外壳；provider 返回非法候选时会使用确定性回退。
 
 ## 语音 sidecar
 
@@ -110,6 +125,8 @@ npm start
 
 `GET /api/connectors/weather` 只返回 connector 状态、来源、时间、新鲜度和错误摘要；`POST /api/connectors/weather/refresh` 默认遵守 TTL，发送 `{ "force": true }` 才会在用户明确要求最新天气时绕过有效缓存发起一次 provider 请求。结果会作为带 `provider`、`source_kind`、`observed_at`、`fetched_at`、`ttl_ms`、`confidence` 和 `provenance` 的 `weather` mutation 写入同一事件入口。过期或失败状态可回读，旧观测不会覆盖较新的 canonical 快照。connector 不能直接生成角色回复；显著天气最多进入 `proactive_candidate`。对话中明确出现“最新/实时/刷新天气”也会走一次强制刷新，再把结果交给 LLM 自然回答。
 
+P4-1 输入运行层通过 `GET /api/input-runtime` 查看来源调度状态。服务默认每 5 分钟检查一次到期来源；connector 的 TTL 决定是否真正访问 provider，失败按 1/5/15/30 分钟退避。天气实时快照与三类预报缓存保存在 SQLite 的 `connector.weather/state`，服务重启后恢复，不保存 token。运行层把实时天气、小实时、小时、每日分别作为独立来源调度，因此单一预报 endpoint 失败不会把其他预报标成失败。调度器只负责采集和恢复：实时天气仍经 `input-store -> persistent-world` 的统一 mutation 入口，预报只进入只读缓存；新闻、日历等来源可在同一运行层注册，但本阶段不会把原始 observation 自动变成世界事件。
+
 天气预报使用独立的只读缓存，不覆盖 canonical 的当前天气观测：
 
 - `POST /api/connectors/weather/forecast/refresh`：可传 `{ "kinds": ["minutely", "hourly", "daily"], "force": true }`；不传 `force` 时分别遵守短临 10 分钟、小时 30 分钟、每日 6 小时 TTL。
@@ -125,6 +142,8 @@ npm start
 `fantasy-pull.v0.2` 从已保存的输入事件计算方向候选；它要求至少三条证据和至少两个来源，且不接受单句命令直接变身。助手回复、语音传输、设备输出和服务生命周期事件不具备幻想方向证据资格。候选和提案是服务端计算结果，Web 不保存第二份状态：
 
 - `GET /api/roles/pulls?character_id=shaping-001`：读取当前方向吸引及 evidence/source 列表。
+- `GET /api/roles/evolution?character_id=shaping-001`：读取候选、同步运行、提案、活动试行和当前 accepted 阶段的审计视图。
+- `POST /api/roles/evolution/sync`：重新聚合已保存的合格输入；返回本次新建的 `created` 提案列表。相同输入指纹重放时返回 `duplicate: true` 和空 `created`，不会重复建提案。
 - `POST /api/roles/proposals`：以 `{ "character_id": "shaping-001", "direction_id": "wetland_frog" }` 把当前 candidate 转成提案。
 - `GET /api/roles/proposals`、`GET /api/roles/proposals/:proposal_id`：读取提案、试行观察和阶段历史。
 - `POST /api/roles/proposals/:proposal_id/choose`：提交 `{ "choice": "try|later|reject", "reason": "..." }`。
@@ -134,9 +153,9 @@ npm start
 - `POST /api/roles/proposals/:proposal_id/archive`：追加归档记录，旧阶段仍可回放。
 - `GET /api/roles/trials?character_id=shaping-001`：读取当前活动试行及其方向表达覆盖层。
 
-活动试行会以只读 `[DESKBOT_ACTIVE_ROLE_TRIAL]` 上下文进入聊天提示词，并按每个完成的用户回合追加一条 `neutral` 观察；明确的正/负反馈仍必须由研究台或其他受控入口提交。覆盖层会临时影响文字措辞、节奏、兴趣和主动提议，并通过 `expression_intent.v1` 同步方向化的屏幕 motif 与 TTS 参数；担忧、警觉和边界状态会优先保持安全清晰。它不会写入 Soul、canonical world 或外壳。每个角色同时最多一个活动试行。提案和试行记录分别持久化在 `role.proposals`、`role.proposal-decisions`；当前仍是 P4 的方向阶段数据，不等同于最终 `role-state.v1` 或外壳变更。
+活动试行会以只读 `[DESKBOT_ACTIVE_ROLE_TRIAL]` 上下文进入聊天提示词，并按每个完成的用户回合追加一条 `neutral` 观察；明确的正/负反馈仍必须由研究台或其他受控入口提交。覆盖层会临时影响文字措辞、节奏、兴趣和主动提议，并通过 `expression_intent.v1` 同步方向化的屏幕 motif 与 TTS 参数；担忧、警觉和边界状态会优先保持安全清晰。它不会写入 Soul、canonical world 或外壳。每个角色同时最多一个活动试行。提案、候选和同步运行记录分别持久化在 `role.proposals`、`role.evolution.candidates`、`role.evolution.runs`；accepted 阶段会以 `role_context.current_stage` 投影到世界生活读模型，但仍不等同于真实外壳变更。
 
-`POST /api/devices/hello` 注册设备的硬件、固件和能力清单；`GET /api/devices` 查看最近上线设备。`GET /api/outbox` 可领取待执行的 `foundry.device-command.v0.1`，`GET /api/outbox/:command_id` 查看单条命令，`POST /api/outbox/:command_id/ack` 提交 `completed` 或 `failed`。命令 ID 由源事件和动作稳定生成，重复 ACK 返回原结果；正式运行时这些记录会跨服务重启恢复。服务端 bridge 默认监听同一 HTTP 端口的 `ws://127.0.0.1:4311/ws`，执行 `device.hello`、格式协商、设备事件、DBA1 音频帧和命令 ACK；协议字段以 `DeskBotClaude\固件桥接接口合同_v0.1.md` 为准。长期 `role-state.v1` 提交仍是后续工作。
+`POST /api/devices/hello` 注册设备的硬件、固件和能力清单；`GET /api/devices` 查看最近上线设备。`GET /api/outbox` 可领取待执行的 `foundry.device-command.v0.1`，`GET /api/outbox/:command_id` 查看单条命令，`POST /api/outbox/:command_id/ack` 提交 `completed` 或 `failed`。命令 ID 由源事件和动作稳定生成，重复 ACK 返回原结果；正式运行时这些记录会跨服务重启恢复。服务端 bridge 默认监听同一 HTTP 端口的 `ws://127.0.0.1:4311/ws`，执行 `device.hello`、格式协商、设备事件、DBA1 音频帧和命令 ACK；协议字段以 `DeskBotClaude\固件桥接接口合同_v0.1.md` 为准。P4 的 role-state 只通过服务端提案、试行和明确决定提交；设备仍不能直接写入角色阶段。
 
 `src/fake-device.mjs` 提供无硬件联调器：`hello()`、`pollOnce()` 和 `executed()` 对应设备职责的最小模拟；`test/app-websocket.test.mjs` 覆盖服务端 bridge 的应用级链路，另已用独立 `src/index.mjs` 进程完成一次 HTTP + WebSocket smoke。它们只模拟或验证服务端，不代表真实固件已经接入。
 

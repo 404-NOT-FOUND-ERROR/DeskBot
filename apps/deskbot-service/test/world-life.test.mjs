@@ -367,6 +367,66 @@ test('content-authored NPC schedules use logical world time and move only one le
   assert.ok(world.get().life.current_scene.participants.every((npcId) => npcId !== 'pathfinder-001'));
 });
 
+test('a persisted planned NPC decision reconciles after a process restart', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deskbot-npc-agent-restart-'));
+  const filename = join(directory, 'npc-agent.sqlite');
+  const initial = new Date('2026-09-17T02:00:00.000Z');
+  try {
+    const firstPersistence = createSqlitePersistence({ filename });
+    const firstWorld = createPersistentWorld({ now: () => initial, persistence: firstPersistence });
+    const firstGoals = createNpcGoals({
+      now: () => initial,
+      persistence: firstPersistence,
+      worldSnapshot: () => firstWorld.get(),
+      ingest: (event) => firstWorld.ingest(event),
+    });
+    // Simulate an interruption after the goal and decision journals are saved,
+    // but before the goal worker gets a chance to ingest its mutation.
+    const stalledGoals = { ...firstGoals, tick: () => ({ processed: 0 }) };
+    const firstLife = createWorldLife({
+      now: () => initial,
+      worldSnapshot: () => firstWorld.get(),
+      ingest: (event) => firstWorld.ingest(event),
+      listMutations: options => firstWorld.listMutations(options),
+      npcGoals: stalledGoals,
+      persistence: firstPersistence,
+    });
+    firstLife.tick();
+    const planned = firstLife.npcAgentLoop.list({ npcId: 'pathfinder-001' }).at(-1);
+    assert.equal(planned.status, 'planned');
+    assert.equal(firstGoals.list().find((goal) => goal.id === planned.goal_id)?.state, 'active');
+    firstPersistence.close();
+
+    const secondPersistence = createSqlitePersistence({ filename });
+    const secondWorld = createPersistentWorld({ now: () => initial, persistence: secondPersistence });
+    const secondGoals = createNpcGoals({
+      now: () => initial,
+      persistence: secondPersistence,
+      worldSnapshot: () => secondWorld.get(),
+      ingest: (event) => secondWorld.ingest(event),
+    });
+    const secondLife = createWorldLife({
+      now: () => initial,
+      worldSnapshot: () => secondWorld.get(),
+      ingest: (event) => secondWorld.ingest(event),
+      listMutations: options => secondWorld.listMutations(options),
+      npcGoals: secondGoals,
+      persistence: secondPersistence,
+    });
+    secondLife.tick();
+    const restored = secondLife.npcAgentLoop.list({ npcId: 'pathfinder-001' }).at(-1);
+    assert.equal(restored.decision_id, planned.decision_id);
+    assert.equal(restored.status, 'executed');
+    assert.equal(restored.goal_id, planned.goal_id);
+    assert.match(restored.executed_event_id, /^npc-goal:/);
+    assert.equal(secondGoals.list().find((goal) => goal.id === planned.goal_id)?.state, 'completed');
+    assert.equal(secondWorld.get().npcs.find((npc) => npc.npc_id === 'pathfinder-001').location_id, 'shaping-field-desk');
+    secondPersistence.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('bounded world-life replay advances logical time across days and moves NPCs by adjacent hops', () => {
   let clock = new Date('2026-09-17T02:00:00.000Z');
   const now = () => new Date(clock);
@@ -455,6 +515,9 @@ test('world-life HTTP endpoints expose encounters and reject remote NPC interact
   const initial = await (await fetch(`${origin}/api/life/world`)).json();
   assert.equal(initial.current_scene.location_id, 'shaping-field-desk');
   assert.equal(initial.encounters[0].npc_id, 'pathfinder-001');
+  const agentDecisions = await (await fetch(`${origin}/api/life/npc-agents?limit=12`)).json();
+  assert.equal(agentDecisions.schema, 'deskbot.npc-agent-decision-list.v0.1');
+  assert.ok(agentDecisions.decisions.some((decision) => decision.npc_id === 'pathfinder-001'));
 
   const remote = await fetch(`${origin}/api/life/npc-interactions`, {
     method: 'POST',

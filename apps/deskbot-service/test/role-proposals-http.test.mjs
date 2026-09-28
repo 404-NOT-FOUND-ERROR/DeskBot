@@ -54,7 +54,10 @@ test('role API exposes pulls and completes an auditable trial lifecycle', async 
   assert.deepEqual(pull.sources.sort(), ['user_profile', 'weather', 'world_line'].sort());
 
   const created = await post('/api/roles/proposals', { character_id: 'shaping-001', direction_id: 'wetland_frog' });
-  assert.equal(created.response.status, 201);
+  // P4 auto-materializes a proposal as soon as the cross-source candidate is
+  // observed; the explicit endpoint is therefore idempotent and may return
+  // the existing proposal with 200.
+  assert.ok([200, 201].includes(created.response.status));
   assert.equal(created.body.proposal.status, 'proposed');
   const proposalId = created.body.proposal.proposal_id;
 

@@ -28,7 +28,7 @@ const voiceClient = voiceSidecarUrl
     ttsPath: process.env.DESKBOT_VOICE_TTS_PATH ?? '/v1/tts',
   })
   : null;
-const weatherConnector = createWeatherConnector();
+const weatherConnector = createWeatherConnector({ persistence });
 const server = createDeskBotServer({ persistence, llm, voiceClient, weatherConnector, websocketPath, worldLifeEnabled: true });
 
 server.listen(port, host, () => {

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { InputError } from './input-store.mjs';
 import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
 import { loadMorrowmereContent } from './content-packages.mjs';
+import { createNpcAgentLoop } from './npc-agent-loop.mjs';
 import {
   composeNpcAgentPrompt,
   getNpcPersona,
@@ -236,7 +237,7 @@ function causalCause(world, branch) {
   return event ? { eventIds: [event.event_id], experienceIds: [] } : null;
 }
 
-function selectCausalScene(world, now) {
+function selectCausalScene(world, now, { roleStages = [] } = {}) {
   const locationId = world.protagonist.location_id;
   const slot = Math.floor(now.getTime() / SLOT_MS);
   for (const branch of CAUSAL_SCENE_BRANCHES) {
@@ -275,6 +276,7 @@ function selectCausalScene(world, now) {
         weather: world.weather?.snapshot?.condition ?? null,
         world_event_id: cause.eventIds.at(-1) ?? null,
         experience_id: cause.experienceIds.at(-1) ?? null,
+        role_stages: roleStages,
       },
       continuity: {
         kind: sameCurrent ? 'continued' : 'causal_branch',
@@ -291,8 +293,8 @@ function selectCausalScene(world, now) {
   return null;
 }
 
-function selectScene(world, now) {
-  const causal = selectCausalScene(world, now);
+function selectScene(world, now, { roleStages = [] } = {}) {
+  const causal = selectCausalScene(world, now, { roleStages });
   if (causal) return causal;
   const locationId = world.protagonist.location_id;
   const catalog = LIFE_SCENES[locationId] ?? LIFE_SCENES['shaping-field-desk'];
@@ -315,13 +317,14 @@ function selectScene(world, now) {
   const journeyKey = world.protagonist?.travel_state?.event_id ?? 'resident';
   const eventKey = world.world_line?.latest_event?.event_id ?? 'quiet-world';
   const weatherKey = world.weather?.snapshot?.condition ?? 'no-weather';
-  const selected = choices[hashNumber(`${locationId}:${world.logical_time?.day}:${slot}:${eventKey}:${weatherKey}`) % choices.length];
+  const roleKey = roleStages.map((stage) => stage.direction_id).sort().join(',') || 'base-role';
+  const selected = choices[hashNumber(`${locationId}:${world.logical_time?.day}:${slot}:${eventKey}:${weatherKey}:${roleKey}`) % choices.length];
   const startsAt = new Date(slot * SLOT_MS).toISOString();
   const expiresAt = new Date((slot + 1) * SLOT_MS).toISOString();
   const participants = (world.npcs ?? []).filter((npc) => npc.location_id === locationId).map((npc) => npc.npc_id).sort();
   const participantOverride = participants.map((npcId) => selected.participant_overrides?.[npcId]).find(Boolean) ?? {};
   const contextSuffix = createHash('sha256')
-    .update(`${LIFE_CONTENT_VERSION}:${journeyKey}:${participants.join(',')}:${selected.id}:${eventKey}:${weatherKey}`)
+    .update(`${LIFE_CONTENT_VERSION}:${journeyKey}:${participants.join(',')}:${selected.id}:${eventKey}:${weatherKey}:${roleKey}`)
     .digest('hex')
     .slice(0, 6);
   const currentParticipantsMatch = sameStrings([...(current?.participants ?? [])].sort(), participants);
@@ -351,6 +354,7 @@ function selectScene(world, now) {
       logical_minute: world.logical_time?.minute_of_day ?? null,
       weather: world.weather?.snapshot?.condition ?? null,
       world_event_id: world.world_line?.latest_event?.event_id ?? null,
+      role_stages: roleStages,
     },
     continuity: {
       kind: continuityKind,
@@ -439,11 +443,30 @@ export function createWorldLife({
   ingest,
   listMutations = null,
   npcGoals = null,
+  npcAgentLoop = null,
+  roleStages = null,
+  persistence = null,
   llm = null,
   enabled = true,
 } = {}) {
   if (typeof worldSnapshot !== 'function' || typeof ingest !== 'function') {
     throw new TypeError('world life needs worldSnapshot and ingest');
+  }
+
+  const agentLoop = npcAgentLoop ?? createNpcAgentLoop({
+    now,
+    persistence,
+    worldSnapshot,
+    npcGoals,
+    profiles: NPC_PROFILES,
+    routines: NPC_ROUTINES,
+    enabled,
+  });
+
+  function roleContext(characterId = DEFAULT_CHARACTER_ID) {
+    if (typeof roleStages !== 'function') return [];
+    const stages = roleStages(characterId);
+    return Array.isArray(stages) ? structuredClone(stages) : [];
   }
 
   function seedNpcs() {
@@ -472,6 +495,7 @@ export function createWorldLife({
   function snapshot() {
     const world = worldSnapshot();
     const currentLocationId = world.protagonist.location_id;
+    const stages = roleContext();
     return {
       schema: 'deskbot.world-life.v0.3',
       enabled,
@@ -480,6 +504,11 @@ export function createWorldLife({
       current_scene: world.life?.current_scene ?? null,
       recent_scenes: world.life?.recent_scenes ?? [],
       recent_experiences: world.life?.recent_experiences ?? [],
+      role_stages: stages,
+      role_context: {
+        current_stage: stages[0] ?? null,
+        stages,
+      },
       encounters: (world.npcs ?? []).filter((npc) => npc.location_id === currentLocationId).map(profileFor),
       available_interactions: INTERACTION_INTENTS,
     };
@@ -501,19 +530,30 @@ export function createWorldLife({
     if (!npcGoals || typeof npcGoals.add !== 'function' || typeof npcGoals.tick !== 'function') return;
     const worldAtStart = worldSnapshot();
     const minutesPerDay = 24 * 60;
-    const routineSlot = (Math.max(1, worldAtStart.logical_time?.day ?? 1) - 1) * (minutesPerDay / NPC_ROUTINE_SLOT_MINUTES)
-      + Math.floor((worldAtStart.logical_time?.minute_of_day ?? 0) / NPC_ROUTINE_SLOT_MINUTES);
+    const routineSlot = (Math.max(1, Number(worldAtStart.logical_time?.day) || 1) - 1)
+      * (minutesPerDay / NPC_ROUTINE_SLOT_MINUTES)
+      + Math.floor((Number(worldAtStart.logical_time?.minute_of_day) || 0) / NPC_ROUTINE_SLOT_MINUTES);
+    const planned = [];
     for (const [npcId, routine] of Object.entries(NPC_ROUTINES)) {
       const world = worldSnapshot();
       const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
       if (!npc || npcGoals.reserved?.(npcId)) continue;
       const profile = NPC_PROFILES[npcId];
-      if (!profile?.legal_actions.includes('move_to_adjacent_location')) continue;
-      const destinationId = routine.route[routineSlot % routine.route.length];
-      if (!destinationId || destinationId === npc.location_id) continue;
-      const hop = nextHop(world, npc.location_id, destinationId);
-      if (!hop) continue;
-      const destination = (world.locations ?? []).find((location) => location.location_id === hop);
+      const decision = agentLoop.decide({
+        world,
+        npc,
+        profile,
+        routine,
+        scene: world.life?.current_scene ?? null,
+        role_stages: roleContext(),
+      });
+      const selected = decision?.selected;
+      if (!decision || !selected) continue;
+      const destination = selected.location_id
+        ? (world.locations ?? []).find((location) => location.location_id === selected.location_id)
+        : null;
+      // Keep the durable goal id stable for legacy replay/readers. The agent
+      // decision id is stored separately in the decision namespace.
       const goalId = `world-life-routine:${npcId}:${routineSlot}`;
       try {
         npcGoals.add({
@@ -523,16 +563,40 @@ export function createWorldLife({
           origin: 'world-life-engine',
           options: [{
             when: { kind: 'npc_status', value: npc.status },
-            action_name: 'move_to_adjacent_location',
-            status: `刚到${destination?.name ?? hop}，正在继续自己的行程`,
-            location_id: hop,
+            action_name: selected.action_name,
+            status: selected.location_id
+              ? `刚到${destination?.name ?? selected.location_id}，正在继续自己的行程`
+              : selected.status,
+            ...(selected.location_id ? { location_id: selected.location_id } : {}),
           }],
         });
+        // Link the decision journal to the durable execution record. The goal
+        // engine remains the only component allowed to write world mutations.
+        agentLoop.bindGoal(decision.decision_id, goalId);
+        planned.push({ decision, goalId });
       } catch (error) {
-        if (!['goal_exists', 'npc_reserved'].includes(error?.code)) throw error;
+        if (error?.code === 'goal_exists') {
+          // A restart may find the same logical-slot goal already persisted;
+          // relink it so reconciliation does not depend on process memory.
+          agentLoop.bindGoal(decision.decision_id, goalId);
+          planned.push({ decision, goalId });
+        } else if (error?.code !== 'npc_reserved') {
+          throw error;
+        }
       }
     }
     npcGoals.tick();
+    for (const { decision, goalId } of planned) {
+      const goal = npcGoals.list?.().find((item) => item.id === goalId);
+      if (goal?.state === 'completed') {
+        const eventId = goal.step_history?.at(-1)?.event_id ?? goal.decision?.event?.event_id ?? null;
+        agentLoop.markExecuted(decision.decision_id, eventId);
+      }
+      else if (goal?.state === 'failed') agentLoop.markFailed(decision.decision_id, goal.error);
+    }
+    // Include persisted decisions whose goals were already present when this
+    // process started. This repairs planned -> executed/failed after restart.
+    agentLoop.reconcile({ goals: npcGoals.list?.() ?? [] });
   }
 
   function tick({ force = false, replayNow = null } = {}) {
@@ -541,7 +605,7 @@ export function createWorldLife({
     scheduleNpcRoutines();
     let world = worldSnapshot();
     const effectiveNow = replayNow instanceof Date && !Number.isNaN(replayNow.getTime()) ? replayNow : now();
-    const selected = selectScene(world, effectiveNow);
+    const selected = selectScene(world, effectiveNow, { roleStages: roleContext() });
     const current = world.life?.current_scene;
     const sameParticipants = sameStrings([...(current?.participants ?? [])].sort(), selected.participants);
     const sameContext = current
@@ -876,7 +940,7 @@ export function createWorldLife({
     return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
   }
 
-  return { tick, replay, snapshot, interact, interactWithAgent, seedNpcs };
+  return { tick, replay, snapshot, interact, interactWithAgent, seedNpcs, npcAgentLoop: agentLoop };
 }
 
 export { CAUSAL_SCENE_BRANCHES, INTERACTION_INTENTS, LIFE_CONTENT_VERSION, LIFE_SCENES, NPC_PROFILES, NPC_ROLE_DIRECTIONS, NPC_ROUTINES, NPC_ROUTINE_SLOT_MINUTES, NPC_ROUTINE_SLOT_MS, SCENE_COOLDOWN_COUNT, SLOT_MS, WORLD_REPLAY_MAX_MINUTES };

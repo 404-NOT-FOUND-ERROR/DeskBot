@@ -100,24 +100,13 @@ test('a bounded recent conversation and the character seed reach the next turn p
   });
 
   assert.equal(prompts.length, 2);
-  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v4/);
-  assert.match(prompts[1], /model_name=喵呜/);
-  assert.match(prompts[1], /continuity_identity=聚形域中持续存在的同一个个体/);
-  assert.match(prompts[1], /first_scene=第一天没有宏大的降临/);
-  assert.match(prompts[1], /personality=有明显的猫感/);
-  assert.match(prompts[1], /response_modes=task：/);
-  assert.match(prompts[1], /catchphrase_rules=/);
-  assert.match(prompts[1], /trigger_rules=用户说“随便”或“无所谓”/);
-  assert.match(prompts[1], /disagreement_style=/);
-  assert.match(prompts[1], /roleplay_methods=稳定动机/);
-  assert.match(prompts[1], /presence_matrix=high：呼唤、闲聊/);
-  assert.match(prompts[1], /soul_positioning=一个存在于奇幻持续世界中的潮玩生命体/);
-  assert.match(prompts[1], /likes=把混乱的事情变清楚/);
-  assert.match(prompts[1], /aversions=被当作只会执行命令的按钮/);
-  assert.match(prompts[1], /fantasy_drive=多源输入先形成被某种奇幻生活吸引/);
-  assert.match(prompts[1], /lived_world_drive=聚形域不是数据库背景板/);
-  assert.match(prompts[1], /连续三次这类场景至少两次出现“喵呜”或“喵”/);
-  assert.match(prompts[1], /tts_direction=未来 TTS/);
+  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v6/);
+  assert.match(prompts[1], /name=喵呜/);
+  assert.match(prompts[1], /identity=聚形域中持续存在的同一个个体/);
+  assert.match(prompts[1], /core=喵呜先有感觉再做事/);
+  assert.doesNotMatch(prompts[1], /first_scene=|trigger_rules=|presence_matrix=/);
+  assert.match(prompts[1], /不设猫叫次数配额/);
+  assert.match(prompts[1], /"tts_profile":"miaowu-v1"/);
   assert.match(prompts[1], /\[DESKBOT_CHARACTER_PROFILE\]/);
   assert.match(prompts[1], /"current_role":\{"stage_id":"miaowu-v1","display_name":"喵呜"/);
   assert.match(prompts[1], /"current_form":\{"form_id":"cat-toy-baseline-v1"/);
@@ -125,9 +114,8 @@ test('a bounded recent conversation and the character seed reach the next turn p
   assert.match(prompts[1], /\[DESKBOT_RECENT_CONVERSATION\]/);
   assert.match(prompts[1], /用户：以后叫我小周/);
   assert.match(prompts[1], /角色：我记住了。/);
-  assert.match(prompts[1], /不得说“已经记下\/已设提醒\/已经执行”/);
-  assert.match(prompts[1], /不得把未观测到的屏幕亮起、耳朵转动、动作或传感器状态描述成已经真实发生/);
-  assert.match(prompts[1], /daily_consequence 是当前已生效的影响/);
+  assert.match(prompts[1], /共同记忆、现实感知和已执行动作，以本轮提供的证据为准/);
+  assert.match(prompts[1], /daily_consequence 已生效/);
 });
 
 test('recent assistant replies that expose role backend language are not imitated', async () => {
@@ -157,7 +145,7 @@ test('recent assistant replies that expose role backend language are not imitate
 
   assert.equal(prompts.length, 2);
   assert.doesNotMatch(prompts[1], /一个方向是水边跳跃/);
-  assert.match(prompts[1], /旧助手回复若带后台方向或审计口吻会被隔离/);
+  assert.match(prompts[1], /旧助手回复不代替本轮意图/);
 });
 
 test('accepted role stage reaches the ordinary prompt without exposing backend fields', async () => {

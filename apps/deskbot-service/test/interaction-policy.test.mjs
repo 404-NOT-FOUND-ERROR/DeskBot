@@ -145,8 +145,8 @@ test('a chat event enters the current reply while prior world events remain opti
   assert.equal(chat.body.turn.proactive_candidates[0].candidate.topic, 'world_line_event');
   assert.ok(capturedPrompt);
   assert.match(capturedPrompt, /\[DESKBOT_INTERACTION_DECISION\]/);
-  assert.match(capturedPrompt, /这里只给一个可选关联话题，不是必须提及的通知/);
-  assert.match(capturedPrompt, /没有自然关联时保持安静/);
+  assert.match(capturedPrompt, /这里只给一个可选关联话题/);
+  assert.match(capturedPrompt, /其余时候让它安静留在后台/);
 });
 
 test('settings are isolated per character and survive policy recreation', () => {

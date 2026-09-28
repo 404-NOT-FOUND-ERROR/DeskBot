@@ -61,9 +61,44 @@ test('OpenAI-compatible provider sends a text-only request and accepts assistant
   assert.equal(request.url, 'https://api.example/v1/chat/completions');
   assert.deepEqual(payload.messages, [{ role: 'user', content: '[DESKBOT_ROLE]\n只输出正文。' }]);
   assert.equal(payload.stream, false);
+  assert.equal(payload.temperature, 0.55);
   assert.equal(result.text, '我听见了。');
   assert.equal(result.model, 'deepseek-chat');
   assert.equal(Object.hasOwn(result, 'state'), false);
+});
+
+test('sampling temperature can be tuned without leaving provider range', async () => {
+  let payload;
+  const llm = createOpenAiCompatibleLlm({
+    base_url: 'https://api.example/v1',
+    api_key: 'not-a-real-secret',
+    model: 'deepseek-chat',
+    temperature: 4,
+    fetchImpl: async (_url, init) => {
+      payload = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: '好。' } }] }), { status: 200 });
+    },
+  });
+  await llm.complete({ prompt: 'hello' });
+  assert.equal(payload.temperature, 1);
+});
+
+test('an empty provider response is retried once before failing', async () => {
+  let calls = 0;
+  const llm = createOpenAiCompatibleLlm({
+    base_url: 'https://api.example/v1',
+    api_key: 'not-a-real-secret',
+    model: 'deepseek-chat',
+    fetchImpl: async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response(JSON.stringify({ choices: [] }), { status: 200 })
+        : new Response(JSON.stringify({ choices: [{ message: { content: '喵，我在。' } }] }), { status: 200 });
+    },
+  });
+  const result = await llm.complete({ prompt: 'hello' });
+  assert.equal(calls, 2);
+  assert.equal(result.text, '喵，我在。');
 });
 
 test('provider errors report status but do not echo response bodies or credentials', async () => {

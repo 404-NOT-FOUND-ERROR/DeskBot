@@ -298,6 +298,8 @@ export function createWeatherConnector({
   now = () => new Date(),
   fetchImpl = globalThis.fetch,
   config = weatherConfigFromEnv(),
+  persistence = null,
+  persistenceNamespace = 'connector.weather',
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new TypeError('fetchImpl must be a function');
@@ -327,6 +329,38 @@ export function createWeatherConnector({
   let lastResult = null;
   const forecastCache = new Map();
   const forecastErrors = new Map();
+
+  function persistState() {
+    if (!persistence?.put) return;
+    // The persisted projection intentionally excludes resolved.token.
+    persistence.put(persistenceNamespace, 'state', {
+      last_attempt_at: lastAttemptAt,
+      last_success_at: lastSuccessAt,
+      last_error: lastError,
+      last_result: lastResult,
+      forecast_cache: Object.fromEntries(forecastCache.entries()),
+      forecast_errors: Object.fromEntries(forecastErrors.entries()),
+    });
+  }
+
+  function restoreState() {
+    const stored = persistence?.get?.(persistenceNamespace, 'state');
+    if (!stored || typeof stored !== 'object') return;
+    lastAttemptAt = typeof stored.last_attempt_at === 'string' ? stored.last_attempt_at : null;
+    lastSuccessAt = typeof stored.last_success_at === 'string' ? stored.last_success_at : null;
+    lastError = stored.last_error && typeof stored.last_error === 'object' ? stored.last_error : null;
+    lastResult = stored.last_result && typeof stored.last_result === 'object' ? stored.last_result : null;
+    for (const kind of FORECAST_KINDS) {
+      const cached = stored.forecast_cache?.[kind];
+      if (cached && typeof cached === 'object' && cached.data && typeof cached.expires_at === 'string') {
+        forecastCache.set(kind, cached);
+      }
+      const error = stored.forecast_errors?.[kind];
+      if (error && typeof error === 'object') forecastErrors.set(kind, error);
+    }
+  }
+
+  restoreState();
 
   function forecastStatus() {
     return Object.fromEntries(FORECAST_KINDS.map((kind) => {
@@ -416,6 +450,7 @@ export function createWeatherConnector({
     const attemptedAt = now().toISOString();
     lastAttemptAt = attemptedAt;
     lastError = null;
+    persistState();
     const url = new URL(resolved.endpoint);
     const qweatherV1 = resolved.provider === 'qweather' && /\/weather\/v1\/current\/?$/i.test(url.pathname);
     if (resolved.provider === 'qweather' && qweatherV1) {
@@ -456,6 +491,7 @@ export function createWeatherConnector({
     } catch (error) {
       const aborted = error?.name === 'AbortError';
       lastError = { code: aborted ? 'weather_connector_timeout' : 'weather_connector_transport_error', message: aborted ? '天气 provider 请求超时' : '天气 provider 请求失败', retryable: true };
+      persistState();
       throw new WeatherConnectorError(504, lastError.code, lastError.message, { retryable: true });
     } finally {
       clearTimeout(timeout);
@@ -463,6 +499,7 @@ export function createWeatherConnector({
     if (!response || !response.ok) {
       const statusCode = Number.isInteger(response?.status) ? response.status : 502;
       lastError = { code: 'weather_provider_http_error', message: `天气 provider 返回 HTTP ${statusCode}`, retryable: statusCode >= 500 || statusCode === 429 };
+      persistState();
       throw new WeatherConnectorError(statusCode >= 500 || statusCode === 429 ? 502 : 424, lastError.code, lastError.message, { retryable: lastError.retryable });
     }
     let body;
@@ -470,6 +507,7 @@ export function createWeatherConnector({
       body = await response.json();
     } catch {
       lastError = { code: 'weather_provider_invalid_json', message: '天气 provider 返回的不是有效 JSON', retryable: false };
+      persistState();
       throw new WeatherConnectorError(502, lastError.code, lastError.message);
     }
     if (resolved.provider === 'qweather') {
@@ -482,11 +520,13 @@ export function createWeatherConnector({
         && body?.wind;
       if ((!qweatherV1 && String(body?.code ?? '') !== '200') || (qweatherV1 && !hasV1Payload && String(body?.code ?? '') !== '200')) {
         lastError = { code: 'weather_provider_api_error', message: `天气 provider 返回 code ${String(body?.code ?? 'unknown')}`, retryable: String(body?.code ?? '').startsWith('5') };
+        persistState();
         throw new WeatherConnectorError(lastError.retryable ? 502 : 424, lastError.code, lastError.message, { retryable: lastError.retryable });
       }
       const current = qweatherV1 ? body : body?.now;
       if (!current || typeof current !== 'object') {
         lastError = { code: 'weather_provider_invalid_payload', message: qweatherV1 ? '和风天气 v1 provider 缺少实时天气对象' : '和风天气 provider 缺少 now 观测对象', retryable: false };
+        persistState();
         throw new WeatherConnectorError(502, lastError.code, lastError.message);
       }
       const temperature = Number(qweatherV1 ? current.temperature?.value : current.temp);
@@ -495,6 +535,7 @@ export function createWeatherConnector({
       const condition = qweatherV1 ? current.condition?.text : current.text;
       if (![temperature, humidity, wind].every(Number.isFinite) || typeof condition !== 'string' || condition.trim() === '') {
         lastError = { code: 'weather_provider_invalid_payload', message: qweatherV1 ? '和风天气 v1 provider 的实时天气字段不完整' : '和风天气 provider 的 now 字段不完整', retryable: false };
+        persistState();
         throw new WeatherConnectorError(502, lastError.code, lastError.message);
       }
       const fetchedAt = now().toISOString();
@@ -537,12 +578,14 @@ export function createWeatherConnector({
         payload: { action: 'update_weather', snapshot },
       };
       lastResult = { event, snapshot };
+      persistState();
       return { connector: status(), event, snapshot, cached: false };
     }
 
     const current = body?.current;
     if (!current || typeof current !== 'object') {
       lastError = { code: 'weather_provider_invalid_payload', message: '天气 provider 缺少 current 观测对象', retryable: false };
+      persistState();
       throw new WeatherConnectorError(502, lastError.code, lastError.message);
     }
     const temperature = finiteNumber(current.temperature_2m);
@@ -551,6 +594,7 @@ export function createWeatherConnector({
     const code = Number.isInteger(current.weather_code) ? current.weather_code : null;
     if (temperature === null || humidity === null || wind === null || code === null) {
       lastError = { code: 'weather_provider_invalid_payload', message: '天气 provider 的 current 字段不完整', retryable: false };
+      persistState();
       throw new WeatherConnectorError(502, lastError.code, lastError.message);
     }
     const fetchedAt = now().toISOString();
@@ -593,6 +637,7 @@ export function createWeatherConnector({
       payload: { action: 'update_weather', snapshot },
     };
     lastResult = { event, snapshot };
+    persistState();
     return { connector: status(), event, snapshot, cached: false };
   }
 
@@ -606,6 +651,7 @@ export function createWeatherConnector({
       const expected = error instanceof WeatherConnectorError;
       const detail = { code: expected ? error.code : 'weather_forecast_endpoint_invalid', message: expected ? error.message : '天气预报 endpoint 无效', retryable: false };
       forecastErrors.set(kind, detail);
+      persistState();
       throw error;
     }
     if (resolved.provider === 'qweather') {
@@ -645,6 +691,7 @@ export function createWeatherConnector({
       const aborted = error?.name === 'AbortError';
       const detail = { code: aborted ? 'weather_forecast_timeout' : 'weather_forecast_transport_error', message: aborted ? '天气预报 provider 请求超时' : '天气预报 provider 请求失败', retryable: true };
       forecastErrors.set(kind, detail);
+      persistState();
       throw new WeatherConnectorError(504, detail.code, detail.message, { retryable: true });
     } finally {
       clearTimeout(timeout);
@@ -653,6 +700,7 @@ export function createWeatherConnector({
       const statusCode = Number.isInteger(response?.status) ? response.status : 502;
       const detail = { code: 'weather_forecast_provider_http_error', message: `天气预报 provider 返回 HTTP ${statusCode}`, retryable: statusCode >= 500 || statusCode === 429 };
       forecastErrors.set(kind, detail);
+      persistState();
       throw new WeatherConnectorError(detail.retryable ? 502 : 424, detail.code, detail.message, { retryable: detail.retryable });
     }
     let body;
@@ -661,6 +709,7 @@ export function createWeatherConnector({
     } catch {
       const detail = { code: 'weather_forecast_invalid_json', message: '天气预报 provider 返回的不是有效 JSON', retryable: false };
       forecastErrors.set(kind, detail);
+      persistState();
       throw new WeatherConnectorError(502, detail.code, detail.message);
     }
     const fetchedAt = now().toISOString();
@@ -681,6 +730,7 @@ export function createWeatherConnector({
     }
     forecastCache.set(kind, { data, fetched_at: fetchedAt, expires_at: expiresAt });
     forecastErrors.delete(kind);
+    persistState();
     return data;
   }
 

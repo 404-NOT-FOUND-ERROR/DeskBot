@@ -20,8 +20,10 @@ import { createWebSocketBridge } from './websocket-bridge.mjs';
 import { createContextSourceRegistry } from './context-sources.mjs';
 import { createInteractionPolicy, InteractionPolicyError } from './interaction-policy.mjs';
 import { WeatherConnectorError } from './weather-connector.mjs';
+import { createInputRuntime } from './input-runtime.mjs';
 import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
+import { createRoleEvolution } from './role-evolution.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
 import {
@@ -121,6 +123,7 @@ function sendInputAccepted(response, event, duplicate, stateResult) {
     evidence: stateResult?.evidence ?? null,
     device: stateResult?.device ?? null,
     output_route: stateResult?.output_route ?? null,
+    role_evolution: stateResult?.roleEvolution ?? null,
     world_mutation: stateResult?.world_mutation ?? null,
     interaction_decision: stateResult?.interaction_decision ?? null,
   });
@@ -137,6 +140,8 @@ export function createDeskBotServer({
   deviceRegistry = createDeviceRegistry({ now, persistence }),
   persistentWorld = createPersistentWorld({ now, persistence }),
   weatherConnector = null,
+  inputRuntime: configuredInputRuntime = null,
+  inputRuntimeIntervalMs = 5 * 60 * 1000,
   contextSources = createContextSourceRegistry({ now, weatherConnector }),
   interactionPolicy = createInteractionPolicy({ now, persistence }),
   roleProposalStore = null,
@@ -154,6 +159,14 @@ export function createDeskBotServer({
   worldLifeEnabled = false,
 } = {}) {
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
+  const roleEvolution = createRoleEvolution({
+    now,
+    persistence,
+    inputStore,
+    roles,
+    computeFantasyPull: fantasyPullEngine,
+    worldSnapshot: () => persistentWorld.get(),
+  });
   let npcGoals;
   const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
   const sharedLifeReports = createSharedLifeReports({
@@ -170,6 +183,8 @@ export function createDeskBotServer({
     ingest: event => ingestNonChatEvent(event),
     listMutations: options => persistentWorld.listMutations(options),
     npcGoals,
+    persistence,
+    roleStages: (characterId) => roles.currentStages({ characterId }),
     llm,
     enabled: worldLifeEnabled,
   });
@@ -295,6 +310,9 @@ export function createDeskBotServer({
       source_event: result.event,
       output_plan: stateResult.outputs,
     });
+    const roleEvolutionResult = result.duplicate
+      ? null
+      : roleEvolution.observeEvent(result.event);
     return {
       event: result.event,
       duplicate: result.duplicate || worldMutation.duplicate,
@@ -303,7 +321,60 @@ export function createDeskBotServer({
       stateResult,
       evidence: evidenceResult?.evidence ?? null,
       outputRoute,
+      roleEvolution: roleEvolutionResult,
     };
+  }
+
+  const inputRuntime = configuredInputRuntime ?? createInputRuntime({
+    now,
+    persistence,
+    intervalMs: inputRuntimeIntervalMs,
+  });
+  if (weatherConnector?.refresh) {
+    const weatherStatus = weatherConnector.status?.() ?? {};
+    inputRuntime.registerSource({
+      sourceId: 'weather',
+      displayName: '天气实时观测',
+      kind: 'external_provider',
+      enabled: weatherStatus.enabled === true && weatherStatus.configured === true,
+      ttlMs: weatherStatus.ttl_ms,
+      provider: weatherStatus.provider,
+      provenance: { connector: 'weather', layer: 'weather', mutation: 'update_weather' },
+      refresh: ({ force = false } = {}) => weatherConnector.refresh({ force }),
+      ingest: (event) => ingestNonChatEvent(event),
+    });
+    if (weatherConnector.forecast) {
+      const forecastLabels = {
+        minutely: '天气小实时预报缓存',
+        hourly: '天气小时预报缓存',
+        daily: '天气每日预报缓存',
+      };
+      for (const kind of ['minutely', 'hourly', 'daily']) {
+        const kindStatus = weatherStatus.forecast?.[kind] ?? {};
+        inputRuntime.registerSource({
+          sourceId: `weather_forecast_${kind}`,
+          displayName: forecastLabels[kind],
+          kind: 'external_provider',
+          enabled: weatherStatus.enabled === true && weatherStatus.configured === true,
+          ttlMs: kindStatus.ttl_ms ?? inputRuntimeIntervalMs,
+          provider: weatherStatus.provider,
+          provenance: { connector: 'weather', layer: `weather_forecast.${kind}`, mutation: 'cache_only' },
+          refresh: async ({ force = false } = {}) => {
+            const result = await weatherConnector.forecast({ kinds: [kind], force });
+            const refreshedStatus = weatherConnector.forecastStatus?.()[kind] ?? {};
+            return {
+              ...result,
+              // Track this forecast kind rather than the current-weather connector clock.
+              connector: {
+                provider: result.connector?.provider ?? weatherStatus.provider,
+                last_success_at: refreshedStatus.last_success_at ?? null,
+                ttl_ms: refreshedStatus.ttl_ms ?? kindStatus.ttl_ms ?? inputRuntimeIntervalMs,
+              },
+            };
+          },
+        });
+      }
+    }
   }
 
   const server = createServer((request, response) => {
@@ -342,6 +413,15 @@ export function createDeskBotServer({
             { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
         return;
       }
+    }
+    if (url.pathname === '/api/life/npc-agents' && request.method === 'GET') {
+      const limit = Number(url.searchParams.get('limit') ?? 24);
+      const npcId = url.searchParams.get('npc_id') || null;
+      sendJson(response, 200, {
+        schema: 'deskbot.npc-agent-decision-list.v0.1',
+        decisions: worldLife.npcAgentLoop.list({ npcId, limit }),
+      });
+      return;
     }
     if (url.pathname === '/api/life/world') {
       if (request.method === 'GET') {
@@ -734,6 +814,11 @@ export function createDeskBotServer({
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/input-runtime') {
+      sendJson(response, 200, inputRuntime.status());
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/connectors/weather') {
       sendJson(response, 200, weatherConnector?.status?.() ?? {
         schema: 'foundry.weather-connector-status.v0.1',
@@ -943,6 +1028,35 @@ export function createDeskBotServer({
         character_id: characterId,
         pulls: rolePulls({ characterId, limit: url.searchParams.get('limit') ?? 200 }),
       });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/roles/evolution') {
+      const characterId = url.searchParams.get('character_id') ?? null;
+      sendJson(response, 200, {
+        schema: 'deskbot.role-evolution-response.v0.1',
+        accepted: true,
+        character_id: characterId,
+        ...(roleEvolution.snapshot({ characterId, limit: url.searchParams.get('limit') ?? 50 })),
+        proposals: roles.list({ characterId, limit: url.searchParams.get('limit') ?? 50 }),
+        active_trials: roles.activeTrials({ characterId, limit: url.searchParams.get('limit') ?? 20 }),
+        current_stages: roles.currentStages({ characterId, limit: 10 }),
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/roles/evolution/sync') {
+      readJson(request, 64 * 1024, { allowEmpty: true })
+        .then((body) => roleEvolution.sync({
+          characterId: body.character_id ?? body.characterId ?? undefined,
+          limit: body.limit ?? 200,
+        }))
+        .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
+          schema: 'deskbot.role-evolution-sync-result.v0.1',
+          accepted: true,
+          ...result,
+        }))
+        .catch((error) => sendRoleError(response, error));
       return;
     }
 
@@ -1426,6 +1540,9 @@ export function createDeskBotServer({
         .then((body) => {
           if (url.pathname === '/api/chat' && (body.role ?? 'user') === 'user') {
             return orchestrator.run(body).then((turn) => {
+              const roleEvolutionResult = turn.duplicate
+                ? null
+                : roleEvolution.observeEvent(turn.input_event);
               sendJson(response, turn.duplicate ? 200 : 202, {
                 accepted: true,
                 duplicate: turn.duplicate,
@@ -1434,6 +1551,7 @@ export function createDeskBotServer({
                 analysis: turn.analysis,
                 state: turn.state,
                 canonical_world: turn.canonical_world,
+                role_evolution: roleEvolutionResult,
                 context: turn.state ? stateEngine.context(turn.state.character_id) : null,
                 pipeline: {
                   stages: ['input', 'world-context', 'state-engine', 'prompt-composer', 'llm', 'output-router'],
@@ -1486,6 +1604,9 @@ export function createDeskBotServer({
             source_event: result.event,
             output_plan: stateResult.outputs,
           });
+          const roleEvolutionResult = result.duplicate
+            ? null
+            : roleEvolution.observeEvent(result.event);
           sendInputAccepted(response, result.event, result.duplicate || worldMutation.duplicate, {
             ...stateResult,
             outputs: stateResult.outputs,
@@ -1496,6 +1617,7 @@ export function createDeskBotServer({
             device: deviceResult?.device ?? null,
             world_mutation: worldMutation,
             interaction_decision: interactionDecision,
+            roleEvolution: roleEvolutionResult,
           });
         })
         .catch((error) => {
@@ -1582,6 +1704,8 @@ export function createDeskBotServer({
   server.sharedLife = sharedLife;
   server.sharedLifeReports = sharedLifeReports;
   server.worldLife = worldLife;
+  server.inputRuntime = inputRuntime;
+  server.roleEvolution = roleEvolution;
   server.once('listening', () => {
     try {
       persistentWorld.syncWallClock?.();
@@ -1591,6 +1715,12 @@ export function createDeskBotServer({
     sharedLife.tick();
     npcGoals.tick();
     worldLife.tick();
+    try {
+      roleEvolution.syncAll();
+    } catch (error) {
+      console.error(`[role-evolution] startup sync failed: ${error.message}`);
+    }
+    inputRuntime.start();
     const timer = setInterval(() => {
       try {
         persistentWorld.syncWallClock?.();
@@ -1600,9 +1730,17 @@ export function createDeskBotServer({
       sharedLife.tick();
       npcGoals.tick();
       worldLife.tick();
+      try {
+        roleEvolution.syncAll();
+      } catch (error) {
+        console.error(`[role-evolution] scheduled sync failed: ${error.message}`);
+      }
     }, 60_000);
     timer.unref();
-    server.once('close', () => clearInterval(timer));
+    server.once('close', () => {
+      clearInterval(timer);
+      inputRuntime.stop();
+    });
   });
   return server;
 }

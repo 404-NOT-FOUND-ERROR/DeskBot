@@ -34,6 +34,21 @@ if (-not (Test-Path -LiteralPath $LlmConfigPath -PathType Leaf)) {
 $env:DESKBOT_LLM_PROVIDER = 'deepseek'
 $env:DESKBOT_LLM_CONFIG = (Resolve-Path -LiteralPath $LlmConfigPath).Path
 
+# Node's fetch does not automatically inherit the Windows system proxy. On
+# this workstation the local proxy is Clash-compatible at 7897; enable Node
+# 24's env-proxy support only when a proxy is not already configured.
+if ([string]::IsNullOrWhiteSpace($env:HTTPS_PROXY) -and [string]::IsNullOrWhiteSpace($env:HTTP_PROXY)) {
+  try {
+    $proxyReachable = Test-NetConnection -ComputerName '127.0.0.1' -Port 7897 -InformationLevel Quiet -WarningAction SilentlyContinue
+    if ($proxyReachable) {
+      $env:HTTPS_PROXY = 'http://127.0.0.1:7897'
+      $env:HTTP_PROXY = 'http://127.0.0.1:7897'
+      $env:NO_PROXY = '127.0.0.1,localhost'
+    }
+  } catch { }
+}
+$env:NODE_USE_ENV_PROXY = '1'
+
 function Assert-PortFree([int]$Port, [string]$Name) {
   $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object {
       $_.LocalPort -eq $Port -and ($_.LocalAddress -eq '127.0.0.1' -or $_.LocalAddress -eq '::1' -or $_.LocalAddress -eq '0.0.0.0' -or $_.LocalAddress -eq '::')
@@ -72,7 +87,7 @@ if ($WeatherEnvFile) {
   if (-not (Test-Path -LiteralPath $WeatherEnvFile -PathType Leaf)) {
     throw "Weather env file not found: $WeatherEnvFile"
   }
-  foreach ($line in Get-Content -LiteralPath $WeatherEnvFile) {
+  foreach ($line in Get-Content -LiteralPath $WeatherEnvFile -Encoding UTF8) {
     if ($line -match '^\s*#' -or $line -match '^\s*$') { continue }
     if ($line -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') { throw "Invalid weather env line" }
     $name = $Matches[1]
