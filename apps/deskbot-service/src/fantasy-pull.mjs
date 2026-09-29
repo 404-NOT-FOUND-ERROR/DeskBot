@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const DIRECTIONS = Object.freeze({
   wetland_frog: Object.freeze({ label: '荷叶青蛙', life: '潮湿、有弹性、会蹲在荷叶上的生活', cues: ['雨', '池塘', '湿地', '荷叶', '青蛙', '散步'] }),
   starry_observer: Object.freeze({ label: '星空观察者', life: '在夜空和远方之间寻找线索的生活', cues: ['星空', '星星', '夜空', '月亮', '观测', '宇宙'] }),
@@ -49,6 +51,54 @@ function sourceOf(event) {
   return event.layer ?? (event.type?.startsWith('world.') ? 'world_line' : event.source ?? 'unknown');
 }
 
+function provenanceIds(event, key) {
+  const values = event.provenance?.[key];
+  return Array.isArray(values)
+    ? [...new Set(values.filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()))].sort()
+    : [];
+}
+
+function evidenceIdFor(event) {
+  const refs = provenanceIds(event, 'evidence_ids');
+  const ids = refs.length ? refs : provenanceIds(event, 'source_event_ids');
+  if (!ids.length) return `evidence-${event.event_id}`;
+  if (ids.length === 1) return ids[0].startsWith('evidence-') ? ids[0] : `evidence-${ids[0]}`;
+  const digest = createHash('sha256').update(JSON.stringify(ids)).digest('hex').slice(0, 24);
+  return `evidence-${digest}`;
+}
+
+function userEvidence(event) {
+  const layer = sourceOf(event);
+  const role = typeof event.payload?.role === 'string' ? event.payload.role.toLowerCase() : 'user';
+  const sourceKind = event.source_kind;
+  if (role !== 'user' || (sourceKind !== undefined && sourceKind !== 'user')) return false;
+  return event.type === 'conversation.input' || layer === 'dialogue' || layer === 'user_profile';
+}
+
+function explicitlyDislikesCue(text, cue) {
+  const negative = '(?:不太喜欢|不喜欢|讨厌|厌恶|排斥|不愿(?:意)?|没兴趣|不想(?:要|去|再)?|不要|拒绝)';
+  let cueAt = text.indexOf(cue);
+  while (cueAt >= 0) {
+    const prefix = text.slice(Math.max(0, cueAt - 16), cueAt);
+    const suffix = text.slice(cueAt + cue.length, cueAt + cue.length + 16);
+    if (/(?:不是|并非)\s*(?:不太喜欢|不喜欢|讨厌|厌恶|排斥|不愿(?:意)?|没兴趣|不想|不要|拒绝)/.test(prefix)) {
+      cueAt = text.indexOf(cue, cueAt + cue.length);
+      continue;
+    }
+    if (new RegExp(`${negative}[^，。！？；,.!?;]{0,8}$`).test(prefix)
+      || new RegExp(`^[^，。！？；,.!?;]{0,8}${negative}`).test(suffix)) return true;
+    cueAt = text.indexOf(cue, cueAt + cue.length);
+  }
+  return false;
+}
+
+function polarityFor(event, cue, text) {
+  const explicit = event.payload?.evidence_polarity;
+  if (['support', 'conflict', 'neutral'].includes(explicit)) return explicit;
+  if (!userEvidence(event)) return 'support';
+  return explicitlyDislikesCue(text, cue) ? 'conflict' : 'support';
+}
+
 const EVIDENCE_LAYERS = new Set([
   'dialogue',
   'world_line',
@@ -72,7 +122,15 @@ export function isFantasyEvidenceEvent(event) {
 
 export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 3, minScore = 0.25, maxCandidates = 3, now = new Date() } = {}) {
   const directionCatalog = { ...DIRECTIONS, ...Object.fromEntries(dynamicDirections(events)) };
-  const scores = new Map(Object.keys(directionCatalog).map((id) => [id, { score: 0, evidence: [], sources: new Set() }]));
+  const scores = new Map(Object.keys(directionCatalog).map((id) => [id, {
+    supportScore: 0,
+    conflictScore: 0,
+    evidence: [],
+    sources: new Set(),
+    opposingSources: new Set(),
+    supportEvidenceIds: new Set(),
+    seenEvidenceIds: new Set(),
+  }]));
   const seen = new Set();
   for (const event of events) {
     if (!isFantasyEvidenceEvent(event)) continue;
@@ -81,36 +139,89 @@ export function computeFantasyPull(events = [], { minSources = 2, minEvidence = 
     const text = textOf(event);
     if (!text) continue;
     const source = sourceOf(event);
+    const evidenceId = evidenceIdFor(event);
     for (const [id, direction] of Object.entries(directionCatalog)) {
       const cues = direction.cues.filter((cue) => text.includes(cue));
       if (!cues.length) continue;
       const bucket = scores.get(id);
-      const ageHours = Math.max(0, (new Date(now).getTime() - new Date(event.occurred_at ?? event.observed_at ?? now).getTime()) / 3600000);
+      if (bucket.seenEvidenceIds.has(evidenceId)) continue;
+      bucket.seenEvidenceIds.add(evidenceId);
+      const ageHours = Math.max(0, (new Date(now).getTime() - new Date(event.received_at ?? event.observed_at ?? event.occurred_at ?? now).getTime()) / 3600000);
       const decay = Number.isFinite(ageHours) ? 1 / (1 + ageHours / 72) : 1;
-      bucket.score += Math.min(cues.length, 2) * (event.confidence ?? 1) * decay;
-      bucket.evidence.push({ evidence_id: `evidence-${event.event_id}`, event_id: event.event_id, cues });
-      bucket.sources.add(source);
+      const weightedCues = cues.map((cue) => ({ cue, polarity: polarityFor(event, cue, text) }));
+      const supportCues = weightedCues.filter((item) => item.polarity === 'support').map((item) => item.cue);
+      const conflictCues = weightedCues.filter((item) => item.polarity === 'conflict').map((item) => item.cue);
+      const neutralCues = weightedCues.filter((item) => item.polarity === 'neutral').map((item) => item.cue);
+      const weight = (count) => Math.min(count, 2) * (event.confidence ?? 1) * decay;
+      bucket.supportScore += weight(supportCues.length);
+      bucket.conflictScore += weight(conflictCues.length);
+      if (supportCues.length) {
+        bucket.sources.add(source);
+        bucket.supportEvidenceIds.add(evidenceId);
+      }
+      if (conflictCues.length) bucket.opposingSources.add(source);
+      bucket.evidence.push({
+        evidence_id: evidenceId,
+        event_id: event.event_id,
+        source_event_ids: provenanceIds(event, 'source_event_ids'),
+        cues,
+        support_cues: supportCues,
+        conflict_cues: conflictCues,
+        neutral_cues: neutralCues,
+        polarity: supportCues.length && conflictCues.length ? 'mixed' : conflictCues.length ? 'conflict' : neutralCues.length && !supportCues.length ? 'neutral' : 'support',
+        support_weight: Math.round(weight(supportCues.length) * 100) / 100,
+        conflict_weight: Math.round(weight(conflictCues.length) * 100) / 100,
+        source,
+        layer: event.layer ?? null,
+        observed_at: event.observed_at ?? null,
+        occurred_at: event.occurred_at ?? null,
+        confidence: event.confidence ?? null,
+      });
     }
   }
   return [...scores.entries()]
     .map(([id, bucket]) => {
       const direction = directionCatalog[id];
-      const eligible = bucket.evidence.length >= minEvidence && bucket.sources.size >= minSources;
+      const netScore = Math.max(0, bucket.supportScore - bucket.conflictScore);
+      const eligible = bucket.supportEvidenceIds.size >= minEvidence && bucket.sources.size >= minSources;
+      const hasEvidence = bucket.evidence.length > 0;
+      const hasConflictEvidence = bucket.evidence.some((item) => item.conflict_cues.length > 0);
+      const hasNeutralEvidence = bucket.evidence.some((item) => item.neutral_cues.length > 0);
+      const score = Math.round(netScore * 100) / 100;
       return {
-        schema: Object.hasOwn(DIRECTIONS, id) ? 'deskbot.fantasy-pull.v0.2' : 'deskbot.fantasy-pull.v0.3',
+        schema: 'deskbot.fantasy-pull.v0.4',
         direction_id: id,
         label: direction.label,
         life: direction.life,
-        score: Math.round(bucket.score * 100) / 100,
-        fantasy_pull: Math.min(1, Math.round((bucket.score / 6) * 100) / 100),
+        score,
+        support_score: Math.round(bucket.supportScore * 100) / 100,
+        conflict_score: Math.round(bucket.conflictScore * 100) / 100,
+        fantasy_pull: Math.min(1, Math.round((score / 6) * 100) / 100),
+        // Keep the event-level explanation with the pull.  The role
+        // evolution layer persists this as durable evidence instead of
+        // asking callers to reconstruct it from a transient score.
+        evidence: bucket.evidence.map((item) => ({
+          ...item,
+          source: item.source ?? null,
+          layer: item.layer ?? null,
+          observed_at: item.observed_at ?? null,
+          occurred_at: item.occurred_at ?? null,
+          confidence: item.confidence ?? null,
+        })),
         evidence_ids: [...new Set(bucket.evidence.map((item) => item.evidence_id))],
+        support_evidence_ids: [...bucket.supportEvidenceIds],
+        conflict_evidence_ids: [...new Set(bucket.evidence.filter((item) => item.conflict_cues.length).map((item) => item.evidence_id))],
         sources: [...bucket.sources],
-        status: eligible && bucket.score >= minScore ? 'candidate' : 'observing',
-        reason: eligible && bucket.score >= minScore ? '跨来源且达到最小证据量，可供角色提案层考虑。' : bucket.score < minScore ? '信号已衰减到低于保留线，继续观察即可。' : '证据或来源仍不足，只保持观察。',
+        opposing_sources: [...bucket.opposingSources],
+        status: eligible && score >= minScore ? 'candidate' : 'observing',
+        reason: eligible && score >= minScore ? '跨来源支持证据达到门槛，可供角色提案层考虑。' : score < minScore ? '净支持信号低于保留线，继续观察即可。' : '支持证据或来源仍不足，只保持观察。',
+        has_evidence: hasEvidence,
+        has_conflict_evidence: hasConflictEvidence,
+        has_neutral_evidence: hasNeutralEvidence,
       };
     })
-    .filter((item) => item.evidence_ids.length > 0)
-    .filter((item) => item.status === 'candidate' || item.score >= minScore)
+    .filter((item) => item.has_evidence)
+    .filter((item) => item.status === 'candidate' || item.score >= minScore || item.has_conflict_evidence || item.has_neutral_evidence)
     .sort((a, b) => b.score - a.score || a.direction_id.localeCompare(b.direction_id))
     .slice(0, Math.max(1, maxCandidates));
 }

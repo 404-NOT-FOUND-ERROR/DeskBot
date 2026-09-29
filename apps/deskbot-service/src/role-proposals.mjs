@@ -185,15 +185,33 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     if (!['proposed', 'deferred'].includes(proposal.status)) {
       throw new RoleProposalError(409, 'role_proposal_not_selectable', `proposal ${proposalId} is ${proposal.status}`);
     }
-    const decision = { schema: 'deskbot.role-proposal-decision.v0.1', decision_id: `${proposalId}:${choice}`, proposal_id: proposalId, choice, reason, decided_at: now().toISOString() };
-    if (proposal.user_choice === choice && decisions.has(decision.decision_id)) {
-      return clone({ proposal, decision: decisions.get(decision.decision_id) });
+    const decisionId = `${proposalId}:${choice}`;
+    const existingDecision = decisions.get(decisionId);
+    if (proposal.user_choice === choice && existingDecision) {
+      return clone({ proposal, decision: existingDecision });
     }
-    if (!decisions.has(decision.decision_id)) { decisions.set(decision.decision_id, decision); persistence?.put('role.proposal-decisions', decision.decision_id, decision); }
+    // A previous process may have committed the decision but not the proposal
+    // before it stopped. Reuse the durable decision timestamp/reason while
+    // repairing the proposal, rather than creating a second decision record.
+    const decision = existingDecision ?? {
+      schema: 'deskbot.role-proposal-decision.v0.1',
+      decision_id: decisionId,
+      proposal_id: proposalId,
+      choice,
+      reason,
+      decided_at: now().toISOString(),
+    };
     const status = choice === 'try' ? 'trying' : choice === 'later' ? 'deferred' : 'rejected';
     const updated = { ...proposal, status, user_choice: choice, decided_at: decision.decided_at, stage_history: [...(proposal.stage_history ?? []), { from: proposal.status, to: status, at: decision.decided_at, reason }] };
     if (choice === 'try' && !updated.trial) updated.trial = null;
-    proposals.set(proposalId, updated); persistence?.put('role.proposals', proposalId, updated);
+    const persist = () => {
+      if (!existingDecision) persistence?.put('role.proposal-decisions', decision.decision_id, decision);
+      persistence?.put('role.proposals', proposalId, updated);
+    };
+    if (typeof persistence?.transaction === 'function') persistence.transaction(persist);
+    else persist();
+    if (!existingDecision) decisions.set(decision.decision_id, decision);
+    proposals.set(proposalId, updated);
     return clone({ proposal: updated, decision });
   }
   function startTrial(proposalId, { windowTurns = 5 } = {}) {

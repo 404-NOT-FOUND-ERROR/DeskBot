@@ -46,17 +46,33 @@ Node deskbot-service :4311
 
 ### P4-1 多源输入运行层
 
-`input-runtime.mjs` 是 provider 采集和 canonical world 之间的运行层。它维护来源注册表、到期判断、成功/失败状态、指数退避和 `input-runtime.sources` 持久化；当前服务启动时注册天气实时观测，以及小实时、小时、每日三个相互独立的天气预报缓存来源，并通过 `GET /api/input-runtime` 暴露安全状态。默认每 5 分钟检查一次，实际请求仍由各 connector 的 TTL 决定；某一种预报失败不会拖垮其他预报或世界生活调度。
+`input-runtime.mjs` 是 provider 采集和 canonical world 之间的运行层。它维护来源注册表、到期判断、成功/失败状态、指数退避、`input-runtime.sources` 来源快照及 `input-runtime.runs` 最近运行记录；`GET /api/input-runtime` 暴露安全状态、最近结果 event ID 和规范化错误。默认每 5 分钟检查一次，实际请求仍由各 connector 的 TTL 决定；某一种预报失败不会拖垮其他预报或世界生活调度。
+
+当前正式启动路径注册天气实时观测，以及小实时、小时、每日三个相互独立的天气预报缓存来源。输入运行层是可插拔 adapter 边界，不代表已经接入新闻抓取：目前没有新的自动新闻 provider。provider 或其他受信来源若交付符合事件合同的 observation，才会进入统一 ingest；抓取、归一化、事件候选和写入世界是不同阶段。
 
 天气 connector 的实时快照和 minutely/hourly/daily 预报现在写入 SQLite `connector.weather/state`，进程重启可恢复缓存、时间、新鲜度和错误摘要。token 不进入状态、事件或日志。实时天气成功后仍必须由 `ingestNonChatEvent()` 进入 `input-store -> persistent-world`；预报来源只更新 connector 缓存，不覆盖 canonical 当前天气。重复事件依靠既有 event ID 幂等，旧观测仍只进入审计而不覆盖较新的世界快照。
 
-输入运行层可以注册新闻、日历、设备等后续 adapter，但本阶段不把 observation 自动解释为世界事件；后续 provider 必须先规范化来源、时间、可信度和 provenance，再通过统一事件入口，P4-2 才负责把证据聚合成世界线候选或合法 mutation。
+输入运行层可以注册新闻、日历、设备等后续 adapter，但目前不负责自动把任意 observation 写成世界事实。来源、时间、可信度和 provenance 必须在统一事件入口归一化；角色方向聚合与世界候选是两个不同的下游路径。
 
 ### P4-2 角色方向演化闭环
 
-`role-evolution.mjs` 从已持久化且符合资格的多源事件中调用 `fantasy-pull.v0.3`，保存候选、运行记录和冷却状态；达到候选阈值时自动创建一条 `proposed` 提案。HTTP 事件入口、成功的用户聊天回合、服务启动和每分钟调度都会触发幂等同步。同步接口 `GET /api/roles/evolution` 提供候选、运行、提案、活动试行和 accepted 阶段；`POST /api/roles/evolution/sync` 返回本次新建的 `created` 列表。相同证据指纹会复用已有运行记录，不重复建提案；聊天重试和重复 event ID 不重复计入试行观察。
+`fantasy-pull.mjs` 将合格事件映射到有限方向目录。四个内置方向之外，事件可携带结构化 `role_direction` / `direction_hint`；同 `direction_id` 的提示合并，至少需要 label、life 和两条 cue。动态提示不绕开聚合器：一个方向仍需至少 3 条有效证据、至少 2 个来源且分数达到门槛才显示为 `candidate`，否则保持 `observing`。证据按事件年龄衰减；assistant、语音/传输/服务输出和设备生命周期输出不能反向塑造角色。
 
-角色状态仍由 `role-proposals.mjs` 管理：候选只生成提案，用户必须明确选择 `try`，试行窗口完成后再明确接受、拒绝或延后。accepted 阶段通过普通提示词、`expression_intent` 和 `world-life` 的 Scene 决策上下文产生有限表达/生活倾向；`GET /api/life/world` 兼容保留 `role_stages`，并提供 `role_context.current_stage/stages`。该投影不是新的世界写权限：角色台词不能直接变更 canonical world，角色阶段也不会自动修改 Soul 或外壳。
+方向证据使用 `payload.evidence_polarity`（`support | conflict | neutral`）。缺省值兼容旧事件，按 cue 命中记作 support；显式 conflict 扣减净分，neutral 不加不扣，三者都会保存事件级证据。候选的最小证据数和来源数只统计 support；方向净分为 support 减 conflict，低于门槛时继续观察。仅对 user 的 `dialogue` / `user_profile` 做有限的 cue 邻接中文否定识别；天气、世界线、外部事实和设备上下文不做自然语言否定推断。具体字段和测试协议见 [`p4-role-evolution-world-candidates.md`](p4-role-evolution-world-candidates.md)。
+
+`role-evolution.mjs` 从最近 30 天内的合格事件保存 evidence、pull、候选、运行记录和冷却状态。候选状态不等于身份已经改变：自动提案还要求支持证据落在至少两个 UTC 事件日期，并且没有另一方向正在试行。API 为兼容历史字段仍称 `logical_days`，其值由支持证据的 `occurred_at`（缺失时回退 `observed_at`）转成 UTC 日期，不是 canonical `logical_time` 的世界日；这是需要后续统一的已知边界。HTTP 事件、成功用户聊天回合、服务启动和周期调度会触发幂等同步；完全相同的事件指纹复用运行结果。
+
+读取接口 `GET /api/roles/evolution` 与别名 `GET /api/role-evolution/status` 返回 evidence、pull、候选、运行、提案、活动试行和当前阶段；同步入口 `POST /api/roles/evolution/sync` 与别名 `POST /api/role-evolution/run` 返回本次运行和新建提案。旧 URL 保持兼容。聊天重试与重复 event ID 不重复计入试行观察。
+
+角色提案与阶段仍由 `role-proposals.mjs` 管理。候选只创建 `proposed` 提案；用户明确选择并启动 `try` 后，合格的用户聊天回合才记录中性观察（默认试行窗口为 5 回合），窗口结束后仍需显式接受、拒绝或延后。accepted 阶段通过普通提示词、`expression_intent` 和 `world-life` Scene 决策上下文产生有限表达/生活倾向；`GET /api/life/world` 兼容保留 `role_stages`，并提供 `role_context.current_stage/stages`。这是对表达和生活倾向的投影，不是新的世界写权限：角色台词不能直接变更 canonical world，角色阶段也不会自动修改 Soul 或外壳。
+
+### P4-3 外部事件到世界候选
+
+`world-candidates.mjs` 将符合白名单类型的外部 observation 转为待审阅的世界候选，而不是直接写世界。候选保存来源事件/evidence ID、provenance、受限动作、规则版本、预览、expected world revision 与 24 小时到期时间；相同 observation 的指纹会复用同一候选。允许的动作仅为 `advance_time`、`apply_world_line_event`、`enqueue_pending_item`、`record_external_context`、`update_weather` 和 `advance_calendar`，每个候选最多 4 个动作；字段在服务端重新归一化，输入事件不能携带任意 `world.mutation` payload 越过桥接。
+
+`GET /api/world/candidates` 及单候选读取接口只提供后端读模型。`POST /api/world/candidates/:id/preview` 通过 `previewWorldMutations()` 重新验证动作、刷新候选预览与 expected revision，但不推进 canonical world；`accept` 再次检查 revision 并由 `persistentWorld.ingest()` 写入白名单 mutation 与 mutation ledger；`dismiss` 留下决定记录。候选过期、revision 冲突、非法动作和重复接受均有明确结果。当前这是后端 API/受控入场层，尚无可视化候选面板，也没有新的自动新闻 Provider；没有显式 accept 就不会改变世界。
+
+角色方向候选回答“喵呜可能想体验什么”；世界候选回答“一个外部 observation 是否能成为有限、可审计的世界 mutation”。前者经证据聚合、提案、试行和阶段决策；后者经动作白名单、无副作用预览和显式接受。两类 candidate 不能互相替代，也不能由 LLM 台词直接提交。
 
 ## 已知风险 / 假设
 

@@ -3,11 +3,18 @@ import { createHash } from 'node:crypto';
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
+const EVIDENCE_NAMESPACE = 'role.evidence';
+const PULL_NAMESPACE = 'role.pulls';
 const CANDIDATE_NAMESPACE = 'role.evolution-candidates';
 const RUN_NAMESPACE = 'role.evolution-runs';
 const COOLDOWN_NAMESPACE = 'role.evolution-cooldowns';
 const MAX_RUNS = 120;
 const MAX_CANDIDATES = 120;
+const MAX_EVIDENCE = 500;
+const MAX_PULLS = 500;
+const EVIDENCE_WINDOW_DAYS = 30;
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+const RULE_VERSION = 'role-evolution-rules.v0.7';
 
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
@@ -25,8 +32,22 @@ function fingerprint(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function stringIds(value) {
+  return Array.isArray(value)
+    ? [...new Set(value.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()))]
+    : [];
+}
+
 function candidateKey(characterId, directionId) {
   return `${characterId}:${directionId}`;
+}
+
+function evidenceKey(characterId, directionId, evidenceId) {
+  return `${characterId}:${directionId}:${evidenceId}`;
+}
+
+function pullKey(characterId, directionId, fingerprintValue) {
+  return `${characterId}:${directionId}:${fingerprintValue}`;
 }
 
 function proposalIdFor(characterId, directionId) {
@@ -47,6 +68,7 @@ function eventIsEligible(event) {
   const type = typeof event?.type === 'string' ? event.type : '';
   const role = typeof event?.payload?.role === 'string' ? event.payload.role.toLowerCase() : '';
   if (role === 'assistant' || type === 'conversation.reply') return false;
+  if (event?.source === 'untrusted_observation') return false;
   if (type.startsWith('voice.') || type.startsWith('transport.') || type.startsWith('service.')) return false;
   if (type.startsWith('conversation.output') || type.startsWith('device.output') || type.startsWith('device.lifecycle')) return false;
   if (event?.source === 'role-evolution-engine' || event?.source_kind === 'role_evolution') return false;
@@ -58,7 +80,75 @@ function stableEvents(inputStore, characterId, limit) {
   return events
     .filter((event) => eventIsEligible(event))
     .filter((event) => event.character_id === characterId || event.character_id === null || event.character_id === undefined)
-    .sort((left, right) => String(left.event_id).localeCompare(String(right.event_id)));
+    .sort((left, right) => {
+      const leftAt = Date.parse(left.received_at ?? left.observed_at ?? left.occurred_at ?? '') || 0;
+      const rightAt = Date.parse(right.received_at ?? right.observed_at ?? right.occurred_at ?? '') || 0;
+      return leftAt - rightAt || String(left.event_id).localeCompare(String(right.event_id));
+    });
+}
+
+function logicalDay(value) {
+  const at = Date.parse(value ?? '');
+  return Number.isFinite(at) ? new Date(at).toISOString().slice(0, 10) : null;
+}
+
+function evidenceFromPull(pull, events, at, windowDays = EVIDENCE_WINDOW_DAYS) {
+  const eventsById = new Map(events.map((event) => [event.event_id, event]));
+  return (Array.isArray(pull.evidence) ? pull.evidence : pull.evidence_ids.map((evidenceId) => ({
+    evidence_id: evidenceId,
+    event_id: String(evidenceId).replace(/^evidence-/, ''),
+    cues: [],
+  }))).map((item) => {
+    const event = eventsById.get(item.event_id) ?? {};
+    const observedAt = event.received_at ?? item.observed_at ?? event.observed_at ?? event.occurred_at ?? at.toISOString();
+    const occurredAt = item.occurred_at ?? event.occurred_at ?? observedAt;
+    const expiresAt = new Date(Date.parse(observedAt) + windowDays * 24 * 3600000).toISOString();
+    return {
+      schema: 'deskbot.role-evidence.v0.3',
+      rule_version: RULE_VERSION,
+      evidence_id: item.evidence_id,
+      event_id: item.event_id,
+      direction_id: pull.direction_id,
+      cues: [...new Set((item.cues ?? []).filter((cue) => typeof cue === 'string' && cue.trim()).map((cue) => cue.trim()))],
+      support_cues: [...new Set((item.support_cues ?? item.cues ?? []).filter((cue) => typeof cue === 'string' && cue.trim()).map((cue) => cue.trim()))],
+      conflict_cues: [...new Set((item.conflict_cues ?? []).filter((cue) => typeof cue === 'string' && cue.trim()).map((cue) => cue.trim()))],
+      neutral_cues: [...new Set((item.neutral_cues ?? []).filter((cue) => typeof cue === 'string' && cue.trim()).map((cue) => cue.trim()))],
+      polarity: item.polarity ?? 'support',
+      support_weight: item.support_weight ?? (item.polarity === 'conflict' ? 0 : 1),
+      conflict_weight: item.conflict_weight ?? (item.polarity === 'conflict' ? 1 : 0),
+      source: item.source ?? event.source ?? null,
+      source_kind: event.source_kind ?? null,
+      source_event_ids: stringIds(
+        Array.isArray(item.source_event_ids) ? item.source_event_ids : event.provenance?.source_event_ids,
+      ),
+      layer: item.layer ?? event.layer ?? null,
+      confidence: item.confidence ?? event.confidence ?? 1,
+      provenance: structuredClone(event.provenance ?? null),
+      observed_at: observedAt,
+      occurred_at: occurredAt,
+      logical_day: logicalDay(observedAt),
+      expires_at: expiresAt,
+      status: Date.parse(observedAt) + windowDays * 24 * 3600000 > at.getTime() ? 'active' : 'expired',
+      fingerprint: fingerprint({
+        evidence_id: item.evidence_id,
+        event_id: item.event_id,
+        direction_id: pull.direction_id,
+        cues: item.cues ?? [],
+        source: item.source ?? event.source ?? null,
+        polarity: item.polarity ?? 'support',
+        support_cues: item.support_cues ?? item.cues ?? [],
+        conflict_cues: item.conflict_cues ?? [],
+        neutral_cues: item.neutral_cues ?? [],
+      }),
+    };
+  });
+}
+
+function withinEvidenceWindow(event, at, windowDays) {
+  const observedMs = Date.parse(event?.received_at ?? event?.observed_at ?? event?.occurred_at ?? '');
+  if (!Number.isFinite(observedMs)) return false;
+  const ageMs = at.getTime() - observedMs;
+  return ageMs >= -MAX_FUTURE_SKEW_MS && ageMs <= windowDays * 24 * 3600000;
 }
 
 function activeProposalFor(roles, characterId, directionId) {
@@ -78,10 +168,14 @@ export function createRoleEvolution({
   activeCharacter = DEFAULT_CHARACTER_ID,
   cooldownMs = 24 * 3600000,
   maxRuns = MAX_RUNS,
+  evidenceWindowDays = EVIDENCE_WINDOW_DAYS,
+  minProposalLogicalDays = 2,
 } = {}) {
   if (!inputStore || typeof inputStore.list !== 'function') throw new TypeError('role evolution needs inputStore');
   if (!roles || typeof roles.list !== 'function' || typeof roles.propose !== 'function') throw new TypeError('role evolution needs role proposal store');
   if (typeof computeFantasyPull !== 'function') throw new TypeError('role evolution needs computeFantasyPull');
+  if (!Number.isInteger(evidenceWindowDays) || evidenceWindowDays < 1 || evidenceWindowDays > 365) throw new TypeError('evidenceWindowDays must be an integer from 1 to 365');
+  if (!Number.isInteger(minProposalLogicalDays) || minProposalLogicalDays < 1 || minProposalLogicalDays > 30) throw new TypeError('minProposalLogicalDays must be an integer from 1 to 30');
 
   const candidates = new Map(
     (persistence?.list?.(CANDIDATE_NAMESPACE) ?? []).map((item) => [item.candidate_key, item]),
@@ -91,6 +185,15 @@ export function createRoleEvolution({
   );
   const cooldowns = new Map(
     (persistence?.list?.(COOLDOWN_NAMESPACE) ?? []).map((item) => [item.cooldown_key, item]),
+  );
+  const evidence = new Map(
+    (persistence?.list?.(EVIDENCE_NAMESPACE) ?? []).map((item) => [
+      evidenceKey(item.character_id ?? activeCharacter, item.direction_id, item.evidence_id),
+      item,
+    ]),
+  );
+  const pulls = new Map(
+    (persistence?.list?.(PULL_NAMESPACE) ?? []).map((item) => [item.pull_key, item]),
   );
   let lastRunId = [...runs.values()].at(-1)?.run_id ?? null;
 
@@ -128,7 +231,68 @@ export function createRoleEvolution({
     return clone(next);
   }
 
-  function materializePull(pull, characterId, at) {
+  function saveEvidence(value) {
+    const next = clone(value);
+    const key = evidenceKey(next.character_id, next.direction_id, next.evidence_id);
+    evidence.set(key, next);
+    persistence?.put?.(EVIDENCE_NAMESPACE, key, next);
+    while (evidence.size > MAX_EVIDENCE) {
+      const oldest = evidence.keys().next().value;
+      if (oldest === undefined) break;
+      evidence.delete(oldest);
+      persistence?.remove?.(EVIDENCE_NAMESPACE, oldest);
+    }
+    return clone(next);
+  }
+
+  function expireEvidence(at, characterId) {
+    const nowMs = at.getTime();
+    for (const [key, item] of evidence) {
+      if (item.character_id !== characterId || item.status === 'expired') continue;
+      const expiresMs = Date.parse(item.expires_at ?? '');
+      if (!Number.isFinite(expiresMs) || expiresMs > nowMs) continue;
+      const expired = { ...item, status: 'expired', expired_at: at.toISOString() };
+      evidence.set(key, expired);
+      persistence?.put?.(EVIDENCE_NAMESPACE, key, expired);
+    }
+  }
+
+  function markUnmaterializedCandidatesStale(at, characterId, materializedDirectionIds) {
+    for (const candidate of candidates.values()) {
+      if (candidate.character_id !== characterId || materializedDirectionIds.has(candidate.direction_id)) continue;
+      const supportIds = candidate.support_evidence_ids ?? candidate.evidence_ids ?? [];
+      const hasActiveSupport = supportIds.some((evidenceId) => {
+        const record = evidence.get(evidenceKey(characterId, candidate.direction_id, evidenceId));
+        return record?.status !== 'expired' && withinEvidenceWindow(record, at, evidenceWindowDays);
+      });
+      saveCandidate({
+        ...candidate,
+        status: hasActiveSupport ? 'observing' : 'stale',
+        stale_reason: hasActiveSupport ? 'below_active_candidate_threshold' : 'support_evidence_expired',
+        stale_at: at.toISOString(),
+        proposal_gate: {
+          ...(candidate.proposal_gate ?? {}),
+          eligible: false,
+        },
+        updated_at: at.toISOString(),
+      });
+    }
+  }
+
+  function savePull(value) {
+    const next = clone(value);
+    pulls.set(next.pull_key, next);
+    persistence?.put?.(PULL_NAMESPACE, next.pull_key, next);
+    while (pulls.size > MAX_PULLS) {
+      const oldest = pulls.keys().next().value;
+      if (oldest === undefined) break;
+      pulls.delete(oldest);
+      persistence?.remove?.(PULL_NAMESPACE, oldest);
+    }
+    return clone(next);
+  }
+
+  function materializePull(pull, characterId, at, events) {
     const key = candidateKey(characterId, pull.direction_id);
     const previous = candidates.get(key);
     const evidenceFingerprint = fingerprint([...pull.evidence_ids].sort());
@@ -137,8 +301,19 @@ export function createRoleEvolution({
     const cooldownUntilMs = cooldown?.cooldown_until ? Date.parse(cooldown.cooldown_until) : 0;
     const nowMs = at.getTime();
     const withinCooldown = Number.isFinite(cooldownUntilMs) && cooldownUntilMs > nowMs;
+    const evidenceRecords = evidenceFromPull(pull, events, at, evidenceWindowDays);
+    for (const record of evidenceRecords) saveEvidence({ ...record, character_id: characterId });
+    const supportEvidenceRecords = evidenceRecords.filter((record) => record.support_weight > 0);
+    const logicalDays = [...new Set(supportEvidenceRecords.map((record) => record.logical_day).filter(Boolean))];
+    const activeTrial = typeof roles.activeTrials === 'function'
+      ? roles.activeTrials({ characterId, limit: 50 }).find((trial) => trial.direction_id !== pull.direction_id)
+      : null;
+    const canAutoPropose = pull.status === 'candidate'
+      && logicalDays.length >= minProposalLogicalDays
+      && !activeTrial;
     const record = {
-      schema: 'deskbot.role-evolution-candidate.v0.1',
+      schema: 'deskbot.role-evolution-candidate.v0.3',
+      rule_version: RULE_VERSION,
       candidate_key: key,
       character_id: characterId,
       direction_id: pull.direction_id,
@@ -148,7 +323,16 @@ export function createRoleEvolution({
       score: pull.score,
       fantasy_pull: pull.fantasy_pull,
       evidence_ids: [...pull.evidence_ids],
+      evidence_count: evidenceRecords.length,
+      support_evidence_ids: [...(pull.support_evidence_ids ?? pull.evidence_ids)],
+      conflict_evidence_ids: [...(pull.conflict_evidence_ids ?? [])],
+      support_evidence_count: supportEvidenceRecords.length,
+      logical_days: logicalDays,
+      first_evidence_at: supportEvidenceRecords[0]?.occurred_at ?? null,
+      last_evidence_at: supportEvidenceRecords.at(-1)?.occurred_at ?? null,
       sources: [...(pull.sources ?? [])],
+      support_score: pull.support_score ?? pull.score,
+      conflict_score: pull.conflict_score ?? 0,
       evidence_fingerprint: evidenceFingerprint,
       first_seen_at: previous?.first_seen_at ?? at.toISOString(),
       last_seen_at: at.toISOString(),
@@ -162,15 +346,16 @@ export function createRoleEvolution({
     let proposal = existing;
     let created = false;
     let suppressed = null;
-    const evidenceChanged = previous?.evidence_fingerprint !== evidenceFingerprint;
     if (pull.status === 'candidate') {
       if (existing) {
         suppressed = 'existing_active_proposal';
         if (typeof roles.refreshEvidence === 'function') {
           proposal = roles.refreshEvidence(existing.proposal_id, pull, { now: at }) ?? proposal;
         }
-      } else if (withinCooldown && !evidenceChanged) {
+      } else if (withinCooldown) {
         suppressed = 'cooldown';
+      } else if (!canAutoPropose) {
+        suppressed = activeTrial ? 'active_trial' : 'cross_logical_day_gate';
       } else {
         proposal = roles.propose(pull, {
           characterId,
@@ -194,6 +379,12 @@ export function createRoleEvolution({
     }
     record.proposal_id = proposal?.proposal_id ?? record.proposal_id;
     record.proposal_status = proposal?.status ?? record.proposal_status;
+    record.proposal_gate = {
+      required_logical_days: minProposalLogicalDays,
+      observed_logical_days: logicalDays.length,
+      active_trial: activeTrial?.proposal_id ?? null,
+      eligible: canAutoPropose,
+    };
     saveCandidate(record);
     return { candidate: record, proposal: clone(proposal), created, suppressed };
   }
@@ -201,30 +392,73 @@ export function createRoleEvolution({
   function sync({ characterId = activeCharacter, limit = 200 } = {}) {
     const resolvedCharacterId = characterKey(characterId);
     const at = now();
-    const events = stableEvents(inputStore, resolvedCharacterId, limit);
+    if (!(at instanceof Date) || !Number.isFinite(at.getTime())) throw new TypeError('role evolution now() must return a valid Date');
+    expireEvidence(at, resolvedCharacterId);
+    const events = stableEvents(inputStore, resolvedCharacterId, limit)
+      .filter((event) => withinEvidenceWindow(event, at, evidenceWindowDays));
     const eventFingerprint = fingerprint(events.map((event) => event.event_id));
-    const runId = `role-evolution:${resolvedCharacterId}:${eventFingerprint.slice(0, 24)}`;
+    const evaluationDay = logicalDay(at.toISOString());
+    const runId = `role-evolution:${resolvedCharacterId}:${RULE_VERSION}:${evaluationDay}:${eventFingerprint.slice(0, 24)}`;
     const existingRun = runs.get(runId);
     if (existingRun) {
       lastRunId = existingRun.run_id;
       return clone({ ...existingRun, created: [], duplicate: true });
     }
     const pulls = computeFantasyPull(events, { now: at, maxCandidates: 12 });
-    const materialized = pulls.map((pull) => materializePull(pull, resolvedCharacterId, at));
+    const materialized = pulls.map((pull) => {
+      const pullEvidence = evidenceFromPull(pull, events, at, evidenceWindowDays);
+      const pullFingerprint = fingerprint({
+        direction_id: pull.direction_id,
+        evidence_ids: pull.evidence_ids,
+        score: pull.score,
+        support_score: pull.support_score ?? pull.score,
+        conflict_score: pull.conflict_score ?? 0,
+        support_evidence_ids: pull.support_evidence_ids ?? pull.evidence_ids,
+        conflict_evidence_ids: pull.conflict_evidence_ids ?? [],
+        sources: pull.sources,
+      });
+      savePull({
+        schema: 'deskbot.role-pull.v0.3',
+        rule_version: RULE_VERSION,
+        pull_key: pullKey(resolvedCharacterId, pull.direction_id, pullFingerprint),
+        character_id: resolvedCharacterId,
+        direction_id: pull.direction_id,
+        status: pull.status,
+        score: pull.score,
+        support_score: pull.support_score ?? pull.score,
+        conflict_score: pull.conflict_score ?? 0,
+        fantasy_pull: pull.fantasy_pull,
+        evidence_ids: [...pull.evidence_ids],
+        support_evidence_ids: [...(pull.support_evidence_ids ?? pull.evidence_ids)],
+        conflict_evidence_ids: [...(pull.conflict_evidence_ids ?? [])],
+        sources: [...(pull.sources ?? [])],
+        logical_days: [...new Set(pullEvidence.map((item) => item.logical_day).filter(Boolean))],
+        event_ids: [...new Set(pullEvidence.map((item) => item.event_id).filter(Boolean))],
+        observed_at: at.toISOString(),
+      });
+      return materializePull(pull, resolvedCharacterId, at, events);
+    });
+    markUnmaterializedCandidatesStale(at, resolvedCharacterId, new Set(pulls.map((pull) => pull.direction_id)));
     const run = saveRun({
-      schema: 'deskbot.role-evolution-run.v0.1',
+      schema: 'deskbot.role-evolution-run.v0.4',
+      rule_version: RULE_VERSION,
       run_id: runId,
       character_id: resolvedCharacterId,
       started_at: at.toISOString(),
       completed_at: at.toISOString(),
       event_count: events.length,
       event_ids: events.map((event) => event.event_id),
+      result_event_ids: events.map((event) => event.event_id),
       event_fingerprint: eventFingerprint,
       pulls: pulls.map((pull) => ({
         direction_id: pull.direction_id,
         status: pull.status,
         score: pull.score,
+        support_score: pull.support_score ?? pull.score,
+        conflict_score: pull.conflict_score ?? 0,
         evidence_ids: [...pull.evidence_ids],
+        support_evidence_ids: [...(pull.support_evidence_ids ?? pull.evidence_ids)],
+        conflict_evidence_ids: [...(pull.conflict_evidence_ids ?? [])],
         sources: [...(pull.sources ?? [])],
       })),
       materialized: materialized.map((item) => ({
@@ -236,6 +470,8 @@ export function createRoleEvolution({
         evidence_fingerprint: item.candidate.evidence_fingerprint,
       })),
       world_revision: typeof worldSnapshot === 'function' ? worldSnapshot()?.world_revision ?? null : null,
+      evidence_count: evidence.size,
+      pull_count: pulls.length,
     });
     return clone({
       ...run,
@@ -253,7 +489,9 @@ export function createRoleEvolution({
     if (!eventIsEligible(event)) return { ignored: true, reason: 'ineligible_event', run: null, trials: [] };
     const characterId = characterKey(event.character_id);
     const trials = [];
-    if (typeof roles.activeTrials === 'function' && typeof roles.recordTrialObservation === 'function') {
+    const isUserChat = event.type === 'conversation.input'
+      && (event.payload?.role === undefined || String(event.payload.role).toLowerCase() === 'user');
+    if (isUserChat && typeof roles.activeTrials === 'function' && typeof roles.recordTrialObservation === 'function') {
       for (const trial of roles.activeTrials({ characterId, limit: 20 })) {
         const result = roles.recordTrialObservation(trial.proposal_id, {
           eventId: event.event_id,
@@ -289,10 +527,21 @@ export function createRoleEvolution({
       .filter((item) => !characterId || item.character_id === characterId)
       .slice(-bounded)
       .map(clone);
+    const evidenceList = [...evidence.values()]
+      .filter((item) => !characterId || item.character_id === characterId)
+      .slice(-bounded)
+      .map(clone);
+    const pullList = [...pulls.values()]
+      .filter((item) => !characterId || item.character_id === characterId)
+      .slice(-bounded)
+      .map(clone);
     return {
-      schema: 'deskbot.role-evolution-snapshot.v0.1',
+      schema: 'deskbot.role-evolution-snapshot.v0.3',
+      rule_version: RULE_VERSION,
       active_character_id: activeCharacter,
       character_id: characterId,
+      evidence: evidenceList,
+      pulls: pullList,
       candidates: candidateList,
       cooldowns: [...cooldowns.values()]
         .filter((item) => !characterId || item.character_id === characterId)
@@ -310,9 +559,14 @@ export function createRoleEvolution({
     snapshot,
     constants: {
       activeCharacter,
+      evidenceNamespace: EVIDENCE_NAMESPACE,
+      pullNamespace: PULL_NAMESPACE,
       candidateNamespace: CANDIDATE_NAMESPACE,
       runNamespace: RUN_NAMESPACE,
       cooldownNamespace: COOLDOWN_NAMESPACE,
+      evidenceWindowDays,
+      minProposalLogicalDays,
+      ruleVersion: RULE_VERSION,
     },
   };
 }
@@ -321,9 +575,15 @@ export {
   CANDIDATE_NAMESPACE,
   COOLDOWN_NAMESPACE,
   DEFAULT_CHARACTER_ID,
+  EVIDENCE_NAMESPACE,
+  EVIDENCE_WINDOW_DAYS,
   MAX_CANDIDATES,
+  MAX_EVIDENCE,
   MAX_RUNS,
+  MAX_PULLS,
+  PULL_NAMESPACE,
   RUN_NAMESPACE,
+  RULE_VERSION,
   eventIsEligible,
   proposalIdFor,
 };

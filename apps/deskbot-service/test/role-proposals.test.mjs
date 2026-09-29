@@ -24,6 +24,29 @@ test('proposal choice is persisted and never silently becomes an accepted shell'
   assert.ok(writes.length >= 2);
 });
 
+test('proposal choice commits its decision and proposal in one persistence transaction', () => {
+  const writes = [];
+  const transactions = [];
+  const persistence = {
+    list: () => [],
+    put: (...args) => writes.push(args),
+    transaction(operation) {
+      transactions.push('begin');
+      return operation();
+    },
+  };
+  const store = createRoleProposalStore({ persistence, now: () => new Date('2026-09-14T00:00:00Z') });
+  const proposal = store.propose({ status: 'candidate', direction_id: 'starry_observer', label: '星空观察者', life: '观测星空', fantasy_pull: 0.9, evidence_ids: ['e1', 'e2', 'e3'] });
+  const result = store.choose(proposal.proposal_id, 'try', { reason: '先试一段' });
+  assert.deepEqual(transactions, ['begin']);
+  assert.deepEqual(writes.slice(-2).map(([namespace, id]) => [namespace, id]), [
+    ['role.proposal-decisions', `${proposal.proposal_id}:try`],
+    ['role.proposals', proposal.proposal_id],
+  ]);
+  assert.equal(result.decision.choice, 'try');
+  assert.equal(result.proposal.status, 'trying');
+});
+
 test('trying proposal has bounded, idempotent observations and explicit completion', () => {
   const writes = [];
   const store = createRoleProposalStore({ persistence: { list: () => [], put: (...args) => writes.push(args) }, now: () => new Date('2026-09-14T00:00:00.000Z') });

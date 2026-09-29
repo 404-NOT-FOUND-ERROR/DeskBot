@@ -29,7 +29,10 @@ async function post(path, body = {}) {
 }
 
 async function addMutation(eventId, layer, payload) {
-  const result = await post('/api/event', {
+  // Canonical world mutations are server-owned.  This HTTP suite seeds
+  // trusted fixtures through the same in-process adapter used by connectors;
+  // the public /api/event boundary intentionally rejects world.mutation.
+  const result = server.ingestNonChatEvent({
     event_id: eventId,
     type: 'world.mutation',
     source: 'role-http-test',
@@ -40,7 +43,10 @@ async function addMutation(eventId, layer, payload) {
     provider: 'role-http-test',
     payload,
   });
-  assert.equal(result.response.status, 202);
+  assert.equal(result.event.source, 'role-http-test');
+  assert.equal(result.event.layer, layer);
+  assert.equal(result.event.source_kind, layer === 'user_profile' ? 'user' : layer === 'weather' ? 'external_provider' : 'world_engine');
+  return result;
 }
 
 test('role API exposes pulls and completes an auditable trial lifecycle', async () => {
@@ -89,17 +95,17 @@ test('role API rejects non-candidates and cannot start a trial before try', asyn
 
 test('role API validates identity fields and exposes the active trial used by chat', async () => {
   const characterId = 'shaping-001';
-  await post('/api/event', {
+  server.ingestNonChatEvent({
     event_id: 'role-chat-weather-001', type: 'world.mutation', source: 'role-http-test', character_id: characterId,
     layer: 'weather', source_kind: 'external_provider', confidence: 1, provider: 'role-http-test',
     payload: { action: 'update_weather', snapshot: { location: '上海', condition: '连续下雨', observed_at: fixedTime.toISOString() } },
   });
-  await post('/api/event', {
+  server.ingestNonChatEvent({
     event_id: 'role-chat-preference-001', type: 'world.mutation', source: 'role-http-test', character_id: characterId,
     layer: 'user_profile', source_kind: 'user', confidence: 1, provider: 'role-http-test',
     payload: { action: 'observe_user_preference', preference_key: 'walk.place', value: '池塘散步' },
   });
-  await post('/api/event', {
+  server.ingestNonChatEvent({
     event_id: 'role-chat-worldline-001', type: 'world.mutation', source: 'role-http-test', character_id: characterId,
     layer: 'world_line', source_kind: 'world_engine', confidence: 1, provider: 'role-http-test',
     payload: { action: 'apply_world_line_event', event: { event_id: 'role-chat-worldline-event', title: '湿地来信', summary: '荷叶在雨里亮了起来。' } },

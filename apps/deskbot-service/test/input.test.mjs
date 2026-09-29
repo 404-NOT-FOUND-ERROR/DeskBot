@@ -42,7 +42,9 @@ test('POST /api/chat normalizes text into a conversation input event', async () 
   assert.equal(body.accepted, true);
   assert.equal(body.duplicate, false);
   assert.equal(body.event.type, 'conversation.input');
-  assert.equal(body.event.source, 'deskbot-web');
+  // The public chat route owns the transport source so clients cannot forge
+  // provenance or provider metadata.
+  assert.equal(body.event.source, 'deskbot-chat');
   assert.equal(body.event.payload.text, '今天有点累');
   assert.equal(body.event.payload.role, 'user');
   assert.equal(body.pipeline.current, 'output-router');

@@ -44,6 +44,19 @@ test('pull merges duplicate events, decays old evidence, and caps retained direc
   assert.equal(old.length, 0);
 });
 
+test('provenance evidence IDs deduplicate replayed observations across wrapper events', () => {
+  const pulls = computeFantasyPull([
+    { ...event('weather-copy', 'weather', '雨天池塘'), provenance: { evidence_ids: ['weather-observation-7'], source_event_ids: ['provider-event-7'] } },
+    { ...event('profile-copy', 'user_profile', '我喜欢池塘散步'), provenance: { evidence_ids: ['weather-observation-7'], source_event_ids: ['provider-event-7'] } },
+    { ...event('world-copy', 'world_line', '湿地出现一片荷叶'), provenance: { evidence_ids: ['weather-observation-7'], source_event_ids: ['provider-event-7'] } },
+  ]);
+  const pull = pulls.find(item => item.direction_id === 'wetland_frog');
+  assert.ok(pull);
+  assert.equal(pull.status, 'observing');
+  assert.deepEqual(pull.evidence_ids, ['evidence-weather-observation-7']);
+  assert.equal(pull.sources.length, 1);
+});
+
 test('pull reads structured weather and preference fields used by real mutation events', () => {
   const pulls = computeFantasyPull([
     { event_id: 'structured-weather', layer: 'weather', source: 'qweather', payload: { snapshot: { condition: '连续下雨', location: '上海' } } },
@@ -85,4 +98,33 @@ test('assistant wording cannot promote otherwise insufficient real evidence', ()
   assert.equal(pulls[0].direction_id, 'wetland_frog');
   assert.equal(pulls[0].status, 'observing');
   assert.deepEqual(pulls[0].evidence_ids, ['evidence-real-weather']);
+});
+
+test('explicit conflict and direct user dislike lower net score without counting as support', () => {
+  const pulls = computeFantasyPull([
+    { event_id: 'support-1', type: 'user.preference', layer: 'user_profile', source: 'profile', payload: { value: '我喜欢池塘散步' } },
+    { event_id: 'support-2', type: 'world.mutation', layer: 'world_line', source: 'world', payload: { summary: '湿地池塘边长出荷叶' } },
+    { event_id: 'conflict-1', type: 'conversation.input', layer: 'dialogue', source: 'dialogue', payload: { role: 'user', text: '我不喜欢青蛙，也不想去湿地' } },
+  ]);
+  const pull = pulls.find((item) => item.direction_id === 'wetland_frog');
+  assert.ok(pull);
+  assert.equal(pull.status, 'observing');
+  assert.equal(pull.support_evidence_ids.length, 2);
+  assert.deepEqual(pull.conflict_evidence_ids, ['evidence-conflict-1']);
+  assert.deepEqual(pull.evidence.find((item) => item.event_id === 'conflict-1').conflict_cues.sort(), ['湿地', '青蛙']);
+  assert.ok(pull.conflict_score > 0);
+  assert.ok(pull.score < pull.support_score);
+});
+
+test('environmental wording remains an observation unless a normalized polarity says otherwise', () => {
+  const pulls = computeFantasyPull([
+    event('weather-1', 'weather', '雨天不适合青蛙出门'),
+    event('weather-2', 'weather', '湿地没有人来散步'),
+    { ...event('profile-conflict', 'user_profile', '我喜欢池塘'), payload: { value: '我喜欢池塘', evidence_polarity: 'conflict' } },
+  ]);
+  const pull = pulls.find((item) => item.direction_id === 'wetland_frog');
+  assert.ok(pull);
+  assert.deepEqual(pull.evidence.find((item) => item.event_id === 'weather-1').conflict_cues, []);
+  assert.deepEqual(pull.evidence.find((item) => item.event_id === 'weather-2').conflict_cues, []);
+  assert.equal(pull.evidence.find((item) => item.event_id === 'profile-conflict').polarity, 'conflict');
 });

@@ -1,6 +1,6 @@
 # 毕设整体开发路线图 `v0.3`
 
-**更新日期：** 2026-09-29
+**更新日期：** 2026-09-30
 **控制性目标：** 证明同一个桌边角色能在共同生活中形成可解释、可感知且跨媒介一致的方向，并把这条体验链落实为可装配、可测量、可复现的装置。  
 **决策依据：** `聚形域世界观设定_v2.1.md`、`聚形域-角色与世界决策记录_2026-09-09.md`、`miaowu-roleplay-bible-v0.1.md`。`v0.2` 保留为上一轮历史计划。
 
@@ -15,6 +15,7 @@ P1 喵呜强角色表达验收与软件基线
  -> P2 多源证据到可解释的角色方向候选
  -> P3 关系记忆与有限主动性
  -> P4 角色方向试行、确认与阶段档案
+ -> P4.1 候选可见性、日期语义与纵向体验验收
  -> P5 同一 expression intent 驱动文字 / 屏幕 / 声音
  -> P6 ASR/TTS 与 ESP-VoCat 真机闭环
  -> P7 角色方向到潮玩视觉语义与可装配外壳
@@ -124,11 +125,31 @@ P3.1 的自动化门槛已满足：重启后状态一致、行动有 mutation/ev
 
 **目的：** 真正做出“它会变成不同的它”，而不是换一份提示词。
 
-建立 `observing -> candidate -> proposed -> trying -> accepted/rejected/deferred -> archived` 状态机。P4 当前闭环已完成：多源 evidence 聚合后自动持久化候选与提案；候选/同步运行保存在 SQLite；聊天成功回合生成中性试行观察；相同 event/fingerprint 重放幂等；用户选择 `try/later/reject`，并在有界窗口后明确接受/拒绝/延后。accepted 阶段进入普通表达、`expression_intent`、world-life Scene 选择上下文和 `GET /api/life/world` 的 `role_context`，重启后恢复。它仍不会自动修改 Soul、canonical world 或外壳；世界环境只有经过白名单合法行动才会变化，LLM 正文没有写入权。后续应做跨日主动性与角色方向到可装配外壳的映射，而不是把这两项误报为 P4 已交付。
+建立 `observing -> candidate -> proposed -> trying -> accepted/rejected/deferred -> archived` 状态机。服务端规则闭环已实现：多源 evidence 聚合后持久化候选与提案；候选/同步运行保存在 SQLite；只有成功的用户聊天回合生成中性试行观察；相同 event/fingerprint 重放幂等；用户选择 `try/later/reject`，并在有界窗口后明确接受/拒绝/延后。accepted 阶段进入普通表达、`expression_intent`、world-life Scene 选择上下文和 `GET /api/life/world` 的 `role_context`，重启后恢复。
+
+方向证据分为 `support/conflict/neutral`：冲突降低净分但保留为反证，中性只审计，只有 support 计入最小数量和来源门槛；旧事件缺少 polarity 时兼容为 support。有限的中文 cue 邻接否定识别只用于用户 `dialogue/user_profile`，不把天气或世界事件的自然语言擅自判成反对。自动提案目前要求支持证据落在至少两个 UTC 事件日期；事件日期来自 `occurred_at`，缺失时回退 `observed_at`，并非 canonical world `logical_time` 的两日生活。这是当前实现边界，不代表角色已经真实跨日成长。
+
+另一条独立链路把合格外部 observation 转成世界候选。候选仅包含服务端白名单动作，`preview` 不写 canonical world，只有显式 `accept` 才检查 world revision 并经统一 ingest/ledger 写入；没有可视化候选面板，也没有新的自动新闻 provider。角色方向候选不能直接改世界，世界候选也不能直接改变角色身份。
 
 **G4：** 一个候选的证据、试行记录、确认/拒绝理由和旧阶段档案可完整回放；世界环境未经世界行动不变。
 
-本次 P4 gate 验收：Node service `244/244` 通过；`role-evolution.test.mjs` 与 `p4-acceptance.test.mjs` 覆盖跨源形成候选、提案幂等、显式试行、聊天观察、accepted 投影和 SQLite 重启恢复。真实 DeepSeek 的长周期人格体感、跨天主动提出新方向仍属于后续纵向人工研究。
+本次 P4 服务端自动化专项：role polarity 与跨 UTC 事件日期提案门槛定向测试 `13/13` 通过；完整 Node service 回归 `266/266` 通过，覆盖显式试行、候选/提案幂等、proposal decision 原子提交、accepted 投影、world candidate preview/accept 和 SQLite 重启恢复。`244/244` 保留为本轮增量前的历史快照。服务端规则通过不等于产品体验 gate 通过；真实 DeepSeek 的长周期人格体感、跨天主动提出新方向和候选处置体验仍需人工验收。
+
+## P4.1：候选可见性、日期语义与纵向体验验收（当前下一步）
+
+**目的：** 让用户和开发者能看见“哪些输入正在影响喵呜的方向”与“哪些外部事件可能改变世界”，并确认它们不会互相越权。
+
+实施顺序：
+
+1. 先重跑完整 Node service 回归，记录精确总数；不以专项 13/13 替代全量测试。
+2. 为角色方向和世界候选提供清楚的观测/处置入口：显示来源、发生/观测时间、support/conflict/neutral、候选状态和提案依据；世界候选要显示动作白名单、preview、expected revision、accept/dismiss 结果。preview 必须无副作用，accept 才能写 canonical mutation。
+3. 明确“跨日”产品语义：区分现实 UTC observation date 与虚拟世界 canonical logical day；决定角色方向积累究竟按哪种时间轴计量，并用固定时区、时钟边界、缺失时间和重放测试锁定行为。当前不能把 UTC 日期称作虚拟世界生活日。
+4. 用隔离数据库走通 observation -> world candidate -> preview -> accept/dismiss -> mutation/evidence 回查，不注入正式存档，不调用付费或不必要的外部新闻 API。
+5. 做至少 7 天的可回放纵向样本：方向证据有支持、冲突、中性和沉降；检查候选合并/淘汰、主动提议、`try/later/reject`、试行阶段表达是否有明显体感且不机械重复。真实模型样本和自动模拟结果分开记录。
+
+**G4.1：** 全量回归通过；日期规则有明确产品决定且边界测试固定；候选面板/验收入口可完成只读观察与明确处置；外部 observation 不能直接改变世界，重复接受不能重复写入；7 日回放能从原始 evidence 解释角色提案，且不把“候选”误报为已改变身份。
+
+通过后再进入 P5：让同一份 `expression_intent` 真正驱动屏幕和 TTS；其后 P6 做 ASR/TTS 与 ESP-VoCat 真机闭环，P7 才将 accepted 方向映射到可装配外壳。P4.1 通过前，不增加新的外部输入 provider，也不批量生成外壳。
 
 ## P5：统一表达意图（1 周，基础合同已实现）
 
@@ -259,11 +280,17 @@ NPC Persona Agent 的首轮模型草稿若不满足“先回应、落到具体�
 - 当前服务端口可健康响应；本轮重启后真实 `/api/chat` 返回 `openai-compatible-v0.1` 的角色化样本，QWeather 当前观测刷新为 `accepted=true,cached=false`，分钟/小时/每日预报分别返回 24/24/7 条；voice-sidecar 仍返回不可用。
 - 当前实现是“有限可回放持续世界 + 角色化 NPC Agent”，不是开放式自主世界。仍缺真实跨天生活样本、主动打扰策略、更多关系型 NPC、真实 ASR/TTS、屏幕/动作和角色方向到外壳的闭环。
 
-## 2026-09-29 当前工作区复核
+## 2026-09-29 工作区复核（历史快照）
 
-- P3 关系记忆与有限主动性、P3.1 有限世界自动生活、P4 角色方向演化的服务端闭环已进入当前工作区：`244/244` Node 测试通过。
+- 当时 P3 关系记忆与有限主动性、P3.1 有限世界自动生活、P4 角色方向演化的服务端闭环已进入工作区：`244/244` Node 测试通过。该数是 2026-09-30 后续增量之前的历史回归快照。
 - Jev Town 客户端 `16 files / 132 tests`、TypeScript 检查和生产构建均通过；路线完整折线、中转点、目的地标记和失效清除已在代码级闭环，仍需人工检查不同窗口尺寸、缩放和真实点击动画。
 - 下一道开发门是 P4.1 体验验收而不是继续堆接口：先完成上述人工验收，再做跨天主动性/打扰频率校准和可量化的共同生活样本；其后才进入 P5 expression intent 的真实屏幕/TTS 消费，最后接入 P6 固件与 P7 外壳。
+
+## 2026-09-30 P4 实现状态
+
+- 角色方向 evidence polarity、支持证据门槛与跨 UTC 事件日期提案门槛已落地；本轮专项定向测试 `13/13` 通过，完整 Node service 回归 `266/266` 通过。
+- 外部 observation 到世界候选的后端桥已实现：受限 mutation 白名单、无副作用 preview、revision 冲突检查、显式 accept/dismiss、幂等与重启恢复均有测试覆盖；无候选可视化面板、无自动新闻 provider。
+- 日期桶仍按 UTC `occurred_at` / `observed_at`，不是虚拟世界 `logical_time`。下一道门是 P4.1 的日期语义决策、候选观测/处置入口和纵向人工体验，不是宣布自主身份演化已经完成。
 
 ## 当前不做
 

@@ -41,21 +41,32 @@ async function post(path, body) {
   });
 }
 
-test('world state and append-only mutation ledger are readable over HTTP', async () => {
+test('world mutations require a reviewed candidate and the ledger is readable over HTTP', async () => {
   const initial = await (await fetch(`${baseUrl}/api/world/state`)).json();
   assert.equal(initial.world.world_revision, 0);
 
-  const mutationResponse = await post('/api/event', {
+  const observationResponse = await post('/api/event', {
     event_id: 'http-world-time-001',
-    type: 'world.mutation',
-    source: 'world-controller',
+    type: 'external.observation',
+    source: 'client-claimed-controller',
     character_id: 'ember-001',
-    payload: { action: 'advance_time', minutes: 30 },
+    payload: { proposed_action: { action: 'advance_time', minutes: 30 } },
   });
-  const mutationBody = await mutationResponse.json();
-  assert.equal(mutationResponse.status, 202);
-  assert.equal(mutationBody.world_mutation.applied, true);
-  assert.equal(mutationBody.world_mutation.mutation.action, 'advance_time');
+  const observation = await observationResponse.json();
+  assert.equal(observationResponse.status, 202);
+  assert.equal(observation.event.source, 'untrusted_observation');
+  assert.equal(observation.world_mutation.applied, false);
+  const candidateId = observation.world_candidate.candidate.candidate_id;
+  const previewResponse = await post(`/api/world/candidates/${encodeURIComponent(candidateId)}/preview`, {});
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json();
+  assert.equal(preview.world_revision, 0);
+  const acceptResponse = await post(`/api/world/candidates/${encodeURIComponent(candidateId)}/accept`, {
+    expected_world_revision: 0,
+  });
+  const accepted = await acceptResponse.json();
+  assert.equal(acceptResponse.status, 202);
+  assert.equal(accepted.world_mutations[0].mutation.action, 'advance_time');
 
   const state = await (await fetch(`${baseUrl}/api/world/state`)).json();
   const ledger = await (await fetch(`${baseUrl}/api/world/mutations?after_sequence=0&limit=10`)).json();
@@ -145,7 +156,7 @@ test('ASR stages and repeated chat correlation count once, and LLM text cannot m
   assert.deepEqual(ledger.mutations.map((record) => record.action), ['advance_time', 'record_user_turn']);
 });
 
-test('invalid world mutation does not reserve its event ID', async () => {
+test('public world mutations are rejected and do not reserve event IDs', async () => {
   const invalid = await post('/api/event', {
     event_id: 'http-world-invalid-001',
     type: 'world.mutation',
@@ -153,7 +164,7 @@ test('invalid world mutation does not reserve its event ID', async () => {
     character_id: 'ember-001',
     payload: { action: 'advance_time', minutes: 0 },
   });
-  assert.equal(invalid.status, 400);
+  assert.equal(invalid.status, 403);
   const corrected = await post('/api/event', {
     event_id: 'http-world-invalid-001',
     type: 'world.mutation',
@@ -161,9 +172,20 @@ test('invalid world mutation does not reserve its event ID', async () => {
     character_id: 'ember-001',
     payload: { action: 'advance_time', minutes: 15 },
   });
-  assert.equal(corrected.status, 202);
-  const body = await corrected.json();
-  assert.equal(body.world_mutation.applied, true);
+  assert.equal(corrected.status, 403);
+  const correctedBody = await corrected.json();
+  assert.equal(correctedBody.error, 'world_mutation_requires_review');
+
+  const observation = await post('/api/event', {
+    event_id: 'http-world-invalid-001',
+    type: 'external.observation',
+    source: 'not-a-controller',
+    payload: { proposed_action: { action: 'advance_time', minutes: 15 } },
+  });
+  assert.equal(observation.status, 202);
+  const observationBody = await observation.json();
+  assert.equal(observationBody.event.source, 'untrusted_observation');
+  assert.equal(observationBody.world_mutation.applied, false);
 });
 
 test('world schema and event filters expose the multisource research contract', async () => {
@@ -176,29 +198,32 @@ test('world schema and event filters expose the multisource research contract', 
   const eventId = 'http-weather-filter-001';
   const weatherResponse = await post('/api/event', {
     event_id: eventId,
-    type: 'world.mutation',
+    type: 'weather.observation',
     source: 'research-console',
     character_id: 'shaping-001',
     source_kind: 'external_provider',
     confidence: 0.8,
     provider: 'weather-http-test',
     provenance: { test: 'http-filter' },
-    payload: {
-      action: 'update_weather',
-      snapshot: { location: '测试房间', condition: 'clear', temperature_c: 21, observed_at: '2026-09-04T00:00:00.000Z' },
-    },
+    payload: { snapshot: { location: '测试房间', condition: 'clear', temperature_c: 21, observed_at: '2026-09-04T00:00:00.000Z' } },
   });
   assert.equal(weatherResponse.status, 202);
+  const weatherBody = await weatherResponse.json();
 
-  const filtered = await (await fetch(`${baseUrl}/api/events?layer=weather&source_kind=external_provider&type=world.mutation&limit=5`)).json();
+  const filtered = await (await fetch(`${baseUrl}/api/events?layer=unclassified&source_kind=unknown&type=weather.observation&limit=5`)).json();
   assert.ok(filtered.events.some((event) => event.event_id === eventId));
-  assert.ok(filtered.events.every((event) => event.layer === 'weather'));
-  assert.ok(filtered.events.every((event) => event.source_kind === 'external_provider'));
+  const storedEvent = filtered.events.find((event) => event.event_id === eventId);
+  assert.equal(storedEvent.layer, 'unclassified');
+  assert.equal(storedEvent.source_kind, 'unknown');
+  assert.equal(storedEvent.confidence, null);
+  assert.equal(storedEvent.provider, null);
+  assert.equal(storedEvent.provenance, null);
 
-  const ledger = await (await fetch(`${baseUrl}/api/world/mutations?limit=20`)).json();
-  const record = ledger.mutations.find((mutation) => mutation.event_id === eventId);
-  assert.equal(record.provider, 'weather-http-test');
-  assert.deepEqual(record.provenance, { test: 'http-filter' });
+  const candidate = weatherBody.world_candidate?.candidate;
+  assert.ok(candidate);
+  assert.equal(candidate.provenance.trust_boundary, 'untrusted_public_observation');
+  const after = await (await fetch(`${baseUrl}/api/world/state`)).json();
+  assert.equal(after.world.weather.snapshot, null);
 });
 
 test('world map and travel endpoints expose routes while chat remains location read-only', async () => {

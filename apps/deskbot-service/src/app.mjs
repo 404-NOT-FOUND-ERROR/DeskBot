@@ -24,6 +24,7 @@ import { createInputRuntime } from './input-runtime.mjs';
 import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import { createRoleEvolution } from './role-evolution.mjs';
+import { createWorldCandidateStore, WorldCandidateError } from './world-candidates.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
 import {
@@ -124,6 +125,7 @@ function sendInputAccepted(response, event, duplicate, stateResult) {
     device: stateResult?.device ?? null,
     output_route: stateResult?.output_route ?? null,
     role_evolution: stateResult?.roleEvolution ?? null,
+    world_candidate: stateResult?.worldCandidate ?? null,
     world_mutation: stateResult?.world_mutation ?? null,
     interaction_decision: stateResult?.interaction_decision ?? null,
   });
@@ -145,6 +147,7 @@ export function createDeskBotServer({
   contextSources = createContextSourceRegistry({ now, weatherConnector }),
   interactionPolicy = createInteractionPolicy({ now, persistence }),
   roleProposalStore = null,
+  worldCandidateStore = null,
   fantasyPullEngine = computeFantasyPull,
   l1bProbeStore = createL1bProbeStore({ now, persistence }),
   researchSessions = null,
@@ -166,6 +169,13 @@ export function createDeskBotServer({
     roles,
     computeFantasyPull: fantasyPullEngine,
     worldSnapshot: () => persistentWorld.get(),
+  });
+  const worldCandidates = worldCandidateStore ?? createWorldCandidateStore({
+    now,
+    persistence,
+    worldSnapshot: () => persistentWorld.get(),
+    ingest: event => ingestNonChatEvent(event),
+    listMutations: options => persistentWorld.listMutations(options),
   });
   let npcGoals;
   const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
@@ -259,6 +269,14 @@ export function createDeskBotServer({
     });
   }
 
+  function sendWorldCandidateError(response, error) {
+    const expected = error instanceof WorldCandidateError || error instanceof InputError || error instanceof TypeError;
+    sendJson(response, expected ? (error.statusCode ?? 400) : 500, {
+      error: expected ? (error.code ?? 'invalid_world_candidate_request') : 'internal_error',
+      message: expected ? error.message : 'world candidate operation failed',
+    });
+  }
+
   function requiredRoleText(value, field) {
     if (typeof value !== 'string' || value.trim() === '') {
       throw new InputError(400, 'invalid_role_request', `${field} must be a non-empty string`);
@@ -313,6 +331,7 @@ export function createDeskBotServer({
     const roleEvolutionResult = result.duplicate
       ? null
       : roleEvolution.observeEvent(result.event);
+    const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
     return {
       event: result.event,
       duplicate: result.duplicate || worldMutation.duplicate,
@@ -322,7 +341,30 @@ export function createDeskBotServer({
       evidence: evidenceResult?.evidence ?? null,
       outputRoute,
       roleEvolution: roleEvolutionResult,
+      worldCandidate: worldCandidateResult,
     };
+  }
+
+  function assertPublicEventWorldMutation(event) {
+    if (event.type !== 'world.mutation') return;
+    throw new InputError(403, 'world_mutation_requires_review', 'canonical world mutations are server-owned; submit an observation for review or use a validated world action endpoint');
+  }
+
+  function normalizePublicEvent(body) {
+    const previous = typeof body.event_id === 'string' ? inputStore.get(body.event_id) : null;
+    const receivedAt = previous?.occurred_at ?? now().toISOString();
+    return normalizeEvent({
+      ...body,
+      schema: 'foundry.event.v0.1',
+      source: 'untrusted_observation',
+      occurred_at: receivedAt,
+      observed_at: receivedAt,
+      layer: 'unclassified',
+      source_kind: 'unknown',
+      confidence: null,
+      provider: null,
+      provenance: null,
+    }, { now: () => new Date(receivedAt) });
   }
 
   const inputRuntime = configuredInputRuntime ?? createInputRuntime({
@@ -1031,30 +1073,35 @@ export function createDeskBotServer({
       return;
     }
 
-    if (request.method === 'GET' && url.pathname === '/api/roles/evolution') {
+    if (request.method === 'GET' && ['/api/roles/evolution', '/api/role-evolution/status'].includes(url.pathname)) {
       const characterId = url.searchParams.get('character_id') ?? null;
+      const snapshot = roleEvolution.snapshot({ characterId, limit: url.searchParams.get('limit') ?? 50 });
       sendJson(response, 200, {
-        schema: 'deskbot.role-evolution-response.v0.1',
         accepted: true,
         character_id: characterId,
-        ...(roleEvolution.snapshot({ characterId, limit: url.searchParams.get('limit') ?? 50 })),
+        ...snapshot,
         proposals: roles.list({ characterId, limit: url.searchParams.get('limit') ?? 50 }),
         active_trials: roles.activeTrials({ characterId, limit: url.searchParams.get('limit') ?? 20 }),
         current_stages: roles.currentStages({ characterId, limit: 10 }),
+        ...(url.pathname === '/api/role-evolution/status'
+          ? { schema: 'deskbot.role-evolution-status.v0.1', snapshot_schema: snapshot.schema }
+          : {}),
       });
       return;
     }
 
-    if (request.method === 'POST' && url.pathname === '/api/roles/evolution/sync') {
+    if (request.method === 'POST' && ['/api/roles/evolution/sync', '/api/role-evolution/run'].includes(url.pathname)) {
       readJson(request, 64 * 1024, { allowEmpty: true })
         .then((body) => roleEvolution.sync({
           characterId: body.character_id ?? body.characterId ?? undefined,
           limit: body.limit ?? 200,
         }))
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
-          schema: 'deskbot.role-evolution-sync-result.v0.1',
           accepted: true,
           ...result,
+          ...(url.pathname === '/api/role-evolution/run'
+            ? { schema: 'deskbot.role-evolution-run-response.v0.1', run_schema: result.schema }
+            : {}),
         }))
         .catch((error) => sendRoleError(response, error));
       return;
@@ -1151,6 +1198,51 @@ export function createDeskBotServer({
 
     if (request.method === 'GET' && url.pathname === '/api/world/schema') {
       sendJson(response, 200, getWorldSchema());
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/world/candidates') {
+      sendJson(response, 200, {
+        schema: 'deskbot.world-candidate-list.v0.1',
+        candidates: worldCandidates.list({
+          worldId: url.searchParams.get('world_id') ?? null,
+          characterId: url.searchParams.get('character_id') ?? null,
+          status: url.searchParams.get('status') ?? null,
+          limit: url.searchParams.get('limit') ?? 50,
+        }),
+      });
+      return;
+    }
+
+    const worldCandidateMatch = url.pathname.match(/^\/api\/world\/candidates\/([^/]+)$/);
+    if (request.method === 'GET' && worldCandidateMatch) {
+      const candidate = worldCandidates.get(decodeURIComponent(worldCandidateMatch[1]));
+      if (!candidate) {
+        sendJson(response, 404, { error: 'world_candidate_not_found', message: 'world candidate not found' });
+      } else {
+        sendJson(response, 200, { schema: 'deskbot.world-candidate-response.v0.1', candidate });
+      }
+      return;
+    }
+
+    const worldCandidateActionMatch = url.pathname.match(/^\/api\/world\/candidates\/([^/]+)\/(preview|accept|dismiss)$/);
+    if (request.method === 'POST' && worldCandidateActionMatch) {
+      const candidateId = decodeURIComponent(worldCandidateActionMatch[1]);
+      const action = worldCandidateActionMatch[2];
+      readJson(request, 64 * 1024, { allowEmpty: true })
+        .then((body) => {
+          if (action === 'preview') return worldCandidates.preview(candidateId);
+          if (action === 'accept') return worldCandidates.accept(candidateId, {
+            expectedWorldRevision: body.expected_world_revision ?? body.expectedWorldRevision,
+          });
+          return worldCandidates.dismiss(candidateId, { reason: body.reason ?? null });
+        })
+        .then((result) => sendJson(response, result.duplicate ? 200 : (action === 'accept' ? 202 : 200), {
+          schema: `deskbot.world-candidate-${action}-response.v0.1`,
+          accepted: action !== 'dismiss' || result.candidate?.status === 'dismissed',
+          ...result,
+        }))
+        .catch((error) => sendWorldCandidateError(response, error));
       return;
     }
 
@@ -1566,7 +1658,8 @@ export function createDeskBotServer({
 
           const event = url.pathname === '/api/chat'
             ? normalizeChat(body, { now })
-            : normalizeEvent(body, { now });
+            : normalizePublicEvent(body);
+          if (url.pathname === '/api/event') assertPublicEventWorldMutation(event);
           const result = inputStore.save(event);
           let worldMutation;
           try {
@@ -1607,6 +1700,7 @@ export function createDeskBotServer({
           const roleEvolutionResult = result.duplicate
             ? null
             : roleEvolution.observeEvent(result.event);
+          const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
           sendInputAccepted(response, result.event, result.duplicate || worldMutation.duplicate, {
             ...stateResult,
             outputs: stateResult.outputs,
@@ -1618,6 +1712,7 @@ export function createDeskBotServer({
             world_mutation: worldMutation,
             interaction_decision: interactionDecision,
             roleEvolution: roleEvolutionResult,
+            worldCandidate: worldCandidateResult,
           });
         })
         .catch((error) => {
@@ -1625,6 +1720,7 @@ export function createDeskBotServer({
             || error instanceof OutputRouterError
             || error instanceof PersistentWorldError
             || error instanceof DeviceRegistryError
+            || error instanceof WorldCandidateError
             || error instanceof LlmProviderError;
           const statusCode = expected ? (error.statusCode ?? 500) : 500;
           sendJson(response, statusCode, {
@@ -1706,6 +1802,12 @@ export function createDeskBotServer({
   server.worldLife = worldLife;
   server.inputRuntime = inputRuntime;
   server.roleEvolution = roleEvolution;
+  server.worldCandidates = worldCandidates;
+  // Test/in-process adapters use the same canonical path as trusted
+  // connectors without weakening the public /api/event boundary.
+  server.ingestNonChatEvent = ingestNonChatEvent;
+  server.persistentWorld = persistentWorld;
+  server.interactionPolicy = interactionPolicy;
   server.once('listening', () => {
     try {
       persistentWorld.syncWallClock?.();

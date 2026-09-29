@@ -73,6 +73,43 @@ test('conflicting chat body cannot reuse an existing event ID', async () => {
   );
 });
 
+test('chat cannot forge source, layer, confidence, provenance, or observation timestamps', async () => {
+  const orchestrator = createChatOrchestrator({
+    inputStore: createInputStore({ now: () => fixedTime }),
+    stateEngine: createStateEngine({ now: () => fixedTime }),
+    worldContext: createWorldContext({ now: () => fixedTime }),
+    llm: {
+      async complete() {
+        return { provider: 'test', model: 'test', text: '知道了。', trace: {} };
+      },
+    },
+    now: () => fixedTime,
+  });
+
+  const turn = await orchestrator.run({
+    event_id: 'turn-untrusted-source-001',
+    character_id: 'shaping-001',
+    message: '雨一直落在荷叶边',
+    source: 'weather-provider',
+    source_kind: 'external_provider',
+    layer: 'weather',
+    confidence: 1,
+    provider: 'claimed-provider',
+    provenance: { source_event_ids: ['claimed-source'] },
+    occurred_at: '2030-01-01T00:00:00.000Z',
+    observed_at: '2030-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(turn.input_event.source, 'deskbot-chat');
+  assert.equal(turn.input_event.layer, 'interaction');
+  assert.equal(turn.input_event.source_kind, 'user');
+  assert.equal(turn.input_event.confidence, 1);
+  assert.equal(turn.input_event.provider, null);
+  assert.equal(turn.input_event.provenance, null);
+  assert.equal(turn.input_event.occurred_at, fixedTime.toISOString());
+  assert.equal(turn.input_event.observed_at, fixedTime.toISOString());
+});
+
 test('a bounded recent conversation and the character seed reach the next turn prompt', async () => {
   const prompts = [];
   const orchestrator = createChatOrchestrator({

@@ -444,10 +444,18 @@ export function createChatOrchestrator({
   }
 
   async function run(input) {
+    const receivedAt = now().toISOString();
     const userEvent = normalizeChat({
       ...input,
       role: 'user',
-      source: input.source ?? 'deskbot-chat',
+      source: 'deskbot-chat',
+      occurred_at: receivedAt,
+      observed_at: receivedAt,
+      layer: 'interaction',
+      source_kind: 'user',
+      confidence: 1,
+      provider: null,
+      provenance: null,
     }, { now });
     inputStore.save(userEvent);
 

@@ -60,6 +60,24 @@ async function post(origin, path, body) {
   return { response, body: await response.json() };
 }
 
+// World mutations are server-owned. Tests that need a trusted world fixture
+// use the same in-process canonical path as connectors and world-life jobs;
+// the public /api/event endpoint intentionally rejects these payloads.
+function trustedWorldEvent(server, event) {
+  const result = server.ingestNonChatEvent(event);
+  return {
+    response: { status: result.duplicate ? 200 : 202 },
+    body: {
+      ...result,
+      interaction_decision: result.interactionDecision,
+      world_mutation: result.worldMutation,
+      role_evolution: result.roleEvolution,
+      world_candidate: result.worldCandidate,
+      event: result.event,
+    },
+  };
+}
+
 test('multisource events are classified without becoming direct announcements', async (t) => {
   const server = createDeskBotServer({ now: () => fixedTime, websocket: false });
   server.listen(0, '127.0.0.1');
@@ -67,7 +85,7 @@ test('multisource events are classified without becoming direct announcements', 
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
   const origin = `http://127.0.0.1:${server.address().port}`;
 
-  const world = await post(origin, '/api/event', {
+  const world = trustedWorldEvent(server, {
     event_id: 'policy-world-001',
     type: 'world.mutation',
     source: 'world-engine',
@@ -123,7 +141,7 @@ test('a chat event enters the current reply while prior world events remain opti
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
   const origin = `http://127.0.0.1:${server.address().port}`;
 
-  await post(origin, '/api/event', {
+  trustedWorldEvent(server, {
     event_id: 'policy-world-002',
     type: 'world.mutation',
     source: 'world-engine',
@@ -225,7 +243,7 @@ test('candidate HTTP read model exposes provenance and reversible lifecycle acti
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
   const origin = `http://127.0.0.1:${server.address().port}`;
 
-  const accepted = await post(origin, '/api/event', {
+  const accepted = trustedWorldEvent(server, {
     event_id: 'policy-http-candidate-001',
     type: 'world.mutation',
     source: 'world-engine',

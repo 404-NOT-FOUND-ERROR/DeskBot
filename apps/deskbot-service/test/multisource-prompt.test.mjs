@@ -35,7 +35,7 @@ test('chat prompt separates five canonical context sources and gates user prefer
   const origin = `http://127.0.0.1:${server.address().port}`;
 
   async function mutate(eventId, layer, sourceKind, payload) {
-    await post(origin, '/api/event', {
+    server.ingestNonChatEvent({
       event_id: eventId,
       type: 'world.mutation',
       source: 'prompt-context-test',

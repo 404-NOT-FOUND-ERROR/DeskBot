@@ -14,7 +14,7 @@ test('structured hints can create an open direction only after repeated independ
   const candidate = result.find(item => item.direction_id === 'lantern_moth');
   assert.equal(candidate.status, 'candidate');
   assert.equal(candidate.sources.length, 3);
-  assert.equal(candidate.schema, 'deskbot.fantasy-pull.v0.3');
+  assert.equal(candidate.schema, 'deskbot.fantasy-pull.v0.4');
 });
 
 test('a single structured hint remains observing and cannot directly alter role', () => {
