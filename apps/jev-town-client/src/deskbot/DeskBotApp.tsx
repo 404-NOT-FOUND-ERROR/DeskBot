@@ -583,8 +583,9 @@ export function DeskBotApp() {
                   {area.objects?.map(object => <div key={object.object_id}><strong>{object.name}</strong><p>{object.status_text??object.description}</p>
                     <ProjectFacilityState state={object.state} names={map?.living?.resource_names}/>
                     {object.state?.stock?<div className="deskbot-mode__stock" aria-label={`${object.name}库存`}>{Object.entries(object.state.stock).map(([resource,count])=><div key={resource}><span>{map?.living?.resource_names[resource]??resource} {Math.floor(count)} 份</span>
-                      {selectedPlace.current?<><button disabled={busy||Boolean(currentTask)||count<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'take')}>取 1 份</button><button disabled={busy||Boolean(currentTask)||(map?.living?.inventory.stock[resource]??0)<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'store')}>存 1 份</button></>:null}</div>)}</div>:null}
+                      {selectedPlace.current&&object.state?.kind!=='ecological_source'?<><button disabled={busy||Boolean(currentTask)||count<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'take')}>取 1 份</button><button disabled={busy||Boolean(currentTask)||(map?.living?.inventory.stock[resource]??0)<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'store')}>存 1 份</button></>:null}</div>)}</div>:null}
                     {map?.living?.resource_renewal?.source_object_id===object.object_id?<p className="deskbot-mode__supply-note">{map.living.resource_renewal.description}</p>:null}
+                    {map?.living?.community_supply?.fruit_source_object_id===object.object_id?<p className="deskbot-mode__supply-note">{map.living.community_supply.description}</p>:null}
                   </div>)}
                 </details>)}
               </div>

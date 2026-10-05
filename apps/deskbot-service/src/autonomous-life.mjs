@@ -3,7 +3,7 @@ import { findWorldPath } from './world-map-content.mjs';
 import { activeWorldTask, startTravelTask, startActivityTask, localWorldDate } from './realtime-world.mjs';
 import { AUTONOMY_VERSION, installAutonomy, syncLifeNeeds, lifeNote } from './life-state.mjs';
 
-import { activitySteps, waterSupplySteps, seedSupplySteps, depositSteps } from './life-planning.mjs';
+import { activitySteps, waterSupplySteps, seedSupplySteps, depositSteps, cookAndStoreSteps, fruitSupplySteps } from './life-planning.mjs';
 import { RESIDENT_PROFILES } from './resident-life.mjs';
 import { advanceSocialLife, reservedSocialActors } from './social-life.mjs';
 import { influenceLifeChoices, recordInputDecision, settleRefraction } from './input-refraction.mjs';
@@ -26,6 +26,27 @@ function hash(text) { let value=2166136261; for(const c of text) value=Math.imul
 export class AutonomousLifeError extends Error { constructor(message){super(message);this.code='life_plan_unavailable';this.statusCode=409;} }
 function planError(message) { return new AutonomousLifeError(message); }
 
+const SUPPLY_TARGETS=new Set(['trial-stove','light-fruit-bough','garden-bed']);
+function supplyClaims(world,at,exceptId) {
+  return Object.values(world.autonomy?.actors??{}).filter(s=>s.actor_id!==exceptId&&!s.paused&&['planned','executing'].includes(s.plan?.status))
+    .filter(s=>{const task=activeWorldTask(world,s.actor_id);return task?.status!=='paused'&&(task||Date.parse(at)-Date.parse(s.plan.created_at)<120*MINUTE);})
+    .flatMap(s=>s.plan.steps.slice(s.plan.index).filter(step=>step.kind==='activity').map(step=>({actor_id:s.actor_id,plan_id:s.plan.plan_id,
+      activity_id:step.activity_id,target:ACTIVITIES.find(recipe=>recipe.activity_id===step.activity_id)?.target})))
+    .filter(claim=>SUPPLY_TARGETS.has(claim.target));
+}
+function checkSupplyClaim(world,at,id,steps) {
+  const targets=new Set(steps.filter(step=>step.kind==='activity').map(step=>ACTIVITIES.find(recipe=>recipe.activity_id===step.activity_id)?.target).filter(target=>SUPPLY_TARGETS.has(target)));
+  const peer=supplyClaims(world,at,id).find(claim=>targets.has(claim.target));
+  if(peer)throw planError(`${actor(world,peer.actor_id).display_name}已经在准备这项补给，等实际结果或另选一件事。`);
+  return steps;
+}
+function mealTurn(world,id) {
+  if(actor(world,id).location_id!=='warm-pot-courtyard')return true;
+  const lastMeal=personId=>world.tasks.filter(task=>task.actor_id===personId&&task.activity_id==='share-meal'&&task.status==='completed').reduce((latest,task)=>Math.max(latest,Date.parse(task.finished_at??task.due_at)),0);
+  const people=Object.values(world.autonomy.actors).filter(s=>!s.paused&&s.appetite>.6&&actor(world,s.actor_id)?.location_id==='warm-pot-courtyard'&&!activeWorldTask(world,s.actor_id)&&!reservedSocialActors(world).includes(s.actor_id))
+    .sort((a,b)=>b.appetite-a.appetite||lastMeal(a.actor_id)-lastMeal(b.actor_id)||a.actor_id.localeCompare(b.actor_id));
+  return !people.length||people[0].actor_id===id;
+}
 
 function candidates(world, state, at) {
   const id=state.actor_id, profile=(world.resident_life?RESIDENT_PROFILES[id]:null)??PROFILE[id]??{interests:['explore'],places:[actor(world,id).location_id],rest:actor(world,id).location_id,quiet:'在这里待一会儿'};
@@ -33,7 +54,7 @@ function candidates(world, state, at) {
   const minute=localWorldDate(at,world.clock.time_zone).minute_of_day, result=[];
   function add(goal,title,reason,score,build) {
     if(Date.parse(state.cooldowns[goal]??'')>Date.parse(at))return;
-    try { result.push({goal,title,reason,score,steps:build(),available:true}); }
+    try { result.push({goal,title,reason,score,steps:checkSupplyClaim(world,at,id,build()),available:true}); }
     catch(error) { result.push({goal,title,reason,score,available:false,blocked_reason:error.message}); }
   }
   function activity(goal,id,reason,score){add(goal,ACTIVITIES.find(r=>r.activity_id===id).title,reason,score,()=>activitySteps(world,state.actor_id,id));}
@@ -44,7 +65,12 @@ function candidates(world, state, at) {
     const duration=night?Math.min(21600,Math.max(3600,((minute<360?360:1800)-minute)*60)):2700;
     return [...(reachable&&destination!==actor(world,id).location_id?[{kind:'travel',location_id:destination}]:[]),{kind:'rest',duration_seconds:duration,title:'休息一会儿'}];
   });
-  if(state.appetite>.6) activity('meal','share-meal','想吃点东西，先确认长桌或厨房还有什么。',state.appetite>.9?140:95);
+  if(carried(world,id,'rations')>0&&stock(world,'shared-table','rations')<(objects['shared-table'].capacity??24))
+    add('store-meals','把做好的饭留到长桌','先把随身袋里的饭放上长桌，让回来的人都找得到。',145,()=>depositSteps(world,id,'shared-table','rations'));
+  if(state.appetite>.6) add('meal','在长桌吃一份饭','想吃点东西，先确认长桌或厨房还有什么。',state.appetite>.9?140:95,()=>{
+    if(stock(world,'shared-table','rations')>0&&!mealTurn(world,id))throw planError('先让同桌更饿、上次吃饭更早的人拿到一份。');
+    return activitySteps(world,id,'share-meal');
+  });
   if(bed.quantity>0 && bed.moisture<.32)activity('water','water-bed','苗床正在失水，想先照看这一批苗。',bed.moisture<.18?110:70);
   if(bed.quantity>0 && bed.moisture>.84)activity('drain','drain-bed','苗床积水了，先疏通排水。',105);
   if(bed.quantity>0 && bed.health<.65)activity('tend','tend-bed','这一批苗有些衰弱，想整理一下。',profile.interests.includes('care')?80:55);
@@ -59,13 +85,21 @@ function candidates(world, state, at) {
     if(objects[objectId].condition<.55)activity(`repair:${objectId}`,recipeId,'设施磨损了，先把材料备齐再修。',profile.interests.includes('repair')||profile.interests.includes('craft')?82:52);
   }
   if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
-  if(world.resident_life && carried(world,id,'rations')>0)add('store-meals','把做好的饭留到长桌','有人晚点回来也能吃上一份。',60,()=>depositSteps(world,id,'shared-table','rations'));
-  const floatBed=objects['floating-frame']?.project_assets?.floating_seedbed;
-  const floatingHarvest=world.resident_projects?.projects?.['floating-seedbed']?.status==='completed' && floatBed?.quantity>0 && floatBed.growth>=.85;
-  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<4 && (carried(world,id,'moss')>=2||stock(world,'seedling-rack','moss')>=2||bed.growth>=.85||floatingHarvest)) {
-    const soupReady=world.resident_projects?.projects?.['leaf-signature-soup']?.status==='completed';
-    activity('cook',soupReady?'cook-leaf-soup':'cook-moss',soupReady?'把验收过的叶芽汤再做一锅，给晚归的人留一份。':'苗圃的收获可以做成饭，给晚归的人也留一份。',65);
+  const hungry=Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id)&&s.appetite>.6).length;
+  const mealReserve=Math.min(10,Math.max(4,hungry+2));
+  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<mealReserve)
+    add('cook','做一锅饭放到长桌','先看苗圃和林间实际采回的食材，做成一锅，再把每一份放到长桌。',hungry?90:65,()=>cookAndStoreSteps(world,id));
+  if(objects['light-fruit-bough']&&stock(world,'shared-table','rations')<mealReserve&&stock(world,'seedling-rack','light_fruit')<2) {
+    if(carried(world,id,'light_fruit')>0)add('store-fruit','把光果带回共用育苗架','让厨房能看到已经采到的食材，回来的人也能取用。',88,()=>depositSteps(world,id,'seedling-rack','light_fruit'));
+    else if(profile.interests.includes('care')||profile.interests.includes('explore')||profile.interests.includes('trade'))
+      add('fruit-supply','采一篮光果送回苗圃','林间果枝有成熟光果时，采下实际的一篮，送到公共食材架。',hungry?86:62,()=>fruitSupplySteps(world,id));
   }
+  const blockedMeal=result.find(choice=>choice.goal==='meal'&&!choice.available);
+  if(blockedMeal&&(stock(world,'shared-table','rations')>0||world.tasks.some(task=>['running','paused'].includes(task.status)&&task.target_object_id==='shared-table')||supplyClaims(world,at,id).some(claim=>claim.target==='trial-stove')))
+    add('wait-meal','在饭桌附近等一小会儿','已有饭或有人正在做这餐，先过去等空位，三分钟后再看真实结果。',state.appetite>.9?139:94,()=>{
+      if(!findWorldPath(world,actor(world,id).location_id,'warm-pot-courtyard'))throw planError('到饭桌的路暂时不通。');
+      return [...(actor(world,id).location_id==='warm-pot-courtyard'?[]:[{kind:'travel',location_id:'warm-pot-courtyard'}]),{kind:'observe',title:'等长桌和厨房空下来',duration_seconds:180}];
+    });
   for(const project of projectCandidates(world,id,at)) {
     if(!project.available) result.push(project);
     else add(project.goal,project.title,project.reason,project.score,()=>activitySteps(world,id,project.activity_id));
@@ -95,7 +129,8 @@ function abandon(world,state,at,reason,cancelled=false) {
 }
 function executeStep(world,state,at,eventId) {
   const plan=state.plan, step=plan.steps[plan.index];
-  if(!step){plan.status='completed';plan.finished_at=at;state.cooldowns[plan.goal]=new Date(Date.parse(at)+120*MINUTE).toISOString();state.next_decision_at=new Date(Date.parse(at)+5*MINUTE).toISOString();feedback(world,state,at,'plan_completed',`“${plan.title}”这件事做完了。`,{plan_id:plan.plan_id});return;}
+  if(!step){plan.status='completed';plan.finished_at=at;const cooldown=plan.goal==='wait-meal'?0:['meal','cook','store-meals','store-fruit','fruit-supply'].includes(plan.goal)?5:120;
+    state.cooldowns[plan.goal]=new Date(Date.parse(at)+cooldown*MINUTE).toISOString();state.next_decision_at=new Date(Date.parse(at)+(plan.goal==='wait-meal'?0:5)*MINUTE).toISOString();feedback(world,state,at,'plan_completed',`“${plan.title}”这件事做完了。`,{plan_id:plan.plan_id});return;}
   const id=state.actor_id, actionId=`${eventId}:${id}:${state.sequence}:${plan.index}`;
   if(step.kind==='travel' && actor(world,id).location_id===step.location_id){plan.index++;return;}
   if(step.kind==='transfer') {

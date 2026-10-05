@@ -819,7 +819,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     };
   }, [citizenKey, labelKey, sceneryKey, onPlaceClick]);
 
-  useEffect(()=>{if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);},[focusLocationId,focusRequest,citizenKey,labelKey,sceneryKey]);
+  useEffect(()=>{if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);else if((focusRequest??0)>0)apiRef.current?.fitTown();},[focusLocationId,focusRequest,citizenKey,labelKey,sceneryKey]);
   // An expired observation or a minute change still updates a reduced-motion view.
   useEffect(()=>{requestFrameRef.current();const timer=setInterval(()=>requestFrameRef.current(),15000);return()=>clearInterval(timer);},[environment]);
 

@@ -56,6 +56,21 @@ test('an owner suggestion followed by a real recipe is practice even though the 
   assert.deepEqual(w.memory.actors[OWN].interests, {});
 });
 
+test('actual finite gathering joins the common ledger once regardless of the enclosing food plan',()=>{
+  for(const goal of ['fruit-supply','cook','meal']) {
+    const w=world();syncDevelopmentEvidence(w,START);
+    w.tasks=[task('actual-fruit',{activity_id:'gather-light-fruit',life_goal:goal,location_id:'backlit-grove'})];
+    syncDevelopmentEvidence(w,END);let model=developmentReadModel(w);
+    assert.equal(model.counts.practice,1);assert.equal(model.recent[0].topic,'care');
+    assert.equal(model.recent[0].root_outcome_id,'task:actual-fruit');
+    const before=structuredClone(w.memory.actors);syncDevelopmentEvidence(w,END);
+    assert.deepEqual(w.memory.actors,before,'evidence projection does not add a new interest reward');
+    w.tasks=[];w.memory.episodes=[episode('gather-view',{topic:null,source:{kind:'canonical_task',task_id:'actual-fruit',activity_id:'gather-light-fruit'}})];
+    syncDevelopmentEvidence(w,END);model=developmentReadModel(w);
+    assert.equal(model.counts.practice,1);assert.equal(model.recent[0].topic,'care');
+  }
+});
+
 test('task, project history and multiple memories share one terminal root after the task has been pruned', () => {
   const w = world(); w.tasks = [task('career-stage', { activity_id: 'seedbed-survey', life_goal: 'project:floating-seedbed:survey', project_id: 'floating-seedbed', project_stage_id: 'survey' })];
   w.resident_projects = { projects: { 'floating-seedbed': { project_id: 'floating-seedbed', owner_id: OWN,

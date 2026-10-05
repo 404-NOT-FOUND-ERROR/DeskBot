@@ -108,17 +108,38 @@ export function upgradeAuthoredScene(world, at) {
   if (world.map_catalog?.version !== '2026-10-04.1' || authored.scene_revision !== 'morrowmere-authored-scene-v1') return false;
   const old = world.map_catalog;
   const semantic = place => { const { x,y,presentation,...rest }=place; return rest; };
+  const existingObjectIds=new Set(old.objects.map(o=>o.object_id));
+  const expectedObjects=authored.objects.filter(o=>existingObjectIds.has(o.object_id));
   if (!equal(old.locations.map(semantic),authored.locations.map(semantic))
-    || !equal(old.areas,authored.areas) || !equal(old.objects,authored.objects)) fail('Scene migration cannot rewrite world semantics');
+    || !equal(old.areas,authored.areas) || !equal(old.objects,expectedObjects)
+    || authored.objects.some(o=>!existingObjectIds.has(o.object_id)&&o.object_id!=='light-fruit-bough')) fail('Scene migration cannot rewrite world semantics');
   for (const place of world.locations) {
     const definition=authored.locations.find(item=>item.location_id===place.location_id);
     if(definition) {place.x=definition.x;place.y=definition.y;place.presentation=structuredClone(definition.presentation);}
   }
-  world.map_catalog=loadWorldMapContent();
+  // Keep object admission separate from the presentation correction. The later
+  // supply migration records its own added object instead of hiding it here.
+  world.map_catalog={...loadWorldMapContent(),objects:structuredClone(old.objects)};
   const previous=world.world_revision;world.world_revision++;
   world.schema_migrations=[...(world.schema_migrations??[]),{id:'morrowmere-authored-scene-v1',applied_at:at,
     before_revision:previous,after_revision:world.world_revision,from_version:old.version,to_version:authored.version,
     scope:'presentation-only',preserved_location_ids:old.locations.map(p=>p.location_id)}];
+  return true;
+}
+
+// Add one authored resource place without replacing expanded catalogs or any
+// physical state. Inventory is installed separately and starts at zero.
+export function upgradeCommunitySupplyMap(world, at) {
+  const catalog=world.map_catalog;
+  if(!catalog || catalog.objects.some(o=>o.object_id==='light-fruit-bough'))return false;
+  if(!catalog.areas.some(a=>a.area_id==='grove-edge'))return false;
+  const source=authored.objects.find(o=>o.object_id==='light-fruit-bough');
+  const candidate={...structuredClone(catalog),objects:[...structuredClone(catalog.objects),structuredClone(source)],
+    version:catalog.version==='2026-10-04.2'?authored.version:catalog.version,supply_revision:'morrowmere-community-supply-v1'};
+  world.map_catalog=validateWorldMapContent(candidate);
+  world.schema_migrations=[...(world.schema_migrations??[]),{id:'morrowmere-community-supply-map-v1',applied_at:at,
+    scope:'additive_object',added_object_ids:['light-fruit-bough'],preserved_existing_tasks:true}];
+  world.world_revision++;
   return true;
 }
 

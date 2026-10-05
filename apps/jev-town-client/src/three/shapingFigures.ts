@@ -194,6 +194,25 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
   const waterSurface = new THREE.Mesh(new THREE.CircleGeometry(.19, 14), new THREE.MeshBasicMaterial({ color: 0x80c2cb }));
   waterSurface.name = 'carried-water-surface'; waterSurface.rotation.x = -Math.PI / 2; waterSurface.position.y = -.01; carryBucket.add(waterSurface);
 
+  const carryBasket = new THREE.Group(); carryBasket.name = 'carried-food-basket';
+  carryBasket.position.set(-.1, -.36, .25); carryBasket.visible = false; limbs.armLeft.add(carryBasket);
+  const basketParts = new FigureParts();
+  basketParts.add(cylinder, 0xbb976b, 0, -.15, 0, .28, .20, .24);
+  basketParts.add(torus, 0x99764f, 0, .05, 0, .27, .25, .13);
+  carryBasket.add(basketParts.mesh(material, 'food-basket-shell'));
+  const mealCargo = new THREE.Group(); mealCargo.name = 'carried-ready-food'; carryBasket.add(mealCargo);
+  const mealParts = new FigureParts();
+  mealParts.add(cylinder, 0xf0e3c5, -.08, .005, 0, .16, .11, .16);
+  mealParts.add(cylinder, 0xc5c996, -.08, .07, 0, .12, .02, .12);
+  mealParts.add(ball, 0xe8c88a, .13, .04, .03, .12, .08, .10);
+  mealCargo.add(mealParts.mesh(material, 'ready-food-cargo'));
+  const ingredientCargo = new THREE.Group(); ingredientCargo.name = 'carried-ingredients'; carryBasket.add(ingredientCargo);
+  const ingredientParts = new FigureParts();
+  ingredientParts.add(ball, 0xb3c484, -.12, .02, .02, .13, .12, .12);
+  ingredientParts.add(ball, 0xe7cf87, .10, .06, -.02, .13, .13, .13);
+  ingredientParts.add(ball, 0x86a16d, .03, .10, .11, .14, .08, .09);
+  ingredientCargo.add(ingredientParts.mesh(material, 'ingredient-cargo-marker'));
+
   function updateCarry(stock?: Readonly<Record<string, number>>, travelling = false) {
     const count = (resource: string) => Number.isFinite(stock?.[resource]) ? Math.max(0, stock![resource]!) : 0;
     const clean = count('water'), raw = count('raw_water');
@@ -201,6 +220,11 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
     carryBucket.userData.stock = { water: clean, raw_water: raw };
     // This is a cargo marker, not an estimate of liquid volume in a physical bucket.
     waterSurface.material.color.set(clean >= 1 ? 0x80c2cb : 0x99ac8d);
+    const meals = count('rations'), moss = count('moss'), fruit = count('light_fruit'), seeds = count('seeds');
+    carryBasket.visible = travelling && meals + moss + fruit + seeds >= 1;
+    carryBasket.userData.stock = { rations: meals, moss, light_fruit: fruit, seeds };
+    carryBasket.userData.cargo_marker = true;
+    mealCargo.visible = meals >= 1; ingredientCargo.visible = meals < 1 && moss + fruit + seeds >= 1;
   }
 
   const face = new THREE.Group(); face.name = "seed-eyes"; face.position.set(0, Y0 + 1.73, .446);
@@ -243,6 +267,7 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
       limbs.armLeft.rotation.y = 0; limbs.armLeft.rotation.z = 0;
       limbs.armRight.rotation.y = 0; limbs.armRight.rotation.z = 0;
       if (carryBucket.visible) limbs.armRight.rotation.x = Math.min(.15, Math.max(-.15, limbs.armRight.rotation.x));
+      if (carryBasket.visible) limbs.armLeft.rotation.x = -.3;
     } else {
       const beat = reducedMotion ? 0 : Math.sin(time * 2.1 + phase);
       limbs.armLeft.rotation.set(0, 0, 0); limbs.armRight.rotation.set(0, 0, 0);
@@ -270,6 +295,10 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
       else if (activityId === 'save-seeds' && (kind === 'care' || kind === 'craft')) {
         limbs.armLeft.rotation.x = -.64 + beat * .045; limbs.armLeft.rotation.y = .26;
         limbs.armRight.rotation.x = -.72 - beat * .045; limbs.armRight.rotation.y = -.26;
+      }
+      else if (activityId === 'gather-light-fruit' && kind === 'care') {
+        limbs.armLeft.rotation.x = -.45; limbs.armRight.rotation.x = -1.65 + beat * .11;
+        limbs.armRight.rotation.z = .18;
       }
       else if (kind === "care") { limbs.armRight.rotation.x = -.65 + beat * .14; limbs.armLeft.rotation.x = -.35; }
       else if (kind === "craft") { limbs.armLeft.rotation.x = -.7 + beat * .08; limbs.armRight.rotation.x = -.7 - beat * .10; }

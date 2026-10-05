@@ -9,7 +9,7 @@ import { sceneEnvironmentAt } from '../src/three/sceneEnvironment.ts';
 
 const content = JSON.parse(readFileSync(new URL('../../../world-content/companion-world/map.v1.json', import.meta.url), 'utf8'));
 const locations: DeskBotLocation[] = content.locations.map((p: DeskBotLocation) => ({ ...p, areas: content.areas.filter((a: { location_id: string }) => a.location_id === p.location_id).map((a: { area_id: string }) => ({ ...a, objects: content.objects.filter((o: { area_id: string }) => o.area_id === a.area_id) })) }));
-const task = (overrides: Partial<SceneLifeActivity> = {}): SceneLifeActivity => ({ actorId: 'cook-001', citizenId: 101, locationId: 'warm-pot-courtyard', taskId: 'task-live', title: '试做苔芽餐', kind: 'craft', activityId: 'cook-moss', status: 'running', dueAt: '2026-10-05T22:00:00Z', remainingMs: 9000, ...overrides });
+const task = (overrides: Partial<SceneLifeActivity> = {}): SceneLifeActivity => ({ actorId: 'cook-001', citizenId: 101, locationId: 'warm-pot-courtyard', taskId: 'task-live', title: '试做苔芽餐', kind: 'craft', activityId: 'cook-moss', targetObjectId: 'trial-stove', status: 'running', dueAt: '2026-10-05T22:00:00Z', remainingMs: 9000, ...overrides });
 
 describe('Shaping Field local lighting and lived task effects', () => {
   it('distinguishes dawn, dusk, late-night and midnight, including wrapped interpolated time', () => {
@@ -47,6 +47,7 @@ describe('Shaping Field local lighting and lived task effects', () => {
     expect(hasSceneTaskEffect('steam', [task({ status: 'paused' })])).toBe(false);
     expect(hasSceneTaskEffect('steam', [task({ kind: 'travel' })])).toBe(false);
     expect(hasSceneTaskEffect('steam', [task({ activityId: undefined, title: '我想煮饭' })])).toBe(false);
+    expect(hasSceneTaskEffect('steam', [task({ targetObjectId: undefined })])).toBe(false);
     expect(hasSceneTaskEffect('irrigation', [task({ activityId: 'water-bed' })])).toBe(true);
     expect(hasSceneTaskEffect('sparks', [task({ activityId: 'craft-frame-kit' })])).toBe(true);
   });

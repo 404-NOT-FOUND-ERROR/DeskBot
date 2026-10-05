@@ -59,9 +59,9 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
   const cloth:THREE.Group[]=[];
   const glowTexture=createSoftLightTexture();
   const stockSlots=new Map<string,THREE.Group[]>();
-  const stockColors:Record<string,number>={water:C.water,seeds:0xc39b51,moss:C.leaf,wood:0xb89064,cloth:0x97aba1,fasteners:0x99a0a5,frame_kit:C.teal,trays:0x735e44,rations:0xd7bb77};
+  const stockColors:Record<string,number>={water:C.water,seeds:0xc39b51,moss:C.leaf,light_fruit:0xe5ce89,wood:0xb89064,cloth:0x97aba1,fasteners:0x99a0a5,frame_kit:C.teal,trays:0x735e44,rations:0xd7bb77};
   const stockSpec:Record<string,{resources:string[];x:number;y:number;z:number}>={
-    'seedling-rack':{resources:['seeds','moss','trays'],x:-5,y:.3,z:.1},
+    'seedling-rack':{resources:['seeds','moss','trays','light_fruit'],x:-5,y:.3,z:.1},
     'parts-drawers':{resources:['wood','cloth','fasteners','frame_kit'],x:1.9,y:.3,z:5.2},
     'shared-table':{resources:['rations'],x:.2,y:1.76,z:4},
     'trial-stove':{resources:['water'],x:-2.2,y:.3,z:3.5},
@@ -189,7 +189,16 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
         lamp(group,6,6);m.box(3,.15,2,5.4,.3,6,C.wood);break;
       }
       case "grove": {
-        for(const [x,z] of [[-5,-5],[5,-5],[-5,3],[4,2]] as const)tree(group,x,z,x+z);
+        const fruitSource=place.areas?.some(area=>area.objects?.some(object=>object.object_id==='light-fruit-bough'));
+        for(const [x,z] of [[-5,-5],[5,-5],[4,2]] as const)tree(group,x,z,x+z);
+        if(!fruitSource)tree(group,-5,3,-2);
+        fixture('light-fruit-bough',(b,g)=>{
+          b.box(.3,2.8,.3,-4.75,.3,3.3,C.wood);b.box(3.5,.16,.17,-4.75,2.95,3.3,C.wood);
+          for(const x of [-6.25,-5.15,-4.05,-3.25]){b.box(.09,.35,.09,x,2.63,3.3,C.wood);b.ball(.61,x,3.15,3.3,0x83aa77);}
+          b.box(1,.12,.72,-4.75,.3,4.3,C.wood);b.box(.15,.2,.15,-4.75,.42,4.3,0xc5b17d);
+          b.box(.55,.26,.07,-6.45,1.2,4.0,C.cream);b.box(.08,.95,.08,-6.45,.3,4.0,C.dark);
+          g.userData.workstations={'gather-light-fruit':{standing:[-4.75,0,5.3],facing:[-4.75,2.4,3.3]}};
+        });
         fixture("light-sample-rack",(b)=>{b.box(.15,2.8,.15,-2,.3,-1,C.wood);b.box(.15,2.8,.15,2,.3,-1,C.wood);b.box(4.3,.15,.2,0,3,-1,C.wood);for(let i=0;i<5;i++)b.box(.45,.8,.1,-1.5+i*.75,1.8,-1,[0x88b99b,0xe1bc63,0x9d9cc3][i%3]!);});
         fixture("root-cushion",(b)=>{b.cylinder(1.5,.5,0,.3,4,C.wood);b.cylinder(1.25,.22,0,.8,4,0xb4bc82);});break;
       }
@@ -216,8 +225,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       case "courtyard": {
         cottage(m,0,-3,0xb8734e,7);m.box(.7,3,.7,2,3.5,-3,C.wood);
         fixture("trial-stove",(b,g)=>{b.box(2.4,1.2,1.8,-4,.3,3,0xb6865c);b.cylinder(.6,.15,-4,1.5,3,C.dark);b.box(.6,1.4,.6,-4,1.5,2.3,C.dark);
-          g.userData.workstations=Object.fromEntries(['soup-record-ratio','soup-cook-trial','soup-confirm-recipe','cook-leaf-soup'].map(id=>[id,{standing:[-4,0,5],facing:[-4,2,3]}]));});
-        fixture("shared-table",(b,g)=>{table(b,2,4,5);g.userData.workstations=Object.fromEntries(['soup-serve-trial','soup-taste-trial'].map(id=>[id,{standing:[.7,0,5.55],facing:[.7,2,4]}]));});lamp(group,6,6);break;
+          g.userData.workstations=Object.fromEntries(['cook-moss','cook-grove-stew','soup-record-ratio','soup-cook-trial','soup-confirm-recipe','cook-leaf-soup'].map(id=>[id,{standing:[-4,0,5],facing:[-4,2,3]}]));});
+        fixture("shared-table",(b,g)=>{table(b,2,4,5);g.userData.workstations=Object.fromEntries(['share-meal','soup-serve-trial','soup-taste-trial'].map(id=>[id,{standing:[.7,0,5.55],facing:[.7,2,4]}]));});lamp(group,6,6);break;
       }
       case "workshop": {
         cottage(m,0,-3,C.teal,8);m.box(3,2.7,.2,0,.3,-.35,C.dark);
@@ -257,7 +266,10 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       spec.resources.forEach((resource,row)=>{
         const slots:THREE.Group[]=[];
         for(let i=0;i<6;i++){const slot=new THREE.Group();slot.name=`stock:${id}:${resource}:${i}`;slot.position.set(spec.x+i*.58,spec.y,spec.z+row*.64);slot.visible=false;object.add(slot);
-          const sm=new Model(slot);sm.box(.46,.58,.46,0,0,0,stockColors[resource]!);sm.finish("stock-stack");slots.push(slot);}
+          const sm=new Model(slot);
+          if(resource==='rations'){for(let bowl=0;bowl<4;bowl++){const item=new THREE.Group();item.name=`portion:${bowl}`;slot.add(item);const dish=new Model(item);dish.cylinder(.21,.12,0,bowl*.2,0,C.cream);dish.cylinder(.165,.025,0,.12+bowl*.2,0,0xc4c999);dish.ball(.045,.055,.16+bowl*.2,0,C.leaf);dish.finish('ready-meal-bowl');}}
+          else {sm.box(.46,.58,.46,0,0,0,stockColors[resource]!);sm.finish("stock-stack");}
+          slots.push(slot);}
         stockSlots.set(`${id}:${resource}`,slots);
       });
     }
@@ -289,7 +301,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     }
     const rack=states.get('seedling-rack');if(rack){const fill=root.getObjectByName('nursery-collected-water');if(fill)fill.position.y=.36+Math.min(1,(rack.stock?.water??0)/(rack.capacity??24))*1.55;}
     for(const [key,slots] of stockSlots){const split=key.lastIndexOf(':'),id=key.slice(0,split),resource=key.slice(split+1),count=states.get(id)?.stock?.[resource]??0;
-      slots.forEach((slot,i)=>{const units=Math.max(0,Math.min(4,count-i*4));slot.visible=units>0;slot.scale.y=.25+units*.1875;slot.userData.quantity=units;});
+      slots.forEach((slot,i)=>{const units=Math.max(0,Math.min(4,count-i*4));slot.visible=units>0;slot.scale.y=resource==='rations'?1:.25+units*.1875;slot.userData.quantity=units;
+        if(resource==='rations')slot.children.forEach((dish,index)=>{dish.visible=index<Math.floor(units);});});
     }
     for(const [id,state] of states){const object=objects.get(id);if(!object)continue;object.userData.state=state;
       if(typeof state.condition==='number'){

@@ -57,13 +57,13 @@ export function sceneOperationAt(model: string, rawMinute: number, night: number
 export type SceneTaskEffect = 'steam' | 'irrigation' | 'sparks' | 'stitch' | 'water-collection' | 'seed-saving';
 export function hasSceneTaskEffect(effect: SceneTaskEffect, activities: readonly SceneLifeActivity[]) {
   const recipes: Record<SceneTaskEffect, readonly string[]> = {
-    steam: ['cook-moss'],
+    steam: ['cook-moss', 'cook-grove-stew'],
     irrigation: ['water-bed'],
     sparks: ['repair-bench', 'repair-frame', 'repair-rack', 'repair-stove', 'craft-tray', 'craft-frame-kit'],
     stitch: ['stitch-canopy'],
     'water-collection': ['collect-water'],
     'seed-saving': ['save-seeds'],
   };
-  const target = effect === 'water-collection' ? 'floating-frame' : effect === 'seed-saving' ? 'seedling-rack' : null;
+  const target = effect === 'water-collection' ? 'floating-frame' : effect === 'seed-saving' ? 'seedling-rack' : effect === 'steam' ? 'trial-stove' : null;
   return activities.some(task => task.status === 'running' && task.kind !== 'travel' && recipes[effect].includes(task.activityId ?? '') && (!target || task.targetObjectId === target));
 }

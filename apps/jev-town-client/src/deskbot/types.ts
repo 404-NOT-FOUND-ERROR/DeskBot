@@ -54,6 +54,7 @@ export interface DeskBotLiving {
   recent_changes: { at:string; text:string; kind:string; task_id?:string; actor_id?:string }[];
   activities:DeskBotLivingActivity[];
   resource_renewal?: { id:string; installed_at:string; source_object_id:string; source_kind:'authored_world_physics'; resource:string; units_per_hour:number; description:string; preserved_existing_stocks_and_tasks:boolean }|null;
+  community_supply?: { id:string; installed_at:string; source_kind:'authored_world_physics'; fruit_source_object_id:string; fruit_resource:string; fruit_units_per_hour:number; fruit_capacity:number; description:string; preserved_existing_stocks_and_tasks:boolean }|null;
 }
 export interface DeskBotAutonomy {
   schema:string;enabled:boolean;installed_at:string;revision:number;policy:string;
@@ -247,6 +248,7 @@ export interface DeskBotWorldTask {
   life_action?:string;
   target_object_id?: string;
   completion?: { effect:string; result?:{ success:boolean; text?:string; reason?:string } }|null;
+  reservation?: { status: 'held'|'consumed'|'returned'; inputs: { container:string; resource:string; count:number }[] };
 }
 
 export interface DeskBotWorldRouteLocation {

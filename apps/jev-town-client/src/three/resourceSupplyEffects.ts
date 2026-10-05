@@ -4,6 +4,7 @@ import { hasSceneTaskEffect } from './sceneLife.ts';
 
 /** Cosmetic work in progress. Inventory and completed products always come from the service. */
 export function createResourceSupplyEffects(parent: THREE.Group, kind: string) {
+  if (kind === 'grove') return createForestFoodEffects(parent);
   if (kind !== 'waterside' && kind !== 'nursery') return null;
   const water = kind === 'waterside';
   const root = new THREE.Group(); root.name = water ? 'spring-water-supply' : 'nursery-seed-saving'; parent.add(root);
@@ -64,4 +65,40 @@ export function createResourceSupplyEffects(parent: THREE.Group, kind: string) {
       particles.instanceMatrix.needsUpdate = true;
     },
   };
+}
+
+/** Fruit matures in the saved ecology stock; a gather animation cannot grow or award any. */
+function createForestFoodEffects(parent: THREE.Group) {
+  const object = parent.getObjectByName('object:light-fruit-bough');
+  if (!object) return null;
+  const root = new THREE.Group(); root.name = 'forest-light-fruit-supply'; object.add(root);
+  const fruit = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.26, 1),
+    new THREE.MeshBasicMaterial({ color: 0xf2dc93 }), 12);
+  fruit.name = 'light-fruit-on-bough'; fruit.visible = false; fruit.frustumCulled = false; root.add(fruit);
+  const work = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.05, 0),
+    new THREE.MeshBasicMaterial({ color: 0xe7cf87, transparent: true, opacity: .7 }), 8);
+  work.name = 'gather-light-fruit-work'; work.visible = false; work.frustumCulled = false; root.add(work);
+  const matrix = new THREE.Object3D();
+  return { root, update(seconds: number, reducedMotion: boolean, context?: SceneLifeContext) {
+    const state = object.userData.state;
+    const amount = Number.isFinite(state?.stock?.light_fruit) ? Math.max(0, state.stock.light_fruit) : null;
+    fruit.visible = amount !== null && amount > 0;
+    fruit.userData = { object_id: 'light-fruit-bough', resource: 'light_fruit', quantity: amount, capacity: state?.capacity ?? null };
+    const time = reducedMotion ? 0 : seconds;
+    for (let i = 0; i < 12; i++) {
+      const fullness = amount === null ? 0 : Math.min(1, Math.max(0, amount - i));
+      matrix.position.set(-6.25 + (i % 6) * .55, 2.68 - (i % 3) * .15 + Math.sin(time * .8 + i) * .035, 3.0 + Math.floor(i / 6) * .65);
+      matrix.rotation.set(0, .17 * i, 0); matrix.scale.setScalar(Math.cbrt(fullness)); matrix.updateMatrix(); fruit.setMatrixAt(i, matrix.matrix);
+    }
+    fruit.instanceMatrix.needsUpdate = true;
+    work.visible = (context?.activities ?? []).some(task => task.status === 'running' && task.kind !== 'travel' &&
+      task.activityId === 'gather-light-fruit' && task.targetObjectId === 'light-fruit-bough' && task.locationId === parent.userData.location_id);
+    work.userData = { activity_id: 'gather-light-fruit', effect: 'work_in_progress' };
+    if (work.visible) for (let i = 0; i < 8; i++) {
+      const cycle = (time * .28 + i / 8) % 1;
+      matrix.position.set(-4.75 + Math.sin(i * 3) * .2, 2.7 - cycle * 1.6, 3.5 + cycle * .8);
+      matrix.rotation.set(0, 0, 0); matrix.scale.setScalar(.5 + cycle * .5); matrix.updateMatrix(); work.setMatrixAt(i, matrix.matrix);
+    }
+    work.instanceMatrix.needsUpdate = true;
+  } };
 }

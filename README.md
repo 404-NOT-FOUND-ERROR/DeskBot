@@ -4,6 +4,8 @@
 
 **角色发展第 1 阶段（2026-10-05）：** 实际任务、居民项目、约定与记忆已共享结果根；原角色方向能读取相同实践，主人促成的真实行动也可追溯。重复视图、重复输入和重启不叠加次数。生活侧栏展示前因、行动和结果，`/development-review.html` 提供五种隔离样本。当前是证据连接与方向观察，能力、主动愿望和实际试用留待后续阶段。见 [验收图与实验效果](research/milestones/role-development-stage1.md) 和 [共同证据规则](research/world/development-evidence-v1.md)。
 
+**角色发展第 2 阶段（2026-10-05）：** 十三人的生活供给增加有限光果来源、实际采集和炖餐，整锅饭进入长桌，采收与厨房错开安排，送饭约定需实际吃完才兑现。地图显示枝上果实、搬运篮、饭碗和正在工作的锅气，侧栏区分可取、携带与预留。原苗床、浮圃、项目和共同经历继续使用；没有补发旧存档食物。见 [供给验收与实验边界](research/milestones/community-supply-stage2.md)，独立规则回放为 `/life-review.html?sample=supply`。
+
 这是《聚形域》桌宠实验装置的软件工作区。当前目标不是做一个通用聊天产品，而是跑通并记录以下可审计链路：
 
 ```text
@@ -34,7 +36,7 @@
 - 第一至第六步已完成基本世界合同、现实 1:1 时钟、分层地图、实际设施、天气表现与有限资源。十三名角色共用规则生活循环；邀请、协作、交换、赴约与关系后果使用真实事务记录。见 [第六步验收](research/milestones/companion-world-step6.md) 与 [社会生活规则](research/world/social-life-v1.md)。
 - 第七步已接入现实输入折射：上海天气、对话和有限生活建议影响下一次空闲选择，保留出处、暂缓理由与实际任务引用。本地已启用 DeepSeek Flash 对话、NASA Science 新闻与上海区域空气质量。其他 agent 等待真实来源，设备联调仍属第九步。见 [第七步验收](research/milestones/companion-world-step7.md)、[输入折射规则](research/world/input-refraction-v1.md) 与 [外界来源配置](research/milestones/external-input-configuration.md)。独立专项为 `/life-review.html?sample=inputs`。
 - 第八步已接入三种长期记忆、关系沉淀、可逆兴趣积累与 DeepSeek 空闲目标选择。需要、任务、路线、材料和实际结果仍由世界核验；模型解释是意图，不是已经完成的经历。私人对话记忆留在本地，自动选择只引用有限镇内记录与公开消息。见 [第八步验收](research/milestones/companion-world-step8.md)；独立七日回放为 `/life-review.html?sample=memory`，不能代替正式世界真实经过七天。
-- 首批造型与场景效果由客户端创作。各光域的自动形态生成、声音演化与换壳流程尚未全部接入，后续按 [当前路线图](research/development-roadmap-v0.4.md) 推进。
+- 首批造型与场景效果由客户端创作。各光域的主动角色愿望、实际试用、形态生成、声音演化与换壳流程继续按 [v0.5 当前路线图](research/development-roadmap-v0.5.md) 推进。
 
 ![十三位光粒居民的首批造型：独立陈列预览，不代表正式聚会](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 

@@ -110,6 +110,19 @@ describe("light-condensed town inhabitants", () => {
     expect(figure.limbs.armRight.rotation.x).toBe(0); expect(figure.limbs.armLeft.rotation.y).toBe(0);
     disposeObject(figure.group);
   });
+  it('carries real meals and ingredients without turning anticipated cooking into prepared food', () => {
+    const figure = createCitizenFigure(0, 1, 'pot-cook-001');
+    const basket = figure.group.getObjectByName('carried-food-basket')!, meals = figure.group.getObjectByName('carried-ready-food')!, ingredients = figure.group.getObjectByName('carried-ingredients')!;
+    figure.updateCarry!({ rations: 3 }, false); expect(basket.visible).toBe(false);
+    figure.updateCarry!({ light_fruit: 2 }, true); expect(basket.visible).toBe(true); expect(ingredients.visible).toBe(true); expect(meals.visible).toBe(false);
+    expect(basket.userData.stock).toMatchObject({ rations: 0, light_fruit: 2 });
+    figure.updateCarry!({ water: 4, rations: 3 }, true); expect(meals.visible).toBe(true); expect(ingredients.visible).toBe(false);
+    figure.updateLife!(5, 'travel', true, false); expect(figure.limbs.armLeft.rotation.x).toBe(-.3);
+    figure.updateCarry!({ rations: Number.NaN, moss: Infinity }, true); expect(basket.visible).toBe(false);
+    figure.updateLife!(5, 'care', false, true, 0, 'gather-light-fruit'); expect(figure.limbs.armRight.rotation.x).toBe(-1.65);
+    figure.updateLife!(5, 'idle', false, true, 0, 'gather-light-fruit'); expect(figure.limbs.armRight.rotation.x).toBe(0);
+    disposeObject(figure.group);
+  });
   it('renders deliberate project assembly and recording gestures while keeping taste a real eating pose',()=>{
     const figure=createCitizenFigure(0,1,'spare-mender-001');
     figure.updateLife!(5,'craft',false,true,0,'pump-assemble');expect(figure.limbs.armLeft.rotation.x).toBe(-.73);expect(figure.limbs.armRight.rotation.y).toBe(-.22);

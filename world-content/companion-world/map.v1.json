@@ -1,7 +1,7 @@
 {
   "schema": "deskbot.world-map-content.v1",
   "content_id": "morrowmere-living-map",
-  "version": "2026-10-04.2",
+  "version": "2026-10-05.1",
   "setting_id": "shaping-field-v2.1",
   "settlement_id": "morrowmere",
   "status": "authored",
@@ -941,6 +941,15 @@
       "capabilities": [
         "inspect"
       ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "light-fruit-bough",
+      "area_id": "grove-edge",
+      "name": "光果枝",
+      "description": "林缘凝结光果的枝丛。果实缓慢长成，必须亲自采下、带去厨房烹饪；枝上数量有限。",
+      "object_kind": "forage-source",
+      "capabilities": ["inspect"],
       "state_scope": "catalog_only"
     },
     {

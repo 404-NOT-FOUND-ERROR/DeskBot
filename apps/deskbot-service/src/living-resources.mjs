@@ -4,6 +4,11 @@ import { PROJECT_ACTIVITIES, projectActivityReason, projectActivityBinding, proj
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
 export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
 export const SPRING_UNITS_PER_HOUR = .75;
+export const COMMUNITY_SUPPLY_VERSION = 'morrowmere-community-supply-v1';
+export const LIGHT_FRUIT_UNITS_PER_HOUR = .5;
+export const LIGHT_FRUIT_CAPACITY = 12;
+export const SPRING_LEVEL_EQUILIBRIUM = .46;
+export const SPRING_LEVEL_RECOVERY_PER_HOUR = .08;
 const MINUTE = 60_000;
 const clamp = (x, low = 0, high = 1) => Math.min(high, Math.max(low, x));
 const copy = value => structuredClone(value);
@@ -11,7 +16,7 @@ export class LivingResourceError extends Error {
   constructor(code, message, statusCode = 409) { super(message); this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, status) => { throw new LivingResourceError(code, message, status); };
-export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '苔芽餐', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤' });
+export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', light_fruit: '林间光果', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '日常饭食', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤' });
 const INITIAL = {
   'floating-frame': { kind: 'waterside', water_level: .46, condition: .67, stock: { raw_water: 12 }, capacity: 24 },
   'garden-bed': { kind: 'plant_bed', moisture: .58, health: .88, growth: .25, quantity: 10 },
@@ -37,6 +42,8 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'repair-stove', title: '修缮试菜灶', kind: 'craft', target: 'trial-stove', seconds: 900, inputs: [{ container: 'bag', resource: 'fasteners', count: 2 }] },
   { activity_id: 'stitch-canopy', title: '缝补交换摊雨棚', kind: 'craft', target: 'market-canopy', seconds: 1080, inputs: [{ container: 'bag', resource: 'cloth', count: 2 }, { container: 'bag', resource: 'fasteners', count: 1 }] },
   { activity_id: 'cook-moss', title: '试做苔芽餐', kind: 'craft', target: 'trial-stove', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }, { container: 'trial-stove', resource: 'water', count: 1 }], output: { container: 'bag', resource: 'rations', count: 2 } },
+  { activity_id: 'gather-light-fruit', title: '在林缘采集两份光果', kind: 'care', target: 'light-fruit-bough', seconds: 600, inputs: [{ container: 'light-fruit-bough', resource: 'light_fruit', count: 2 }], output: { container: 'bag', resource: 'light_fruit', count: 2 } },
+  { activity_id: 'cook-grove-stew', title: '煮一锅林间光果餐', kind: 'craft', target: 'trial-stove', seconds: 1200, inputs: [{ container: 'bag', resource: 'light_fruit', count: 2 }, { container: 'trial-stove', resource: 'water', count: 1 }], output: { container: 'bag', resource: 'rations', count: 3 } },
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
   { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
   { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
@@ -90,6 +97,22 @@ export function installResourceRenewal(world, at) {
   note(world, at, '泉眼开始缓慢补充原水；居民可以汲水净滤，也可以从收获的苔芽中留种。', { kind: 'resource_renewal_installation', migration_id: RESOURCE_RENEWAL_VERSION });
   return true;
 }
+// Add a renewable, finite ecological source without granting meals or importing
+// growth from time before this rule existed. Existing crops and reservations stay.
+export function installCommunitySupply(world, at) {
+  const living = world.living;
+  if (!living || living.community_supply?.id === COMMUNITY_SUPPLY_VERSION || !world.map_catalog?.objects?.some(o => o.object_id === 'light-fruit-bough')) return false;
+  living.objects['light-fruit-bough'] ??= { object_id: 'light-fruit-bough', kind: 'ecological_source', stock: { light_fruit: 0 }, capacity: LIGHT_FRUIT_CAPACITY, updated_at: at };
+  if (living.objects['seedling-rack']?.stock) living.objects['seedling-rack'].stock.light_fruit ??= 0;
+  living.community_supply = { id: COMMUNITY_SUPPLY_VERSION, installed_at: at, source_kind: 'authored_world_physics',
+    fruit_source_object_id: 'light-fruit-bough', fruit_resource: 'light_fruit', fruit_units_per_hour: LIGHT_FRUIT_UNITS_PER_HOUR,
+    fruit_capacity: LIGHT_FRUIT_CAPACITY, spring_equilibrium_level: SPRING_LEVEL_EQUILIBRIUM, spring_recovery_per_hour: SPRING_LEVEL_RECOVERY_PER_HOUR,
+    description: '林缘光果每小时凝聚 0.5 份，最多留存 12 份；采集、搬运和煮饭仍需实际完成。泉眼回流缓慢稳定水位。这些是聚形域规则，不是上海观测。',
+    preserved_existing_stocks_and_tasks: true, starting_fruit_stock: 'empty' };
+  living.revision += 1;
+  note(world, at, '林缘开始记录光果的凝聚与采集；泉眼回流开始缓慢稳定水位，现有食材和饭份保持原数。', { kind: 'community_supply_installation', migration_id: COMMUNITY_SUPPLY_VERSION });
+  return true;
+}
 function localMinute(world, milliseconds) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en', { timeZone: world.clock?.time_zone ?? 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(milliseconds).map(p => [p.type, p.value]));
   return Number(parts.hour) * 60 + Number(parts.minute);
@@ -124,7 +147,10 @@ function step(world, start, end, daylight) {
   const evaporation = fresh ? .009 + (1 - weather.humidity) * .016 + Math.max(0, weather.temperature_c - 20) * .0008 : .014;
   const water = l.objects['floating-frame'];
   if (water) {
-    water.water_level = clamp(water.water_level + hours * (rain - evaporation * .4 - Math.max(0, water.water_level - .65) * .16));
+    const supplyInstalled = Date.parse(l.community_supply?.installed_at ?? '');
+    const inflowHours = Number.isFinite(supplyInstalled) ? Math.max(0, end - Math.max(start, supplyInstalled)) / 3_600_000 : 0;
+    const springInflow = inflowHours * SPRING_LEVEL_RECOVERY_PER_HOUR * (SPRING_LEVEL_EQUILIBRIUM - water.water_level);
+    water.water_level = clamp(water.water_level + hours * (rain - evaporation * .4 - Math.max(0, water.water_level - .65) * .16) + springInflow);
     if (water.stock && Object.hasOwn(water.stock, 'raw_water')) {
       // A fictional spring is an authored source, never a weather measurement.
       // A migration must not produce supplies for time before it was installed.
@@ -133,6 +159,13 @@ function step(world, start, end, daylight) {
       const availableCapacity = Math.max(0, water.capacity - heldCount(world, 'floating-frame', 'raw_water'));
       water.stock.raw_water = clamp(water.stock.raw_water + springHours * SPRING_UNITS_PER_HOUR, 0, availableCapacity);
     }
+  }
+  const fruit = l.objects['light-fruit-bough'];
+  if (fruit?.stock && l.community_supply?.id === COMMUNITY_SUPPLY_VERSION) {
+    const installed = Date.parse(l.community_supply.installed_at);
+    const growingHours = Math.max(0, end - Math.max(start, installed)) / 3_600_000;
+    const availableCapacity = Math.max(0, fruit.capacity - heldCount(world, 'light-fruit-bough', 'light_fruit'));
+    fruit.stock.light_fruit = clamp((fruit.stock.light_fruit ?? 0) + growingHours * LIGHT_FRUIT_UNITS_PER_HOUR, 0, availableCapacity);
   }
   const bed = l.objects['garden-bed'];
   if (bed) {
@@ -208,7 +241,7 @@ function eligibility(world, recipe, actorId, { completion = false, taskId = null
     if (state.water_level > .88) return '水位过高，暂时无法安全汲水。';
     if (state.condition < .4) return '浮框已经损坏，需要先修缮再汲水。';
   }
-  if (['craft-tray', 'craft-frame-kit', 'cook-moss'].includes(recipe.activity_id) && state.condition < .4) return '设施已经损坏，需要先修缮。';
+  if (['craft-tray', 'craft-frame-kit', 'cook-moss', 'cook-grove-stew'].includes(recipe.activity_id) && state.condition < .4) return '设施已经损坏，需要先修缮。';
   if (['repair-frame', 'repair-bench', 'repair-rack', 'repair-stove', 'stitch-canopy'].includes(recipe.activity_id) && state.condition > .9) return '设施状况良好，暂时无需修缮。';
   if (!completion) for (const input of recipe.inputs) if (countIn(world, input.container, actorId, input.resource) < input.count) return `缺少${RESOURCES[input.resource]}，需要 ${input.count} 份${input.container === 'bag' ? '随身携带' : ''}。`;
   if (recipe.output) {
@@ -270,7 +303,7 @@ export function completeLivingActivity(world, task, at) {
     changes.push({ ...recipe.output, container: recipe.output.container === 'bag' ? `bag:${task.actor_id}` : recipe.output.container });
   }
   target.updated_at = at; task.reservation.status = 'consumed'; world.living.revision += 1;
-  const text = recipe.activity_id === 'harvest-bed' ? `收获了 ${changes[0].count} 份鲜苔芽，苗床等待下一次播种。` : recipe.activity_id === 'share-meal' ? '在长桌吃完一份苔芽餐。' : `${recipe.title}完成了。`;
+  const text = recipe.activity_id === 'harvest-bed' ? `收获了 ${changes[0].count} 份鲜苔芽，苗床等待下一次播种。` : recipe.activity_id === 'share-meal' ? '在长桌吃完一份饭。' : `${recipe.title}完成了。`;
   note(world, at, text, { kind: 'activity_completed', task_id: task.task_id, actor_id: task.actor_id });
   return { success: true, text, before, after: copy(target), stock_changes: changes, ...(projectResult ? { project_result: projectResult } : {}) };
 }
@@ -285,6 +318,7 @@ export function transferLivingResource(world, payload, at) {
   const actorId = payload.actor_id ?? world.protagonist.character_id;
   const actor = person(world, actorId), object = definition(world, payload.object_id), storage = world.living?.objects[payload.object_id];
   if (!object || !storage?.stock || !canUse(world, object, actorId)) fail('resource_store_unknown', '这里没有可以使用的公共库存。', 404);
+  if (storage.kind === 'ecological_source') fail('resource_source_requires_gathering', '光果仍长在林缘枝上，需要实际完成采集活动后才能携带。');
   if (actor.location_id !== object.location_id || (world.tasks ?? []).some(t => t.actor_id === actorId && ['running', 'paused'].includes(t.status))) fail('resource_actor_unavailable', '先到达这个地点并完成当前活动。');
   if (!Object.hasOwn(storage.stock, payload.resource) || !Object.hasOwn(RESOURCES, payload.resource)) fail('resource_unknown', '这里不存放这种物品。', 400);
   if (!Number.isSafeInteger(payload.count) || payload.count < 1 || payload.count > 24 || !['take', 'store'].includes(payload.operation)) fail('invalid_resource_transfer', '每次取放 1 到 24 份物品。', 400);
@@ -305,6 +339,7 @@ export function livingObjectReadModel(world, object) {
 }
 function objectStatus(state) {
   const percent = x => Math.round(x * 100);
+  if (state.kind === 'ecological_source') return `已凝聚光果 ${Math.round((state.stock.light_fruit ?? 0) * 10) / 10}/${state.capacity} 份 · 每小时凝聚 ${LIGHT_FRUIT_UNITS_PER_HOUR} 份`;
   if (state.kind === 'plant_bed') return state.quantity ? `土壤湿润 ${percent(state.moisture)}% · 苗况 ${percent(state.health)}% · 生长 ${percent(state.growth)}%${state.growth >= .85 ? ' · 可收获' : ''}` : state.dead_quantity ? '留下了枯苗，重新播种时需要清理' : '苗床空着，等待播种';
   if (state.kind === 'waterside') return `水位 ${percent(state.water_level)}% · 浮框完好 ${percent(state.condition)}%${state.stock && Object.hasOwn(state.stock, 'raw_water') ? ` · 原水 ${Math.round(state.stock.raw_water * 10) / 10}/${state.capacity} 份` : ''}`;
   return typeof state.condition === 'number' ? `完好 ${percent(state.condition)}%` : '有限库存';
@@ -314,6 +349,7 @@ export function livingReadModel(world, actorId = world.protagonist.character_id)
   return { schema: world.living.schema, rule_version: LIVING_RULE_VERSION, simulated_until: world.living.simulated_until,
     revision: world.living.revision, recovery: copy(world.living.recovery), resource_names: RESOURCES,
     resource_renewal: copy(world.living.resource_renewal ?? null),
+    community_supply: copy(world.living.community_supply ?? null),
     inventory: copy(world.living.inventories[actorId] ?? { stock: {}, capacity: 24 }), recent_changes: copy(world.living.recent_changes.slice(-8)),
     activities: ACTIVITIES.filter(recipe => projectActivityVisible(world, recipe, actorId)).map(recipe => {
       const reason = eligibility(world, recipe, actorId);

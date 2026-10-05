@@ -2,14 +2,14 @@ import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-me
 import { syncDevelopmentEvidence } from './development-evidence.mjs';
 import { installBodyPerception, applyBodyObservation, markBodyCommands, markBodyCommandDispatched, applyBodyCommandAck, applyBodyCommandLocalFailure, settleBodyPerception } from './body-perception.mjs';
 import { applyLifeChoice } from './autonomous-life.mjs';
-import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
+import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, upgradeCommunitySupplyMap, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
 import { getWorldEnvironment } from './world-environment.mjs';
 import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
 import { installResidentLife } from './resident-life.mjs';
 import { installResidentProjects, projectReadModel } from './resident-projects.mjs';
 import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
-import { LivingResourceError, installLivingResources, installResourceRenewal, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
+import { LivingResourceError, installLivingResources, installResourceRenewal, installCommunitySupply, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
 import { createHash } from 'node:crypto';
 import { RealTimeWorldError, activeWorldTask, applyRealTimeClock, localWorldDate, startTravelTask, startActivityTask, controlWorldTask, advanceWorldTask } from './realtime-world.mjs';
 
@@ -583,6 +583,7 @@ function migrateWorldToCurrentSetting(world, now) {
   }
 
   if (upgradeAuthoredScene(next, timestamp)) changed = true;
+  if (upgradeCommunitySupplyMap(next, timestamp)) changed = true;
   if (installLivingResources(next, timestamp)) {
     changed = true; next.world_revision += 1;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-living-resources-v1',applied_at:timestamp,scope:'additive_resources',preserved_existing_tasks:true}];
@@ -594,6 +595,11 @@ function migrateWorldToCurrentSetting(world, now) {
   if (installResidentProjects(next, timestamp)) {
     changed = true; next.world_revision += 1;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-resident-projects-v1',applied_at:timestamp,scope:'additive_resident_projects',preserved_existing_tasks:true,preserved_existing_stocks:true,past_events_created:0}];
+  }
+  if (installCommunitySupply(next, timestamp)) {
+    changed=true;next.world_revision++;
+    next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-community-supply-v1',applied_at:timestamp,
+      scope:'additive_finite_forage_source',preserved_existing_tasks:true,preserved_existing_stocks:true,past_events_created:0}];
   }
 
   const initialField = createInitialShapingField(
@@ -1407,6 +1413,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     const initial = createDefaultWorld(now);
     installWorldMapContent(initial, loadWorldMapContent(), initial.created_at);
     installLivingResources(initial, initial.created_at);
+    installCommunitySupply(initial, initial.created_at);
     worlds.set(initial.world_id, initial);
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }

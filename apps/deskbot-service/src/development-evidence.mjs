@@ -69,7 +69,10 @@ function fromTask(w, task, at, registered) {
     { kind: 'canonical_task', task_id: task.task_id, commitment_id: string(task.social_commitment_id), task_kind: string(task.kind) });
   r.activity_id = string(task.activity_id);
   r.title = titleFor(r.activity_id, task.kind, task.life_action);
-  r.topic = goalTopic(task.life_goal ?? '') ?? goalTopic(task.activity_id ?? '');
+  // The new finite gathering outcome joins the existing common ledger. Its
+  // enacted recipe supplies the topic; a food-preparation plan is not cooking
+  // competence and does not change the legacy interest scoring in this stage.
+  r.topic = task.activity_id === 'gather-light-fruit' ? 'care' : goalTopic(task.life_goal ?? '') ?? goalTopic(task.activity_id ?? '');
   r.location_id = string(task.to_location_id ?? task.location_id ?? task.destination_location_id);
   r.project_ids = strings([task.project_id]);
   r.causes = taskCauses(w, task);
@@ -119,7 +122,7 @@ function fromEpisode(episode, at, registered) {
     { kind: 'legacy_memory_fact', task_id: string(s.task_id), commitment_id: string(s.commitment_id), task_kind: null, original_kind: s.kind });
   r.activity_id = string(s.activity_id);
   r.title = s.kind === 'canonical_commitment' ? '实际约定结果' : titleFor(r.activity_id);
-  r.topic = string(episode.topic) ?? goalTopic(r.activity_id ?? s.project_id ?? '');
+  r.topic = r.activity_id === 'gather-light-fruit' ? 'care' : string(episode.topic) ?? goalTopic(r.activity_id ?? s.project_id ?? '');
   r.location_id = string(episode.location_id);
   r.project_ids = strings([s.project_id]);
   r.causes.plan_id = string(s.plan_id);

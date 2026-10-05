@@ -19,6 +19,16 @@ function locations(rawWater = 12, seeds = 2, capacity = 24): DeskBotLocation[] {
 }
 const task = (overrides: Partial<SceneLifeActivity> = {}): SceneLifeActivity => ({ actorId: 'shaping-001', citizenId: 101, locationId: 'echo-waterside', taskId: 'task-supply', title: '汲水净滤', kind: 'care', activityId: 'collect-water', targetObjectId: 'floating-frame', status: 'running', dueAt: '2026-10-05T12:10:00Z', remainingMs: 600000, ...overrides });
 const context = (activities: SceneLifeActivity[]) => ({ minute: 720, daylight: 1, activities });
+function foodLocations(fruit = 4.5, meals = 5): DeskBotLocation[] {
+  const places = locations(), grove = places.find(place => place.location_id === 'backlit-grove')!;
+  grove.areas ??= []; grove.areas.push({ area_id: 'grove-edge', location_id: grove.location_id, name: '光果林缘', description: '', access: 'public', neighbor_area_ids: [],
+    objects: [{ object_id: 'light-fruit-bough', area_id: 'grove-edge', name: '光果枝', description: '', object_kind: 'source', state_scope: 'persistent_living',
+      state: { object_id: 'light-fruit-bough', kind: 'ecological_source', updated_at: '2026-10-05T12:00:00Z', stock: { light_fruit: fruit }, capacity: 12 } }] });
+  for (const place of places) for (const area of place.areas ?? []) for (const object of area.objects ?? []) {
+    if (object.object_id === 'shared-table' && object.state) object.state.stock = { rations: meals };
+  }
+  return places;
+}
 
 describe('resource supply scene follows canonical inventory and tasks', () => {
   it('encodes available raw water using actual source capacity, not water level or future output', () => {
@@ -70,6 +80,36 @@ describe('resource supply scene follows canonical inventory and tasks', () => {
     expect(sceneWorkTarget(frame, 'repair-frame')).toBeNull();
     const rack = scene.objects.get('seedling-rack')!;
     expect(sceneWorkTarget(rack, 'save-seeds')).not.toBeNull();
+    disposeObject(scene.root);
+  });
+  it('shows finite branch fruit and the exact admitted gathering task without awarding its future output', () => {
+    const scene = buildCompanionScenery(foodLocations());
+    const fruit = scene.root.getObjectByName('light-fruit-on-bough') as THREE.InstancedMesh;
+    const gathering = scene.root.getObjectByName('gather-light-fruit-work')!;
+    const active = task({ locationId: 'backlit-grove', activityId: 'gather-light-fruit', targetObjectId: 'light-fruit-bough' });
+    scene.update(3, 0, 0, 0, true, context([active]));
+    expect(fruit.userData).toMatchObject({ quantity: 4.5, capacity: 12 }); expect(gathering.visible).toBe(true);
+    const matrix = new THREE.Matrix4(); fruit.getMatrixAt(5, matrix); expect(matrix.elements[0]).toBe(0);
+    for (const wrong of [{ status: 'paused' as const }, { targetObjectId: 'garden-bed' }, { locationId: 'moss-sprout-garden' }, { kind: 'travel' }]) {
+      scene.update(4, 0, 0, 0, true, context([{ ...active, ...wrong }])); expect(gathering.visible).toBe(false);
+    }
+    // The held fruit has already left the free stock. Work animation does not put it back on the branch.
+    scene.applyState(foodLocations(0)); scene.update(5, 0, 0, 0, true, context([active]));
+    expect(fruit.visible).toBe(false); expect(fruit.userData.quantity).toBe(0); expect(gathering.visible).toBe(true);
+    const bough = scene.objects.get('light-fruit-bough')!;
+    expect(sceneWorkAnchor(bough, new THREE.Vector3(), 'gather-light-fruit')).toEqual(bough.parent!.localToWorld(new THREE.Vector3(-4.75, 0, 5.3)));
+    disposeObject(scene.root);
+  });
+  it('shows exactly the table-ready bowls and new cooking steam, with no bowl for held or future meals', () => {
+    const scene = buildCompanionScenery(foodLocations(0, 5));
+    const first = scene.root.getObjectByName('stock:shared-table:rations:0')!, second = scene.root.getObjectByName('stock:shared-table:rations:1')!;
+    expect(first.children.filter(item => item.visible)).toHaveLength(4); expect(second.children.filter(item => item.visible)).toHaveLength(1);
+    const cooking = task({ locationId: 'warm-pot-courtyard', kind: 'craft', activityId: 'cook-grove-stew', targetObjectId: 'trial-stove' });
+    const steam = scene.root.getObjectByName('cook-task-steam')!;
+    scene.applyState(foodLocations(0, 0)); scene.update(2, 0, 0, 0, true, context([cooking]));
+    expect(first.visible).toBe(false); expect(second.visible).toBe(false); expect(steam.visible).toBe(true);
+    scene.update(3, 0, 0, 0, true, context([{ ...cooking, status: 'paused' }])); expect(steam.visible).toBe(false);
+    expect(hasSceneTaskEffect('steam', [{ ...cooking, targetObjectId: 'shared-table' }])).toBe(false);
     disposeObject(scene.root);
   });
 });

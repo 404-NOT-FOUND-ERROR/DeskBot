@@ -30,12 +30,14 @@ function interruptible(w,id,commitmentId=null) {
   const explicitJoin=id===w.protagonist.character_id&&w.social.commitments.some(c=>c.id===commitmentId&&c.responses[id]==='join');
   return !task && (!state?.paused||explicitJoin) && !['planned','executing'].includes(state?.plan?.status) && !reserved;
 }
-function refusal(w,id) {
+function refusal(w,id,definition=null) {
   const s=w.autonomy?.actors[id];
   if(!person(w,id))return '还没有住进镇里';
   if(s?.paused)return '想先留一点自己的时间';
   if(s?.energy<.3)return '现在很累，想先休息';
-  if(s?.appetite>.85)return '得先吃点东西';
+  // Food help is precisely for a hungry resident; appetite alone cannot refuse
+  // an actual portion offered by a neighbour. Other engagements retain needs.
+  if(s?.appetite>.85 && !['food-help','meal'].includes(definition?.kind))return '得先吃点东西';
   return null;
 }
 function close(w,c,at,status,text) {
@@ -113,7 +115,7 @@ function progress(w,c,at,eventId,reserved) {
   if(c.status==='proposed') {
     for(const id of c.actors.filter(id=>c.responses[id]==='pending')) {
       if(id===w.protagonist.character_id&&Date.parse(at)<Date.parse(c.respond_after))continue;
-      const reason=refusal(w,id);
+      const reason=refusal(w,id,c);
       if(reason){c.responses[id]='decline';close(w,c,at,'declined',`${person(w,id).display_name}${reason}，这次不参加。`);return;}
       if(interruptible(w,id,c.id)&&!reserved.includes(id)){c.responses[id]='join';record(w,c,at,'responded',`${person(w,id).display_name}愿意参加。`);}
     }
@@ -138,6 +140,23 @@ function progress(w,c,at,eventId,reserved) {
     return;
   }
   if(c.kind==='exchange') {exchangeResidentResources(w,c,at,c.offers);close(w,c,at,'completed','交换完成，实际物品与关系记录已保存。');return;}
+  if(c.kind==='food-help') {
+    const [donor,recipient]=c.actors;
+    if(c.actors.some(id=>person(w,id).location_id!==c.location_id))fail('meeting_left','有人离开了送饭地点。');
+    if(c.served_at) {
+      if(!drainTask(w,c,recipient,at))return;
+      close(w,c,at,'completed','邻居送来的一份饭实际吃完了；材料、需要和这次帮助留下同一次记录。');
+      return;
+    }
+    if(c.actors.some(id=>activeWorldTask(w,id)||reserved.includes(id)) || w.tasks.some(t=>['running','paused'].includes(t.status)&&t.target_object_id==='shared-table'))return;
+    // The transaction performs handoff, local storage and admission together.
+    // A spoken promise cannot satisfy appetite or reserve someone else's food.
+    exchangeResidentResources(w,c,at,[{from:donor,to:recipient,resource:'rations',count:1}]);
+    transferLivingResource(w,{actor_id:recipient,object_id:'shared-table',resource:'rations',count:1,operation:'store'},at);
+    startTask(w,c,recipient,at,`${eventId}:${c.id}:eat`,{activity_id:'share-meal'});
+    c.served_at=at;
+    return;
+  }
   if(c.kind==='cooperate') {
     const [worker,recipient]=c.actors;
     if(!c.worker_steps)c.worker_steps=activitySteps(w,worker,c.produce_activity);
@@ -189,6 +208,13 @@ function publishFact(w,c,at) {
 function offers(w,at) {
   const own=w.protagonist.character_id,grower='wetland-grower-001',mender='spare-mender-001',cook='pot-cook-001';
   const definitions=[];
+  const hungry=Object.values(w.autonomy?.actors??{}).filter(s=>s.appetite>.85)
+    .sort((a,b)=>b.appetite-a.appetite||a.actor_id.localeCompare(b.actor_id));
+  const donors=Object.values(w.autonomy?.actors??{}).filter(s=>s.appetite<.6&&quantity(w,s.actor_id,'rations')>=1);
+  for(const recipient of hungry)for(const donor of donors)if(recipient.actor_id!==donor.actor_id)
+    definitions.push({kind:'food-help',key:`food-help:${pair([donor.actor_id,recipient.actor_id])}`,actors:[donor.actor_id,recipient.actor_id],
+      location_id:'warm-pot-courtyard',title:`给${person(w,recipient.actor_id).display_name}送一份饭`,
+      reason:'手里确实有一份余餐，想在长桌交给还没吃饭的邻居；吃完之后才算帮上忙。'});
   if(w.living.objects['floating-frame'].condition<.72)definitions.push({kind:'cooperate',key:'cooperate:frame',actors:[mender,grower],location_id:'echo-waterside',title:'一起补好水岸浮框',reason:'苔团照看浮圃，扣扣备好修补包再带过来。',produce_activity:'craft-frame-kit',resource:'frame_kit',use_activity:'repair-frame'});
   if(w.living.objects['seedling-rack'].stock.trays<2)definitions.push({kind:'cooperate',key:'cooperate:tray',actors:[mender,grower],location_id:'moss-sprout-garden',title:'给苗圃添一只托盘',reason:'扣扣负责制作，苔团在苗圃接过来并存放。',produce_activity:'craft-tray',resource:'trays'});
   if(w.living.objects['shared-table'].stock.rations>=2)definitions.push({kind:'meal',actors:[cook,own],location_id:'warm-pot-courtyard',title:'约喵呜一起吃饭',reason:'锅粒看见长桌还有饭，想留一顿不赶时间的晚饭。'});
@@ -217,7 +243,7 @@ export function advanceSocialLife(w,at,{eventId,reservedActors=[]}={}) {
   if(minute>=420&&minute<1320&&Date.parse(at)>=Date.parse(w.social.next_offer_at)&&w.social.commitments.filter(c=>LIVE.includes(c.status)).length<5) {
     let count=0;
     for(const d of offers(w,at)) {
-      if(!d.location_id||d.actors.some(id=>refusal(w,id)||!interruptible(w,id)||reservedActors.includes(id))||d.actors.some(id=>!findWorldPath(w,person(w,id).location_id,d.location_id)))continue;
+      if(!d.location_id||d.actors.some(id=>refusal(w,id,d)||!interruptible(w,id)||reservedActors.includes(id))||d.actors.some(id=>!findWorldPath(w,person(w,id).location_id,d.location_id)))continue;
       if(d.kind==='cooperate'){try{activitySteps(w,d.actors[0],d.produce_activity);}catch{continue;}}
       if(propose(w,at,d))count++;
       if(count>=2)break;

@@ -27,14 +27,14 @@ function harness(t) {
 
 test('catalog connects ten stable locations, internal areas and inspectable objects without inventing residents',()=>{
   const content=loadWorldMapContent();
-  assert.equal(content.locations.length,10);assert.equal(content.areas.length,20);assert.equal(content.objects.length,20);
+  assert.equal(content.locations.length,10);assert.equal(content.areas.length,20);assert.equal(content.objects.length,21);
   const world=createPersistentWorld().get(), map=getWorldMap(world);
   assert.equal(map.regions.length,5);assert.equal(map.npcs.length,0);
   assert.deepEqual(map.locations.flatMap(place=>place.areas.map(area=>area.area_id)).sort(),map.areas.map(area=>area.area_id).sort());
-  assert.equal(map.locations.flatMap(place=>place.areas.flatMap(area=>area.objects)).length,20);
+  assert.equal(map.locations.flatMap(place=>place.areas.flatMap(area=>area.objects)).length,21);
   for(const place of map.locations){assert.ok(getWorldRoute(world,{destinationLocationId:place.location_id}).found);assert.deepEqual(place.presentation,content.locations.find(item=>item.location_id===place.location_id).presentation);}
   assert.equal(map.content.objects_have_simulated_state,true);
-  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,8);
+  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,9);
   assert.equal(content.objects.every(object=>object.state_scope==='catalog_only'),true,'the authored directory cannot forge live state');
 });
 
@@ -109,6 +109,28 @@ function expanded(content){
   candidate.passages.push({passage_id:'quiet-step--shaping-field-desk',from_location_id:'quiet-step',to_location_id:HOME,name:'静阶小路',default_status:'open',presentation_space:'jev-town-map-v1',presentation_points:[location.presentation.point,candidate.locations[0].presentation.point]});
   return candidate;
 }
+test('community source migration preserves expanded geography and old stocks, tasks and cursors, with zero initial fruit',t=>{
+  const h=harness(t),candidate=expanded(loadWorldMapContent());
+  h.mutate('expanded-before-supply',{action:'admit_map_content',content:candidate,expected_world_revision:h.world.get().world_revision});
+  h.mutate('old-running-task',{action:'start_activity',task_id:'old-observe',kind:'care',title:'保留原来的观察',duration_seconds:1800});
+  const legacy=h.world.get();
+  legacy.map_catalog.objects=legacy.map_catalog.objects.filter(o=>o.object_id!=='light-fruit-bough');
+  delete legacy.living.objects['light-fruit-bough'];delete legacy.living.community_supply;
+  delete legacy.living.objects['seedling-rack'].stock.light_fruit;
+  h.persistence.put('canonical-world.states',legacy.world_id,legacy);h.restart();
+  const migrated=h.world.get();
+  assert.equal(migrated.map_catalog.version,'extension-test-v2');assert.equal(migrated.locations.length,11);
+  assert.ok(migrated.map_catalog.objects.some(o=>o.object_id==='quiet-bench'));
+  assert.ok(migrated.map_catalog.objects.some(o=>o.object_id==='light-fruit-bough'));
+  assert.equal(migrated.living.objects['light-fruit-bough'].stock.light_fruit,0);
+  assert.equal(migrated.living.objects['seedling-rack'].stock.light_fruit,0);
+  assert.deepEqual(migrated.tasks,legacy.tasks);assert.equal(migrated.living.simulated_until,legacy.living.simulated_until);
+  for(const [id,state]of Object.entries(legacy.living.objects)) {
+    const actual=structuredClone(migrated.living.objects[id]);if(id==='seedling-rack')delete actual.stock.light_fruit;
+    assert.deepEqual(actual,state);
+  }
+  h.restart();assert.deepEqual(h.world.get(),migrated);
+});
 test('validated expansion commits atomically, preserves ownership and survives reload without reverting to ten places',t=>{
   const h=harness(t),candidate=expanded(loadWorldMapContent()),before=h.world.get();
   assert.throws(()=>h.mutate('stale-expand',{action:'admit_map_content',content:candidate,expected_world_revision:before.world_revision-1}),{code:'map_revision_conflict'});

@@ -214,6 +214,31 @@
 .life-choice-origin p { font-size: 11px; margin-top: 8px; padding-left: 16px; }
 .life-choice-origin--model { color: #688a82; }
 .life-supply-note { font-size: 11px; line-height: 1.7; color: #74827a; margin: 10px 0 0; }
+.life-community .life-row { align-items: flex-start; }
+.life-community .life-row h2 { font-size: 16px; margin: 5px 0 0; }
+.life-community .life-row > .life-chip { margin-top: 6px; flex: none; }
+.life-community__portions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 14px; }
+.life-community__portions > :is(button,div) { display: grid; gap: 5px; align-content: center; text-align: left; padding: 12px 9px; border: 1px solid #e0e7d9; border-radius: 11px; background: #f4f7ee; color: #6f8270; }
+.life-community__portions strong { font-size: 23px; line-height: 1; font-weight: 550; color: #4f7766; font-variant-numeric: tabular-nums; }
+.life-community__portions span { font-size: 10px; }
+.life-community--waiting .life-community__portions > :last-child { border-color: #e5dcc5; background: #f9f4e8; }
+.life-community--waiting .life-community__portions > :last-child strong { color: #a18a5d; }
+.life-sidebar .life-community__state { font-size: 11px; margin: 11px 0; line-height: 1.8; }
+.life-community__details { font-size: 11px; color: #76866f; }
+.life-community__details > summary { cursor: pointer; }
+.life-community__ingredients { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 11px 0; }
+.life-community__ingredients > button { display: block; padding: 9px; text-align: left; font-size: 10px; color: #75826c; background: #fbfaf3; border: 1px solid #e8e8dc; border-radius: 8px; line-height: 1.8; }
+.life-community__ingredients > button:last-child:nth-child(3) { grid-column: 1 / -1; }
+.life-community__ingredients strong { color: #63816a; font-variant-numeric: tabular-nums; }
+.life-community__ingredients small { display: block; font-size: 10px; color: #97a085; }
+.life-community__work { display: grid; gap: 9px; padding: 0; margin: 14px 0 9px; list-style: none; }
+.life-community__work li { display: grid; grid-template-columns: 5px minmax(0,1fr) auto; align-items: start; gap: 8px; }
+.life-community__work li > span { width: 4px; height: 4px; border-radius: 50%; margin-top: 5px; background: #8cae8e; }
+.life-community__work li > span.is-paused { background: #c1ac7e; }
+.life-community__work strong { font-weight: 500; font-size: 10px; color: #6b826b; }
+.life-sidebar .life-community__work p { font-size: 10px; margin: 3px 0 0; line-height: 1.65; }
+.life-community__work li > button { border: 0; background: transparent; font-size: 10px; padding: 1px 0; color: #80927b; }
+.life-sidebar :is(.life-community__names,.life-community__empty) { font-size: 10px; color: #94a087; line-height: 1.8; margin-bottom: 0; }
 .life-resident-project-glance { grid-column: 1 / -1; font-size: 10px; color: #6f8d7c; line-height: 1.5; overflow-wrap: anywhere; }
 .life-resident-project { margin: 18px 0; padding: 15px; border: 1px solid #dce5d5; border-radius: 13px; background: #f4f7ee; }
 .life-resident-project h3 { margin: 0 0 5px; }

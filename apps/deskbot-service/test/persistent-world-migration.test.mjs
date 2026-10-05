@@ -92,7 +92,7 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
   assert.equal(migrated.locations[0].settlement_id, 'morrowmere');
   assert.equal(migrated.locations[0].location_kind, 'home');
   assert.equal(migrated.shaping_field.measurement_status, 'unmeasured');
-  assert.equal(migrated.world_revision, 11); // One additive resource-rule installation.
+  assert.equal(migrated.world_revision, 12); // Resource rules plus the finite community source.
   assert.equal(migrated.living.migration.id, 'morrowmere-living-resources-v1');
   assert.equal(migrated.living.migration.legacy_task_effects_preserved, true);
   assert.equal(migrated.schema_migrations.find(item => item.id === 'companion-living-map-v1').before_revision, 9);
