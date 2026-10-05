@@ -7,10 +7,18 @@ import type { Citizen } from "@shared/citizens.ts";
 import type { LabelSpec } from "../three/sceneSpec.ts";
 import type { TownScene3DHandle } from "../three/TownScene3D.tsx";
 import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
+import type { DeskBotEnvironment, DeskBotLocation } from "../deskbot/types.ts";
+import type { SceneLifeActivity } from "../deskbot/activityProjection.ts";
+import "./shaping-map.css";
 import { isWebglAvailable } from "../three/webgl.ts";
 import { CitizenSprite } from "./CitizenSprite.tsx";
 
 export interface TownMapProps {
+  sceneLocations?: readonly DeskBotLocation[];
+  environment?: DeskBotEnvironment;
+  activities?: readonly SceneLifeActivity[];
+  focusLocationId?: string | null;
+  focusRequest?: number;
   citizens?: readonly Citizen[];
   labels?: readonly LabelSpec[];
   positions: Map<number, Point>;
@@ -19,6 +27,7 @@ export interface TownMapProps {
   confidences: Map<number, number | null>;
   focusedAction: Action | null;
   onFocusAction: (action: Action | null) => void;
+  onCitizenClick?:(id:number)=>void;
   onPlaceClick?: (locationId: string) => void;
   travelVisual?: DeskBotTravelVisual | null;
   routePreview?: DeskBotRoutePreview | null;
@@ -39,7 +48,7 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, labels, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick, travelVisual, routePreview }: TownMapProps) {
+export function TownMap({ citizens = CITIZENS, labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
@@ -62,14 +71,19 @@ export function TownMap({ citizens = CITIZENS, labels, positions, durations, act
   const anyDecisions = [...actions.values()].some((a) => a !== null);
 
   return (
-    <div className="town-map" role="group" aria-label={`Interactive 3D town map with ${citizens.length} citizens`}>
+    <div className={`town-map${sceneLocations ? " town-map--shaping" : ""}`} role="group" aria-label={sceneLocations ? `聚形域 3D 地图，${citizens.length} 位光粒居民` : `Interactive 3D town map with ${citizens.length} citizens`}>
       {supportsWebgl ? (
         <div className="town-map__scene">
-          <Suspense fallback={<p className="town-map__loading">Building Cloverfield…</p>}>
+          <Suspense fallback={<p className="town-map__loading">正在搭建小镇…</p>}>
             <TownScene3D
               ref={sceneRef}
               citizens={citizens}
               labels={labels}
+              sceneLocations={sceneLocations}
+              environment={environment}
+              activities={activities}
+              focusLocationId={focusLocationId}
+              focusRequest={focusRequest}
               positions={positions}
               durations={durations}
               actions={actions}
@@ -91,6 +105,8 @@ export function TownMap({ citizens = CITIZENS, labels, positions, durations, act
                 <CitizenSprite
                   key={citizen.id}
                   citizen={citizen}
+                  activityLabel={sceneLocations ? activities?.find((activity) => activity.citizenId === citizen.id)?.title ?? "留一点空闲，看看下一件事" : undefined}
+                  onSelect={onCitizenClick}
                   action={action}
                   confidence={confidences.get(citizen.id) ?? null}
                   highlighted={focusedAction !== null && action === focusedAction}
@@ -139,11 +155,11 @@ export function TownMap({ citizens = CITIZENS, labels, positions, durations, act
             <button type="button" aria-label="Rotate right" onClick={() => sceneRef.current?.rotateBy(Math.PI / 2)}>
               ⟳
             </button>
-            <button type="button" className="map-controls__text" aria-label="Fit town" title="Fit town" onClick={() => sceneRef.current?.fitTown()}>
-              Fit town
+            <button type="button" className="map-controls__text" aria-label={sceneLocations ? "查看全镇" : "Fit town"} title={sceneLocations ? "查看全镇" : "Fit town"} onClick={() => sceneRef.current?.fitTown()}>
+              {sceneLocations ? "全镇" : "Fit town"}
             </button>
             <button type="button" className="map-controls__text" aria-label="Reset view" title="Reset view" onClick={() => sceneRef.current?.resetView()}>
-              Reset
+              {sceneLocations ? "复位" : "Reset"}
             </button>
             <button
               type="button"

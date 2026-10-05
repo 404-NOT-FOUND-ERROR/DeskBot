@@ -4,6 +4,8 @@ import type { Citizen } from "@shared/citizens.ts";
 
 export interface CitizenSpriteProps {
   citizen: Citizen;
+  onSelect?:(id:number)=>void;
+  activityLabel?: string;
   action: Action | null;
   confidence: number | null;
   highlighted: boolean;
@@ -19,21 +21,23 @@ export interface CitizenSpriteProps {
  * and hover/focus tooltip. The scene writes its `transform` directly, so
  * camera movement never re-renders React.
  */
-function CitizenSpriteImpl({ citizen, action, confidence, highlighted, registerHotspot }: CitizenSpriteProps) {
+function CitizenSpriteImpl({ citizen, action, confidence, highlighted, registerHotspot,onSelect,activityLabel }: CitizenSpriteProps) {
   const pct = confidence !== null ? Math.round(confidence * 100) : null;
 
   return (
     <button
       type="button"
+      onClick={()=>onSelect?.(citizen.id)}
       ref={(element) => registerHotspot(citizen.id, element)}
       className={`citizen-hotspot${highlighted ? " citizen-hotspot--highlighted" : ""}`}
-      aria-label={`${citizen.name}, ${citizen.role}. ${
+      aria-label={activityLabel ? `${citizen.name}，${citizen.role}。${activityLabel}` : `${citizen.name}, ${citizen.role}. ${
         action ? `Last decision: ${ACTION_LABEL[action]}${pct !== null ? ` at ${pct}% confidence` : ""}.` : "Has not reacted yet."
       }`}
     >
       <span className="citizen-hotspot__tooltip" role="tooltip">
         <strong>{citizen.name}</strong>
         <span className="citizen-hotspot__tooltip-role">{citizen.role}</span>
+        {activityLabel ? <span className="citizen-hotspot__tooltip-life">{activityLabel}</span> : null}
         <span className="citizen-hotspot__tooltip-personality">{citizen.personality}</span>
         {action ? (
           <span className="citizen-hotspot__tooltip-action">

@@ -5,7 +5,7 @@
 ```text
 多源输入
   -> Node 持续世界与角色状态
-  -> DeepSeek 文本生成
+  -> DeepSeek 对话与有限目标选择
   -> 文字 / 表情 / TTS 表达意图
   -> Web 与 ESP-VoCat 客户端
 ```
@@ -14,7 +14,7 @@
 
 - `apps/deskbot-service`：唯一在线状态源、SQLite 持久化、世界逻辑、LLM 编排、天气连接器和设备桥。
 - `apps/deskbot-web`：研究与体验界面，只读取和调用服务端 API，不保存第二份世界状态。
-- `apps/jev-town-client`：基于 CeciliaW888/jev-town 的 3D 世界体验客户端；读取 canonical map 和 life Scene，并通过受验证事件提交 NPC 行动。
+- `apps/jev-town-client`：基于 CeciliaW888/jev-town 的 3D 世界体验客户端；读取世界地图、场景与实际任务，表现聚形域的光粒居民和持续生活，并调用服务端核验的生活互动。
 - `voice-sidecar`：无状态 ASR/TTS 边界；当前基线不代表真实中文模型性能。
 - `research`：研究协议、实验设计与接口说明。
 - `tmp`：源码审阅副本、下载和临时产物，不进入 Git。
@@ -23,8 +23,21 @@
 
 ## 当前执行基线
 
+- **聚形域视觉更新（2026-10-05）**：保留低多边形小镇，新增喵呜与十二位居民的光粒首批造型、任务驱动动作、设施细节、连续昼夜与渐息灯火；生活侧栏整理为清楚的当前活动、居民近况、约定与记忆。见 [图文说明与预览边界](documentation/shaping-field-visual-life.md)，独立美术预览为 `/scene-review.html`。
+- 第一至第六步已完成基本世界合同、现实 1:1 时钟、分层地图、实际设施、天气表现与有限资源。十三名角色共用规则生活循环；邀请、协作、交换、赴约与关系后果使用真实事务记录。见 [第六步验收](research/milestones/companion-world-step6.md) 与 [社会生活规则](research/world/social-life-v1.md)。
+- 第七步已接入现实输入折射：上海天气、对话和有限生活建议影响下一次空闲选择，保留出处、暂缓理由与实际任务引用。本地已启用 DeepSeek Flash 对话、NASA Science 新闻与上海区域空气质量。其他 agent 等待真实来源，设备联调仍属第九步。见 [第七步验收](research/milestones/companion-world-step7.md)、[输入折射规则](research/world/input-refraction-v1.md) 与 [外界来源配置](research/milestones/external-input-configuration.md)。独立专项为 `/life-review.html?sample=inputs`。
+- 第八步已接入三种长期记忆、关系沉淀、可逆兴趣积累与 DeepSeek 空闲目标选择。需要、任务、路线、材料和实际结果仍由世界核验；模型解释是意图，不是已经完成的经历。私人对话记忆留在本地，自动选择只引用有限镇内记录与公开消息。见 [第八步验收](research/milestones/companion-world-step8.md)；独立七日回放为 `/life-review.html?sample=memory`，不能代替正式世界真实经过七天。
+- 首批造型与场景效果由客户端创作。各光域的自动形态生成、声音演化与换壳流程尚未全部接入，后续按 [当前路线图](research/development-roadmap-v0.4.md) 推进。
+
+![十三位光粒居民的首批造型：独立陈列预览，不代表正式聚会](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
+
+![午夜小镇：普通窗灯与店招渐息，公共路灯保留，独立时间预览](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
+
+这两张图来自只读美术预览。实际生活界面、傍晚苗圃、夜间工作的照明例外及全部截图说明见 [聚形域：让持续生活看得见](documentation/shaping-field-visual-life.md)。预览中的时间、天气和编排动作不写入正式世界。
+
 - 工程架构与交接索引：[`documentation/architecture.md`](documentation/architecture.md)
-- 当前路线图：[`research/development-roadmap-v0.3.md`](research/development-roadmap-v0.3.md)
+- 伴生世界居民重设计：[`research/npcs/resident-life-design-v1.md`](research/npcs/resident-life-design-v1.md)
+- 地图内容目录：[`world-content/companion-world/map.v1.json`](world-content/companion-world/map.v1.json)；2D 与 3D 都读取 `GET /api/world/map`，内部区域与物件可展开查看。
 - 角色与世界决策记录：[`research/聚形域-角色与世界决策记录_2026-09-09.md`](research/聚形域-角色与世界决策记录_2026-09-09.md)
 - 喵呜角色验收：[`research/miaowu-expression-acceptance-v0.1.md`](research/miaowu-expression-acceptance-v0.1.md)
 - 喵呜角色表演：[`research/miaowu-roleplay-bible-v0.1.md`](research/miaowu-roleplay-bible-v0.1.md)
@@ -33,7 +46,7 @@
 - P2 奇幻吸引里程碑：[`research/milestones/p2-fantasy-pull-v0.1.md`](research/milestones/p2-fantasy-pull-v0.1.md)
 - 服务与固件接口：[`research/protocol/interaction-contract-v0.1.md`](research/protocol/interaction-contract-v0.1.md)
 
-`research/development-roadmap-v0.1.md` 与 `research/development-roadmap-v0.2.md` 是历史计划，不再作为当前排期依据。角色提示词或状态结构变更只有在自动测试和真实模型人工验收都通过后，才算完成。
+`research/development-roadmap-v0.1.md` 至 `research/development-roadmap-v0.3.md` 是历史计划及实现记录，不再作为当前排期依据。第一至第八步的资料继续保留。角色提示词或状态结构变更只有在自动测试和真实模型人工验收都通过后，才算完成。
 
 ## 首次配置
 
@@ -61,54 +74,28 @@ notepad config\weather.env
 
 ## 本地运行
 
-先启动服务：
-
-```powershell
-Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot'
-.\scripts\start-local.ps1 -StartWeb
-```
-
-要同时启动 Jev Town 世界体验客户端，使用 `-StartWorld`：
+从仓库根目录启动服务、研究页面与 3D 世界客户端：
 
 ```powershell
 .\scripts\start-local.ps1 -StartWeb -StartWorld
 ```
 
-Jev Town 客户端地址是 <http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311>。它使用 `apps/jev-town-client` 的 3D 地图和 NPC 面板，但不保存第二份世界状态；接入来源、授权范围和发布清单见 [`documentation/jev-town-adoption.md`](documentation/jev-town-adoption.md)。
+生活世界：<http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311>。研究界面：<http://127.0.0.1:4322/>。Jev Town 接入来源、授权范围和发布清单见 [接入说明](documentation/jev-town-adoption.md)。
 
-脚本会从本地 `llm_config.json` 启用 DeepSeek，检查 `4311/4322` 端口；使用 `-StartWorld` 时还会检查 `5173`，启动后确认每个进程各自持有监听端口并通过健康检查。需要天气时使用：
-
-```powershell
-.\scripts\start-local.ps1 -StartWeb -WeatherEnvFile (Resolve-Path config\weather.env)
-```
-
-若端口已占用会直接失败，不会把旧进程误认成新版本。也可以分别启动服务和 Web：
-## 本地运行
-
-需要 Node.js 24 或更高版本。先启动服务：
+脚本优先读取本地 `config\llm_config.json`，默认加载已有的 `config\weather.local.env`；新闻和区域空气质量连接器默认开启。上海 Open-Meteo 天气是当前工作站配置，公开 clone 需自行配置城市。配置方法见 [本地配置](config/README.md)。可显式指定天气文件：
 
 ```powershell
-Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot\apps\deskbot-service'
-npm.cmd start
-
+.\scripts\start-local.ps1 -StartWeb -StartWorld -WeatherEnvFile (Resolve-Path config\weather.env)
 ```
 
-再启动 Web 页面：
+启动脚本检查 `4311/4322/5173` 端口与健康状态；已有端口占用会直接失败。`GET /health` 仅证明服务就绪，天气与模型是否接通需查看相应连接器状态。数据库中的旧观测不能代替当前有效天气。若聊天返回 `llm_transport_error`，先检查本机网络、TLS 和代理配置。
 
-```powershell
-Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot\apps\deskbot-web'
-npm.cmd start
-```
+独立预览与规则回放：
 
-浏览器访问 <http://127.0.0.1:4322/>。DeepSeek、QWeather 和语音模型均需由本机环境变量或本地配置显式启用；密钥不得写入源码、网页、日志或 Git。
-
-运行检查：`GET /health` 只证明 Node 服务已就绪；`GET /api/connectors/weather` 以本次进程的配置为准。若聊天返回 `502` 且 `error=llm_transport_error`，表示请求没有拿到 DeepSeek HTTP 响应，通常是当前 PowerShell 的网络/TLS/代理策略；这不是角色提示词或世界状态错误。若天气显示 `provider=open-meteo`、`status=disabled`，表示本次进程没有加载 QWeather 环境文件，不代表旧 SQLite 快照仍可当作实时数据。带 QWeather 配置启动：
-
-```powershell
-.\scripts\start-local.ps1 -StartWeb -WeatherEnvFile 'C:\path\to\weather.env'
-```
-
-`weather.env` 只能包含 `DESKBOT_WEATHER_*` 变量；脚本和状态接口都不会打印 token。
+- `/scene-review.html`：昼夜、风雨、居民近景和动作编排；只读，不写入正式世界。
+- `/life-review.html`：三日生活与协作、延期专项。
+- `/life-review.html?sample=inputs`：现实输入折射专项。
+- `/life-review.html?sample=memory`：七日记忆与兴趣积累专项，使用标注的测试模型。
 
 停止本次本地服务：
 

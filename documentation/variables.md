@@ -2,8 +2,12 @@
 
 所有变量按“谁读取、是否敏感、默认值和部署边界”记录。密钥不得进入浏览器、SQLite、事件 payload、日志、Git 或屏幕。
 
+生产入口默认 `DESKBOT_TIME_MODE=realtime`、`DESKBOT_TIME_ZONE=Asia/Shanghai`。研究回放必须显式设置 `DESKBOT_TIME_MODE=simulation`，同时通过 `DESKBOT_DB_PATH` 选择独立数据库。已有 `real_time` 存档不会因切换环境变量退回模拟；其时区在迁移时确定，避免改变日历及任务历史。
+
 | 变量 | 使用者 | 作用域 | 敏感性/来源 | 轮换与上线要求 |
 |---|---|---|---|---|
+| `DESKBOT_TIME_MODE` | Node | server | 非敏感；默认 `realtime` | `simulation` 只用于独立研究存档 |
+| `DESKBOT_TIME_ZONE` | Node | server | 非敏感；默认 `Asia/Shanghai` | UTC 持久时间按当地日期与昼夜显示；有效 IANA 时区 |
 | `DESKBOT_LLM_PROVIDER` | Node | server | 非敏感；env | 显式 `deepseek`/`openai-compatible`，默认 fake |
 | `DESKBOT_LLM_CONFIG` | Node | server | 路径敏感；本地 JSON | 文件 ACL 仅用户可读；换 key 后重启 |
 | `DESKBOT_LLM_API_KEY` | Node | server | 高敏感；env | 不打印；provider 轮换后重启 |

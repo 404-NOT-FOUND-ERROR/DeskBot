@@ -1,5 +1,7 @@
 {
   "base_url": "https://api.deepseek.com",
   "api_key": "PASTE_YOUR_DEEPSEEK_KEY_HERE",
-  "model": "deepseek-v4-flash"
+  "model": "deepseek-flash",
+  "thinking": "disabled",
+  "max_tokens": 768
 }

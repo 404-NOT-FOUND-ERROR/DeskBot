@@ -6,6 +6,7 @@ import { after, test } from 'node:test';
 
 import {
   createConfiguredLlm,
+  createReloadableLlm,
   createOpenAiCompatibleLlm,
   LlmConfigurationError,
   LlmProviderError,
@@ -123,4 +124,40 @@ test('real provider requires an explicit complete configuration', () => {
     () => loadLlmConfiguration({ env: { DESKBOT_LLM_PROVIDER: 'deepseek' } }),
     (error) => error instanceof LlmConfigurationError && /base_url/.test(error.message),
   );
+});
+
+test('saved DeepSeek configuration reloads, bounds output, disables thinking and never falls back to test replies', async () => {
+  const configPath = join(testDirectory, 'reloadable.json');
+  const save = api_key => writeFileSync(configPath, JSON.stringify({base_url:'https://api.example',api_key,model:'deepseek-flash',thinking:'disabled',max_tokens:768}));
+  save('');
+  let request;
+  const llm = createReloadableLlm({env:{},configPath,fetchImpl:async (_url, init) => {
+    request = JSON.parse(init.body);
+    return new Response(JSON.stringify({choices:[{message:{content:'喵，我在。'}}]}));
+  }});
+  assert.equal(llm.status().status, 'not_configured');
+  await assert.rejects(() => llm.complete({prompt:'hello'}), e => e.code === 'llm_configuration_required' && e.statusCode === 503);
+  save('local-secret-only');
+  assert.equal(llm.status().status, 'configured');
+  const result = await llm.complete({prompt:'hello'});
+  assert.equal(result.model, 'deepseek-flash');
+  assert.equal(result.provider, 'deepseek-api-v0.1');
+  assert.deepEqual(request.thinking, {type:'disabled'});
+  assert.equal(request.max_tokens, 768);
+  assert.equal(llm.status().status, 'connected');
+  assert.ok(!JSON.stringify(llm.status()).includes('local-secret-only'));
+  save('another-key');
+  assert.equal(llm.status().verified_at, null);
+  writeFileSync(configPath, '{"api_key":"private-broken-secret');
+  await assert.rejects(() => llm.complete({prompt:'hello'}), e => !e.message.includes('private-broken-secret'));
+});
+
+test('provider authentication failure is visible without exposing credentials or upstream text', async () => {
+  const configPath = join(testDirectory, 'invalid-key.json');
+  writeFileSync(configPath, JSON.stringify({base_url:'https://api.example',api_key:'bad-secret',model:'deepseek-flash'}));
+  const llm = createReloadableLlm({env:{},configPath,fetchImpl:async () => new Response('sensitive upstream message', {status:401})});
+  await assert.rejects(() => llm.complete({prompt:'hello'}), e => e.status === 401);
+  assert.equal(llm.status().status, 'error');
+  assert.equal(llm.status().last_error, 'llm_http_error');
+  assert.ok(!JSON.stringify(llm.status()).includes('bad-secret'));
 });

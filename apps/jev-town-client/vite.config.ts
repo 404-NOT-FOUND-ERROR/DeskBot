@@ -26,6 +26,13 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        sceneReview: fileURLToPath(new URL("./scene-review.html", import.meta.url)),
+        lifeReview: fileURLToPath(new URL("./life-review.html", import.meta.url)),
+      },
+    },
     // The lazily loaded 3D scene chunk is mostly Three.js itself (~135 kB gzipped).
     chunkSizeWarningLimit: 800,
   },

@@ -2,6 +2,20 @@
 
 DeskBot 是一个绑定本机回环地址的小型持续世界服务。Node `deskbot-service` 是唯一的 canonical world、事件、短状态、证据、LLM 回合和设备 outbox 状态源；Web 只展示并调用它；Python voice-sidecar 只提供无状态 ASR/TTS 边界；ESP-VoCat 通过版本化协议接入。
 
+## 2026 年 10 月伴生世界开发合同
+
+当前目标和步骤以 [开发路线 v0.4](../research/development-roadmap-v0.4.md) 为准。`world-content/companion-world/rules.v1.json` 与 `residents.v1.json` 分别保存现实同步时间、身体能力、输入作用范围等规则以及十二名重新设计的居民。`companion-world-contract.mjs` 校验身份、时间、权限、人物引用、持续项目和关系网络；`GET /api/world/contract` 返回作者合同及当前实际 NPC ID、地点数和世界 revision。
+
+此接口是只读开发合同。现实时间存档返回 `partially_implemented`、`real_time_tasks: true`；整体规则及新居民尚未全部安装，仍返回 `rules_enforced_by_runtime: false`、`resident_catalog_installed: false`。读取不推进时间、不改变世界。分类辅助函数的服务器来源确认参数不能取自事件自填字段，分类结果也不授予直接状态写权限。第 7 步接入真实折射时仍需领域规则校验。
+
+生产入口已经启用真实时间、持久任务及分层地图。世界候选仍需要显式接受，角色试行仍需要用户处置，NPC 仍有三名限制；自主试行和十二名居民按新路线后续步骤迁移。
+
+第三步的唯一地图内容源为 `world-content/companion-world/map.v1.json`。`world-map-content.mjs` 校验地区、地点、内部区域、对象和双向通路的完整引用、地理连通性、耗时及展示端点。`world.map_catalog` 保存作者目录，`world.passage_states` 保存通路开闭、原因、时间、原因事件和版本。对象当前为 `catalog_only`，区域访问标签是作者定义；尚未实现内部走动、来访许可或资源结果。
+
+`getWorldMap`、`getWorldRoute`、主角旅行任务、NPC 候选与位置变化都使用相同的 `worldHopAccess` / `findWorldPath`。到期核验关闭的当前路段会使任务失败并保留上次确认位置；通过一个仍开放的路段后，剩余路线按当前通路重新规划。`set_passage_access` 与 `admit_map_content` 进入正常世界 mutation 的事务及幂等账本，公开事件接口拒绝直接提交这两种写入。扩建要求当前世界版本、完整候选、已有身份不变与仅追加连接；不是模型文本的自动落地。
+
+旧存档通过一次 `companion-living-map-v1` 迁移追加五个地点，记录前后 revision，不改任务期限、当地时间、已确认位置、住处引用或已有物品状态。2D 地图及 3D 客户端读取同一个派生接口；3D 当前目录的展示锚点由服务端提供，旧五地点锚点表仅用于兼容旧接口。3D 地形底图仍为现有渲染器，内部区域以地点信息展示，后续设施状态再绑定对象。
+
 ## 运行结构
 
 ```text
@@ -89,7 +103,11 @@ Node deskbot-service :4311
 
 地图不是第二套世界状态。`persistent-world` 保存地点、坐标、邻接路线、路程、NPC 位置和喵呜当前位置；`GET /api/world/map` 每次从这份 canonical snapshot 派生一个只读地图模型。Web 只负责绘制与选择，不拥有地点、路线或旅行结果。
 
-`POST /api/world/travel` 会把出发请求转换成标准 `world.mutation / move_protagonist`，再走现有 input、world、evidence 和 ledger 管线。服务端校验：目的地存在、与当前位置相邻、当前世界事件没有阻断旅行、事件 ID 幂等。成功后一次性写入当前位置、抵达状态和旅行耗时；失败不改地点和逻辑时间。LLM 回复仍是只读输出，文本里声称“去了某地”不能移动角色。
+`POST /api/world/travel` 把出发请求转换成 `world.mutation / move_protagonist`。生产模式校验相邻第一段、可达最终目的地、阻断状态与同一角色任务互斥后，保存 `running` 旅行任务及 UTC 开始/预计到期时间，返回 `travelling`，当前位置暂时表示上次确认位置。每段真实时间到期后再次核验路线和阻断状态，原子提交实际位置与任务状态，再规划下一段。暂停冻结余下耗时；继续重新计算截止时间；取消或失败停留在上次确认位置。网页不执行后续路段，LLM 的抵达措辞也不能移动角色。独立 `simulation` 模式保留研究用的即时逻辑旅行。
+
+`realtime-world.mjs` 定义真实时钟与任务领域规则。`persistent-world.syncWallClock()` 每当地分钟变化提交时钟；`syncTasks()` 按到期顺序有界恢复任务，记录 `due_at`、`reconciled_at` 与 `late`。任务结果和世界位置在同一 SQLite 事务中提交。生产每秒检查任务，服务重启直接校正时间并补算已经到期的步骤；回拨期间拒绝任务推进。`GET /api/world/tasks` 只读，`POST /api/world/tasks` 白名单创建 `craft/care` 或执行 `pause/resume/cancel`，本阶段活动仅记录完成，不产生资源。客户端时间和完成效果字段不能控制到期结果。
+
+NPC 日程区分 `simulation` 与 `real_time` 日期编号；目标必须等待对应任务完成。出行中的角色不被纳入原地点当面互动和场景参与者。成长证据在真实模式使用事件 `occurred_at` 的当地日期，研究模式保留 UTC 观察日期。生产拒绝 `advance_time`、日历日期/时区改写和研究快进；要回放请使用另一个数据库。
 
 当前地图只有五个固定地点，是为了验证第一人称旅行与世界空间感，不是完整开放世界。每个地点同时有摆件区域、材质、代表性物件、可见动作和可继续选择；这些字段既供地图读模型做视觉语义，也供 Lorebook/Scene 只按相关性召回。世界生活 V1 已让世界事件、天气、逻辑时间段和当前位置从有限目录中选择在地生活切片，并让同地 NPC 留下当前行动；不要把静态地点说明无限堆进 prompt，也不要让用户点击直接重写地图规则。
 

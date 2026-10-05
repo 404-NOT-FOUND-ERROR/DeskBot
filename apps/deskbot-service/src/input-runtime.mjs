@@ -251,9 +251,9 @@ export function createInputRuntime({
     }
   }
 
-  async function tick({ force = false } = {}) {
+  async function tick({ force = false, sourceIds = null } = {}) {
     if (ticking) return ticking;
-    ticking = Promise.all([...sources.values()].map(async (source) => {
+    ticking = Promise.all([...sources.values()].filter(source => sourceIds === null || sourceIds.includes(source.source_id)).map(async (source) => {
       try {
         return await refreshSource(source, { force });
       } catch (error) {

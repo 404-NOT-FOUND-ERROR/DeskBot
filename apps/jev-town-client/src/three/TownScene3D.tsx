@@ -19,8 +19,18 @@ import {
 import { toCssHex } from "./palette.ts";
 import { LABEL_SPECS, type LabelKind, type LabelSpec } from "./sceneSpec.ts";
 import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
+import type { DeskBotEnvironment, DeskBotLocation } from "../deskbot/types.ts";
+import { createEnvironmentEffects } from "./environmentEffects.ts";
+import { activityProgressAt, type SceneLifeActivity } from "../deskbot/activityProjection.ts";
+import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
+import { sceneWorkAnchor } from './sceneWorkplace.ts';
 
 export interface TownScene3DProps {
+  sceneLocations?: readonly DeskBotLocation[];
+  environment?: DeskBotEnvironment;
+  activities?: readonly SceneLifeActivity[];
+  focusLocationId?: string | null;
+  focusRequest?: number;
   citizens: readonly Citizen[];
   labels?: readonly LabelSpec[];
   positions: Map<number, Point>;
@@ -177,6 +187,7 @@ interface CitizenEntry {
   action: Action | null;
   pulseAt: number | null;
   phase: number;
+  workOffset: THREE.Vector3;
 }
 
 /**
@@ -190,14 +201,19 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, labels = LABEL_SPECS, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
+  { citizens, labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
   // World revisions replace object identities frequently. Scene construction is
   // keyed by the actual actors/places instead, so a map refresh cannot reset a
   // citizen halfway through an authoritative travel segment.
-  const citizenKey = citizens.map((citizen) => `${citizen.id}:${citizen.palette}`).join(",");
+  const citizenKey = citizens.map((citizen) => `${citizen.id}:${citizen.palette}:${citizen.residentStyle??""}`).join(",");
   const labelKey = labels.map((label) => `${label.id}:${label.label}:${label.x}:${label.z}:${label.height}`).join("|");
+  const sceneryKey=JSON.stringify(sceneLocations?.map(place=>[place.location_id,place.presentation,place.areas?.map(a=>a.objects?.map(o=>o.object_id))]));
+  const sceneLocationsRef=useRef(sceneLocations);sceneLocationsRef.current=sceneLocations;
+  const environmentRef=useRef(environment);environmentRef.current=environment;
+  const activitiesRef=useRef(activities);activitiesRef.current=activities;
+  const focusLocationRef=useRef(focusLocationId);focusLocationRef.current=focusLocationId;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const callbacksRef = useRef({ getHotspot, onPlaceClick, onZoomChange, onContextLost });
   callbacksRef.current = { getHotspot, onPlaceClick, onZoomChange, onContextLost };
@@ -240,7 +256,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     // Filmic response keeps the sunlit roofs from clipping to flat white.
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
@@ -262,7 +278,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
 
     // --- Lighting: soft sky fill plus a warm low sun for readable shadows ---
-    scene.add(new THREE.HemisphereLight(0xfffaf0, 0x8fb07a, 1.15));
+    const sky=new THREE.HemisphereLight(0xfffaf0, 0x8fb07a, 1.15);scene.add(sky);
     // A dim fill from the opposite side keeps shadowed walls readable.
     const fill = new THREE.DirectionalLight(0xdfe8ff, 0.35);
     fill.position.set(60, 45, -70);
@@ -278,8 +294,9 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       top: shadowSpan,
       bottom: -shadowSpan,
       near: 10,
-      far: 260,
+      far: 600,
     });
+    sun.shadow.camera.updateProjectionMatrix();
     sun.shadow.radius = 2.5;
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.04;
@@ -287,8 +304,10 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     scene.add(sun.target);
 
     // --- Static scenery ---
-    const scenery = buildTownScenery();
+    const scenery = buildTownScenery(sceneLocations);
+    let appliedSceneLocations=sceneLocations;
     scene.add(scenery.root);
+    const environmentEffects=createEnvironmentEffects(scene,sky,sun,fill,scenery.companion,scenery.updateVegetation);
 
     const routePreviewGroup = new THREE.Group();
     routePreviewGroup.name = "deskbot-route-preview";
@@ -318,7 +337,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const entries = new Map<number, CitizenEntry>();
     const now0 = performance.now();
     for (const citizen of citizens) {
-      const figure = createCitizenFigure(citizen.palette, citizen.id);
+      const figure = createCitizenFigure(citizen.palette, citizen.id,citizen.residentStyle);
       const start = initialPositionsRef.current.get(citizen.id) ?? { x: MAP_W / 2, y: MAP_H / 2 };
       const world = mapToWorld(start.x, start.y);
       figure.group.position.set(world.x, 0, world.z);
@@ -345,6 +364,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         action: null,
         pulseAt: null,
         phase: (citizen.id * 0.618) % 1,
+        workOffset: new THREE.Vector3(),
       });
     }
     entriesRef.current = entries;
@@ -579,25 +599,50 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
 
     const plaza = mapToWorld(getPlace("plaza").x, getPlace("plaza").y);
     const tower = mapToWorld(getPlace("watchtower").x, getPlace("watchtower").y);
+    const workAnchors = new Map<string, THREE.Vector3>();
+    let previousCitizenFrame = performance.now();
 
     function updateCitizens(now: number): boolean {
       let moving = false;
       const t = now / 1000;
+      const wallNow = Date.now();
+      const activityById = new Map(activitiesRef.current?.map((activity) => [activity.citizenId, activity]));
+      const night = environmentRef.current ? sceneEnvironmentAt(environmentRef.current,wallNow).night : 0;
+      const blend = reducedMotion ? 1 : 1 - Math.exp(-Math.min(.1, Math.max(0,(now-previousCitizenFrame)/1000))*3);
+      previousCitizenFrame = now;
       for (const entry of entries.values()) {
         const { figure } = entry;
-        const progress = entry.duration > 0 ? clamp((now - entry.startedAt) / entry.duration, 0, 1) : 1;
-        const walking = progress < 1;
+        const activity = activityById.get(entry.citizen.id);
+        const admittedTravel = activity?.kind === "travel" && activity.route && activity.route.length > 1 ? activity : undefined;
+        const progress = admittedTravel ? activityProgressAt(admittedTravel,wallNow) : entry.duration > 0 ? clamp((now - entry.startedAt) / entry.duration, 0, 1) : 1;
+        const walking = admittedTravel ? admittedTravel.status === "running" : progress < 1;
         if (walking) moving = true;
 
-        const sampleDistance = easeInOutCubic(progress) * entry.routeLength;
-        const sample = sampleRoute(entry.route, sampleDistance);
+        const route = admittedTravel?.route ?? entry.route;
+        const sampleDistance = admittedTravel ? progress * routeLength(route) : easeInOutCubic(progress) * entry.routeLength;
+        const sample = sampleRoute(route, sampleDistance);
         entry.current = { x: sample.x, y: sample.y };
         const world = mapToWorld(sample.x, sample.y);
         figure.group.position.set(world.x, 0, world.z);
+        let workAnchor:THREE.Vector3|undefined;
+        if(activity && !admittedTravel && activity.targetObjectId) {
+          workAnchor = workAnchors.get(activity.taskId);
+          const object = scenery.companion?.objects.get(activity.targetObjectId);
+          if(!workAnchor && object) {
+            workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z));
+            workAnchors.set(activity.taskId,workAnchor);
+            if(workAnchors.size>64)workAnchors.delete(workAnchors.keys().next().value!);
+          }
+        }
+        const targetOffset = workAnchor ? new THREE.Vector3(workAnchor.x-world.x,0,workAnchor.z-world.z) : new THREE.Vector3();
+        if(entry.workOffset.distanceToSquared(targetOffset)>.0001)moving=true;
+        entry.workOffset.lerp(targetOffset,blend);
+        figure.group.position.add(entry.workOffset);
 
         // Face the direction of travel; once arrived, face what the decision is about.
         let facing = figure.group.rotation.y;
         if (walking) facing = Math.PI / 2 - sample.heading;
+        else if(workAnchor) facing = Math.atan2(world.x-workAnchor.x,world.z-workAnchor.z)+Math.PI;
         else if (entry.action === "INVESTIGATE" || entry.action === "JOIN")
           facing = Math.atan2(plaza.x - world.x, plaza.z - world.z);
         else if (entry.action === "WARN") facing = Math.atan2(tower.x - world.x, tower.z - world.z);
@@ -652,6 +697,14 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
           figure.body.position.y = lift;
           figure.body.rotation.x = lean;
         }
+        figure.updateLife?.(t, activity?.status === "paused" ? "idle" : activity?.kind ?? "idle", walking, reducedMotion,night,activity?.activityId);
+        if(sceneLocationsRef.current) {
+          const glyph = activity?.status === "paused" ? "Ⅱ" : activity?.kind === "travel" ? "↗" : activity?.kind === "rest" ? "☾" : activity?.kind === "craft" ? "✦" : activity?.kind === "care" ? "♧" : activity?.kind === "eat" ? "◡" : activity ? "⋯" : "";
+          entry.badgeEl.textContent = glyph;
+          entry.badgeEl.title = activity?.title ?? "";
+          entry.badgeEl.className = `citizen-badge citizen-badge--life${activity?.status === "paused" ? " is-paused" : ""}`;
+          entry.badgeEl.hidden = !activity || viewport.height / (2 * camera.top) < 8;
+        }
 
         if (entry.pulseAt !== null) {
           const age = now - entry.pulseAt;
@@ -704,7 +757,13 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       if (scenery.bell) {
         scenery.bell.rotation.z = warnCount > 0 && !reducedMotion ? Math.sin(now / 180) * 0.45 : 0;
       }
-      if (!reducedMotion) updateFountainJets(scenery.fountainJets, now / 1000);
+      if (!reducedMotion && scenery.fountainJets.visible) updateFountainJets(scenery.fountainJets, now / 1000);
+      if(sceneLocationsRef.current && sceneLocationsRef.current!==appliedSceneLocations){scenery.companion?.applyState(sceneLocationsRef.current);appliedSceneLocations=sceneLocationsRef.current;}
+      environmentEffects.update(environmentRef.current,now/1000,reducedMotion,Date.now(),activitiesRef.current);
+      if (environmentRef.current) {
+        const lighting = sceneEnvironmentAt(environmentRef.current);
+        scenery.updateDomesticLights?.(lighting.minute, lighting.night);
+      }
 
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
@@ -723,6 +782,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     intersection.observe(container);
 
     handleResize();
+    if(focusLocationRef.current)apiRef.current?.focusPlace(focusLocationRef.current);
     updateFountainJets(scenery.fountainJets, 0);
     requestFrame();
 
@@ -739,6 +799,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       canvas.removeEventListener("wheel", handleWheel);
       canvas.removeEventListener("contextmenu", handleContextMenu);
 
+      environmentEffects.dispose();
       scenery.dispose();
       disposeRoutePreview(routePreviewGroup);
       routePreviewGroupRef.current = null;
@@ -751,7 +812,11 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       entriesRef.current = null;
       requestFrameRef.current = () => {};
     };
-  }, [citizenKey, labelKey, onPlaceClick]);
+  }, [citizenKey, labelKey, sceneryKey, onPlaceClick]);
+
+  useEffect(()=>{if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);},[focusLocationId,focusRequest,citizenKey,labelKey,sceneryKey]);
+  // An expired observation or a minute change still updates a reduced-motion view.
+  useEffect(()=>{requestFrameRef.current();const timer=setInterval(()=>requestFrameRef.current(),15000);return()=>clearInterval(timer);},[environment]);
 
   // The route preview is a separate, static overlay. Keeping it out of the
   // mount-only scene effect lets a selected destination update without

@@ -34,6 +34,8 @@ export const DEFAULT_EVENT_TYPES = Object.freeze(new Set([
   'audio.vad_started',
   'audio.vad_ended',
   'sensor.touch',
+  'sensor.microphone_direction',
+  'shell.install.detected',
   'sensor.imu',
   'device.playback_started',
   'device.playback_completed',

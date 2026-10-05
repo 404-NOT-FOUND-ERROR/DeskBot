@@ -33,6 +33,10 @@ if (-not (Test-Path -LiteralPath $LlmConfigPath -PathType Leaf)) {
 # The config file is read by Node; only the path and provider are exported.
 $env:DESKBOT_LLM_PROVIDER = 'deepseek'
 $env:DESKBOT_LLM_CONFIG = (Resolve-Path -LiteralPath $LlmConfigPath).Path
+$env:DESKBOT_LLM_PROBE = '1'
+# Two bounded, public sources. No additional API key is needed.
+if ([string]::IsNullOrWhiteSpace($env:DESKBOT_NEWS_ENABLED)) { $env:DESKBOT_NEWS_ENABLED = '1' }
+if ([string]::IsNullOrWhiteSpace($env:DESKBOT_AIR_ENABLED)) { $env:DESKBOT_AIR_ENABLED = '1' }
 
 # Node's fetch does not automatically inherit the Windows system proxy. On
 # this workstation the local proxy is Clash-compatible at 7897; enable Node
@@ -81,6 +85,11 @@ if ($StartWorld) {
   if (-not (Test-Path -LiteralPath $viteEntry -PathType Leaf)) {
     throw "Jev Town dependencies not installed: $viteEntry. Run npm.cmd install in apps\jev-town-client."
   }
+}
+
+if ([string]::IsNullOrWhiteSpace($WeatherEnvFile)) {
+  $savedWeatherPath = Join-Path $repoRoot 'config\weather.local.env'
+  if (Test-Path -LiteralPath $savedWeatherPath -PathType Leaf) { $WeatherEnvFile = $savedWeatherPath }
 }
 
 if ($WeatherEnvFile) {

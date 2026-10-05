@@ -1,0 +1,72 @@
+{
+  "schema": "deskbot.companion-world-rules.v1",
+  "version": "2026-10-04",
+  "status": "contract_only",
+  "character_id": "shaping-001",
+  "purpose": "现实输入经过分级与折射，影响一个拥有自身时间、居民、行动后果和持续记忆的伴生世界。",
+  "time": {
+    "rate": 1,
+    "time_zone": "Asia/Shanghai",
+    "storage": "UTC",
+    "day_boundary": "local_midnight",
+    "travel": "elapsed_duration",
+    "offline": "reconcile_elapsed_time",
+    "catch_up": "chronological_bounded",
+    "page_refresh_advances_time": false
+  },
+  "body": {
+    "camera": false,
+    "locomotion": false,
+    "yaw_degrees_of_freedom": 1,
+    "sensors": ["head_touch", "screen_touch", "magnetic_shell_detection", "microphone_direction"],
+    "microphone_direction_identifies_person": false,
+    "shell_detection_changes_identity": false,
+    "unrecognized_shell": "retain_identity_and_report_uncertainty"
+  },
+  "population": {
+    "initial_authored_count": 12,
+    "next_scale_target": 24,
+    "hard_limit": null,
+    "decision_schedule": "event_or_task_due",
+    "background_progress": "rules_and_persistent_tasks",
+    "model_calls": "selective_with_budget"
+  },
+  "map": {
+    "levels": ["region", "location", "area", "object"],
+    "initial_location_count": 5,
+    "current_location_count": 10,
+    "first_expansion_target": 10,
+    "new_location_admission": "validated_content_and_world_mutation",
+    "persistent_changes": ["route_access", "water_level", "growth", "inventory", "facility_condition", "decoration", "resident_use"]
+  },
+  "identity": {
+    "persistent_across_forms": true,
+    "autonomous_reversible_trials": true,
+    "user_feedback": "influence_choices",
+    "physical_fabrication": "human_participation",
+    "single_input_rewrites_identity": false
+  },
+  "memory": {
+    "kinds": ["world_fact", "personal_interpretation", "hearsay"],
+    "self_generated_text_is_independent_evidence": false,
+    "duplicate_origin_is_independent_evidence": false,
+    "correction_preserves_history": true
+  },
+  "input_policies": [
+    {"id": "clock", "required_attestation": "clock", "max_age_seconds": 60, "may_inform": ["environment", "task_progress"], "rule": "按现实经过时间推进；出行和聊天不另行快进世界。"},
+    {"id": "weather", "required_attestation": "provider", "max_age_seconds": 3600, "may_inform": ["environment", "world_opportunity"], "rule": "有效观测经折射规则改变环境，单次天气不证明性格。"},
+    {"id": "body", "required_attestation": "device", "max_age_seconds": 300, "may_inform": ["attention", "body_awareness", "relationship_observation"], "rule": "记录设备确实观察到的事情，触摸意义与情境有关；方向不等于身份。"},
+    {"id": "dialogue", "required_attestation": "user", "max_age_seconds": 86400, "may_inform": ["attention", "belief", "relationship_observation", "goal_proposal"], "rule": "用户提出建议、邀请或约定，由角色结合目标判断；对外界的断言仍需核实。"},
+    {"id": "external", "required_attestation": "provider", "max_age_seconds": 86400, "may_inform": ["belief", "world_opportunity"], "rule": "新闻、事实等保留出处并受时效限制，进入有限的世界机会，不直接重写地图。"},
+    {"id": "world", "required_attestation": "world_engine", "max_age_seconds": null, "may_inform": ["experience", "relationship_observation", "goal_proposal"], "rule": "已执行且有状态记录的行动才能成为世界事实；日程和愿望只是计划。"},
+    {"id": "agent", "required_attestation": "agent", "max_age_seconds": 86400, "may_inform": ["belief", "goal_proposal"], "rule": "其他 agent 的消息是请求或信息，行动仍需当前世界能力和规则允许。"},
+    {"id": "audit", "required_attestation": null, "max_age_seconds": null, "may_inform": [], "rule": "模型回复、ASR中间结果、命令回执、生命周期及未分类事件不作为独立成长证据。"}
+  ],
+  "world_rules": [
+    "行动有前提、真实耗时、结果和原因引用；已开始的任务允许继续、等待、失败或取消。",
+    "资源的获得、消耗和自然补充有明确规则；设施、交换和照料留下持久状态。",
+    "居民有自己的目标和关系；用户离开时，已登记事务仍能推进。",
+    "新地点、传闻、希望和叙述不能仅凭模型文本变成已发生的事实。",
+    "保留普通日常和未完成的事情；不以频繁事件或强制打扰维持存在感。"
+  ]
+}

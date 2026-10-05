@@ -199,7 +199,7 @@ export async function sendChat(
 }
 
 export async function travelToLocation(
-  request: { locationId: string; eventId: string; reason?: string; expectedWorldRevision?: number; expectedFromLocationId?: string },
+  request: { locationId: string; destinationLocationId?: string; eventId: string; reason?: string; expectedWorldRevision?: number; expectedFromLocationId?: string },
   baseUrl = deskbotBaseUrl(),
 ): Promise<DeskBotWorldTravelResponse> {
   const latest = await getJson<DeskBotWorldMap>(baseUrl, "/api/world/map");
@@ -225,6 +225,7 @@ export async function travelToLocation(
     event_id: request.eventId,
     character_id: latest.protagonist.character_id,
     location_id: destination.location_id,
+    ...(request.destinationLocationId ? { destination_location_id: request.destinationLocationId } : {}),
     reason: request.reason ?? `从地图确认前往${destination.name}`,
     ...(request.expectedWorldRevision !== undefined ? { expected_world_revision: request.expectedWorldRevision } : {}),
     ...(request.expectedFromLocationId !== undefined ? { expected_from_location_id: request.expectedFromLocationId } : {}),
@@ -253,7 +254,7 @@ export async function travelRouteToLocation(
     presentationPoints?: DeskBotPresentationPoint[];
     map: DeskBotWorldMap;
   }) => unknown | PromiseLike<unknown>,
-): Promise<{ map: DeskBotWorldMap; route: DeskBotWorldRouteResponse["route"]; completed: boolean; stepsCompleted: number }> {
+): Promise<{ map: DeskBotWorldMap; route: DeskBotWorldRouteResponse["route"]; completed: boolean; stepsCompleted: number; pending?: boolean }> {
   let completed = 0;
   // Re-planning after every canonical hop must not change the progress
   // denominator shown to the user for the current trip.
@@ -292,12 +293,16 @@ export async function travelRouteToLocation(
     try {
       const result = await travelToLocation({
         locationId: next.to_location_id,
+        ...(latestMap.clock?.mode === "real_time" ? { destinationLocationId: request.destinationLocationId } : {}),
         eventId: stepEventId,
         reason: request.reason || `沿路线前往${routeResponse.route.destination_location_id}`,
         expectedWorldRevision: routeResponse.world_revision,
         expectedFromLocationId: next.from_location_id,
       }, baseUrl);
       latestMap = result.map;
+      if (result.map.protagonist.travel_state?.status === "travelling") {
+        return { map: latestMap, route: finalRoute, completed: false, stepsCompleted: completed, pending: true };
+      }
       completed += 1;
       await onStep?.({
         step: completed,
@@ -318,4 +323,26 @@ export async function travelRouteToLocation(
     }
     if (completed >= 50) throw new Error("路线已行进 50 段仍未抵达，旅行已暂停以避免无限绕行。 ");
   }
+}
+
+export async function controlWorldTask(taskId: string, operation: "pause" | "resume" | "cancel", baseUrl = deskbotBaseUrl()): Promise<void> {
+  await postJson(baseUrl, "/api/world/tasks", { task_id: taskId, operation, event_id: `world-task-${crypto.randomUUID()}` }, "活动状态更新失败");
+}
+
+export async function startLivingActivity(activityId:string,eventId:string,baseUrl=deskbotBaseUrl()):Promise<void>{
+  await postJson(baseUrl,"/api/world/tasks",{activity_id:activityId,event_id:eventId},"生活活动没有开始");
+}
+export async function transferResource(objectId:string,resource:string,operation:"take"|"store",eventId:string,baseUrl=deskbotBaseUrl()):Promise<void>{
+  await postJson(baseUrl,"/api/world/resources/transfer",{object_id:objectId,resource,operation,count:1,event_id:eventId},"物品取放失败");
+}
+export async function controlAutonomousLife(operation:"pause"|"resume",baseUrl=deskbotBaseUrl()):Promise<void>{
+  await postJson(baseUrl,"/api/life/autonomy",{operation,event_id:`life-control-${crypto.randomUUID()}`},"生活安排更新失败");
+}
+
+export async function respondSocialInvitation(invitationId:string,operation:"join"|"decline"|"withdraw",eventId:string,baseUrl=deskbotBaseUrl()) {
+  return postJson(baseUrl,"/api/life/social",{invitation_id:invitationId,operation,event_id:eventId},"约定更新失败");
+}
+
+export async function suggestLifeIdea(suggestion:string,eventId:string,baseUrl=deskbotBaseUrl()) {
+  return postJson(baseUrl,"/api/life/inputs",{suggestion,event_id:eventId},"建议暂时没有送达");
 }

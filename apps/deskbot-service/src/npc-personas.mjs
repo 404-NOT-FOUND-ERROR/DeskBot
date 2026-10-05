@@ -6,6 +6,7 @@
  * parsing editable prose on every request.
  */
 
+import { residentPersona, RESIDENT_PROFILES } from './resident-life.mjs';
 const freeze = (value) => Object.freeze(value);
 const clone = (value) => structuredClone(value);
 
@@ -153,18 +154,19 @@ export const NPC_PERSONAS = freeze({
   }),
 });
 
-export function getNpcPersona(npcId) {
+export function getNpcPersona(npcId, residentVersion = null) {
+  if(residentVersion)return residentPersona(npcId);
   return NPC_PERSONAS[npcId] ?? null;
 }
 
-export function publicNpcProfile(npcId) {
-  const persona = getNpcPersona(npcId);
+export function publicNpcProfile(npcId, residentVersion = null) {
+  const persona = getNpcPersona(npcId,residentVersion);
   if (!persona) return null;
   return {
     npc_id: persona.persona_id,
     display_name: persona.display_name,
     role: persona.role,
-    role_label: NPC_ROLE_LABELS[persona.role] ?? '聚形域居民',
+    role_label: (residentVersion?RESIDENT_PROFILES[npcId]?.role_label:null) ?? NPC_ROLE_LABELS[persona.role] ?? '聚形域居民',
     bio: `${persona.visual_anchor}${persona.premise}`,
     toy_profile: clone(persona.toy_profile),
     mischief: persona.toy_profile?.mischief ?? null,

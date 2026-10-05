@@ -6,6 +6,8 @@
  * a candidate for world-life/npc-goals to validate and execute.
  */
 
+import { findWorldPath, worldHopAccess } from './world-map-content.mjs';
+
 const DECISION_NAMESPACE = 'life.npc-agent-decisions';
 const DECISION_SCHEMA = 'deskbot.npc-agent-decision.v0.1';
 const SLOT_MINUTES = 120;
@@ -37,29 +39,12 @@ function hash(value) {
 
 function isAdjacent(world, from, to) {
   if (!from || !to || from === to) return false;
-  const origin = (world.locations ?? []).find((location) => location.location_id === from);
-  return (origin?.neighbors ?? []).includes(to);
+  return worldHopAccess(world, from, to).allowed;
 }
 
 function nextHopToward(world, from, target) {
   if (!from || !target || from === target) return null;
-  const queue = [from];
-  const previous = new Map([[from, null]]);
-  while (queue.length) {
-    const current = queue.shift();
-    const location = (world.locations ?? []).find((item) => item.location_id === current);
-    for (const neighbor of location?.neighbors ?? []) {
-      if (previous.has(neighbor)) continue;
-      previous.set(neighbor, current);
-      if (neighbor === target) {
-        let cursor = target;
-        while (previous.get(cursor) !== from && previous.get(cursor) !== null) cursor = previous.get(cursor);
-        return cursor;
-      }
-      queue.push(neighbor);
-    }
-  }
-  return null;
+  return findWorldPath(world, from, target)?.[1] ?? null;
 }
 
 function candidate({
@@ -146,6 +131,7 @@ export function createNpcAgentLoop({
     if (legal.has('move_to_adjacent_location')) {
       const origin = (world.locations ?? []).find((location) => location.location_id === currentLocation);
       for (const neighbor of origin?.neighbors ?? []) {
+        if (!isAdjacent(world, currentLocation, neighbor)) continue;
         if (neighbor === routeTarget) continue;
         result.push(candidate({
           id: `adjacent:${neighbor}`,
@@ -217,10 +203,14 @@ export function createNpcAgentLoop({
     if (!enabled || !npc?.npc_id) return null;
     // One decision per NPC and logical slot. The chosen action may move the NPC;
     // a changed location must not grant a second decision in the same slot.
-    const key = `${npc.npc_id}:${slotKey(world)}`;
+    const timeBasis = world.clock?.mode === 'real_time' ? `realtime:${world.logical_time.date}:` : '';
+    const key = `${npc.npc_id}:${timeBasis}${slotKey(world)}`;
     const decisionId = `npc-agent:${key}`;
     const existing = decisions.get(decisionId);
-    if (existing) return clone(existing);
+    if (existing) {
+      if (existing.status === 'planned' && existing.location_id !== npc.location_id) return markFailed(decisionId, 'npc_location_changed_before_execution');
+      return clone(existing);
+    }
 
     const context = { npc, slot_key: slotKey(world), world_revision: world.world_revision };
     const candidates = legalCandidates({ world, npc, profile: profile ?? profiles[npc.npc_id], routine: routine ?? routines[npc.npc_id], scene });
@@ -234,6 +224,8 @@ export function createNpcAgentLoop({
       decision_id: decisionId,
       npc_id: npc.npc_id,
       slot_key: context.slot_key,
+      clock_mode: world.clock?.mode ?? 'simulation',
+      calendar_date: world.logical_time.date ?? null,
       world_revision: world.world_revision,
       location_id: npc.location_id,
       legal_candidates: candidates,
@@ -280,7 +272,8 @@ export function createNpcAgentLoop({
     const slot = Number(slotText);
     if (!Number.isInteger(day) || !Number.isInteger(slot) || day < 1 || slot < 0) return null;
     const slotsPerDay = 1440 / SLOT_MINUTES;
-    return `world-life-routine:${decision.npc_id}:${(day - 1) * slotsPerDay + slot}`;
+    const timeBasis = decision.clock_mode === 'real_time' ? `realtime:${decision.calendar_date}:` : '';
+    return `world-life-routine:${decision.npc_id}:${timeBasis}${(day - 1) * slotsPerDay + slot}`;
   }
 
   // Reconcile the durable decision journal with npc-goals after a restart.

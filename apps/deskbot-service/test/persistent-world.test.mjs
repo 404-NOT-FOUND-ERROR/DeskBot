@@ -50,7 +50,7 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
   assert.equal(initial.protagonist.appearance.version, 'appearance-baseline-v0.2');
   assert.equal(initial.protagonist.appearance.silhouette, '白色圆润多瓣底座 + 圆形黑屏幕脸 + 两只短三角耳');
   assert.equal(initial.protagonist.appearance.recognition_anchor, '白色多瓣底座 + 黑色圆屏 + 两只短三角耳 + 黄色胸口圆点');
-  assert.equal(initial.locations.length, 5);
+  assert.equal(initial.locations.length, 10);
   assert.equal(initial.locations.find((location) => location.location_id === 'tidal-old-road').neighbors.includes('whisper-market'), true);
   assert.deepEqual(initial.npcs, []);
   assert.equal(initial.active_event, null);
@@ -205,14 +205,13 @@ test('known Morrowmere routes expose render-only presentation points and reverse
   const persistentWorld = createPersistentWorld({ now: () => fixedTime });
   const forward = getWorldRoute(persistentWorld.get(), { destinationLocationId: 'echo-waterside' });
   assert.deepEqual(forward.steps[0].presentation_points, [
-    { x: 50, y: 90 },
-    { x: 50, y: 70 },
+    { x: 60, y: 108 }, { x: 60, y: 110 }, { x: 90, y: 110 },
+    { x: 90, y: 70 }, { x: 80, y: 70 }, { x: 80, y: 68 },
   ]);
   assert.equal(forward.steps[0].presentation_space, 'jev-town-map-v1');
   assert.deepEqual(forward.steps.at(-1).presentation_points, [
-    { x: 30, y: 50 },
-    { x: 50, y: 50 },
-    { x: 50, y: 10 },
+    { x: 60, y: 48 }, { x: 60, y: 50 }, { x: 70, y: 50 },
+    { x: 70, y: 110 }, { x: 40, y: 110 }, { x: 40, y: 108 },
   ]);
 
   persistentWorld.ingest(event({
@@ -230,13 +229,12 @@ test('known Morrowmere routes expose render-only presentation points and reverse
   assert.equal(moved.applied, true);
   const reverse = getWorldRoute(moved.world, { destinationLocationId: 'shaping-field-desk' });
   assert.deepEqual(reverse.steps[0].presentation_points, [
-    { x: 50, y: 10 },
-    { x: 50, y: 50 },
-    { x: 30, y: 50 },
+    { x: 40, y: 108 }, { x: 40, y: 110 }, { x: 70, y: 110 },
+    { x: 70, y: 50 }, { x: 60, y: 50 }, { x: 60, y: 48 },
   ]);
   assert.deepEqual(reverse.steps.at(-1).presentation_points, [
-    { x: 50, y: 70 },
-    { x: 50, y: 90 },
+    { x: 80, y: 68 }, { x: 80, y: 70 }, { x: 90, y: 70 },
+    { x: 90, y: 110 }, { x: 60, y: 110 }, { x: 60, y: 108 },
   ]);
 });
 

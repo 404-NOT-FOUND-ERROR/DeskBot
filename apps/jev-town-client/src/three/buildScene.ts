@@ -9,6 +9,12 @@
  */
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import type { DeskBotLocation } from "../deskbot/types.ts";
+import { buildCompanionScenery, type CompanionScenery } from "./companionScenery.ts";
+import { createShapingFigure } from "./shapingFigures.ts";
+import { sceneOperationAt } from './sceneLife.ts';
+import { createSoftLightTexture } from './sceneLifeEffects.ts';
+import { mapToWorld } from "@shared/world.ts";
 import { MAP_H, MAP_W, STREET_LINES } from "@shared/town.ts";
 import { ACTION_COLOR, CITIZEN_PALETTE, FOCUS_COLOR, PALETTE, ROOF_TINTS, WALL_TINTS } from "./palette.ts";
 import {
@@ -331,6 +337,45 @@ function addCottage(batch: GeometryBatch, spec: CottageSpec): void {
   p.box(1.5, 0.5, 0.45, -W * 0.28, y0, D / 2 + 1.5, PALETTE.hedge);
 }
 
+/** Background houses follow a visual household routine, without inventing resident events. */
+function addDomesticWindowLights(root: THREE.Group, cottages: readonly CottageSpec[]) {
+  if (!cottages.length) return;
+  const group = new THREE.Group(); group.name = 'background-domestic-lights'; root.add(group);
+  const geometry = new THREE.PlaneGeometry(1, 1), texture = createSoftLightTexture();
+  const batches: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
+  const W = 4.4, D = 3.8, H = 2.7;
+  const windowSpecs = [
+    { x: -W * .22, y: TILE_HEIGHT + H * .42 + .75 / 2, z: D / 2 + .11, w: .8, h: .75, facing: 0 },
+    { x: W / 2 + .11, y: TILE_HEIGHT + H * .45 + .7 / 2, z: 0, w: .75, h: .7, facing: Math.PI / 2 },
+    { x: -W / 2 - .11, y: TILE_HEIGHT + H * .45 + .7 / 2, z: 0, w: .75, h: .7, facing: -Math.PI / 2 },
+  ];
+  const dummy = new THREE.Object3D();
+  for (let variation = 0; variation < 4; variation++) {
+    const local = cottages.filter((_cottage, index) => index % 4 === variation);
+    if (!local.length) continue;
+    const material = new THREE.MeshBasicMaterial({ color: 0xffdfac, map: texture, transparent: true, opacity: 0, depthWrite: false });
+    const batch = new THREE.InstancedMesh(geometry, material, local.length * windowSpecs.length);
+    batch.name = `household-window-batch:${variation}`; batch.visible = false;
+    batch.userData = { variation, cottage_count: local.length, light_channel: 'window', state_scope: 'presentation_only' };
+    let index = 0;
+    for (const cottage of local) {
+      const base = frame(cottage.x, cottage.z, facingRotation(cottage.facing), cottage.scale);
+      for (const window of windowSpecs) {
+        dummy.position.set(window.x, window.y, window.z); dummy.rotation.set(0, window.facing, 0); dummy.scale.set(window.w, window.h, 1); dummy.updateMatrix();
+        batch.setMatrixAt(index++, base.clone().multiply(dummy.matrix));
+      }
+    }
+    batch.instanceMatrix.needsUpdate = true; batch.computeBoundingSphere(); group.add(batch); batches.push(batch);
+  }
+  return (minute: number, night: number) => {
+    for (const batch of batches) {
+      const power = sceneOperationAt('homes', minute, night, [], batch.userData.variation).window;
+      batch.material.opacity = power * .86; batch.visible = power > .001;
+      batch.userData.power = power;
+    }
+  };
+}
+
 function addTree(batch: GeometryBatch, spec: TreeSpec, seed: number): void {
   const lean = ((seed % 7) - 3) * 0.015;
   const p = new Parts(batch, frame(spec.x, spec.z, (seed % 9) * 0.7, spec.scale));
@@ -612,6 +657,10 @@ function addPond(batch: GeometryBatch, water: GeometryBatch, x: number, z: numbe
 // --- Public builders --------------------------------------------------------------
 
 export interface TownScenery {
+  companion?: CompanionScenery;
+  updateVegetation: (time:number,wind:number,reducedMotion:boolean)=>void;
+  /** Decorative background windows use the same local household dimming convention. */
+  updateDomesticLights?: (minute:number,night:number)=>void;
   /** Everything that doesn't move, merged. */
   root: THREE.Group;
   /** The watchtower bell, pivoting at its hanger so it can swing. */
@@ -623,27 +672,53 @@ export interface TownScenery {
 
 export const FOUNTAIN_JET_COUNT = 36;
 
-export function buildTownScenery(): TownScenery {
+export function buildTownScenery(locations?: readonly DeskBotLocation[]): TownScenery {
   const root = new THREE.Group();
   root.name = "scenery";
 
   const solid = new GeometryBatch();
+  const ground = new GeometryBatch();
+  const vegetation = new GeometryBatch();
   const water = new GeometryBatch();
   const glow = new GeometryBatch();
   const extras: SignatureExtras = { water, glow, bell: null };
 
-  addGround(solid);
-  for (const cottage of COTTAGE_SPECS) addCottage(solid, cottage);
-  TREE_SPECS.forEach((tree, i) => addTree(solid, tree, i));
-  for (const signature of SIGNATURE_SPECS) addSignature(solid, extras, signature);
-  addPlaza(solid, water);
-  for (const pond of POND_SPECS) addPond(solid, water, pond.x, pond.z);
+  addGround(ground);
+  const lots=(locations??[]).flatMap(place=>place.presentation?.lot ? [mapToWorld(place.presentation.lot.x,place.presentation.lot.y)] : []);
+  const reserved=(x:number,z:number)=>lots.some(lot=>Math.abs(lot.x-x)<8 && Math.abs(lot.z-z)<8);
+  const backgroundCottages=COTTAGE_SPECS.filter(cottage=>!reserved(cottage.x,cottage.z));
+  for (const cottage of backgroundCottages) addCottage(solid, cottage);
+  TREE_SPECS.forEach((tree, i) => {if(!reserved(tree.x,tree.z)) addTree(vegetation, tree, i);});
+  for (const signature of SIGNATURE_SPECS) if(!reserved(signature.x,signature.z)) addSignature(solid, extras, signature);
+  if(!reserved(PLAZA_SPEC.x,PLAZA_SPEC.z)) addPlaza(solid, water);
+  for (const pond of POND_SPECS) if(!reserved(pond.x,pond.z)) addPond(solid, water, pond.x, pond.z);
+  const companion=lots.length ? buildCompanionScenery(locations!) : undefined;
+  if(companion)root.add(companion.root);
+  const updateDomesticLights=companion ? addDomesticWindowLights(root,backgroundCottages) : undefined;
 
   const solidMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // Terrain receives building shadows but must not shadow its own large coplanar faces.
+  const groundMesh = ground.build(solidMaterial, "town-ground");
+  groundMesh.receiveShadow = true;
+  root.add(groundMesh);
   const solidMesh = solid.build(solidMaterial, "town-solid");
   solidMesh.castShadow = true;
   solidMesh.receiveShadow = true;
   root.add(solidMesh);
+  // Trees stay batched, but leaves respond to wind independently of buildings.
+  const treeTime={value:0},treeWind={value:0};
+  const treeMaterial=new THREE.MeshLambertMaterial({vertexColors:true});
+  treeMaterial.onBeforeCompile=shader=>{
+    shader.uniforms.treeTime=treeTime;shader.uniforms.treeWind=treeWind;
+    shader.vertexShader='uniform float treeTime; uniform float treeWind;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\ntransformed.x += sin(treeTime * 1.6 + position.z * .21 + position.x * .13) * treeWind * .018 * pow(max(position.y - 2.0, 0.0) / 5.0, 1.4);');
+  };
+  treeMaterial.customProgramCacheKey=()=>"morrowmere-wind-canopy-v1";
+  const treeMesh=vegetation.build(treeMaterial,"town-wind-vegetation");treeMesh.castShadow=true;treeMesh.receiveShadow=true;
+  const depthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});
+  depthMaterial.onBeforeCompile=treeMaterial.onBeforeCompile;depthMaterial.customProgramCacheKey=treeMaterial.customProgramCacheKey;
+  treeMesh.customDepthMaterial=depthMaterial;root.add(treeMesh);
 
   const waterMaterial = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -665,13 +740,17 @@ export function buildTownScenery(): TownScenery {
   const fountainJets = new THREE.InstancedMesh(new THREE.SphereGeometry(0.16, 6, 5), jetMaterial, FOUNTAIN_JET_COUNT);
   fountainJets.name = "fountain-jets";
   fountainJets.frustumCulled = false;
+  fountainJets.visible=!reserved(PLAZA_SPEC.x,PLAZA_SPEC.z);
   root.add(fountainJets);
 
   return {
     root,
     bell: extras.bell,
     fountainJets,
-    dispose: () => disposeObject(root),
+    companion,
+    updateDomesticLights,
+    updateVegetation:(time,wind,reducedMotion)=>{treeTime.value=reducedMotion ? 0 : time;treeWind.value=reducedMotion ? 0 : wind;},
+    dispose: () => {depthMaterial.dispose();disposeObject(root);},
   };
 }
 
@@ -728,6 +807,8 @@ export interface CitizenFigure {
   };
   focusRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   pulseRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** Cosmetic pose from an admitted task; never changes world state or travel. */
+  updateLife?: (seconds: number, kind: string, walking: boolean, reducedMotion: boolean, night?: number, activityId?: string) => void;
 }
 
 const HAIR_COLORS = [0x3b2a20, 0x6b4a2e, 0xc9a26a, 0x2b2622, 0x8a4b2a, 0x9a9590, 0x5a3a28];
@@ -826,12 +907,13 @@ function place(x: number, y: number, z: number, sx: number, sy: number, sz: numb
  * that does not move independently is baked into one smooth-shaded mesh, so a
  * crowd of fifty stays at five draw calls each.
  */
-export function createCitizenFigure(paletteIndex: number, seed: number): CitizenFigure {
+export function createCitizenFigure(paletteIndex: number, seed: number, residentStyle?:string): CitizenFigure {
+  if (residentStyle) return createShapingFigure(residentStyle, seed);
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
 
-  const shirt = CITIZEN_PALETTE[paletteIndex % CITIZEN_PALETTE.length] ?? CITIZEN_PALETTE[0]!;
+  const shirt = CITIZEN_PALETTE[paletteIndex % CITIZEN_PALETTE.length]!;
   const skin = pick(SKIN_TONES, seed * 7 + 1);
   const hair = pick(HAIR_COLORS, seed * 5 + 3);
   const trousers = pick(TROUSER_COLORS, seed * 11 + 5);
@@ -945,17 +1027,23 @@ export function actionColor(action: string | null): number {
 
 /** Recursively frees GPU resources for every geometry/material under `object`, including `object` itself. */
 export function disposeObject(object: THREE.Object3D): void {
+  const geometries=new Set<THREE.BufferGeometry>();
+  const materials=new Set<THREE.Material>();
+  const textures=new Set<THREE.Texture>();
   object.traverse((child: THREE.Object3D) => {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      const material = child.material;
-      if (Array.isArray(material)) {
-        for (const m of material) m.dispose();
-      } else {
-        material.dispose();
+    if (child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Line) {
+      // Instanced light grains (and fountain jets) own their instance buffers.
+      if (child instanceof THREE.InstancedMesh) child.dispose();
+      geometries.add(child.geometry);
+      for(const material of Array.isArray(child.material)?child.material:[child.material]) {
+        materials.add(material);
+        for(const value of Object.values(material)) if(value instanceof THREE.Texture)textures.add(value);
       }
     }
   });
+  textures.forEach(texture=>texture.dispose());
+  materials.forEach(material=>material.dispose());
+  geometries.forEach(geometry=>geometry.dispose());
 }
 
 export { TILE_HEIGHT };

@@ -222,7 +222,7 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
     }
     for (const existing of plans.values()) {
       if (existing.cancelled_at) continue;
-      const pending = existing.steps.filter(s => s.status === 'pending' || s.status === 'failed');
+      const pending = existing.steps.filter(s => ['pending', 'waiting', 'failed'].includes(s.status));
       for (const step of pending) {
         const resource = step.payload.action === 'apply_world_line_event'
           ? 'world-line' : `npc:${step.payload.npc?.npc_id ?? step.payload.npc_id}`;
@@ -243,14 +243,25 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
       if (plan.cancelled_at) continue;
       for (const step of plan.steps) {
         if (step.status === 'failed') break;
+        if (step.status === 'waiting') {
+          const task = worldSnapshot?.().tasks?.find(task => task.task_id === step.task_id);
+          if (task && ['running', 'paused'].includes(task.status)) break;
+          step.status = task?.status === 'completed' ? 'applied' : 'failed';
+          step.applied_at = now().toISOString();
+          if (step.status === 'failed') step.error = task?.failure_reason ?? task?.status ?? 'task_missing';
+          persistence?.put('life.plans', plan.id, plan);
+          if (step.status === 'failed') break;
+        }
         if (step.status !== 'pending') continue;
         if (Date.parse(step.at) > now().getTime() || applied >= 3) break;
         try {
-          ingest({ event_id: `life:${plan.id}:${step.index}`, type: 'world.mutation',
+          const result = ingest({ event_id: `life:${plan.id}:${step.index}`, type: 'world.mutation',
             source: 'shared-life-scheduler', source_kind: 'world_engine', layer: 'world_line',
             occurred_at: step.at, observed_at: step.at, confidence: 1,
             character_id: DEFAULT_CHARACTER_ID, payload: step.payload });
-          step.status = 'applied';
+          const task = result?.worldMutation?.mutation?.details?.task;
+          step.status = task && ['running', 'paused'].includes(task.status) ? 'waiting' : 'applied';
+          if (step.status === 'waiting') step.task_id = task.task_id;
           step.applied_at = now().toISOString();
           applied++;
         } catch (error) {
@@ -259,6 +270,7 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
             ? error.code : 'world_mutation_rejected';
         }
         persistence?.put('life.plans', plan.id, plan);
+        if (step.status === 'waiting') break;
       }
     }
     return { applied };
@@ -268,6 +280,12 @@ export function createSharedLife({ persistence = null, now = () => new Date(), i
     if (!plan) throw new InputError(404, 'plan_not_found', 'Plan not found');
     plan.cancelled_at ??= now().toISOString();
     for (const step of plan.steps) {
+      if (step.status === 'waiting') {
+        const task = worldSnapshot?.().tasks?.find(task => task.task_id === step.task_id);
+        if (task && ['running', 'paused'].includes(task.status)) ingest({ event_id: `life-cancel:${id}:${step.index}:${task.revision}`, type: 'world.mutation',
+          source: 'shared-life-scheduler', character_id: DEFAULT_CHARACTER_ID, occurred_at: now().toISOString(), payload: { action: 'control_task', task_id: task.task_id, operation: 'cancel' } });
+        step.status = 'cancelled';
+      }
       if (step.status === 'pending') step.status = 'cancelled';
     }
     persistence?.put('life.plans', id, plan);

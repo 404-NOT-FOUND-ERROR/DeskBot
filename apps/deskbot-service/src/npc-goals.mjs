@@ -144,6 +144,13 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
     if (!['pause', 'resume', 'cancel'].includes(operation)) throw new InputError(400, 'invalid_goal_operation', 'Invalid goal operation');
     if (TERMINAL_STATES.has(current.state) || (operation !== 'cancel' && current.state === 'failed')) throw new InputError(409, 'goal_terminal', 'Create a new goal after this terminal goal');
     if (operation === 'resume' && current.state !== 'paused') throw new InputError(409, 'goal_not_paused', 'Only a paused goal can resume');
+    const taskId = current.steps?.[current.current_step_index]?.task_id ?? current.task_id;
+    const task = worldSnapshot().tasks?.find(item => item.task_id === taskId);
+    if (task && ['running', 'paused'].includes(task.status)) {
+      const timestamp = now().toISOString();
+      ingest({ event_id: `goal-task:${id}:${task.revision}:${operation}`, type: 'world.mutation', source: 'npc-goal-control',
+        character_id: 'shaping-001', occurred_at: timestamp, payload: { action: 'control_task', task_id: taskId, operation } });
+    }
     const state = operation === 'pause' ? 'paused' : operation === 'resume' ? 'active' : 'cancelled';
     return save({ ...current, state, waiting: state === 'active' ? null : current.waiting, ...(state === 'cancelled' ? { ended_at: now().toISOString() } : {}) });
   }
@@ -170,6 +177,22 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
     }
     const timestamp = now();
     const world = worldSnapshot();
+    if (step.task_id) {
+      const task = world.tasks?.find(item => item.task_id === step.task_id);
+      if (task && ['running', 'paused'].includes(task.status)) return;
+      step.state = task?.status === 'completed' ? 'completed' : 'failed';
+      step.ended_at = timestamp.toISOString();
+      if (step.state === 'failed') step.error = task?.failure_reason ?? task?.status ?? 'task_missing';
+      goal.step_history.push({ step_id: step.step_id, state: step.state, task_id: step.task_id, ended_at: step.ended_at, error: step.error ?? null });
+      goal.waiting = null;
+      if (step.state === 'completed') {
+        goal.current_step_index += 1;
+        goal.state = goal.current_step_index >= goal.steps.length ? 'completed' : 'active';
+        if (goal.state === 'completed') goal.completed_at = step.ended_at;
+      } else { goal.state = 'failed'; goal.error = step.error; goal.ended_at = step.ended_at; }
+      save(goal);
+      return;
+    }
     const deadlinePassed = step.deadline_at && timestamp.getTime() > Date.parse(step.deadline_at);
     const readyAtPassed = !step.wait_until || timestamp.getTime() >= Date.parse(step.wait_until);
     const conditionReady = conditionSatisfied(step.when, world);
@@ -210,6 +233,15 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
     }
     try {
       const result = ingest(step.decision.event);
+      const startedTask = result?.worldMutation?.mutation?.details?.task;
+      if (startedTask && ['running', 'paused'].includes(startedTask.status)) {
+        step.task_id = startedTask.task_id;
+        step.state = 'waiting';
+        goal.state = 'waiting';
+        goal.waiting = { step_id: step.step_id, reason: 'world_task', task_id: startedTask.task_id, since: timestamp.toISOString() };
+        save(goal);
+        return;
+      }
       step.state = 'completed';
       step.ended_at = now().toISOString();
       goal.step_history.push({ step_id: step.step_id, state: 'completed', ended_at: step.ended_at, event_id: step.decision.event.event_id, duplicate: Boolean(result?.duplicate) });
@@ -230,6 +262,15 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
   }
   function tickLegacy(original) {
     const goal = structuredClone(original);
+    if (goal.task_id) {
+      const task = worldSnapshot().tasks?.find(item => item.task_id === goal.task_id);
+      if (task && ['running', 'paused'].includes(task.status)) return;
+      goal.state = task?.status === 'completed' ? 'completed' : 'failed';
+      if (goal.state === 'completed') goal.completed_at = now().toISOString();
+      else { goal.error = task?.failure_reason ?? task?.status ?? 'task_missing'; goal.ended_at = now().toISOString(); }
+      save(goal);
+      return;
+    }
     if (!goal.decision) {
       if (reserved(goal.npc_id)) return;
       const world = worldSnapshot();
@@ -241,7 +282,12 @@ export function createNpcGoals({ persistence = null, now = () => new Date(), wor
         event: { ...eventFor(goal, { step_id: 'legacy', payload: chosen.payload }, timestamp), event_id: `npc-goal:${goal.id}` } };
       save(goal);
     }
-    try { ingest(goal.decision.event); goal.state = 'completed'; goal.completed_at = now().toISOString(); }
+    try {
+      const result = ingest(goal.decision.event);
+      const task = result?.worldMutation?.mutation?.details?.task;
+      if (task && ['running', 'paused'].includes(task.status)) { goal.task_id = task.task_id; goal.state = 'waiting'; }
+      else { goal.state = 'completed'; goal.completed_at = now().toISOString(); }
+    }
     catch (error) { goal.state = 'failed'; goal.error = error.code ?? 'npc_action_failed'; goal.ended_at = now().toISOString(); }
     save(goal);
   }

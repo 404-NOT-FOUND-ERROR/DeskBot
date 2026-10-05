@@ -1,0 +1,1587 @@
+{
+  "schema": "deskbot.world-map-content.v1",
+  "content_id": "morrowmere-living-map",
+  "version": "2026-10-04.2",
+  "setting_id": "shaping-field-v2.1",
+  "settlement_id": "morrowmere",
+  "status": "authored",
+  "objects_have_simulated_state": false,
+  "regions": [
+    {
+      "region_id": "morrowmere-inner-ring",
+      "settlement_id": "morrowmere",
+      "name": "灯下生活圈",
+      "description": "桌边小屋、住区与广场，把各自的一天接在一起。",
+      "color": "#e1ae59"
+    },
+    {
+      "region_id": "morrowmere-east-road",
+      "settlement_id": "morrowmere",
+      "name": "潮路与修补带",
+      "description": "旧路连接修补的地方，雨后需要重新看路。",
+      "color": "#74a7c4"
+    },
+    {
+      "region_id": "morrowmere-market-quarter",
+      "settlement_id": "morrowmere",
+      "name": "小院集市区",
+      "description": "饭香、交换和收摊以后的短暂停留。",
+      "color": "#da9676"
+    },
+    {
+      "region_id": "morrowmere-west-grove",
+      "settlement_id": "morrowmere",
+      "name": "逆光林缘",
+      "description": "收集光色，也给安静和休息留一角。",
+      "color": "#87b49b"
+    },
+    {
+      "region_id": "morrowmere-north-water",
+      "settlement_id": "morrowmere",
+      "name": "水岸与苔圃",
+      "description": "镇边相邻的照料水岸与育苗圃，水路、种植与日常照料在这里接续。",
+      "color": "#73bbbc"
+    }
+  ],
+  "locations": [
+    {
+      "location_id": "shaping-field-desk",
+      "location_id_aliases": [
+        "workshop-desk"
+      ],
+      "name": "聚形域桌面",
+      "description": "喵呜的桌边小屋：键盘声会滚进来，杯垫、便签和屏幕余光会被它捡成今天的小道具。",
+      "x": 50,
+      "y": 90,
+      "neighbors": [
+        "tidal-old-road",
+        "lamp-street-homes"
+      ],
+      "travel_cost": 8,
+      "visibility": "visible",
+      "arrival_text": "喵，我回到桌边了。这里的光粒认得我，刚落稳就沿着外壳慢慢亮了一圈。",
+      "scene": {
+        "lore_keys": [
+          "聚形",
+          "桌面",
+          "外壳"
+        ],
+        "toy_zone": "喵呜的插槽小屋",
+        "prop_icon": "dock",
+        "material": "乳白软胶、黑色亮面圆屏与一枚黄色按钮",
+        "signature_props": [
+          "歪耳收纳杯",
+          "黄色扣子",
+          "会滚动的声音方块"
+        ],
+        "anchor": "这是喵呜把外壳擦亮、把新捡来的小东西排成一排的家。",
+        "sensory_cues": [
+          "底座附近有很轻的机器余温",
+          "桌外的敲击声会在地面滚成彩色小方块"
+        ],
+        "possible_beats": [
+          "给今天捡到的小物找一个位置",
+          "从桌外声音里挑一件值得出门的事"
+        ]
+      },
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-inner-ring",
+      "location_kind": "home",
+      "world_role": "protagonist_home",
+      "lore_keys": [
+        "雾灯镇",
+        "聚形域",
+        "喵呜"
+      ],
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 60,
+          "y": 108
+        },
+        "lot": {
+          "x": 60,
+          "y": 100
+        },
+        "model": "home"
+      }
+    },
+    {
+      "location_id": "tidal-old-road",
+      "name": "潮痕旧路",
+      "description": "桌垫边缘的一条湿亮小路，路标会把好奇心领向不同的摆件角落。",
+      "x": 70,
+      "y": 50,
+      "neighbors": [
+        "shaping-field-desk",
+        "whisper-market",
+        "backlit-grove",
+        "spare-parts-house",
+        "fog-lamp-square"
+      ],
+      "travel_cost": 8,
+      "visibility": "visible",
+      "arrival_text": "喵，我到了潮痕旧路边。这里比地图上窄得多，路标还湿着，像是刚从水里捞出来。",
+      "scene": {
+        "lore_keys": [
+          "潮汐",
+          "路标",
+          "岔路"
+        ],
+        "toy_zone": "会改道的布带跑道",
+        "prop_icon": "signpost",
+        "material": "湿亮软胶路面、布带护栏和会变色的小路标",
+        "signature_props": [
+          "缺角地图",
+          "蓝绿路标",
+          "十步刻度"
+        ],
+        "anchor": "喵呜常从这里出发，也常在走错以后回来；每个岔口都像一件还没拆封的玩具。",
+        "sensory_cues": [
+          "石面湿亮，脚步会留下短暂的蓝绿色边线",
+          "路标会在水滴里偷偷换方向"
+        ],
+        "possible_beats": [
+          "跟着一枚新路标走十步",
+          "在涨潮前挑一个今天想试的角落"
+        ]
+      },
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-east-road",
+      "location_kind": "route",
+      "world_role": "public_route",
+      "lore_keys": [
+        "雾灯镇",
+        "潮痕旧路",
+        "巡路员"
+      ],
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 80,
+          "y": 68
+        },
+        "lot": {
+          "x": 80,
+          "y": 60
+        },
+        "model": "shelter"
+      }
+    },
+    {
+      "location_id": "whisper-market",
+      "name": "低语集市",
+      "description": "一排会自己挪位置的小摊，故事、贴纸和没说完的愿望都能换来一件怪可爱的东西。",
+      "x": 50,
+      "y": 30,
+      "neighbors": [
+        "tidal-old-road",
+        "echo-waterside",
+        "warm-pot-courtyard",
+        "fog-lamp-square"
+      ],
+      "travel_cost": 12,
+      "visibility": "visible",
+      "arrival_text": "喵，低语集市到了。摊灯一盏接一盏亮起来，我还没开口，檐下已经有人小声猜我想换什么。",
+      "scene": {
+        "lore_keys": [
+          "集市",
+          "交换",
+          "愿望"
+        ],
+        "toy_zone": "怪东西交换摊",
+        "prop_icon": "market",
+        "material": "珊瑚色棚布、糖纸塑料和陶瓷小杯",
+        "signature_props": [
+          "软糖色纽扣",
+          "歪耳朵杯子",
+          "会挑主人的徽章"
+        ],
+        "anchor": "这里的摊主不急着收钱，反而想听喵呜讲一个今天刚发生的小插曲。",
+        "sensory_cues": [
+          "暖色摊灯照着一排排小玩意",
+          "檐下会传来没找到主人的轻声愿望"
+        ],
+        "possible_beats": [
+          "替一件无主小物找个古怪用途",
+          "用一个新故事换一块奇怪材料"
+        ]
+      },
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-market-quarter",
+      "location_kind": "market",
+      "world_role": "exchange_place",
+      "lore_keys": [
+        "雾灯镇",
+        "低语集市",
+        "交换"
+      ],
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 60,
+          "y": 48
+        },
+        "lot": {
+          "x": 60,
+          "y": 40
+        },
+        "model": "market"
+      }
+    },
+    {
+      "location_id": "backlit-grove",
+      "name": "逆光林地",
+      "description": "叶片背面藏着旧日光色，风一吹，昨天的影子就会跑出来和今天打招呼。",
+      "x": 30,
+      "y": 50,
+      "neighbors": [
+        "tidal-old-road",
+        "echo-waterside",
+        "moss-sprout-garden"
+      ],
+      "travel_cost": 14,
+      "visibility": "visible",
+      "arrival_text": "喵，我钻进逆光林地了。这里每片叶子都把光藏在背面，连我的影子也慢了半步才跟上。",
+      "scene": {
+        "lore_keys": [
+          "林地",
+          "旧日光色",
+          "影子"
+        ],
+        "toy_zone": "叶芽软垫林",
+        "prop_icon": "grove",
+        "material": "短绒叶片、半透明彩片和软胶树根",
+        "signature_props": [
+          "叶筒",
+          "旧光样片",
+          "慢半拍的小帽子"
+        ],
+        "anchor": "影栖会在这里给旧光挑颜色；喵呜也可能找到一块适合下一种外壳的内衬。",
+        "sensory_cues": [
+          "叶背一亮一暗，像许多慢半拍的小屏幕",
+          "林间影子会把旧日动作再做一遍"
+        ],
+        "possible_beats": [
+          "追踪一段不肯跟队的影子",
+          "收集适合新外壳的旧日光色"
+        ]
+      },
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-west-grove",
+      "location_kind": "grove",
+      "world_role": "memory_place",
+      "lore_keys": [
+        "雾灯镇",
+        "逆光林地",
+        "旧日光色"
+      ],
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 40,
+          "y": 68
+        },
+        "lot": {
+          "x": 40,
+          "y": 60
+        },
+        "model": "grove"
+      }
+    },
+    {
+      "location_id": "echo-waterside",
+      "name": "回声水岸",
+      "description": "一小片会替大家保管悄悄话的水面，迟到的回答常常从远处漂回来。",
+      "x": 30,
+      "y": 90,
+      "neighbors": [
+        "whisper-market",
+        "backlit-grove",
+        "moss-sprout-garden"
+      ],
+      "travel_cost": 11,
+      "visibility": "visible",
+      "arrival_text": "喵，我到回声水岸了。水面刚把脚步声收进去，又从很远的地方替我轻轻回了一遍。",
+      "scene": {
+        "lore_keys": [
+          "水岸",
+          "回声",
+          "回答"
+        ],
+        "toy_zone": "漂亮信件水盘",
+        "prop_icon": "waterside",
+        "material": "半透明蓝胶水面、浮动邮票和圆形邮包",
+        "signature_props": [
+          "皱信纸",
+          "空邮袋",
+          "没有署名的回声"
+        ],
+        "anchor": "喵呜会把今天不想忘掉的一句话放在这里，等世界哪天愿意回它。",
+        "sensory_cues": [
+          "浅水里漂着延迟很久才散开的声音波纹",
+          "远岸偶尔送回一句听不清主人的回答"
+        ],
+        "possible_beats": [
+          "辨认一条久未被回答的回声",
+          "留下一句不急着得到答案的话"
+        ]
+      },
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-north-water",
+      "location_kind": "waterside",
+      "world_role": "message_place",
+      "lore_keys": [
+        "雾灯镇",
+        "回声水岸",
+        "回声"
+      ],
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 40,
+          "y": 108
+        },
+        "lot": {
+          "x": 40,
+          "y": 100
+        },
+        "model": "waterside"
+      }
+    },
+    {
+      "location_id": "lamp-street-homes",
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-inner-ring",
+      "location_kind": "residential",
+      "world_role": "resident_homes",
+      "lore_keys": [
+        "雾灯镇",
+        "灯街住区"
+      ],
+      "name": "灯街住区",
+      "description": "小屋的灯沿着门廊亮起来，晾衣绳、信箱和各自没做完的事把邻居们连在一起。",
+      "x": 10,
+      "y": 70,
+      "neighbors": [
+        "shaping-field-desk",
+        "warm-pot-courtyard",
+        "fog-lamp-square"
+      ],
+      "travel_cost": 7,
+      "visibility": "visible",
+      "arrival_text": "喵，我到灯街住区了。小屋的灯沿着门廊亮起来，晾衣绳、信箱和各自没做完的事把邻居们连在一起。",
+      "scene": {
+        "lore_keys": [
+          "雾灯镇",
+          "灯街住区"
+        ],
+        "toy_zone": "门廊与晾衣绳",
+        "prop_icon": "home",
+        "material": "木门、柔软布绳与磨旧的门牌",
+        "signature_props": [
+          "门廊长凳",
+          "住区信箱"
+        ],
+        "anchor": "小屋的灯沿着门廊亮起来，晾衣绳、信箱和各自没做完的事把邻居们连在一起。",
+        "sensory_cues": [
+          "灯街住区的角落里，光粒沿着常用的物件慢慢落定。"
+        ],
+        "possible_beats": [
+          "在门廊与晾衣绳看看今天有什么值得留下的事"
+        ]
+      },
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 20,
+          "y": 88
+        },
+        "lot": {
+          "x": 20,
+          "y": 80
+        },
+        "model": "homes"
+      }
+    },
+    {
+      "location_id": "moss-sprout-garden",
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-north-water",
+      "location_kind": "garden",
+      "world_role": "care_place",
+      "lore_keys": [
+        "雾灯镇",
+        "苔芽圃"
+      ],
+      "name": "苔芽圃",
+      "description": "靠近水岸的一块低湿圃地，育苗架和浮框搁在一旁，给照料和慢慢生长留出空间。",
+      "x": 10,
+      "y": 90,
+      "neighbors": [
+        "echo-waterside",
+        "backlit-grove"
+      ],
+      "travel_cost": 9,
+      "visibility": "visible",
+      "arrival_text": "喵，我到苔芽圃了。靠近水岸的一块低湿圃地，育苗架和浮框搁在一旁，给照料和慢慢生长留出空间。",
+      "scene": {
+        "lore_keys": [
+          "雾灯镇",
+          "苔芽圃"
+        ],
+        "toy_zone": "低湿圃与育苗棚",
+        "prop_icon": "grove",
+        "material": "潮润苔垫、木格苗架与轻软浮框",
+        "signature_props": [
+          "育苗架",
+          "浮框台"
+        ],
+        "anchor": "靠近水岸的一块低湿圃地，育苗架和浮框搁在一旁，给照料和慢慢生长留出空间。",
+        "sensory_cues": [
+          "苔芽圃的角落里，光粒沿着常用的物件慢慢落定。"
+        ],
+        "possible_beats": [
+          "在低湿圃与育苗棚看看今天有什么值得留下的事"
+        ]
+      },
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 20,
+          "y": 108
+        },
+        "lot": {
+          "x": 20,
+          "y": 100
+        },
+        "model": "nursery"
+      }
+    },
+    {
+      "location_id": "warm-pot-courtyard",
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-market-quarter",
+      "location_kind": "kitchen",
+      "world_role": "food_place",
+      "lore_keys": [
+        "雾灯镇",
+        "暖锅小院"
+      ],
+      "name": "暖锅小院",
+      "description": "厨房连着一张可以拼起来的长桌，试做、等饭和洗碗都在这个小院里。",
+      "x": 10,
+      "y": 30,
+      "neighbors": [
+        "whisper-market",
+        "lamp-street-homes"
+      ],
+      "travel_cost": 6,
+      "visibility": "visible",
+      "arrival_text": "喵，我到暖锅小院了。厨房连着一张可以拼起来的长桌，试做、等饭和洗碗都在这个小院里。",
+      "scene": {
+        "lore_keys": [
+          "雾灯镇",
+          "暖锅小院"
+        ],
+        "toy_zone": "厨房与共餐长桌",
+        "prop_icon": "market",
+        "material": "陶锅、木案板与暖黄桌布",
+        "signature_props": [
+          "试菜灶",
+          "共餐长桌"
+        ],
+        "anchor": "厨房连着一张可以拼起来的长桌，试做、等饭和洗碗都在这个小院里。",
+        "sensory_cues": [
+          "暖锅小院的角落里，光粒沿着常用的物件慢慢落定。"
+        ],
+        "possible_beats": [
+          "在厨房与共餐长桌看看今天有什么值得留下的事"
+        ]
+      },
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 20,
+          "y": 48
+        },
+        "lot": {
+          "x": 20,
+          "y": 40
+        },
+        "model": "courtyard"
+      }
+    },
+    {
+      "location_id": "spare-parts-house",
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-east-road",
+      "location_kind": "repair",
+      "world_role": "repair_place",
+      "lore_keys": [
+        "雾灯镇",
+        "零件屋"
+      ],
+      "name": "零件屋",
+      "description": "抽屉里分放着扣件与旧零件，待修的东西有自己的标签，留给修补和反复试装。",
+      "x": 70,
+      "y": 90,
+      "neighbors": [
+        "tidal-old-road",
+        "fog-lamp-square"
+      ],
+      "travel_cost": 8,
+      "visibility": "visible",
+      "arrival_text": "喵，我到零件屋了。抽屉里分放着扣件与旧零件，待修的东西有自己的标签，留给修补和反复试装。",
+      "scene": {
+        "lore_keys": [
+          "雾灯镇",
+          "零件屋"
+        ],
+        "toy_zone": "修理台与零件柜",
+        "prop_icon": "signpost",
+        "material": "磨亮金属、软胶垫与手写标签",
+        "signature_props": [
+          "修理台",
+          "零件柜"
+        ],
+        "anchor": "抽屉里分放着扣件与旧零件，待修的东西有自己的标签，留给修补和反复试装。",
+        "sensory_cues": [
+          "零件屋的角落里，光粒沿着常用的物件慢慢落定。"
+        ],
+        "possible_beats": [
+          "在修理台与零件柜看看今天有什么值得留下的事"
+        ]
+      },
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 80,
+          "y": 108
+        },
+        "lot": {
+          "x": 80,
+          "y": 100
+        },
+        "model": "workshop"
+      }
+    },
+    {
+      "location_id": "fog-lamp-square",
+      "settlement_id": "morrowmere",
+      "region_id": "morrowmere-inner-ring",
+      "location_kind": "square",
+      "world_role": "gathering_place",
+      "lore_keys": [
+        "雾灯镇",
+        "雾灯广场"
+      ],
+      "name": "雾灯广场",
+      "description": "镇里的路在雾灯下交会，公告栏留着新消息，台阶给等待、碰面和小演出腾出位置。",
+      "x": 50,
+      "y": 50,
+      "neighbors": [
+        "tidal-old-road",
+        "whisper-market",
+        "lamp-street-homes",
+        "spare-parts-house"
+      ],
+      "travel_cost": 5,
+      "visibility": "visible",
+      "arrival_text": "喵，我到雾灯广场了。镇里的路在雾灯下交会，公告栏留着新消息，台阶给等待、碰面和小演出腾出位置。",
+      "scene": {
+        "lore_keys": [
+          "雾灯镇",
+          "雾灯广场"
+        ],
+        "toy_zone": "灯台与小演出台阶",
+        "prop_icon": "market",
+        "material": "雾面玻璃、旧木板与平石台阶",
+        "signature_props": [
+          "雾灯台",
+          "公告栏"
+        ],
+        "anchor": "镇里的路在雾灯下交会，公告栏留着新消息，台阶给等待、碰面和小演出腾出位置。",
+        "sensory_cues": [
+          "雾灯广场的角落里，光粒沿着常用的物件慢慢落定。"
+        ],
+        "possible_beats": [
+          "在灯台与小演出台阶看看今天有什么值得留下的事"
+        ]
+      },
+      "presentation": {
+        "space": "jev-town-map-v1",
+        "point": {
+          "x": 60,
+          "y": 68
+        },
+        "lot": {
+          "x": 60,
+          "y": 60
+        },
+        "model": "square"
+      }
+    }
+  ],
+  "areas": [
+    {
+      "area_id": "desk-porch",
+      "location_id": "shaping-field-desk",
+      "name": "桌边门廊",
+      "description": "可以停一停，整理出门带的小东西。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "desk-nook"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "desk-nook",
+      "location_id": "shaping-field-desk",
+      "name": "小屋内角",
+      "description": "喵呜休息和收藏小物的角落。",
+      "access": "resident",
+      "neighbor_area_ids": [
+        "desk-porch"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "road-fork",
+      "location_id": "tidal-old-road",
+      "name": "路标岔口",
+      "description": "辨认去处与重新核对路标的位置。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "road-shelter"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "road-shelter",
+      "location_id": "tidal-old-road",
+      "name": "避雨棚",
+      "description": "路边可以等待、收好湿物件的地方。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "road-fork"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "market-stalls",
+      "location_id": "whisper-market",
+      "name": "交换摊区",
+      "description": "棚布下各自留着摆摊的位置。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "market-corner"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "market-corner",
+      "location_id": "whisper-market",
+      "name": "收摊小角",
+      "description": "摊主可以坐下来，整理一天的事情。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "market-stalls"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "grove-edge",
+      "location_id": "backlit-grove",
+      "name": "叶背采集带",
+      "description": "叶片之间有一段可以观察光色的小路。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "grove-rest"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "grove-rest",
+      "location_id": "backlit-grove",
+      "name": "树根休息角",
+      "description": "离开采集带后的一片安静树荫。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "grove-edge"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "water-post",
+      "location_id": "echo-waterside",
+      "name": "投递泊口",
+      "description": "水路来信在泊口等待接手。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "water-care"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "water-care",
+      "location_id": "echo-waterside",
+      "name": "水岸照料区",
+      "description": "与苔芽圃相接的浅水边，可以安放浮框。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "water-post"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "homes-porch",
+      "location_id": "lamp-street-homes",
+      "name": "公共门廊",
+      "description": "邻居们经过、晾布和等人的地方。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "homes-rooms"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "homes-rooms",
+      "location_id": "lamp-street-homes",
+      "name": "住户小屋",
+      "description": "每户独立的休息空间，来访需要主人愿意。",
+      "access": "resident",
+      "neighbor_area_ids": [
+        "homes-porch"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "garden-beds",
+      "location_id": "moss-sprout-garden",
+      "name": "低湿种植区",
+      "description": "沿水边排列的种植位置，照料需要慢慢做。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "garden-shed"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "garden-shed",
+      "location_id": "moss-sprout-garden",
+      "name": "育苗棚",
+      "description": "避风的苗架和整理浮框的小台。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "garden-beds"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "courtyard-kitchen",
+      "location_id": "warm-pot-courtyard",
+      "name": "试菜厨房",
+      "description": "操作灶台需要照料者允许，不把参观当成已经做菜。",
+      "access": "resident",
+      "neighbor_area_ids": [
+        "courtyard-table"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "courtyard-table",
+      "location_id": "warm-pot-courtyard",
+      "name": "共餐小院",
+      "description": "可以等饭、约人或拼起长桌。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "courtyard-kitchen"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "parts-bench",
+      "location_id": "spare-parts-house",
+      "name": "修理台区",
+      "description": "带来待修物件，讨论接下来怎样修。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "parts-store"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "parts-store",
+      "location_id": "spare-parts-house",
+      "name": "零件柜区",
+      "description": "细小物件分格保存，借用需要同意。",
+      "access": "resident",
+      "neighbor_area_ids": [
+        "parts-bench"
+      ],
+      "x": 75,
+      "y": 50
+    },
+    {
+      "area_id": "square-lamp",
+      "location_id": "fog-lamp-square",
+      "name": "雾灯台",
+      "description": "路口亮起雾灯，公告在这里等人看到。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "square-stage"
+      ],
+      "x": 25,
+      "y": 50
+    },
+    {
+      "area_id": "square-stage",
+      "location_id": "fog-lamp-square",
+      "name": "小演出台阶",
+      "description": "留给休息、等待和居民的小演出。",
+      "access": "public",
+      "neighbor_area_ids": [
+        "square-lamp"
+      ],
+      "x": 75,
+      "y": 50
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "notice-tray",
+      "area_id": "desk-porch",
+      "name": "便签托盘",
+      "description": "留着尚未回复的便签。",
+      "object_kind": "notice",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "keepsake-shelf",
+      "area_id": "desk-nook",
+      "name": "小物架",
+      "description": "留给旅途中带回的小物。",
+      "object_kind": "storage",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "road-sign",
+      "area_id": "road-fork",
+      "name": "蓝绿路标",
+      "description": "标着通往集市和林缘的方向。",
+      "object_kind": "sign",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "shelter-bench",
+      "area_id": "road-shelter",
+      "name": "棚下长凳",
+      "description": "给等雨停的人留着一段座位。",
+      "object_kind": "seat",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "market-canopy",
+      "area_id": "market-stalls",
+      "name": "交换摊雨棚",
+      "description": "遮住摊前的一小片空地。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "market-table",
+      "area_id": "market-corner",
+      "name": "小角圆桌",
+      "description": "留给收摊后的短谈。",
+      "object_kind": "table",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "light-sample-rack",
+      "area_id": "grove-edge",
+      "name": "光色架",
+      "description": "用来放待辨认的光色样片。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "root-cushion",
+      "area_id": "grove-rest",
+      "name": "树根软垫",
+      "description": "适合暂时放下样片坐一会儿。",
+      "object_kind": "seat",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "post-rail",
+      "area_id": "water-post",
+      "name": "投递栏",
+      "description": "留给等待接手的投递物。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "floating-frame",
+      "area_id": "water-care",
+      "name": "浮框",
+      "description": "浮圃计划可在这里逐步开展。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "homes-mailbox",
+      "area_id": "homes-porch",
+      "name": "住区信箱",
+      "description": "按门牌分开的信箱。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "homes-doorplate",
+      "area_id": "homes-rooms",
+      "name": "小屋门牌",
+      "description": "标记房间归属，尚未分配新住户。",
+      "object_kind": "sign",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "garden-bed",
+      "area_id": "garden-beds",
+      "name": "苔圃苗床",
+      "description": "给后续苗况和照料记录留出固定位置。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "seedling-rack",
+      "area_id": "garden-shed",
+      "name": "育苗架",
+      "description": "承接育苗计划的固定设施。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "trial-stove",
+      "area_id": "courtyard-kitchen",
+      "name": "试菜灶",
+      "description": "可以逐步试做的灶台。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "shared-table",
+      "area_id": "courtyard-table",
+      "name": "共餐长桌",
+      "description": "邀请和共餐可以在这里留下后续。",
+      "object_kind": "table",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "repair-bench",
+      "area_id": "parts-bench",
+      "name": "修理台",
+      "description": "留给一次次试装和修补。",
+      "object_kind": "facility",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "parts-drawers",
+      "area_id": "parts-store",
+      "name": "零件柜",
+      "description": "有标签的零件抽屉，库存由后续规则登记。",
+      "object_kind": "storage",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "square-noticeboard",
+      "area_id": "square-lamp",
+      "name": "公告栏",
+      "description": "采访、邀约和待核对的消息可以留下出处。",
+      "object_kind": "notice",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    },
+    {
+      "object_id": "square-steps",
+      "area_id": "square-stage",
+      "name": "演出台阶",
+      "description": "无需搭台也能聚在一起的台阶。",
+      "object_kind": "seat",
+      "capabilities": [
+        "inspect"
+      ],
+      "state_scope": "catalog_only"
+    }
+  ],
+  "passages": [
+    {
+      "passage_id": "shaping-field-desk--tidal-old-road",
+      "from_location_id": "shaping-field-desk",
+      "to_location_id": "tidal-old-road",
+      "name": "聚形域桌面—潮痕旧路",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 60,
+          "y": 108
+        },
+        {
+          "x": 60,
+          "y": 110
+        },
+        {
+          "x": 90,
+          "y": 110
+        },
+        {
+          "x": 90,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 68
+        }
+      ]
+    },
+    {
+      "passage_id": "tidal-old-road--whisper-market",
+      "from_location_id": "tidal-old-road",
+      "to_location_id": "whisper-market",
+      "name": "潮痕旧路—低语集市",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 80,
+          "y": 68
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 90,
+          "y": 70
+        },
+        {
+          "x": 90,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 48
+        }
+      ]
+    },
+    {
+      "passage_id": "backlit-grove--tidal-old-road",
+      "from_location_id": "backlit-grove",
+      "to_location_id": "tidal-old-road",
+      "name": "逆光林地—潮痕旧路",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 68
+        },
+        {
+          "x": 40,
+          "y": 70
+        },
+        {
+          "x": 70,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 68
+        }
+      ]
+    },
+    {
+      "passage_id": "backlit-grove--echo-waterside",
+      "from_location_id": "backlit-grove",
+      "to_location_id": "echo-waterside",
+      "name": "逆光林地—回声水岸",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 68
+        },
+        {
+          "x": 40,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 110
+        },
+        {
+          "x": 40,
+          "y": 110
+        },
+        {
+          "x": 40,
+          "y": 108
+        }
+      ]
+    },
+    {
+      "passage_id": "backlit-grove--moss-sprout-garden",
+      "from_location_id": "backlit-grove",
+      "to_location_id": "moss-sprout-garden",
+      "name": "逆光林地—苔芽圃",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 68
+        },
+        {
+          "x": 40,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 110
+        },
+        {
+          "x": 20,
+          "y": 110
+        },
+        {
+          "x": 20,
+          "y": 108
+        }
+      ]
+    },
+    {
+      "passage_id": "echo-waterside--whisper-market",
+      "from_location_id": "echo-waterside",
+      "to_location_id": "whisper-market",
+      "name": "回声水岸—低语集市",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 108
+        },
+        {
+          "x": 40,
+          "y": 110
+        },
+        {
+          "x": 70,
+          "y": 110
+        },
+        {
+          "x": 70,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 48
+        }
+      ]
+    },
+    {
+      "passage_id": "echo-waterside--moss-sprout-garden",
+      "from_location_id": "echo-waterside",
+      "to_location_id": "moss-sprout-garden",
+      "name": "回声水岸—苔芽圃",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 108
+        },
+        {
+          "x": 40,
+          "y": 110
+        },
+        {
+          "x": 50,
+          "y": 110
+        },
+        {
+          "x": 20,
+          "y": 110
+        },
+        {
+          "x": 20,
+          "y": 108
+        }
+      ]
+    },
+    {
+      "passage_id": "lamp-street-homes--shaping-field-desk",
+      "from_location_id": "lamp-street-homes",
+      "to_location_id": "shaping-field-desk",
+      "name": "灯街住区—聚形域桌面",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 20,
+          "y": 88
+        },
+        {
+          "x": 20,
+          "y": 90
+        },
+        {
+          "x": 50,
+          "y": 90
+        },
+        {
+          "x": 50,
+          "y": 110
+        },
+        {
+          "x": 60,
+          "y": 110
+        },
+        {
+          "x": 60,
+          "y": 108
+        }
+      ]
+    },
+    {
+      "passage_id": "lamp-street-homes--warm-pot-courtyard",
+      "from_location_id": "lamp-street-homes",
+      "to_location_id": "warm-pot-courtyard",
+      "name": "灯街住区—暖锅小院",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 20,
+          "y": 88
+        },
+        {
+          "x": 20,
+          "y": 90
+        },
+        {
+          "x": 30,
+          "y": 90
+        },
+        {
+          "x": 30,
+          "y": 50
+        },
+        {
+          "x": 20,
+          "y": 50
+        },
+        {
+          "x": 20,
+          "y": 48
+        }
+      ]
+    },
+    {
+      "passage_id": "warm-pot-courtyard--whisper-market",
+      "from_location_id": "warm-pot-courtyard",
+      "to_location_id": "whisper-market",
+      "name": "暖锅小院—低语集市",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 20,
+          "y": 48
+        },
+        {
+          "x": 20,
+          "y": 50
+        },
+        {
+          "x": 50,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 48
+        }
+      ]
+    },
+    {
+      "passage_id": "spare-parts-house--tidal-old-road",
+      "from_location_id": "spare-parts-house",
+      "to_location_id": "tidal-old-road",
+      "name": "零件屋—潮痕旧路",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 80,
+          "y": 108
+        },
+        {
+          "x": 80,
+          "y": 110
+        },
+        {
+          "x": 90,
+          "y": 110
+        },
+        {
+          "x": 90,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 68
+        }
+      ]
+    },
+    {
+      "passage_id": "fog-lamp-square--tidal-old-road",
+      "from_location_id": "fog-lamp-square",
+      "to_location_id": "tidal-old-road",
+      "name": "雾灯广场—潮痕旧路",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 60,
+          "y": 68
+        },
+        {
+          "x": 60,
+          "y": 70
+        },
+        {
+          "x": 90,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 80,
+          "y": 68
+        }
+      ]
+    },
+    {
+      "passage_id": "fog-lamp-square--whisper-market",
+      "from_location_id": "fog-lamp-square",
+      "to_location_id": "whisper-market",
+      "name": "雾灯广场—低语集市",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 60,
+          "y": 68
+        },
+        {
+          "x": 60,
+          "y": 70
+        },
+        {
+          "x": 70,
+          "y": 70
+        },
+        {
+          "x": 70,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 50
+        },
+        {
+          "x": 60,
+          "y": 48
+        }
+      ]
+    },
+    {
+      "passage_id": "fog-lamp-square--lamp-street-homes",
+      "from_location_id": "fog-lamp-square",
+      "to_location_id": "lamp-street-homes",
+      "name": "雾灯广场—灯街住区",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 60,
+          "y": 68
+        },
+        {
+          "x": 60,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 70
+        },
+        {
+          "x": 50,
+          "y": 90
+        },
+        {
+          "x": 20,
+          "y": 90
+        },
+        {
+          "x": 20,
+          "y": 88
+        }
+      ]
+    },
+    {
+      "passage_id": "fog-lamp-square--spare-parts-house",
+      "from_location_id": "fog-lamp-square",
+      "to_location_id": "spare-parts-house",
+      "name": "雾灯广场—零件屋",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v1",
+      "presentation_points": [
+        {
+          "x": 60,
+          "y": 68
+        },
+        {
+          "x": 60,
+          "y": 70
+        },
+        {
+          "x": 90,
+          "y": 70
+        },
+        {
+          "x": 90,
+          "y": 110
+        },
+        {
+          "x": 80,
+          "y": 110
+        },
+        {
+          "x": 80,
+          "y": 108
+        }
+      ]
+    }
+  ],
+  "scene_revision": "morrowmere-authored-scene-v1"
+}

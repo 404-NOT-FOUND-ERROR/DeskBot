@@ -7,9 +7,12 @@ import { TownMap } from "../components/TownMap.tsx";
 import type { LabelSpec } from "../three/sceneSpec.ts";
 import { buildRoutePreview, buildTravelVisual, resolveTravelRoute, type DeskBotTravelVisual } from "./routeVisual.ts";
 import { canonicalPointForLocation, canonicalRouteBetween } from "./canonicalGeometry.ts";
-import { buildNpcCandidates, deskbotBaseUrl, executeCandidate, fetchDeskBotWorld, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation } from "./bridge.ts";
+import { buildNpcCandidates, controlWorldTask, controlAutonomousLife, respondSocialInvitation, suggestLifeIdea, deskbotBaseUrl, executeCandidate, fetchDeskBotWorld, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation, startLivingActivity, transferResource } from "./bridge.ts";
 import type { DeskBotActionCandidate, DeskBotInteractionIntent, DeskBotLifeWorld, DeskBotNpc, DeskBotNpcInteractionResponse, DeskBotWorldMap, DeskBotWorldRouteResponse } from "./types.ts";
 import "./deskbot.css";
+import { LifeSidebar } from "./LifeSidebar.tsx";
+import {projectSceneActivities} from './activityProjection.ts';
+import {activeActorTask,taskDisplayTitle,taskTimeLabel,worldGlance} from './lifeGlance.ts';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -44,14 +47,11 @@ function position(x: number, y: number): Point {
   return { x, y };
 }
 
-function formatLogicalTime(map: DeskBotWorldMap): string {
-  const hours = Math.floor(map.logical_time.minute_of_day / 60).toString().padStart(2, "0");
-  const minutes = (map.logical_time.minute_of_day % 60).toString().padStart(2, "0");
-  return `第 ${map.logical_time.day} 天 · ${hours}:${minutes}`;
-}
-
 export function DeskBotApp() {
   const baseUrl = useMemo(deskbotBaseUrl, []);
+  const [npcSelectionRequest,setNpcSelectionRequest]=useState(0);
+  const suggestionRetry=useRef<{fingerprint:string;id:string}|null>(null);
+  const socialRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const [map, setMap] = useState<DeskBotWorldMap | null>(null);
   const [life, setLife] = useState<DeskBotLifeWorld | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
@@ -64,16 +64,41 @@ export function DeskBotApp() {
   const [chatBusy, setChatBusy] = useState(false);
   const [storyLines, setStoryLines] = useState<StoryLine[]>([]);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [placeFocusRequest,setPlaceFocusRequest]=useState(0);
   const [selectedRoute, setSelectedRoute] = useState<DeskBotWorldRouteResponse | null>(null);
   const [routeBusy, setRouteBusy] = useState(false);
   const [travelBusy, setTravelBusy] = useState(false);
   const [arrivalText, setArrivalText] = useState<string | null>(null);
   const [travelVisual, setTravelVisual] = useState<DeskBotTravelVisual | null>(null);
-  const [message, setMessage] = useState("正在读取 DeskBot canonical world…");
+  const [message, setMessage] = useState("正在连接雾灯镇…");
   const interactionRetry = useRef<{ fingerprint: string; id: string } | null>(null);
   const chatRetry = useRef<{ fingerprint: string; id: string } | null>(null);
   const travelRetry = useRef<{ fingerprint: string; id: string } | null>(null);
+  const livingRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const routeRequest = useRef(0);
+  const observedTask = useRef<{ id: string; status: string } | null>(null);
+  const currentTask = map?.tasks?.find(task => task.actor_id === map.protagonist.character_id && ["running", "paused"].includes(task.status));
+  const travelling = currentTask?.kind === "travel";
+  const ownLife=map?.autonomy?.actors.find(actor=>actor.actor_id===map.protagonist.character_id);
+  const taskTitle = currentTask ? taskDisplayTitle(map,currentTask) : undefined;
+  const glance=worldGlance(map);
+  const sceneActivities=useMemo(()=>projectSceneActivities(map),[map]);
+
+  useEffect(() => {
+    const previous = observedTask.current;
+    const task = previous ? map?.tasks?.find(task => task.task_id === previous.id) : null;
+    if (previous && task?.status === "completed" && previous.status !== "completed" && task.kind === "travel") {
+      const place = map?.locations.find(place => place.location_id === task.destination_location_id);
+      setArrivalText(place?.arrival_text || `我到${place?.name ?? "目的地"}了。`);
+      setMessage(`已抵达${place?.name ?? "目的地"}。`);
+    }
+    if (previous && task?.status === "failed" && previous.status !== "failed") {
+      setArrivalText(null);
+      setMessage(task.failure_reason === "travel_blocked" ? "道路受阻，这次出行停在上次确认的位置；可以重新选择路线。" : task.activity_id ? `${task.title}未完成：${task.failure_reason}，预留材料已归还。` : "这次活动没有完成，已保存结果；可以重新安排。");
+    }
+    if(previous&&task?.status==='completed'&&previous.status!=='completed'&&task.activity_id)setMessage(task.completion?.result?.text??`${task.title}完成了。`);
+    observedTask.current = currentTask ? { id: currentTask.task_id, status: currentTask.status } : task ? { id: task.task_id, status: task.status } : previous;
+  }, [map, currentTask]);
 
   // Async reads can finish out of order (especially while a travel animation
   // is running). Never let an older canonical revision roll the scene back.
@@ -96,6 +121,7 @@ export function DeskBotApp() {
   }, []);
   const handlePlaceClick = useCallback((locationId: string) => {
     setSelectedPlaceId(locationId);
+    setPlaceFocusRequest(request=>request+1);
     setSelectedRoute(null);
     setArrivalText(null);
   }, []);
@@ -104,12 +130,27 @@ export function DeskBotApp() {
     setStoryLines((current) => [...current.filter((item) => item.id !== line.id), line].slice(-16));
   }
 
+  async function runLivingAction(activityId:string|null,objectId?:string,resource?:string,operation?:"take"|"store") {
+    const fingerprint=JSON.stringify([activityId,objectId,resource,operation]);
+    if(livingRetry.current?.fingerprint!==fingerprint)livingRetry.current={fingerprint,id:newWorldEventId('living')};
+    setBusy(true);
+    try {
+      const eventId=livingRetry.current.id;
+      if(activityId)await startLivingActivity(activityId,eventId,baseUrl);
+      else await transferResource(objectId!,resource!,operation!,eventId,baseUrl);
+      livingRetry.current=null;await refresh();setMessage(activityId?'活动已经开始，经过实际时间后会检查结果。':operation==='take'?'物品已放进随身袋。':'物品已存回这里。');
+    } catch(error){setMessage(error instanceof Error?error.message:'活动未完成');}finally{setBusy(false);}
+  }
+
+  async function toggleAutonomy(){if(!ownLife)return;setBusy(true);try{await controlAutonomousLife(ownLife.paused?'resume':'pause',baseUrl);await refresh();setMessage(ownLife.paused?'喵呜恢复自行安排生活。':'下一次自发安排暂缓，手里的活动仍会继续。');}catch(error){setMessage(error instanceof Error?error.message:'更新失败');}finally{setBusy(false);}}
+  async function respondInvitation(id:string,operation:'join'|'decline'|'withdraw'){const fingerprint=id+':'+operation;if(socialRetry.current?.fingerprint!==fingerprint)socialRetry.current={fingerprint,id:newWorldEventId('social')};setBusy(true);try{await respondSocialInvitation(id,operation,socialRetry.current.id,baseUrl);socialRetry.current=null;await refresh();setMessage(operation==='join'?'愿意参加，手头的事忙完再赴约。':operation==='decline'?'已经告诉对方这次不参加。':'已经告诉对方退出，实际做过的事会保存。');}catch(error){setMessage(error instanceof Error?error.message:'约定更新失败');}finally{setBusy(false);}}
+
   const refresh = useCallback(async () => {
     try {
       const snapshot = await fetchDeskBotWorld(baseUrl);
       applyMap(snapshot.map);
       applyLife(snapshot.life);
-      setMessage(`已读取 world revision ${snapshot.map.world_revision}；页面没有维护第二份世界事实。`);
+      setMessage("小镇的近况已更新。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "无法读取 DeskBot 世界");
     }
@@ -181,20 +222,22 @@ export function DeskBotApp() {
       id: numericId(map.protagonist.character_id, 500000),
       name: "喵呜",
       role: "聚形中的潮玩生命体",
-      personality: protagonistLocation?.arrival_text || "正在观察这个持续世界。",
+      personality: map.protagonist.travel_state?.status === "travelling" ? "正在路上，尚未抵达。" : protagonistLocation?.arrival_text || "正在观察这个持续世界。",
       homeId: "cottage_north",
       workId: "market",
       palette: 4,
+      residentStyle: 'shaping-001',
       leaning: {},
     };
     return [protagonist, ...map.npcs.map((npc, index) => ({
       id: npcIds.get(npc.npc_id)!,
       name: npc.display_name,
-      role: npc.role,
+      role: npc.role_label??npc.role,
+      residentStyle:npc.resident_version?npc.npc_id:undefined,
       personality: `${npc.temperament}；${npc.status}`,
       homeId: "cottage_north" as const,
       workId: "market" as const,
-      palette: index % 6,
+      palette: npc.palette??index % 6,
       leaning: {},
     }))];
   }, [map, npcIds]);
@@ -208,18 +251,20 @@ export function DeskBotApp() {
       const point = canonicalPointForLocation(protagonistLocation);
       result.set(numericId(map.protagonist.character_id, 500000), position(point.x, point.y));
     }
-    map.npcs.forEach((npc, index) => {
+    map.npcs.forEach((npc) => {
       const location = byId.get(npc.location_id);
       if (!location) return;
-      const spread = (index - (map.npcs.length - 1) / 2) * 2.5;
+      const peers=map.npcs.filter(n=>n.location_id===npc.location_id),rank=peers.findIndex(n=>n.npc_id===npc.npc_id);
+      const angle=rank/Math.max(1,peers.length)*Math.PI*2;
+      const spreadX=peers.length>1?Math.cos(angle)*3:0,spreadY=peers.length>1?Math.sin(angle)*3:0;
       const point = canonicalPointForLocation(location);
-      result.set(npcIds.get(npc.npc_id)!, position(point.x + spread, point.y + spread));
+      result.set(npcIds.get(npc.npc_id)!, position(point.x + spreadX, point.y + spreadY));
     });
     return result;
   }, [map, npcIds]);
 
   const labels = useMemo<readonly LabelSpec[]>(() => map?.locations.map((location) => {
-    const point = canonicalPointForLocation(location);
+    const point = location.presentation?.lot ?? canonicalPointForLocation(location);
     const world = mapToWorld(point.x, point.y);
     return {
       id: location.location_id,
@@ -245,6 +290,7 @@ export function DeskBotApp() {
     ? encounters.find((npc) => npc.npc_id === selectedNpcBase.npc_id) ?? selectedNpcBase
     : null;
   const selectedNpcIsPresent = Boolean(selectedNpc && encounterIds.has(selectedNpc.npc_id));
+  const selectedNpcTask=activeActorTask(map,selectedNpc?.npc_id);
   const candidates = map && selectedNpc ? buildNpcCandidates(map, selectedNpc) : [];
   const selectedPlace = map?.locations.find((location) => location.location_id === selectedPlaceId) ?? null;
   const selectedRouteSteps = selectedRoute?.route.steps ?? [];
@@ -295,7 +341,7 @@ export function DeskBotApp() {
   }
 
   async function confirmTravel() {
-    if (!map || !selectedPlace || selectedPlace.current || travelBusy || routeBusy || !selectedRoute?.route.found || selectedRoute.route.blocked) return;
+    if (!map || !selectedPlace || selectedPlace.current || currentTask || travelBusy || routeBusy || !selectedRoute?.route.found || selectedRoute.route.blocked) return;
     const locationId = selectedPlace.location_id;
     const fingerprint = locationId;
     const eventId = travelRetry.current?.fingerprint === fingerprint
@@ -348,6 +394,10 @@ export function DeskBotApp() {
       applyMap(result.map);
       setSelectedRoute(null);
       setSelectedPlaceId(null);
+      if (result.pending) {
+        setMessage(`喵呜已出发前往${selectedPlace.name}，途中进度会继续保存。`);
+        return;
+      }
       const finalLocation = result.map.locations.find((location) => location.current);
       const arrival = finalLocation?.arrival_text || selectedPlace.arrival_text || `喵，我到${selectedPlace.name}了。`;
       setArrivalText(arrival);
@@ -431,18 +481,27 @@ export function DeskBotApp() {
     }
   }
 
+  async function sendSuggestion(suggestion:string) {
+    if(busy)return;
+    if(suggestionRetry.current?.fingerprint!==suggestion)suggestionRetry.current={fingerprint:suggestion,id:newWorldEventId('suggestion')};
+    setBusy(true);
+    try {await suggestLifeIdea(suggestion,suggestionRetry.current.id,baseUrl);suggestionRetry.current=null;await refresh();setMessage('建议已经送达，喵呜会在下一次安排时考虑。');}
+    catch(error){setMessage(error instanceof Error?error.message:'建议没有送达');}
+    finally{setBusy(false);}
+  }
+
   return (
     <div className="deskbot-mode">
       <header className="deskbot-mode__header">
         <div>
-          <span className="deskbot-mode__eyebrow">CECILIA JEV TOWN × DESKBOT · WORLD CLIENT</span>
-          <h1>{map?.settlement?.display_name ?? "雾灯镇"} · 聚形域</h1>
-          <p>{map?.settlement?.narrative_anchor ?? "Jev Town 负责低多边形舞台与人物运动；DeskBot 仍是唯一世界事实来源。"}</p>
+          <span className="deskbot-mode__eyebrow">THE SHAPING FIELD · 聚形域</span>
+          <h1>{map?.settlement?.display_name ?? "雾灯镇"}<span>伴生世界</span></h1>
+          <p>光粒聚成的生命，在这里慢慢过日子。</p>
         </div>
         <div className="deskbot-mode__status">
-          <strong>{map ? formatLogicalTime(map) : "等待世界"}</strong>
-          <span>revision {map?.world_revision ?? "-"}</span>
-          <button type="button" onClick={() => void refresh()}>重新读取</button>
+          <div className="deskbot-mode__clock"><span>{glance.date?`${glance.date} · 上海`:'上海 · 与现实相伴'}</span><strong>{glance.clock}</strong></div>
+          <div className="deskbot-mode__weather" aria-label="当前昼夜和天气"><span className="deskbot-mode__phase"><i aria-hidden="true">{['午夜','深夜','入夜'].includes(glance.phase)?'☾':'✧'}</i>{glance.phase}</span><span title={map?.environment?.weather.wind_mps!=null&&glance.weatherState==='fresh'?`风 ${map.environment.weather.wind_mps.toFixed(1)} m/s`:undefined}>{glance.weather}{glance.temperature!==null?` ${glance.temperature}°`:''}</span></div>
+          <div className="deskbot-mode__header-actions"><button type="button" disabled={!map} onClick={()=>map&&handlePlaceClick(map.protagonist.location_id)}>看看喵呜 <span aria-hidden="true">↗</span></button><button type="button" onClick={() => void refresh()} aria-label="刷新小镇近况">↻</button></div>
         </div>
       </header>
 
@@ -451,6 +510,10 @@ export function DeskBotApp() {
           <TownMap
             citizens={citizens}
             labels={labels}
+            sceneLocations={map?.locations}
+            environment={map?.environment}
+            focusLocationId={selectedPlaceId}
+            focusRequest={placeFocusRequest}
             positions={positions}
             durations={durations}
             actions={actions}
@@ -458,16 +521,18 @@ export function DeskBotApp() {
             focusedAction={null}
             onFocusAction={() => {}}
             onPlaceClick={handlePlaceClick}
+            onCitizenClick={id=>{const npc=map?.npcs.find(n=>npcIds.get(n.npc_id)===id);if(npc){setSelectedNpcId(npc.npc_id);setNpcSelectionRequest(v=>v+1);}}}
             travelVisual={travelVisual}
             routePreview={routePreview}
+            activities={sceneActivities}
           />
-          <section className="deskbot-mode__story" aria-label="雾灯镇当前故事">
+          <details className="deskbot-mode__story" aria-label="雾灯镇当前故事" open={storyLines.length>0?true:undefined}><summary><span>喵呜 · {map?.locations.find(l=>l.current)?.name??"雾灯镇"}</span><strong>{currentTask?taskTitle:"此刻的日常"}</strong></summary>
             <div className="deskbot-mode__story-scene">
-              <span>此刻 · {map?.locations.find((location) => location.current)?.name ?? "雾灯镇"}</span>
-              <h2>{life?.current_scene?.title ?? "雾灯镇的日常"}</h2>
-              <p>{life?.current_scene?.narration ?? "风从镇边的水路慢慢吹来。喵呜正沿着地图看向下一个想去的地方。"}</p>
-              {life?.current_scene?.sensory_cue ? <em>{life.current_scene.sensory_cue}</em> : null}
-              {life?.current_scene?.opportunity ? <small>喵呜还在惦记：{life.current_scene.opportunity}（尚未发生）</small> : null}
+              <span>{travelling ? "此刻 · 在路上" : `此刻 · ${map?.locations.find((location) => location.current)?.name ?? "雾灯镇"}`}</span>
+              <h2>{currentTask ? taskTitle : life?.current_scene?.title ?? "雾灯镇的日常"}</h2>
+              <p>{currentTask?.origin==='autonomous_life' ? ownLife?.plan?.reason : travelling ? currentTask.status === "paused" ? "这次出行暂时停下了。继续时会接着剩下的路程走。" : "喵呜还没抵达。这段路按现实时间慢慢走，关掉网页也会继续。" : life?.current_scene?.narration ?? "风从镇边的水路慢慢吹来。喵呜正沿着地图看向下一个想去的地方。"}</p>
+              {!currentTask && life?.current_scene?.sensory_cue ? <em>{life.current_scene.sensory_cue}</em> : null}
+              {!currentTask && life?.current_scene?.opportunity ? <small>喵呜还在惦记：{life.current_scene.opportunity}（尚未发生）</small> : null}
             </div>
             {storyLines.length ? (
               <ol className="deskbot-mode__story-lines" aria-live="polite" aria-relevant="additions text">
@@ -480,14 +545,31 @@ export function DeskBotApp() {
             ) : null}
             {lastInteraction?.experience ? <small className="deskbot-mode__story-note">共同经历已记入：{lastInteraction.experience.summary}</small> : null}
             {lastInteraction?.role_evidence?.direction ? <small className="deskbot-mode__story-note">角色方向线索：{lastInteraction.role_evidence.direction.label} · 观察中，尚未改变身份或外壳</small> : null}
-          </section>
+          </details>
 
           {selectedPlace ? (
             <section className="deskbot-mode__place-card" aria-label={`${selectedPlace.name} 地点信息`}>
               <button className="deskbot-mode__place-close" type="button" aria-label="关闭地点信息" onClick={() => { setSelectedPlaceId(null); setSelectedRoute(null); }}>×</button>
               <span className="deskbot-mode__eyebrow">{selectedPlace.current ? "喵呜现在就在这里" : selectedRoute?.route.blocked ? "路线暂时受阻" : selectedRoute?.route.found ? (selectedRouteIsTransfer ? `需要中转 · ${selectedRouteSteps.length} 段` : "直达 · 相邻地点") : routeBusy ? "正在规划路线…" : "暂无可行路线"}</span>
               <h2>{selectedPlace.name}</h2>
+              {selectedPlace.areas?.some(area=>area.objects?.some(object=>object.state)) ? <div className="deskbot-mode__living-summary" aria-label="当前环境与设施">{selectedPlace.areas.flatMap(area=>area.objects??[]).filter(object=>object.state).map(object=><p key={object.object_id}><strong>{object.name}</strong><span>{object.status_text}</span></p>)}</div> : null}
               <p>{selectedPlace.description || "这里还没有留下描述。"}</p>
+              <small>{map?.regions?.find(region => region.region_id === selectedPlace.region_id)?.name}</small>
+              <div className="deskbot-mode__area-list" aria-label="地点内部区域">
+                {selectedPlace.areas?.map(area => <details key={area.area_id}>
+                  <summary>{area.name}<span>{area.access === "resident" ? "来访需同意" : "公共区域"}</span></summary>
+                  <p>{area.description}</p>
+                  {area.objects?.map(object => <div key={object.object_id}><strong>{object.name}</strong><p>{object.status_text??object.description}</p>
+                    {object.state?.stock?<div className="deskbot-mode__stock" aria-label={`${object.name}库存`}>{Object.entries(object.state.stock).map(([resource,count])=><div key={resource}><span>{map?.living?.resource_names[resource]??resource} {Math.floor(count)} 份</span>
+                      {selectedPlace.current?<><button disabled={busy||Boolean(currentTask)||count<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'take')}>取 1 份</button><button disabled={busy||Boolean(currentTask)||(map?.living?.inventory.stock[resource]??0)<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'store')}>存 1 份</button></>:null}</div>)}</div>:null}
+                  </div>)}
+                </details>)}
+              </div>
+              <div className="deskbot-mode__living-actions" aria-label="这里的生活活动">{map?.living?.activities.filter(activity=>activity.location_id===selectedPlace.location_id).map(activity=><div key={activity.activity_id}>
+                <button disabled={busy||!activity.available} onClick={()=>void runLivingAction(activity.activity_id)}>{activity.title} · {Math.ceil(activity.duration_seconds/60)} 分钟</button>
+                <small>{activity.available ? activity.inputs.length?activity.inputs.map(input=>`${input.from}：${input.name} ${input.count} 份`).join('，'):'不需要材料' : activity.unavailable_reason}</small>
+              </div>)}</div>
+              {map?.paths?.filter(path => !path.open && [path.from_location_id,path.to_location_id].includes(selectedPlace.location_id)).map(path => <small key={path.passage_id ?? `${path.from_location_id}-${path.to_location_id}`} className="deskbot-mode__closed-path">通路暂时封闭：{path.blocked_reason}</small>)}
               {!selectedPlace.current && selectedRoute?.route.found && !selectedRoute.route.blocked ? (
                 <>
                   <small>{selectedRouteIsTransfer ? "这不是不可达，而是需要沿相邻地点逐段前往。" : "当前地点与目标地点相邻，可以直接前往。"}</small>
@@ -502,7 +584,7 @@ export function DeskBotApp() {
                     </ol>
                   ) : null}
                   <small>预计 {selectedRoute.route.total_cost_minutes} 分钟；每一段都会重新确认世界状态。</small>
-                  <button className="deskbot-mode__travel-button" type="button" disabled={travelBusy || routeBusy} onClick={() => void confirmTravel()}>
+                  <button className="deskbot-mode__travel-button" type="button" disabled={travelBusy || routeBusy || Boolean(currentTask)} onClick={() => void confirmTravel()}>
                     {travelBusy ? (selectedRouteIsTransfer ? "正在逐段前往…" : "正在前往…") : (selectedRouteIsTransfer ? `按路线前往${selectedPlace.name}` : `前往${selectedPlace.name}`)}
                   </button>
                 </>
@@ -536,24 +618,25 @@ export function DeskBotApp() {
           </form>
         </section>
 
-        <aside className="deskbot-mode__side">
-          <section className="deskbot-mode__panel">
-            <span className="deskbot-mode__eyebrow">NPC · 来自 canonical map</span>
-            <div className="deskbot-mode__npc-tabs">
-              {map?.npcs.map((npc) => (
-                <button key={npc.npc_id} type="button" className={selectedNpc?.npc_id === npc.npc_id ? "is-active" : ""} onClick={() => { setSelectedNpcId(npc.npc_id); setCandidate(null); }}>
-                  {npc.display_name}<span>{encounterIds.has(npc.npc_id) ? "当前相遇" : "远处"}</span>
-                </button>
-              ))}
-            </div>
+        <LifeSidebar onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
+            <p className="deskbot-mode__task-time">{taskTimeLabel(currentTask)}</p>
+            {travelling ? <small>正从{map?.locations.find(place => place.current)?.name??'上一处地点'}出发，尚未抵达。</small> : null}
+            <div className="deskbot-mode__task-controls"><button type="button" disabled={busy} onClick={() => { void (async () => { setBusy(true); try { await controlWorldTask(currentTask.task_id, currentTask.status === "paused" ? "resume" : "pause", baseUrl); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败"); } finally { setBusy(false); } })(); }}>{currentTask.status === "paused" ? "继续" : "暂停"}</button>
+            <button type="button" disabled={busy} onClick={() => { void (async () => { setBusy(true); try { await controlWorldTask(currentTask.task_id, "cancel", baseUrl); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "取消失败"); } finally { setBusy(false); } })(); }}>取消这次活动</button></div>
+            {currentTask.activity_id?<small className="deskbot-mode__task-note">材料已备好。暂停时留着，取消或失败后会归还。</small>:null}
+          </section> : null} npcDetail={<section className="deskbot-mode__panel">
+            <span className="deskbot-mode__eyebrow">这位居民的近况</span>
             {selectedNpc ? (
               <div className="deskbot-mode__npc">
                 <h2>{selectedNpc.display_name}</h2>
-                <strong>{selectedNpc.status}</strong>
+                <strong>{selectedNpcTask?taskDisplayTitle(map,selectedNpcTask):selectedNpc.status}</strong>
+                {selectedNpcTask?<small className="deskbot-mode__resident-time">{taskTimeLabel(selectedNpcTask)}</small>:null}
+                <button className="life-place-link" onClick={()=>handlePlaceClick(selectedNpc.location_id)}>{map?.locations.find(l=>l.location_id===selectedNpc.location_id)?.name} ↗</button>
                 <p>{selectedNpc.bio}</p>
-                <small>{selectedNpc.speech_style}</small>
+                {selectedNpc.desires?<p>惦记：{selectedNpc.desires[0]}</p>:null}
+                {selectedNpc.project?<small>长一点的愿望：{selectedNpc.project.goal} · 还在慢慢尝试</small>:null}
                 {selectedNpc.relationship ? (
-                  <div className="deskbot-mode__relationship" aria-label="与这个 NPC 的关系记录">
+                  <div className="deskbot-mode__relationship" aria-label="与这位居民的关系记录">
                     <span>熟悉 {selectedNpc.relationship.familiarity}</span>
                     <span>信任 {selectedNpc.relationship.trust}</span>
                     <span>相遇 {selectedNpc.relationship.encounters}</span>
@@ -571,16 +654,27 @@ export function DeskBotApp() {
                         ))}
                       </div>
                       <label className="deskbot-mode__idea-label" htmlFor="npc-idea">想和对方交换什么想法</label>
-                      <textarea id="npc-idea" maxLength={500} value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="写下一件你想和这个 NPC 一起试试的事" />
+                      <textarea id="npc-idea" maxLength={500} value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="写下一件你想和这位居民 一起试试的事" />
                       <small className="deskbot-mode__idea-count">{idea.length}/500</small>
                     </>
-                  ) : <p className="deskbot-mode__not-present">喵呜和这位 NPC 不在同一地点。先在世界里相遇后，才能进行当面互动。</p>}
+                  ) : <p className="deskbot-mode__not-present">还没在同一处碰面。先到对方所在的地方，再当面聊聊。</p>}
                 </div>
               </div>
-            ) : <p>当前没有 NPC。</p>}
-          </section>
-
-          <section className="deskbot-mode__panel">
+            ) : <p>镇上还没有居民。</p>}
+          </section>} experienceDetail={<><details className="life-settled"><summary>共同经历</summary><section className="deskbot-mode__panel">
+            <span className="deskbot-mode__eyebrow">最近一起经历的小事</span>
+            {life?.recent_experiences.length ? (
+              <ol className="deskbot-mode__experiences">
+                {[...life.recent_experiences].reverse().slice(0, 5).map((experience) => (
+                  <li key={experience.experience_id}>
+                    <strong>{experience.npc_name ?? "世界记录"}</strong>
+                    <span>{experience.summary}</span>
+                    <time dateTime={experience.occurred_at}>{new Date(experience.occurred_at).toLocaleString("zh-CN", { timeZone:'Asia/Shanghai', month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="deskbot-mode__empty-experiences">还没有共同经历。和同一地点的居民打个招呼，日子就开始留下痕迹。</p>}
+          </section></details><details className="life-settled"><summary>开发调试 · 居民行程</summary><section className="deskbot-mode__panel">
             <span className="deskbot-mode__eyebrow">NPC 行程候选 · 管理视图 · 尚未发生</span>
             <div className="deskbot-mode__candidates">
               {candidates.map((item) => (
@@ -596,29 +690,12 @@ export function DeskBotApp() {
                 <button type="button" disabled={busy} onClick={() => void confirmCandidate()}>{busy ? "正在交给 DeskBot…" : "确认这次行动"}</button>
               </div>
             ) : null}
-          </section>
-
-          <section className="deskbot-mode__panel">
-            <span className="deskbot-mode__eyebrow">最近共同经历 · DeskBot 持久记录</span>
-            {life?.recent_experiences.length ? (
-              <ol className="deskbot-mode__experiences">
-                {[...life.recent_experiences].reverse().slice(0, 5).map((experience) => (
-                  <li key={experience.experience_id}>
-                    <strong>{experience.npc_name ?? "世界记录"}</strong>
-                    <span>{experience.summary}</span>
-                    <time dateTime={experience.occurred_at}>{new Date(experience.occurred_at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
-                  </li>
-                ))}
-              </ol>
-            ) : <p className="deskbot-mode__empty-experiences">还没有共同经历。与同地点 NPC 互动后，记录会出现在这里。</p>}
-          </section>
-        </aside>
+          </section></details></>}/>
       </main>
 
       <footer className="deskbot-mode__footer">
         <span>{message}</span>
-        <code>{baseUrl}</code>
-        <a href="/">返回原 Jev Town</a>
+        <details><summary>开发信息</summary><code>{baseUrl} · 世界版本 {map?.world_revision}</code><a href="http://127.0.0.1:4322/" target="_blank" rel="noreferrer">研究界面 ↗</a></details>
       </footer>
     </div>
   );

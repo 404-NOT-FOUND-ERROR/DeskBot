@@ -6,7 +6,8 @@ import { canonicalPointForLocation, canonicalRouteBetween } from "./canonicalGeo
 /** Presentation-space contract shared by the DeskBot route service and Jev Town. */
 export const DESKBOT_PRESENTATION_SPACE = "jev-town-map-v1";
 const PRESENTATION_MIN = 0;
-const PRESENTATION_MAX = 100;
+// The scene slab is 120 wide; admitted routes use the 10..110 street boundary.
+const PRESENTATION_MAX = 110;
 
 /**
  * A visual segment for the protagonist's current canonical world step.

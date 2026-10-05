@@ -1,0 +1,78 @@
+.town-map--shaping {
+  isolation: isolate;
+  background: #dce5d6;
+  border-radius: 22px;
+}
+.town-map--shaping .map-controls {
+  border-radius: 14px;
+  padding: 5px;
+  gap: 4px;
+  backdrop-filter: blur(12px);
+  background: #fbf8edeb;
+  box-shadow: 0 4px 18px #233c3520;
+}
+.town-map--shaping .map-controls button {
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+  min-width: 30px;
+  padding: 6px 8px;
+}
+.town-map--shaping .map-controls button:hover { background: #477c6812; }
+.town-map--shaping .map-controls__zoom-value { font-size: 10px; font-variant-numeric: tabular-nums; }
+.town-map--shaping .place-label {
+  color: #304840;
+  padding: 5px 10px;
+  border: 1px solid #efe8cebd;
+  border-radius: 6px 12px 12px;
+  background: #fffbece3;
+  font-size: 11px;
+  font-weight: 650;
+  box-shadow: 0 3px 8px #2445391d;
+  backdrop-filter: blur(5px);
+}
+.town-map--shaping .place-label::after {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 1px;
+  height: 7px;
+  background: #fbf5dc9c;
+  left: 50%;
+  bottom: -7px;
+}
+.town-map--shaping .citizen-badge--life {
+  background: #fbf3dce8;
+  color: #436858;
+  border: 1px solid #a6bda57d;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  box-shadow: 0 2px 8px #253d3222;
+  animation: none;
+}
+.town-map--shaping .citizen-badge--life[hidden] { display: none; }
+.town-map--shaping .citizen-badge--life.is-paused { color: #8b7961; }
+.town-map--shaping .citizen-hotspot__tooltip {
+  min-width: 168px;
+  max-width: 230px;
+  border: 1px solid #dfdbc5;
+  border-radius: 14px;
+  background: #fffbedf5;
+  box-shadow: 0 8px 22px #273e3425;
+  color: #344c42;
+}
+.town-map--shaping .citizen-hotspot__tooltip-life {
+  display: block;
+  padding: 5px 0;
+  font-size: 11px;
+  color: #537967;
+}
+@media(max-width:600px) {
+  .town-map--shaping .map-controls { max-width: calc(100% - 24px); }
+  .town-map--shaping .map-controls button { min-width: 26px; padding: 6px; }
+  .town-map--shaping .map-controls__zoom-value { min-width: 30px; }
+}

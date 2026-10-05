@@ -254,6 +254,17 @@ body { overflow-x:hidden; background:#0b2430; }
 .game-map .map-routes { opacity:.86; }
 .game-map .map-route { stroke:rgba(30,64,65,.34); stroke-width:3.4; stroke-dasharray:3 5; stroke-linecap:round; }
 .game-map .map-route.reachable { stroke:#fff7d5; stroke-width:5.5; stroke-dasharray:1 0; filter:drop-shadow(0 2px 0 rgba(53,75,72,.45)); }
+.game-map .map-route.closed { stroke:#bc615c; stroke-width:3; stroke-dasharray:2 4; opacity:.7; }
+.map-area-list { display:grid; gap:7px; margin:10px 0; }
+.map-area-list details { border:1px solid rgba(42,93,95,.2); border-radius:6px; padding:7px; background:rgba(255,252,232,.55); }
+.map-area-list summary { cursor:pointer; color:#31545a; font-size:11px; font-weight:700; }
+.map-area-list summary small { color:#678287; font-size:9px; font-weight:400; }
+.map-area-list details > div { border-top:1px solid rgba(42,93,95,.15); padding-top:6px; margin-top:6px; }
+.map-closure-note { color:#a84d49 !important; }
+.map-place-directory { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
+.map-place-directory button { border:1px solid rgba(42,93,95,.22); border-radius:5px; padding:4px 6px; color:#31545a; background:rgba(255,252,232,.65); font:inherit; font-size:10px; cursor:pointer; }
+.map-place-directory button.selected { color:white; background:#377f7c; }
+.map-inspector { max-height:calc(100% - 200px); overflow:auto; }
 .game-map .map-location { z-index:4; width:148px; color:#173c43; text-shadow:0 1px 0 rgba(255,255,255,.75); }
 .game-map .map-location i { position:relative; display:block; width:54px; height:48px; border:2px solid rgba(53,93,98,.75); border-radius:15px 12px 17px 11px; background:#f6f1d5; box-shadow:0 0 0 5px rgba(255,255,255,.65),0 5px 0 rgba(33,75,78,.28); transition:transform .18s ease,filter .18s ease; }
 .game-map .map-location i::before,.game-map .map-location i::after,.game-map .map-location i b { position:absolute; display:block; content:""; }
@@ -502,3 +513,7 @@ body { overflow-x:hidden; background:#0b2430; }
   .game-dock button span { font-size:14px; }
   .world-stage + .research-only,.world-stage ~ .research-only { width:min(100% - 20px,600px); }
 }
+.map-living-actions { display:grid; gap:8px; margin:10px 0; }
+.map-living-actions > div { display:grid; gap:4px; }
+.map-living-actions small { font-size:.75rem; opacity:.8; }
+.map-self-life{border:1px solid #bcc9ad;background:#f1f1df;border-radius:10px;padding:10px;margin:12px 0}

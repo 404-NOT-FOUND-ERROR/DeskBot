@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { localWorldDate } from './realtime-world.mjs';
 
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 
@@ -14,7 +15,7 @@ const MAX_EVIDENCE = 500;
 const MAX_PULLS = 500;
 const EVIDENCE_WINDOW_DAYS = 30;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
-const RULE_VERSION = 'role-evolution-rules.v0.7';
+const RULE_VERSION = 'role-evolution-rules.v0.8';
 
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
@@ -87,12 +88,13 @@ function stableEvents(inputStore, characterId, limit) {
     });
 }
 
-function logicalDay(value) {
+function logicalDay(value, timeZone = null) {
+  if (timeZone) return localWorldDate(value, timeZone)?.date ?? null;
   const at = Date.parse(value ?? '');
   return Number.isFinite(at) ? new Date(at).toISOString().slice(0, 10) : null;
 }
 
-function evidenceFromPull(pull, events, at, windowDays = EVIDENCE_WINDOW_DAYS) {
+function evidenceFromPull(pull, events, at, windowDays = EVIDENCE_WINDOW_DAYS, timeZone = null) {
   const eventsById = new Map(events.map((event) => [event.event_id, event]));
   return (Array.isArray(pull.evidence) ? pull.evidence : pull.evidence_ids.map((evidenceId) => ({
     evidence_id: evidenceId,
@@ -126,13 +128,17 @@ function evidenceFromPull(pull, events, at, windowDays = EVIDENCE_WINDOW_DAYS) {
       provenance: structuredClone(event.provenance ?? null),
       observed_at: observedAt,
       occurred_at: occurredAt,
-      logical_day: logicalDay(observedAt),
+      logical_day: logicalDay(timeZone ? occurredAt : observedAt, timeZone),
+      day_basis: timeZone ? 'occurred_at_local_calendar' : 'observed_at_utc_simulation',
+      time_zone: timeZone,
       expires_at: expiresAt,
       status: Date.parse(observedAt) + windowDays * 24 * 3600000 > at.getTime() ? 'active' : 'expired',
       fingerprint: fingerprint({
         evidence_id: item.evidence_id,
         event_id: item.event_id,
         direction_id: pull.direction_id,
+        day_basis: timeZone,
+        logical_day: logicalDay(timeZone ? occurredAt : observedAt, timeZone),
         cues: item.cues ?? [],
         source: item.source ?? event.source ?? null,
         polarity: item.polarity ?? 'support',
@@ -301,7 +307,7 @@ export function createRoleEvolution({
     const cooldownUntilMs = cooldown?.cooldown_until ? Date.parse(cooldown.cooldown_until) : 0;
     const nowMs = at.getTime();
     const withinCooldown = Number.isFinite(cooldownUntilMs) && cooldownUntilMs > nowMs;
-    const evidenceRecords = evidenceFromPull(pull, events, at, evidenceWindowDays);
+    const evidenceRecords = evidenceFromPull(pull, events, at, evidenceWindowDays, worldSnapshot?.()?.clock?.mode === 'real_time' ? worldSnapshot().clock.time_zone : null);
     for (const record of evidenceRecords) saveEvidence({ ...record, character_id: characterId });
     const supportEvidenceRecords = evidenceRecords.filter((record) => record.support_weight > 0);
     const logicalDays = [...new Set(supportEvidenceRecords.map((record) => record.logical_day).filter(Boolean))];
@@ -397,8 +403,9 @@ export function createRoleEvolution({
     const events = stableEvents(inputStore, resolvedCharacterId, limit)
       .filter((event) => withinEvidenceWindow(event, at, evidenceWindowDays));
     const eventFingerprint = fingerprint(events.map((event) => event.event_id));
-    const evaluationDay = logicalDay(at.toISOString());
-    const runId = `role-evolution:${resolvedCharacterId}:${RULE_VERSION}:${evaluationDay}:${eventFingerprint.slice(0, 24)}`;
+    const timeZone = worldSnapshot?.()?.clock?.mode === 'real_time' ? worldSnapshot().clock.time_zone : null;
+    const evaluationDay = logicalDay(at.toISOString(), timeZone);
+    const runId = `role-evolution:${resolvedCharacterId}:${RULE_VERSION}:${timeZone ?? 'simulation-utc'}:${evaluationDay}:${eventFingerprint.slice(0, 24)}`;
     const existingRun = runs.get(runId);
     if (existingRun) {
       lastRunId = existingRun.run_id;
@@ -406,7 +413,7 @@ export function createRoleEvolution({
     }
     const pulls = computeFantasyPull(events, { now: at, maxCandidates: 12 });
     const materialized = pulls.map((pull) => {
-      const pullEvidence = evidenceFromPull(pull, events, at, evidenceWindowDays);
+      const pullEvidence = evidenceFromPull(pull, events, at, evidenceWindowDays, timeZone);
       const pullFingerprint = fingerprint({
         direction_id: pull.direction_id,
         evidence_ids: pull.evidence_ids,

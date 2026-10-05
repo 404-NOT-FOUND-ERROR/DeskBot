@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 function requireText(value, field) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -45,7 +46,7 @@ export function loadLlmConfiguration({ env = process.env, configPath = env.DESKB
     const filename = resolve(configPath);
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync(filename, 'utf8'));
+      parsed = JSON.parse(readFileSync(filename, 'utf8').replace(/^\uFEFF/, ''));
     } catch (error) {
       throw new LlmConfigurationError(`unable to read DESKBOT_LLM_CONFIG: ${error.message}`);
     }
@@ -60,6 +61,10 @@ export function loadLlmConfiguration({ env = process.env, configPath = env.DESKB
     base_url: requireText(env.DESKBOT_LLM_BASE_URL ?? fileConfig.base_url, 'base_url'),
     api_key: requireText(env.DESKBOT_LLM_API_KEY ?? fileConfig.api_key, 'api_key'),
     model: requireText(env.DESKBOT_LLM_MODEL ?? fileConfig.model, 'model'),
+    ...(provider === 'deepseek' ? {
+      thinking: fileConfig.thinking === 'enabled' ? 'enabled' : 'disabled',
+      max_tokens: Math.min(4096, Math.max(64, Number.parseInt(fileConfig.max_tokens, 10) || 768)),
+    } : {}),
   };
 }
 
@@ -71,6 +76,8 @@ export function createOpenAiCompatibleLlm({
   fetchImpl = globalThis.fetch,
   timeoutMs = 60_000,
   emptyResponseRetries = 1,
+  thinking = null,
+  max_tokens = null,
 } = {}) {
   const endpoint = completionUrl(baseUrl);
   const secret = requireText(apiKey, 'api_key');
@@ -84,9 +91,10 @@ export function createOpenAiCompatibleLlm({
 
   return {
     id: 'openai-compatible-v0.1',
-    async complete({ prompt }) {
+    async complete({ prompt, purpose }) {
       const promptText = requireText(prompt, 'prompt');
-      const attempts = Math.max(0, Number(emptyResponseRetries)) + 1;
+      const choosing=purpose==='life_choice';
+      const attempts = choosing?1:Math.max(0, Number(emptyResponseRetries)) + 1;
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         let response;
@@ -102,8 +110,10 @@ export function createOpenAiCompatibleLlm({
               messages: [{ role: 'user', content: promptText }],
               stream: false,
               temperature: samplingTemperature,
+              ...(thinking ? { thinking: { type: thinking } } : {}),
+              ...(choosing ? {max_tokens:512,response_format:{type:'json_object'}} : max_tokens ? { max_tokens } : {}),
             }),
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: AbortSignal.timeout(choosing?20_000:timeoutMs),
           });
         } catch (error) {
           lastError = new LlmProviderError('llm_transport_error', 'LLM request failed before a provider response was received', {
@@ -149,6 +159,48 @@ export function createOpenAiCompatibleLlm({
         };
       }
       throw lastError ?? new LlmProviderError('llm_invalid_response', 'LLM endpoint returned no assistant text');
+    },
+  };
+}
+
+// Read the local file on each request so saving a key or changing the model
+// takes effect without restarting the persistent world. Never fall back to
+// generated test text when a real provider is unavailable.
+export function createReloadableLlm({ env = process.env, configPath, fetchImpl, now = () => new Date() } = {}) {
+  let verified = null;
+  let failure = null;
+  const read = () => loadLlmConfiguration({ env: { ...env, DESKBOT_LLM_PROVIDER: 'deepseek' }, configPath });
+  const signature = c => createHash('sha256').update(JSON.stringify(c)).digest('hex');
+  return {
+    id: 'deepseek-api-v0.1',
+    status() {
+      try {
+        const c = read(), same = verified?.signature === signature(c);
+        return { provider: 'deepseek', model: c.model, configured: true, status: failure?.signature === signature(c) ? 'error' : same ? 'connected' : 'configured',
+          verified_at: same ? verified.at : null, last_error: failure?.signature === signature(c) ? failure.code : null,
+          role: 'dialogue_only', high_level_decisions: 'bounded_rules' };
+      } catch {
+        return { provider: 'deepseek', model: 'deepseek-flash', configured: false, status: 'not_configured',
+          verified_at: null, last_error: 'llm_configuration_required', role: 'dialogue_only', high_level_decisions: 'bounded_rules' };
+      }
+    },
+    async complete(input) {
+      let c;
+      try { c = read(); } catch {
+        const error = new LlmProviderError('llm_configuration_required', '请在本地配置文件中填写 DeepSeek 密钥并保存。', { retryable: false });
+        error.statusCode = 503;
+        throw error;
+      }
+      const key = signature(c);
+      try {
+        const result = await createOpenAiCompatibleLlm({ ...c, fetchImpl }).complete(input);
+        verified = { signature: key, at: now().toISOString() };
+        failure = null;
+        return { ...result, provider: this.id };
+      } catch (error) {
+        failure = { signature: key, code: error.code ?? 'llm_provider_error' };
+        throw error;
+      }
     },
   };
 }

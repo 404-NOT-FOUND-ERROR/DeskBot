@@ -464,6 +464,7 @@ export function createWeatherConnector({
       url.searchParams.set('latitude', String(resolved.latitude));
       url.searchParams.set('longitude', String(resolved.longitude));
       url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m');
+      url.searchParams.set('wind_speed_unit', 'ms');
       url.searchParams.set('timezone', resolved.timezone);
     }
     const controller = new AbortController();
@@ -669,6 +670,7 @@ export function createWeatherConnector({
         url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum');
       }
       url.searchParams.set('forecast_days', kind === 'daily' ? '7' : '2');
+      url.searchParams.set('wind_speed_unit', 'ms');
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), resolved.timeoutMs);

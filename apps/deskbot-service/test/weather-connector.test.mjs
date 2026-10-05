@@ -161,6 +161,7 @@ test('weather refresh reuses a fresh observation without another provider reques
     config: { enabled: true, endpoint: 'https://api.open-meteo.com/v1/forecast', provider: 'open-meteo', location: '上海', latitude: 31.2304, longitude: 121.4737, ttlMs: 1800000 },
     fetchImpl: async (url, options) => {
       calls += 1;
+      assert.equal(new URL(url).searchParams.get('wind_speed_unit'), 'ms');
       return fakeFetch({ timezone: 'Asia/Shanghai', utc_offset_seconds: 28800, current: { time: '2026-09-07T16:00', temperature_2m: 26, relative_humidity_2m: 70, weather_code: 1, wind_speed_10m: 3 } })(url, options);
     },
   });

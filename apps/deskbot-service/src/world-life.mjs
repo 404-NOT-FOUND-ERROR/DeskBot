@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { activeWorldTask } from './realtime-world.mjs';
 import { InputError } from './input-store.mjs';
 import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
 import { loadMorrowmereContent } from './content-packages.mjs';
@@ -11,6 +12,7 @@ import {
 } from './npc-personas.mjs';
 
 const SLOT_MS = 30 * 60 * 1000;
+import { residentResponse } from './resident-life.mjs';
 const NPC_ROUTINE_SLOT_MS = 2 * 60 * 60 * 1000;
 const SCENE_COOLDOWN_COUNT = 2;
 const LIFE_CONTENT_VERSION = 'world-life-v2';
@@ -250,7 +252,7 @@ function selectCausalScene(world, now, { roleStages = [] } = {}) {
     if (causalSceneConsumed(world, branch, cause.eventIds, cause.experienceIds) && !sameCurrent) continue;
     const startSlot = sameCurrent && current.started_at ? Math.floor(Date.parse(current.started_at) / SLOT_MS) : slot;
     if (sameCurrent && slot > startSlot) continue;
-    const participants = (world.npcs ?? []).filter(npc => npc.location_id === locationId).map(npc => npc.npc_id).sort();
+    const participants = (world.npcs ?? []).filter(npc => npc.location_id === locationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map(npc => npc.npc_id).sort();
     const causeKey = [...cause.eventIds, ...cause.experienceIds].join(':');
     const contextSuffix = createHash('sha256').update(`${LIFE_CONTENT_VERSION}:${branch.id}:${causeKey}:${locationId}`).digest('hex').slice(0, 6);
     return {
@@ -321,7 +323,7 @@ function selectScene(world, now, { roleStages = [] } = {}) {
   const selected = choices[hashNumber(`${locationId}:${world.logical_time?.day}:${slot}:${eventKey}:${weatherKey}:${roleKey}`) % choices.length];
   const startsAt = new Date(slot * SLOT_MS).toISOString();
   const expiresAt = new Date((slot + 1) * SLOT_MS).toISOString();
-  const participants = (world.npcs ?? []).filter((npc) => npc.location_id === locationId).map((npc) => npc.npc_id).sort();
+  const participants = (world.npcs ?? []).filter((npc) => npc.location_id === locationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map((npc) => npc.npc_id).sort();
   const participantOverride = participants.map((npcId) => selected.participant_overrides?.[npcId]).find(Boolean) ?? {};
   const contextSuffix = createHash('sha256')
     .update(`${LIFE_CONTENT_VERSION}:${journeyKey}:${participants.join(',')}:${selected.id}:${eventKey}:${weatherKey}:${roleKey}`)
@@ -371,7 +373,7 @@ function selectScene(world, now, { roleStages = [] } = {}) {
 
 function profileFor(npc) {
   const profile = NPC_PROFILES[npc.npc_id] ?? {};
-  const authored = publicNpcProfile(npc.npc_id) ?? {};
+  const authored = publicNpcProfile(npc.npc_id,npc.resident_version) ?? {};
   return {
     ...profile,
     ...authored,
@@ -388,7 +390,8 @@ function profileFor(npc) {
   };
 }
 
-function npcResponse(npc, intent, idea) {
+function npcResponse(npc, intent, idea, world) {
+  if(npc.resident_version)return residentResponse(world,npc,intent,idea);
   const quoted = idea ? `“${idea.slice(0, 80)}${idea.length > 80 ? '……' : ''}”` : '';
   if (npc.role === 'route_keeper') {
     return {
@@ -501,7 +504,8 @@ export function createWorldLife({
       enabled,
       world_revision: world.world_revision,
       current_location_id: currentLocationId,
-      current_scene: world.life?.current_scene ?? null,
+      current_scene: activeWorldTask(world)?.kind === 'travel' ? null : world.life?.current_scene ?? null,
+      current_task: activeWorldTask(world),
       recent_scenes: world.life?.recent_scenes ?? [],
       recent_experiences: world.life?.recent_experiences ?? [],
       role_stages: stages,
@@ -509,7 +513,7 @@ export function createWorldLife({
         current_stage: stages[0] ?? null,
         stages,
       },
-      encounters: (world.npcs ?? []).filter((npc) => npc.location_id === currentLocationId).map(profileFor),
+      encounters: activeWorldTask(world)?.kind === 'travel' ? [] : (world.npcs ?? []).filter((npc) => npc.location_id === currentLocationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map(profileFor),
       available_interactions: INTERACTION_INTENTS,
     };
   }
@@ -527,6 +531,7 @@ export function createWorldLife({
   }
 
   function scheduleNpcRoutines() {
+    if (worldSnapshot().autonomy?.enabled) return;
     if (!npcGoals || typeof npcGoals.add !== 'function' || typeof npcGoals.tick !== 'function') return;
     const worldAtStart = worldSnapshot();
     const minutesPerDay = 24 * 60;
@@ -537,7 +542,7 @@ export function createWorldLife({
     for (const [npcId, routine] of Object.entries(NPC_ROUTINES)) {
       const world = worldSnapshot();
       const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
-      if (!npc || npcGoals.reserved?.(npcId)) continue;
+      if (!npc || activeWorldTask(world, npcId) || npcGoals.reserved?.(npcId)) continue;
       const profile = NPC_PROFILES[npcId];
       const decision = agentLoop.decide({
         world,
@@ -548,13 +553,14 @@ export function createWorldLife({
         role_stages: roleContext(),
       });
       const selected = decision?.selected;
-      if (!decision || !selected) continue;
+      if (!decision || !selected || decision.status !== 'planned') continue;
       const destination = selected.location_id
         ? (world.locations ?? []).find((location) => location.location_id === selected.location_id)
         : null;
       // Keep the durable goal id stable for legacy replay/readers. The agent
       // decision id is stored separately in the decision namespace.
-      const goalId = `world-life-routine:${npcId}:${routineSlot}`;
+      const timeBasis = world.clock?.mode === 'real_time' ? `realtime:${world.logical_time.date}:` : '';
+      const goalId = `world-life-routine:${npcId}:${timeBasis}${routineSlot}`;
       try {
         npcGoals.add({
           id: goalId,
@@ -580,6 +586,8 @@ export function createWorldLife({
           // relink it so reconciliation does not depend on process memory.
           agentLoop.bindGoal(decision.decision_id, goalId);
           planned.push({ decision, goalId });
+        } else if (['npc_location_not_reachable', 'actor_busy', 'npc_travel_required', 'location_not_reachable', 'passage_closed', 'travel_blocked'].includes(error?.code)) {
+          agentLoop.markFailed(decision.decision_id, error.code);
         } else if (error?.code !== 'npc_reserved') {
           throw error;
         }
@@ -604,6 +612,7 @@ export function createWorldLife({
     seedNpcs();
     scheduleNpcRoutines();
     let world = worldSnapshot();
+    if (activeWorldTask(world)?.kind === 'travel') return snapshot();
     const effectiveNow = replayNow instanceof Date && !Number.isNaN(replayNow.getTime()) ? replayNow : now();
     const selected = selectScene(world, effectiveNow, { roleStages: roleContext() });
     const current = world.life?.current_scene;
@@ -648,6 +657,7 @@ export function createWorldLife({
       });
       world = worldSnapshot();
       for (const [npcId, action] of Object.entries(selected.npc_actions)) {
+        if (world.autonomy?.enabled || activeWorldTask(world, npcId)) continue;
         if (!(world.npcs ?? []).some((npc) => npc.npc_id === npcId && npc.location_id === selected.location_id)) continue;
         ingest({
           event_id: `world-life-v1:npc-scene:${selected.scene_id}:${npcId}`,
@@ -665,6 +675,7 @@ export function createWorldLife({
   }
 
   function replay({ minutes, replay_id: requestedReplayId } = {}) {
+    if (worldSnapshot().clock?.mode === 'real_time') throw new InputError(409, 'real_time_replay_forbidden', '研究回放需要独立模拟存档，生产世界不能快进');
     if (!enabled) throw new InputError(409, 'world_life_disabled', '世界生活引擎尚未启用');
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > WORLD_REPLAY_MAX_MINUTES) {
       throw new InputError(400, 'invalid_world_replay_minutes', `minutes must be an integer between 1 and ${WORLD_REPLAY_MAX_MINUTES}`);
@@ -768,14 +779,14 @@ export function createWorldLife({
     const world = worldSnapshot();
     const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
     if (!npc) throw new InputError(404, 'npc_not_found', '没有找到这个 NPC');
-    if (npc.location_id !== world.protagonist.location_id) {
+    if (activeWorldTask(world)?.kind === 'travel' || activeWorldTask(world, npcId)?.kind === 'travel' || npc.location_id !== world.protagonist.location_id) {
       throw new InputError(409, 'npc_not_present', '只有与喵呜在同一地点时才能互动');
     }
     const timestamp = now().toISOString();
     const requestedKey = optionalInteractionKey(body.interaction_id);
     const interactionId = interactionKey({ npcId, intent, idea, requestedKey, timestamp: now().getTime() });
     const storedInteraction = npc.last_interaction?.interaction_id === interactionId ? npc.last_interaction : null;
-    const response = storedInteraction?.response ?? npcResponse(profileFor(npc), intent, idea);
+    const response = storedInteraction?.response ?? npcResponse(profileFor(npc), intent, idea, world);
     return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
   }
 
@@ -857,7 +868,7 @@ export function createWorldLife({
     const world = worldSnapshot();
     const npc = (world.npcs ?? []).find((item) => item.npc_id === npcId);
     if (!npc) throw new InputError(404, 'npc_not_found', '没有找到这个 NPC');
-    if (npc.location_id !== world.protagonist.location_id) {
+    if (activeWorldTask(world)?.kind === 'travel' || activeWorldTask(world, npcId)?.kind === 'travel' || npc.location_id !== world.protagonist.location_id) {
       throw new InputError(409, 'npc_not_present', '只有与喵呜在同一地点时才能互动');
     }
     const timestamp = now().toISOString();
@@ -869,12 +880,12 @@ export function createWorldLife({
     // A persona is an authoring choice, not a requirement for the world to
     // remain usable. Unknown NPCs and offline/fake deployments retain the
     // deterministic authored response path.
-    const persona = getNpcPersona(npcId);
+    const persona = getNpcPersona(npcId,npc.resident_version);
     const canUsePersonaAgent = typeof llm?.complete === 'function' && llm.id !== 'fake-llm-v0.1';
     if (!persona || !canUsePersonaAgent) {
       return recordInteraction({
         body, world, npc, npcId, intent, idea, interactionId, timestamp,
-        response: npcResponse(profileFor(npc), intent, idea),
+        response: npcResponse(profileFor(npc), intent, idea, world),
       });
     }
 
@@ -931,11 +942,11 @@ export function createWorldLife({
           // Never keep an ungrounded first draft just because the corrective
           // pass returned another setting explanation. The authored response
           // is the deterministic safety net for character legibility.
-          response = npcResponse(profileFor(npc), intent, idea);
+          response = npcResponse(profileFor(npc), intent, idea, world);
         }
       }
     } catch {
-      response = npcResponse(profileFor(npc), intent, idea);
+      response = npcResponse(profileFor(npc), intent, idea, world);
     }
     return recordInteraction({ body, world, npc, npcId, intent, idea, interactionId, response, timestamp });
   }

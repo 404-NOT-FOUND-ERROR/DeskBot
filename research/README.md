@@ -2,6 +2,8 @@
 
 本目录用于同济大学工业设计（机械）毕业设计的研究与工程记录。
 
+当前开发主线见 [伴生世界开发路线 v0.4](development-roadmap-v0.4.md)，居民内容见 [雾灯镇居民生活设计](npcs/resident-life-design-v1.md)。前四步已完成规则合同、现实同步时钟与持久任务、十个地点及内部区域与对象目录、八件对象的环境与有限资源状态和对应模型变化。下一步为喵呜与居民共用自主生活循环；十二名居民的正式安装仍在第六步。地图设计见 [持续生活地图](world/living-map-v1.md)，规则见 [环境与资源](world/living-resources-v1.md)，本次证据见 [第四步验收](milestones/companion-world-step4.md)。
+
 ## 当前研究问题
 
 如何将对话、设备感知和事件记录等多源证据，转化为可解释的角色状态变化，并进一步映射为桌宠的行为反馈与可打印、可装配、可替换外壳。
@@ -31,7 +33,8 @@
 
 ## 目录
 
-- `development-roadmap-v0.1.md`：从开源选型、软件闭环、VoCat 实机、中性内核、三组外壳到用户实验和论文的整体路线图。
+- `development-roadmap-v0.4.md`：当前执行路线，包含地图扩展、世界变化、十二名居民、现实折射、自主生活、身体表达和形态落地的顺序与验收。
+- `development-roadmap-v0.1.md` 至 `development-roadmap-v0.3.md`：历史计划及能力验证记录。
 - `role-state-v1.md`：角色状态协议、字段说明和示例。
 - `protocol/interaction-contract-v0.1.md`：DeskBot Service、设备桥接层和实体桌宠之间的软件—硬件交互契约。
 - `protocol/input-state-output-v0.1.md`：DeskBot 对话、统一输入层、情绪/CAPS 状态和网页/硬件输出的职责边界。

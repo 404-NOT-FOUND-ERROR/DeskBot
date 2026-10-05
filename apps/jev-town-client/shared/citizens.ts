@@ -12,6 +12,7 @@ export interface Citizen {
   workId: PlaceId;
   /** Colour band for the sprite, 0-5. */
   palette: number;
+  residentStyle?:string;
   /**
    * Baseline temperament, only used by the offline simulation fallback so that
    * it still feels like these particular people. Real rounds ignore it entirely.

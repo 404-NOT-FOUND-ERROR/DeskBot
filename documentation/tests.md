@@ -4,13 +4,19 @@
 
 ## Existing coverage
 
+2026-10-04 第三步：服务回归 322 项、客户端回归 136 项通过；TypeScript 和 Vite 构建通过，Web JavaScript 语法检查通过。`world-map-content.test.mjs` 新增 19 项，覆盖非法目录、断开地理连接、迁移与保留任务、通路版本与幂等、到期封路、剩余路线重规划、合法扩建与重启、NPC 通路合法性和公开写入边界。`mapCatalog.test.ts` 新增 2 项，覆盖目录中的十个展示锚点与全部通路端点。
+
+本地 SQLite 一致性备份完整性为 `ok`；迁移副本保留主角、NPC、任务、时钟、互动计数和近期经历。浏览器验证 2D/3D 十地点、内部区域及物件展开；这些检查不证明后续苗况、库存、完整经济或长期文化已经实现。一次完整回归因系统临时分配到 Node fetch 禁用端口而失败，原有用例原样重跑后 322 项通过；没有为绕过它改变产品规则。详细证据见 [第三步验收](../research/milestones/companion-world-step3.md)。
+
 | 用例 | 规则/预期 | 证据 | 状态 |
 |---|---|---|---|
 | NPC Persona Agent | Persona 字段、Markdown 作者卡、Scene/关系提示词、HTTP 真实调用、fallback、重复请求幂等 | `npc-personas.test.mjs`、`world-life.test.mjs` | existing: local fake LLM |
 | 雾灯镇内容合同 | settlement、地点归属、Lore key、NevaMind NPC 字段、日程与世界事件模板和 canonical world 对齐 | `morrowmere-content.test.mjs`、`persistent-world*.test.mjs` | existing |
 | 内容包编译与第一天回放 | 只读校验作者包、故事目录来源、预览无副作用、五步 canonical 计划 | `content-packages.test.mjs`、`story-packages.test.mjs` | existing |
 | 路线投影与旅行动画 | 统一地点锚点、完整路线折线、中转点、端点、道路拐点和分段动画时长；版本漂移清除预览；未知地点使用坐标 fallback，不改变服务端事实 | `canonicalGeometry.test.ts`、`routeVisual.test.ts`、`deskbotBridge.test.ts` | existing: 26 targeted client cases |
-| 持久化真实墙钟 | 首次锚定、分钟余数、单次追赶上限、marker 中断恢复、SQLite 重启和 replay 幂等 | `persistent-world-clock.test.mjs` | existing: 5 cases |
+| 研究模拟墙钟 | 首次锚定、分钟余数、单次追赶上限、marker 中断恢复、SQLite 重启和 replay 幂等 | `persistent-world-clock.test.mjs` | existing: 5 cases；独立 simulation |
+| 生产实时钟与任务 | 北京时间午夜、停机校正、回拨保护、禁止快进、SQLite 恢复、任务控制、多段路线、封路核验、事务回滚、NPC 等待、HTTP 幂等与当地日期成长门槛、研究决策隔离 | `realtime-world.test.mjs` | implemented: 14 cases |
+| 真实旅行客户端 | 把最终目标交给服务端；出发不动画抵达、不立即执行后续路段；持续任务控制 | `realtimeTravel.test.ts` | implemented: 2 cases |
 | 输入与聊天幂等 | 相同 event/correlation 不重复回合；冲突返回错误 | `apps/deskbot-service/test/input.test.mjs`、`persistence-restart.test.mjs` | existing |
 | 喵呜提示词 | seed/profile/反应节拍/边界字段进入 prompt | `chat-orchestrator.test.mjs`、`persistent-world.test.mjs` | existing |
 | 角色试行表达覆盖 | 活动方向进入 prompt；用户回合 neutral 观察；同角色单活动试行 | `chat-orchestrator.test.mjs`、`role-proposals.test.mjs`、`role-proposals-http.test.mjs` | existing |
@@ -19,7 +25,7 @@
 | 天气缓存 | TTL、force、观测时间单调、v7/v1 字段和错误不泄密 | `weather-connector.test.mjs`、`context-sources.test.mjs` | existing |
 | P4-1 输入运行层 | 来源注册、TTL 到期判断、SQLite 状态恢复、失败退避、持久化失败隔离、canonical ingest callback 不被调度异常打断 | `input-runtime.test.mjs`、`weather-persistence.test.mjs` | implemented: 5 cases |
 | P4 角色方向 evidence polarity | `support/conflict/neutral` 分别加分/扣分/只审计；缺省 polarity 兼容为 support；仅 dialogue/user_profile 有 cue 邻接中文显式否定识别；支持证据单独计数与跨源门槛 | `fantasy-pull.test.mjs` | implemented: targeted polarity cases |
-| P4 角色演化闭环 | 独立来源聚合、UTC 事件日期提案门槛、候选/提案幂等物化、显式试行、仅用户聊天消耗试行回合、accepted 阶段提示词/表达/世界投影、SQLite 重启恢复、单句变形不越权 | `role-evolution.test.mjs`、`p4-acceptance.test.mjs`、`role-proposals-http.test.mjs`、`chat-orchestrator.test.mjs`、`world-life.test.mjs` | implemented |
+| P4 角色演化闭环 | 独立来源聚合、日期提案门槛（生产为事件当地日期，研究为 UTC 观察日期）、候选/提案幂等物化、显式试行、仅用户聊天消耗试行回合、accepted 阶段提示词/表达/世界投影、SQLite 重启恢复、单句变形不越权 | `role-evolution.test.mjs`、`p4-acceptance.test.mjs`、`role-proposals-http.test.mjs`、`chat-orchestrator.test.mjs`、`world-life.test.mjs` | implemented |
 | P4 外部事件到世界候选 | observation 来源/evidence/provenance 保留、白名单动作、preview 无副作用、revision 冲突需重预览、显式 accept/dismiss、过期/幂等/重启恢复 | `world-candidates.test.mjs`、`world-candidates-http.test.mjs`、`p4-acceptance.test.mjs` | implemented: backend/API; no visual candidate panel or automatic news provider |
 | LLM 错误 | 不回显 provider body/secret；缺配置拒绝启动 | `llm.test.mjs` | existing |
 | 设备 outbox/ACK | 白名单命令、重复 ACK、冲突 ACK 和失败可解释 | `output-router*.test.mjs`、`device-*.test.mjs` | existing |

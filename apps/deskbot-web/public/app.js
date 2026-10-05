@@ -397,17 +397,19 @@ function updateWorld(world) {
     appearanceState.className = `mini-pill ${appearance.state === 'baseline' ? 'ok' : 'muted'}`;
     appearanceState.textContent = appearance.state === 'baseline' ? '基础形态' : appearance.state || '未标注';
   }
-  const logical = world.logical_time; setText('#world-time', logical ? `第 ${logical.day} 天 · ${String(Math.floor((logical.minute_of_day || 0) / 60)).padStart(2, '0')}:${String((logical.minute_of_day || 0) % 60).padStart(2, '0')}` : '—'); setText('#world-turns', world.interaction?.user_turn_count ?? 0);
+  const logical = world.logical_time; setText('#world-time', logical ? `${logical.date || `第 ${logical.day} 天`} · ${String(Math.floor((logical.minute_of_day || 0) / 60)).padStart(2, '0')}:${String((logical.minute_of_day || 0) % 60).padStart(2, '0')}` : '—'); setText('#world-turns', world.interaction?.user_turn_count ?? 0);
   const event = world.active_event || world.world_line?.latest_event; $('#world-event').innerHTML = event ? `<span class="event-spark">◌</span><span><strong>${escapeHtml(event.title || event.event_id || '进行中的事件')}</strong>${event.daily_consequence ? `<small>${escapeHtml(event.daily_consequence)}</small>` : ''}</span>` : '<span class="event-spark">◌</span><span>当前没有进行中的世界事件</span>';
-  setText('#scene-location', location?.name || '聚形域');
-  setText('#scene-time', logical ? `第 ${logical.day} 天 · ${String(Math.floor((logical.minute_of_day || 0) / 60)).padStart(2, '0')}:${String((logical.minute_of_day || 0) % 60).padStart(2, '0')}` : '桌边时间醒来中');
+  const trip = (world.tasks || []).find(task => task.actor_id === CHARACTER_ID && task.kind === 'travel' && ['running', 'paused'].includes(task.status));
+  const tripDestination = trip && world.locations.find(place => place.location_id === trip.destination_location_id);
+  setText('#scene-location', trip ? `前往${tripDestination?.name || '目的地'}途中` : location?.name || '聚形域');
+  setText('#scene-time', logical ? `${logical.date || `第 ${logical.day} 天`} · ${String(Math.floor((logical.minute_of_day || 0) / 60)).padStart(2, '0')}:${String((logical.minute_of_day || 0) % 60).padStart(2, '0')}` : '桌边时间醒来中');
   renderScenePreview(location, event);
   if (emptyState?.isConnected) {
     const title = emptyState.querySelector('h3');
     const copy = emptyState.querySelector('p');
     const possibleBeat = location?.scene?.possible_beats?.[0];
-    if (title) title.textContent = location?.name ? `我在${location.name}` : '世界已经醒着';
-    if (copy) copy.textContent = event?.daily_consequence || (possibleBeat ? `我还没决定，不过有点想${possibleBeat}。` : '我先看看这里今天会发生什么。');
+    if (title) title.textContent = trip ? `我正在去${tripDestination?.name || '目的地'}` : location?.name ? `我在${location.name}` : '世界已经醒着';
+    if (copy) copy.textContent = trip ? trip.status === 'paused' ? '这次出行暂时停下了，继续时接着剩下的路程走。' : '还没到呢。这段路按现实时间慢慢走，关掉网页也会继续。' : event?.daily_consequence || (possibleBeat ? `我还没决定，不过有点想${possibleBeat}。` : '我先看看这里今天会发生什么。');
   }
   renderWorldLine(world.world_line || {});
   const gameWorldEvents = $('#game-world-events');
@@ -583,14 +585,20 @@ function updateWorldLife(life, { allowAutoOpen = true } = {}) {
   const currentLocation = (state.world?.locations || []).find((location) => location.location_id === life.current_location_id);
   const currentEvent = state.world?.active_event || state.world?.world_line?.latest_event;
   if (currentLocation) renderScenePreview(currentLocation, currentEvent);
-  if (life.current_scene && state.announcedSceneId !== life.current_scene.scene_id) {
+  const lifeTask=currentWorldTask();
+  const ownLife=lifeTask?.origin==='autonomous_life'?state.worldMap?.autonomy?.actors.find(actor=>actor.actor_id===CHARACTER_ID):null;
+  if(lifeTask && state.announcedLifeTaskId!==lifeTask.task_id){
+    state.announcedLifeTaskId=lifeTask.task_id;
+    appendMessage('assistant',`${lifeTask.title}${ownLife?.plan?.reason?'。'+ownLife.plan.reason:''}`,lifeTask.origin==='autonomous_life'?'自己的安排 · 任务进行中':'当前活动 · 任务进行中');
+  }
+  if (!lifeTask && life.current_scene && state.announcedSceneId !== life.current_scene.scene_id) {
     state.announcedSceneId = life.current_scene.scene_id;
     appendSceneMessage(life.current_scene);
   }
   const recentTarget = $('#game-life-scenes');
   if (recentTarget) {
     const scenes = [life.current_scene, ...(life.recent_scenes || []).slice(-4).reverse()].filter(Boolean);
-    recentTarget.innerHTML = scenes.map((scene, index) => `<article><strong>${escapeHtml(scene.title || scene.scene_id)}</strong><p>${escapeHtml(scene.narration || '这个片段没有留下旁白。')}</p><small>${index === 0 ? `正在发生${scene.continuation_count ? ` · 已延续 ${scene.continuation_count} 个时段` : ''}` : `已结束 · ${formatTime(scene.ended_at || scene.expires_at)}`}</small></article>`).join('') || '<p>世界还没有留下日常片段。</p>';
+    recentTarget.innerHTML = lifeTask?`<article><strong>${escapeHtml(lifeTask.title)}</strong><p>${escapeHtml(ownLife?.plan?.reason||'当前活动按真实时间继续。')}</p><small>${lifeTask.status==='paused'?'暂停中':'进行中，尚未完成'}</small></article>`:scenes.map((scene, index) => `<article><strong>${escapeHtml(scene.title || scene.scene_id)}</strong><p>${escapeHtml(scene.narration || '这个片段没有留下旁白。')}</p><small>${index === 0 ? `正在发生${scene.continuation_count ? ` · 已延续 ${scene.continuation_count} 个时段` : ''}` : `已结束 · ${formatTime(scene.ended_at || scene.expires_at)}`}</small></article>`).join('') || '<p>世界还没有留下日常片段。</p>';
   }
   if (allowAutoOpen) {
     const firstUnseen = encounters.find((npc) => !encounterSeen(npc.npc_id));
@@ -610,17 +618,21 @@ function renderScenePreview(location, event) {
     : location
       ? { x: location.x, y: location.y }
       : { x: 50, y: 50 };
-  const lifeScene = state.worldLife?.current_scene?.location_id === location?.location_id ? state.worldLife.current_scene : null;
+  const task=currentWorldTask();
+  const trip = task?.kind==='travel'?task:null;
+  const ownLife=task?.origin==='autonomous_life'?state.worldMap?.autonomy?.actors.find(actor=>actor.actor_id===CHARACTER_ID):null;
+  const destination = trip && state.world.locations.find(place => place.location_id === trip.destination_location_id);
+  const lifeScene = !task && state.worldLife?.current_scene?.location_id === location?.location_id ? state.worldLife.current_scene : null;
   const cue = lifeScene?.sensory_cue || location?.scene?.sensory_cues?.[0] || mapLocation?.scene_preview?.sensory_cues?.[0] || location?.description;
   const possibility = location?.scene?.possible_beats?.[0] || mapLocation?.scene_preview?.possible_beats?.[0];
   const livedConsequence = event?.daily_consequence;
   visual.style.setProperty('--scene-x', `${Math.max(0, Math.min(100, Number(coordinate.x) || 50))}%`);
   visual.style.setProperty('--scene-y', `${Math.max(0, Math.min(100, Number(coordinate.y) || 50))}%`);
   visual.dataset.location = location?.location_id || 'unknown';
-  visual.setAttribute('aria-label', `喵呜在${location?.name || '聚形域'}的场景`);
-  setText('#scene-visual-kicker', lifeScene ? '此刻正在发生' : livedConsequence ? '世界正在发生' : '我眼前');
-  setText('#scene-visual-title', lifeScene?.title || event?.title || location?.name || '聚形域');
-  setText('#scene-visual-copy', lifeScene?.narration || livedConsequence || (cue ? `我看见${String(cue).replace(/[。.]$/, '')}。` : possibility ? `我有点想${possibility}。` : '我正在看看这里今天会发生什么。'));
+  visual.setAttribute('aria-label', trip ? `前往${destination?.name || '目的地'}途中；上次确认位置是${location?.name || '聚形域'}` : `喵呜在${location?.name || '聚形域'}的场景`);
+  setText('#scene-visual-kicker', task ? task.status === 'paused' ? '活动暂停' : trip?'在路上':'正在忙' : lifeScene ? '此刻正在发生' : livedConsequence ? '世界正在发生' : '我眼前');
+  setText('#scene-visual-title', task ? task.title : lifeScene?.title || event?.title || location?.name || '聚形域');
+  setText('#scene-visual-copy', task ? `${ownLife?.plan?.reason||'当前活动按真实时间继续。'}${trip?'尚未抵达，行程进度会持续保存。':'完成后才记录实际结果。'}` : lifeScene?.narration || livedConsequence || (cue ? `我看见${String(cue).replace(/[。.]$/, '')}。` : possibility ? `我有点想${possibility}。` : '我正在看看这里今天会发生什么。'));
 }
 
 function worldMapLocation(locationId) {
@@ -633,7 +645,24 @@ function mapPropClass(value) {
 
 function renderWorldMap(map) {
   if (!map) return;
+  if (state.worldMap?.world_revision > map.world_revision) return;
+  const previousTrip = state.worldMap?.tasks?.find(task => task.actor_id === CHARACTER_ID && task.kind === 'travel' && ['running', 'paused'].includes(task.status));
+  const finishedTrip = previousTrip && map.tasks?.find(task => task.task_id === previousTrip.task_id && task.status === 'completed');
+  const failedTrip = previousTrip && map.tasks?.find(task => task.task_id === previousTrip.task_id && task.status === 'failed');
+  if (failedTrip) {
+    $('#map-result').textContent = failedTrip.failure_reason === 'travel_blocked' ? '道路受阻，这次出行停在上次确认的位置；可以重新安排。' : '这次出行没有完成，位置保留在上次确认的地点。';
+    $('#map-result').className = 'map-result bad';
+  }
+  if (finishedTrip) {
+    const place = map.locations.find(place => place.location_id === finishedTrip.destination_location_id);
+    const arrival = place?.arrival_text || `我到${place?.name || '目的地'}了。`;
+    appendMessage('assistant', arrival, `聚形域 · 抵达${place?.name || '目的地'}`);
+    $('#map-result').textContent = arrival;
+    $('#map-result').className = 'map-result ok';
+    state.mapArrivalLocationId = place?.location_id;
+  }
   state.worldMap = map;
+  const currentTask = currentWorldTask();
   const currentWorldLocation = (state.world?.locations || []).find((location) => location.location_id === state.world?.protagonist?.location_id);
   const currentEvent = state.world?.active_event || state.world?.world_line?.latest_event;
   if (currentWorldLocation) renderScenePreview(currentWorldLocation, currentEvent);
@@ -647,7 +676,7 @@ function renderWorldMap(map) {
     const from = locations.find((location) => location.location_id === path.from_location_id);
     const to = locations.find((location) => location.location_id === path.to_location_id);
     if (!from || !to) return '';
-    return `<line x1="${Number(from.x)}" y1="${Number(from.y)}" x2="${Number(to.x)}" y2="${Number(to.y)}" class="map-route ${path.reachable ? 'reachable' : ''}" />`;
+    return `<line x1="${Number(from.x)}" y1="${Number(from.y)}" x2="${Number(to.x)}" y2="${Number(to.y)}" class="map-route ${path.reachable ? 'reachable' : ''} ${path.open === false ? 'closed' : ''}" />`;
   }).join('');
   const nodeMarkup = locations.map((location) => {
     const selected = location.location_id === state.mapSelectedLocationId;
@@ -656,7 +685,7 @@ function renderWorldMap(map) {
     const propClass = mapPropClass(location.scene_preview?.prop_icon);
     const props = (location.scene_preview?.signature_props || []).slice(0, 2).join(' · ');
     const residentCount = location.npc_summary?.length ?? 0;
-    return `<button class="map-location map-${escapeHtml(location.location_id)} ${propClass} ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"><b></b></i><span><strong>${escapeHtml(location.name)}</strong><em>${escapeHtml(zone)}</em></span><small>${location.current ? '喵呜正在这里' : location.reachable ? `${escapeHtml(location.travel_cost || '—')} 分钟可到` : residentCount ? `${residentCount} 位居民在这里` : props || '还要绕一段路'}</small></button>`;
+    return `<button class="map-location map-${escapeHtml(location.location_id)} ${propClass} ${stateClass} ${selected ? 'selected' : ''}" type="button" data-map-location="${escapeHtml(location.location_id)}" style="--map-x:${Number(location.x)}%;--map-y:${Number(location.y)}%" aria-pressed="${selected}"><i aria-hidden="true"><b></b></i><span><strong>${escapeHtml(location.name)}</strong><em>${escapeHtml(zone)}</em></span><small>${location.current ? currentTask?.kind === 'travel' ? '上次确认的位置' : '喵呜正在这里' : location.reachable ? `${escapeHtml(location.travel_cost || '—')} 分钟可到` : residentCount ? `${residentCount} 位居民在这里` : props || '还要绕一段路'}</small></button>`;
   }).join('');
   const arrivalLocation = locations.find((location) => location.location_id === state.mapArrivalLocationId && location.current);
   const mapTarget = $('#world-map');
@@ -666,7 +695,7 @@ function renderWorldMap(map) {
     mapTarget.style.setProperty('--focus-y', `${Number(arrivalLocation.y)}%`);
   }
   const arrivalToast = arrivalLocation ? `<div class="map-arrival-toast"><span>喵呜到了</span><strong>${escapeHtml(arrivalLocation.name)}</strong></div>` : '';
-  mapTarget.innerHTML = `<div class="map-stage"><div class="map-caption"><span class="map-caption-index">桌边小世界 · 01</span><strong>今天的摆件盘</strong><span>每件摆件里，都有人在过自己的日子</span></div><div class="map-status-rail" aria-hidden="true"><span>世界还在走</span><i></i><b>第 ${escapeHtml(map.logical_time?.day ?? '—')} 天 · ${escapeHtml(String(Math.floor((map.logical_time?.minute_of_day ?? 0) / 60)).padStart(2, '0'))}:${escapeHtml(String((map.logical_time?.minute_of_day ?? 0) % 60).padStart(2, '0'))}</b></div><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
+  mapTarget.innerHTML = `<div class="map-stage"><div class="map-caption"><span class="map-caption-index">桌边小世界 · 01</span><strong>今天的摆件盘</strong><span>每件摆件里，都有人在过自己的日子</span></div><div class="map-status-rail" aria-hidden="true"><span>世界还在走</span><i></i><b>${escapeHtml(map.logical_time?.date || `第 ${map.logical_time?.day ?? '—'} 天`)} · ${escapeHtml(String(Math.floor((map.logical_time?.minute_of_day ?? 0) / 60)).padStart(2, '0'))}:${escapeHtml(String((map.logical_time?.minute_of_day ?? 0) % 60).padStart(2, '0'))}</b></div><svg class="map-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${pathMarkup}</svg>${nodeMarkup}</div>${arrivalToast}`;
   const pill = $('#map-status');
   const blocked = map.active_event?.blocks_travel === true;
   pill.className = `mini-pill ${blocked ? 'warn' : 'ok'}`;
@@ -695,28 +724,45 @@ function toggleGamePanel(panelId) {
 function renderMapDetail() {
   const location = worldMapLocation(state.mapSelectedLocationId);
   const target = $('#map-detail');
+  const openAreas = new Set([...target.querySelectorAll('details[open][data-map-area]')].map(element => element.dataset.mapArea));
   if (!location) {
     target.innerHTML = '<strong>地图暂无地点</strong><p>等待持续世界加载。</p>';
     return;
   }
   const currentEvent = location.current_event_summary ? `<span class="map-event-note">此刻 · ${escapeHtml(location.current_event_summary)}</span>` : '';
-  const localLifeScene = location.current && state.worldLife?.current_scene?.location_id === location.location_id ? state.worldLife.current_scene : null;
+  const task = currentWorldTask();
+  const localLifeScene = !task && location.current && state.worldLife?.current_scene?.location_id === location.location_id ? state.worldLife.current_scene : null;
   const npcs = location.npc_summary?.length ? `<span class="map-npc-note">在这里 · ${location.npc_summary.map((npc) => location.current ? `<button type="button" data-open-npc="${escapeHtml(npc.npc_id)}">${escapeHtml(npc.display_name)}</button>` : escapeHtml(npc.display_name)).join('、')}</span>` : '';
-  const sceneCueValue = localLifeScene?.sensory_cue || location.scene_preview?.sensory_cues?.[0];
-  const possibleBeatValue = localLifeScene?.opportunity || location.scene_preview?.possible_beats?.[0];
+  const sceneCueValue = !task && (localLifeScene?.sensory_cue || location.scene_preview?.sensory_cues?.[0]);
+  const possibleBeatValue = !task && (localLifeScene?.opportunity || location.scene_preview?.possible_beats?.[0]);
   const toyZone = location.scene_preview?.toy_zone ? `<span class="map-zone-note">摸起来 · ${escapeHtml(location.scene_preview.toy_zone)}</span>` : '';
   const material = location.scene_preview?.material ? `<span class="map-material-note">摆着 · ${escapeHtml(location.scene_preview.material)}</span>` : '';
   const props = location.scene_preview?.signature_props?.length ? `<span class="map-prop-note">眼前 · ${location.scene_preview.signature_props.map(escapeHtml).join('、')}</span>` : '';
   const sceneCue = sceneCueValue ? `<span class="map-scene-note">眼前 · ${escapeHtml(sceneCueValue)}</span>` : '';
   const possibleBeat = possibleBeatValue ? `<span class="map-possibility-note">喵呜惦记 · ${escapeHtml(possibleBeatValue)}</span>` : '';
+  const region = (state.worldMap?.regions || []).find(region => region.region_id === location.region_id);
+  const living = state.worldMap?.living;
+  const inside = `<div class="map-area-list" aria-label="地点内部区域">${(location.areas || []).map(area => `<details data-map-area="${escapeHtml(area.area_id)}" ${openAreas.has(area.area_id) ? 'open' : ''}><summary>${escapeHtml(area.name)} <small>${area.access === 'resident' ? '来访需同意' : '公共区域'}</small></summary><p>${escapeHtml(area.description)}</p>${(area.objects || []).map(object => `<div><strong>${escapeHtml(object.name)}</strong><p>${escapeHtml(object.status_text || object.description)}</p>${Object.entries(object.state?.stock || {}).map(([resource,count])=>`<p>${escapeHtml(living?.resource_names[resource] || resource)} ${Math.floor(count)} 份 ${location.current?`<button data-resource-object="${escapeHtml(object.object_id)}" data-resource="${escapeHtml(resource)}" data-resource-operation="take" ${state.mapTravelBusy||task||count<1?'disabled':''}>取 1 份</button> <button data-resource-object="${escapeHtml(object.object_id)}" data-resource="${escapeHtml(resource)}" data-resource-operation="store" ${state.mapTravelBusy||task||(living?.inventory.stock[resource]||0)<1?'disabled':''}>存 1 份</button>`:''}</p>`).join('')}</div>`).join('')}</details>`).join('')}</div>`;
+  const activities = `<div class="map-living-actions">${(living?.activities || []).filter(a=>a.location_id===location.location_id).map(a=>`<div><button data-living-activity="${escapeHtml(a.activity_id)}" ${state.mapTravelBusy||!a.available?'disabled':''}>${escapeHtml(a.title)} · ${Math.ceil(a.duration_seconds/60)} 分钟</button><small>${escapeHtml(a.unavailable_reason || a.inputs.map(input=>`${input.from}：${input.name} ${input.count} 份`).join('，') || '不需要材料')}</small></div>`).join('')}</div>`;
+  const carried = living?`<p>随身袋：${escapeHtml(Object.entries(living.inventory.stock).filter(([,count])=>count>=1).map(([resource,count])=>`${living.resource_names[resource]} ${Math.floor(count)} 份`).join(' · ')||'暂时没有物品')}</p><p>${escapeHtml(living.recent_changes.at(-1)?.text || '')}</p>`:'';
+  const closures = (state.worldMap?.paths || []).filter(path => path.open === false && [path.from_location_id,path.to_location_id].includes(location.location_id)).map(path => `<p class="map-closure-note">通路暂时封闭：${escapeHtml(path.blocked_reason || '等待重新开放')}</p>`).join('');
+  const directory = `<nav class="map-place-directory" aria-label="雾灯镇地点目录">${(state.worldMap?.locations || []).filter(place => place.visibility !== 'hidden').map(place => `<button type="button" data-inspect-location="${escapeHtml(place.location_id)}" class="${place.location_id === location.location_id ? 'selected' : ''}">${escapeHtml(place.name)}</button>`).join('')}</nav>`;
   let action = '<span class="map-current-label">喵呜现在就在这里</span>';
-  if (!location.current && location.reachable) action = `<button class="map-travel-button" type="button" data-travel-location="${escapeHtml(location.location_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>前往这里 <span>${escapeHtml(location.travel_cost || '—')} 分钟</span></button>`;
+  if (!location.current && location.reachable) action = `<button class="map-travel-button" type="button" data-travel-location="${escapeHtml(location.location_id)}" ${state.mapTravelBusy || task ? 'disabled' : ''}>前往这里 <span>${escapeHtml(location.travel_cost || '—')} 分钟</span></button>`;
   if (!location.current && !location.reachable) action = '<span class="map-distant-label">要先经过相邻地点</span>';
-  target.innerHTML = `<div><strong>${escapeHtml(location.name)}</strong><p>${escapeHtml(location.description || '这里还没有留下描述。')}</p>${toyZone}${material}${props}${sceneCue}${possibleBeat}${currentEvent}${npcs}</div>${action}`;
+  if (task) {
+    const seconds = task.status === 'paused' ? Math.ceil(task.remaining_ms / 1000) : Math.max(0, Math.ceil((Date.parse(task.due_at) - Date.now()) / 1000));
+    action = `<div class="map-event-note"><strong>${escapeHtml(task.title)} · ${task.status === 'paused' ? '暂停中' : task.kind === 'travel' ? '在路上' : '正在忙'}</strong><p>这一段还需约 ${Math.ceil(seconds / 60)} 分钟${task.kind === 'travel' ? '；抵达后更新位置' : ''}</p><button type="button" data-task-operation="${task.status === 'paused' ? 'resume' : 'pause'}" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>${task.status === 'paused' ? '继续' : '暂停'}</button> <button type="button" data-task-operation="cancel" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>取消这次活动</button></div>`;
+  }
+  const autonomy=state.worldMap?.autonomy,ownLife=autonomy?.actors.find(actor=>actor.actor_id===CHARACTER_ID);
+  const social=state.worldMap?.social,livePromises=(social?.commitments||[]).filter(c=>['proposed','accepted','meeting','working'].includes(c.status));
+  const socialLife=social?`<details class="map-self-life"><summary>居民来往 · ${livePromises.length} 项正在安排</summary>${livePromises.slice(0,5).map(c=>`<article><strong>${escapeHtml(c.title)}</strong><p>${escapeHtml(c.last_note)}</p>${c.actors.includes(CHARACTER_ID)&&c.status==='proposed'&&c.responses[CHARACTER_ID]==='pending'?`<button data-social-operation="join" data-social-id="${escapeHtml(c.id)}" ${state.mapTravelBusy?'disabled':''}>愿意参加</button> <button data-social-operation="decline" data-social-id="${escapeHtml(c.id)}" ${state.mapTravelBusy?'disabled':''}>这次不参加</button>`:''}</article>`).join('')||'<p>眼下没有未完成的约定。</p>'}${social.notices.slice(-2).map(n=>`<p>簌簌的小报：${escapeHtml(n.text)} <small>· 有原始事务记录</small></p>`).join('')}</details>`:'';
+  const selfLife=ownLife?`<section class="map-self-life" aria-label="自己安排的生活"><strong>自己安排的生活 · ${escapeHtml(ownLife.plan?.title||'看看下一件小事')}</strong><p>${escapeHtml(ownLife.plan?.reason||'留点时间，再决定。')}</p><small>精神 ${Math.round(ownLife.energy*100)}% · 食欲 ${Math.round(ownLife.appetite*100)}%</small><p>${escapeHtml(ownLife.last_feedback?.text||'')}</p><button data-autonomy-operation="${ownLife.paused?'resume':'pause'}" ${state.mapTravelBusy?'disabled':''}>${ownLife.paused?'恢复自发安排':'暂缓自发安排'}</button><p>${autonomy.actors.filter(actor=>actor.actor_id!==CHARACTER_ID).map(actor=>`${escapeHtml(actor.display_name)}：${escapeHtml(state.worldMap.tasks?.find(task=>task.actor_id===actor.actor_id&&['running','paused'].includes(task.status))?.title||actor.last_feedback?.text||'正在留意接下来能做的事')}`).join('<br>')}</p></section>`:'';
+  target.innerHTML = `<div>${directory}${selfLife}${socialLife}<strong>${escapeHtml(location.name)}</strong>${region ? `<p>${escapeHtml(region.name)}</p>` : ''}<p>${escapeHtml(location.description || '这里还没有留下描述。')}</p>${inside}${activities}${carried}${closures}${toyZone}${material}${props}${sceneCue}${possibleBeat}${currentEvent}${npcs}</div>${action}`;
 }
 
 async function travelTo(locationId) {
-  if (!locationId || state.mapTravelBusy) return;
+  if (!locationId || state.mapTravelBusy || currentWorldTask()) return;
   const destination = worldMapLocation(locationId);
   if (!destination?.reachable) return;
   state.mapTravelBusy = true;
@@ -731,6 +777,13 @@ async function travelTo(locationId) {
       location_id: locationId,
       reason: `从地图选择前往${destination.name}`,
     });
+    if (payload.map?.protagonist?.travel_state?.status === 'travelling') {
+      result.textContent = payload.world_mutation?.mutation?.details?.departure_text || `已出发前往${destination.name}。`;
+      if (payload.world_mutation?.world) updateWorld(payload.world_mutation.world);
+      renderWorldMap(payload.map);
+      await refreshWorldProgress();
+      return;
+    }
     const arrival = payload.world_mutation?.mutation?.details?.arrival_text || destination.arrival_text || `我到${destination.name}了。`;
     result.className = 'map-result ok';
     result.textContent = arrival;
@@ -1416,6 +1469,45 @@ async function refreshDashboard({ allowEncounterAutoOpen = true } = {}) {
   await refreshInteractionLab();
 }
 
+function currentWorldTask() {
+  return state.worldMap?.tasks?.find(task => task.actor_id === CHARACTER_ID && ['running', 'paused'].includes(task.status));
+}
+
+let worldProgressBusy = false;
+async function refreshWorldProgress() {
+  if (worldProgressBusy) return;
+  worldProgressBusy = true;
+  try {
+    const [world, map, life] = await Promise.all([getJson('/api/world'), getJson('/api/world/map'), getJson('/api/life/world')]);
+    if ((world.world || world).world_revision >= (state.world?.world_revision ?? 0)) updateWorld(world.world || world);
+    renderWorldMap(map);
+    updateWorldLife(life, { allowAutoOpen: false });
+  } catch { /* Keep the last confirmed state visible during a transient disconnect. */ }
+  finally { worldProgressBusy = false; }
+}
+
+async function controlTask(taskId, operation) {
+  if (state.mapTravelBusy) return;
+  state.mapTravelBusy = true;
+  renderMapDetail();
+  try {
+    await postJson('/api/world/tasks', { task_id: taskId, operation, event_id: `web-task-${crypto.randomUUID()}` });
+    await refreshWorldProgress();
+  } catch (error) { $('#map-result').textContent = error.message; }
+  finally { state.mapTravelBusy = false; renderMapDetail(); }
+}
+
+let livingActionRetry = null;
+async function runLivingAction(payload, path) {
+  if (state.mapTravelBusy) return;
+  const fingerprint=JSON.stringify([payload,path]);
+  if(livingActionRetry?.fingerprint!==fingerprint)livingActionRetry={fingerprint,event_id:`web-living-${crypto.randomUUID()}`};
+  state.mapTravelBusy=true;renderMapDetail();
+  try { await postJson(path,{...payload,event_id:livingActionRetry.event_id});livingActionRetry=null;await refreshWorldProgress();$('#map-result').textContent='生活活动与库存已更新。'; }
+  catch(error){$('#map-result').textContent=error.message;}
+  finally{state.mapTravelBusy=false;renderMapDetail();}
+}
+
 async function submitMutation() {
   if (state.mutationBusy) return;
   state.mutationBusy = true;
@@ -1541,9 +1633,22 @@ $('#world-map').addEventListener('click', (event) => {
   syncGameDock();
 });
 $('#map-detail').addEventListener('click', (event) => {
+  const socialButton=event.target.closest('[data-social-operation]');
+  if(socialButton){runLivingAction({invitation_id:socialButton.dataset.socialId,operation:socialButton.dataset.socialOperation},'/api/life/social');return;}
+  const lifeButton=event.target.closest('[data-autonomy-operation]');
+  if(lifeButton){runLivingAction({operation:lifeButton.dataset.autonomyOperation},'/api/life/autonomy');return;}
+  const inspectButton = event.target.closest('[data-inspect-location]');
+  if (inspectButton) { state.mapSelectedLocationId = inspectButton.dataset.inspectLocation; renderWorldMap(state.worldMap); return; }
+  const taskButton = event.target.closest('[data-task-operation]');
+  if (taskButton) { controlTask(taskButton.dataset.taskId, taskButton.dataset.taskOperation); return; }
+  const activityButton = event.target.closest('[data-living-activity]');
+  if(activityButton){runLivingAction({activity_id:activityButton.dataset.livingActivity},'/api/world/tasks');return;}
+  const resourceButton = event.target.closest('[data-resource-operation]');
+  if(resourceButton){runLivingAction({object_id:resourceButton.dataset.resourceObject,resource:resourceButton.dataset.resource,operation:resourceButton.dataset.resourceOperation,count:1},'/api/world/resources/transfer');return;}
   const button = event.target.closest('[data-travel-location]');
   if (button) travelTo(button.dataset.travelLocation);
 });
+setInterval(refreshWorldProgress, 5000);
 document.addEventListener('click', (event) => {
   const npcButton = event.target.closest('[data-open-npc]');
   if (npcButton) openNpcPanel(npcButton.dataset.openNpc);

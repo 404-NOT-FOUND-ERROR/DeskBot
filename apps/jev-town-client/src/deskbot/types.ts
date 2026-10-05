@@ -13,6 +13,68 @@ export interface DeskBotLocation {
   current: boolean;
   reachable: boolean;
   arrival_text: string;
+  presentation?: { space: string; point: DeskBotPresentationPoint; lot?: DeskBotPresentationPoint; model?: string } | null;
+  areas?: DeskBotArea[];
+}
+
+export interface DeskBotObject {
+  object_id: string;
+  area_id: string;
+  name: string;
+  description: string;
+  object_kind: string;
+  state_scope: "catalog_only" | "persistent_living";
+  state?: DeskBotObjectState;
+  status_text?: string;
+  resource_names?: Record<string,string>;
+}
+
+export interface DeskBotObjectState {
+  object_id: string; kind: string; updated_at: string;
+  water_level?: number; moisture?: number; health?: number; growth?: number; quantity?: number; dead_quantity?:number; condition?: number;
+  stock?: Record<string,number>; capacity?: number;
+}
+export interface DeskBotLivingActivity {
+  activity_id: string; title: string; kind: "care"|"craft"; target_object_id: string; location_id: string;
+  duration_seconds: number; inputs: { resource:string; name:string; count:number; from:string }[];
+  available:boolean; unavailable_reason:string|null;
+}
+export interface DeskBotLiving {
+  schema:string; simulated_until:string; revision:number; rule_version:string;
+  recovery: { pending:boolean; target_at:string };
+  resource_names:Record<string,string>; inventory:{stock:Record<string,number>;capacity:number};
+  recent_changes: { at:string; text:string; kind:string; task_id?:string; actor_id?:string }[];
+  activities:DeskBotLivingActivity[];
+}
+export interface DeskBotAutonomy {
+  schema:string;enabled:boolean;installed_at:string;revision:number;policy:string;
+  actors:{actor_id:string;display_name:string;location_id:string;energy:number;appetite:number;paused:boolean;next_decision_at:string;
+    plan:{plan_id:string;title:string;reason:string;status:string;index:number;steps:{kind:string}[];task_id:string|null;decision?:{source:string;reason:string;model?:string;memory_ids?:string[]}}|null;
+    last_feedback:{at:string;text:string;kind:string}|null;inventory:Record<string,number>}[];
+  recent:{at:string;actor_id:string;kind:string;text:string;task_id?:string}[];
+}
+
+export interface DeskBotMemoryEpisode {
+  id:string;kind:'world_fact'|'personal_interpretation'|'hearsay';actor_ids:string[];at:string;text:string;topic:string|null;outcome:string;
+  independent_evidence:boolean;evidence_ids?:string[];expires_at?:string;
+  source:{kind:string;task_id?:string;commitment_id?:string;label?:string;url?:string|null;model?:string;request_id?:string};
+}
+export interface DeskBotLivedMemory {
+  schema:string;owner_id:string;installed_at:string;revision:number;identity_preserved:boolean;counts:Record<string,number>;
+  actors:{actor_id:string;display_name:string;interests:Record<string,{topic:string;days:string[];stage:string;successes:number;setbacks:number;bonus:number;evidence_ids:string[]}>}[];
+  own:DeskBotMemoryEpisode[];recent:DeskBotMemoryEpisode[];
+  planner:{enabled:boolean;policy:string;limits:{per_hour:number;per_day:number;actor_cooldown_minutes:number};attempts_last_hour:number;
+    requests:{id:string;actor_id:string;status:string;failure?:string;model?:string;choice?:{goal:string;reason:string;memory_ids:string[]}|null}[];
+    recent:{id:string;actor_id:string;at:string;status:string;reason:string;model:string|null;goal:string|null}[]};
+}
+export interface DeskBotArea {
+  area_id: string;
+  location_id: string;
+  name: string;
+  description: string;
+  access: "public" | "resident";
+  neighbor_area_ids: string[];
+  objects?: DeskBotObject[];
 }
 
 export interface DeskBotNpc {
@@ -27,6 +89,29 @@ export interface DeskBotNpc {
   last_action: string | null;
   last_response?: string | null;
   relationship?: DeskBotNpcRelationship;
+  resident_version?:string;
+  role_label?:string;
+  color?:string;
+  palette?:number;
+  desires?:string[];
+  flaws?:string[];
+  home_location_id?:string;
+  project?:{goal:string;status:string};
+}
+
+export interface DeskBotSocialCommitment {
+  id:string;kind:string;title:string;reason:string;status:string;phase:string;
+  actors:string[];people:{id:string;name:string}[];location_id:string;location_name:string;
+  created_at:string;updated_at:string;deadline_at:string;respond_after:string;finished_at?:string;
+  responses:Record<string,string>;delay_count:number;last_note:string;
+  changes:{at:string;text:string;task_id?:string}[];
+}
+export interface DeskBotSocial {
+  schema:string;policy:string;installed_at:string;revision:number;
+  commitments:DeskBotSocialCommitment[];
+  relationships:Record<string,{actors:string[];encounters:number;trust:number;kept:number;missed:number;last_event:{at:string;text:string}|null}>;
+  recent:{at:string;kind:string;text:string;commitment_id:string|null;actor_ids:string[]}[];
+  notices:{id:string;at:string;author_id:string;kind:string;origin_id:string;source_commitment_id:string;source_task_ids:string[];text:string;verified_by:string}[];
 }
 
 export interface DeskBotNpcRelationship {
@@ -39,8 +124,22 @@ export interface DeskBotWorldMap {
   schema: "deskbot.world-map.v0.1";
   world_id: string;
   world_revision: number;
-  logical_time: { day: number; minute_of_day: number; tick: number };
-  protagonist: { character_id: string; location_id: string };
+  logical_time: { day: number; minute_of_day: number; tick: number; date?: string; time_zone?: string };
+  clock?: { mode: string; rate?: number; time_zone?: string };
+  environment?: DeskBotEnvironment;
+  living?: DeskBotLiving|null;
+  autonomy?: DeskBotAutonomy|null;
+  memory?:DeskBotLivedMemory|null;
+  social?:DeskBotSocial|null;
+  refraction?:DeskBotRefraction|null;
+  resident_life?:{version:string;installed_at:string;count:number}|null;
+  tasks?: DeskBotWorldTask[];
+  content?: { content_id: string; version: string; objects_have_simulated_state: boolean } | null;
+  regions?: { region_id: string; name: string; description: string; color: string }[];
+  areas?: DeskBotArea[];
+  objects?: DeskBotObject[];
+  paths?: { passage_id: string | null; from_location_id: string; to_location_id: string; open: boolean; blocked_reason: string | null }[];
+  protagonist: { character_id: string; location_id: string; travel_state?: { status: string; task_id?: string; arrival_text?: string | null } };
   world_setting?: {
     setting_id: string;
     version: string;
@@ -59,6 +158,47 @@ export interface DeskBotWorldMap {
   locations: DeskBotLocation[];
   npcs: DeskBotNpc[];
   active_event?: { event_id?: string; title?: string; blocks_travel?: boolean } | null;
+}
+
+export interface DeskBotRefraction {
+  schema:string;policy:string;revision:number;
+  suggestions:{id:string;title:string}[];
+  source_status:{id:string;name:string;status:string;last_success_at?:string|null;next_attempt_at?:string|null;ttl_ms?:number;error_code?:string|null}[];
+  records:{id:string;category:string;source_label:string;source_url:string|null;observed_at:string;expires_at:string;attested:boolean;
+    meaning:string;text:string;summary:string;suggestion:string|null;status:string;last_note:string;origin_id:string;plan_id?:string|null;published_at?:string|null;original_text?:string|null;
+    decisions:{at:string;selected:boolean;reason:string}[]}[];
+}
+
+export interface DeskBotEnvironment {
+  schema: "deskbot.world-environment.v1";
+  projected_at: string;
+  time: { mode:string; time_zone:string; minute_of_day:number; phase:string; synced_at:string|null; lighting_convention:string };
+  weather: { status:"fresh"|"stale"|"unavailable"; location:string|null; condition:string|null; provider:string|null;
+    observed_at:string|null; expires_at:string|null; temperature_c:number|null; wind_mps:number|null;
+    precipitation:"rain"|"snow"|"none"; cloud_cover:number; intensity:number };
+}
+
+export interface DeskBotWorldTask {
+  task_id: string;
+  kind: "travel" | "craft" | "care";
+  actor_id: string;
+  title: string;
+  status: "running" | "paused" | "completed" | "cancelled" | "failed";
+  due_at: string;
+  remaining_ms: number;
+  location_id?: string;
+  started_at?: string;
+  segment_started_at?: string;
+  duration_ms?: number;
+  from_location_id?: string;
+  to_location_id?: string;
+  destination_location_id?: string;
+  failure_reason?: string | null;
+  activity_id?: string;
+  origin?:string;
+  life_action?:string;
+  target_object_id?: string;
+  completion?: { effect:string; result?:{ success:boolean; text?:string; reason?:string } }|null;
 }
 
 export interface DeskBotWorldRouteLocation {
@@ -111,7 +251,7 @@ export interface DeskBotWorldTravelResponse {
   map: DeskBotWorldMap;
   world_mutation?: {
     applied?: boolean;
-    mutation?: { details?: { arrival_text?: string | null } };
+    mutation?: { details?: { arrival_text?: string | null; departure_text?: string; task?: DeskBotWorldTask } };
   };
 }
 

@@ -32,7 +32,7 @@ export const CANONICAL_SCENE_ANCHORS: Readonly<Record<string, RoutePoint>> = Obj
 });
 
 export type CanonicalLocationRef = Pick<DeskBotLocation, "x" | "y"> &
-  Partial<Pick<DeskBotLocation, "location_id">>;
+  Partial<Pick<DeskBotLocation, "location_id" | "presentation">>;
 
 function finiteCoordinate(value: number, fallback: number): number {
   const finite = Number.isFinite(value) ? value : fallback;
@@ -41,6 +41,10 @@ function finiteCoordinate(value: number, fallback: number): number {
 
 /** Project a DeskBot location into Jev Town scene space. */
 export function canonicalPointForLocation(location: CanonicalLocationRef): RoutePoint {
+  // Current catalogs carry their scene anchors from the service. The table
+  // below is only a compatibility fallback for older map responses.
+  const supplied = location.presentation;
+  if (supplied?.space === "jev-town-map-v1" && [supplied.point.x, supplied.point.y].every(value => Number.isFinite(value) && value >= 10 && value <= 110)) return { ...supplied.point };
   const anchored = location.location_id ? CANONICAL_SCENE_ANCHORS[location.location_id] : undefined;
   if (anchored) return { ...anchored };
   return {

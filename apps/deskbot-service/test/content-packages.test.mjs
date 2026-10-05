@@ -9,7 +9,7 @@ test('Morrowmere compiler returns one canonical, auditable content package', () 
   const compiled = loadMorrowmereContent();
   assert.equal(compiled.schema, 'deskbot.compiled-content-package.v0.1');
   assert.equal(compiled.settlement.settlement_id, DEFAULT_SETTLEMENT.settlement_id);
-  assert.equal(compiled.locations.length, 5);
+  assert.equal(compiled.locations.length, 10);
   assert.equal(compiled.npcs.length, 3);
   assert.equal(compiled.schedules.schedules.length, 3);
   assert.equal(compiled.stories.story_packages[0].id, 'morrowmere-first-day-v1');

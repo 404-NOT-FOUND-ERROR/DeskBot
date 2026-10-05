@@ -157,7 +157,7 @@ export function createChatOrchestrator({
   }
 
   async function execute(userEvent) {
-    const canonicalProjection = persistentWorld?.ingest(userEvent) ?? null;
+    const canonicalProjection = persistentWorld?.ingest(userEvent,{attestedKind:'user',sourceLabel:'用户对话'}) ?? null;
     const correlationAlreadyCounted = canonicalProjection?.reason === 'correlation_already_counted';
     const matchedByInput = correlationAlreadyCounted ? [] : worldContext.observe(userEvent);
     const stateResult = correlationAlreadyCounted

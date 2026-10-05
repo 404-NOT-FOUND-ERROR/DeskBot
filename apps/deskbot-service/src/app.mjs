@@ -1,12 +1,22 @@
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
+import { activeWorldTask, worldTaskReadModel } from './realtime-world.mjs';
 import { createSharedLife } from './shared-life.mjs';
 import { createSharedLifeReports } from './shared-life-reports.mjs';
 import { createNpcGoals } from './npc-goals.mjs';
 import { createWorldLife } from './world-life.mjs';
+import { RESIDENT_VERSION } from './resident-life.mjs';
+import { socialReadModel } from './social-life.mjs';
+import { REFRACTION_VERSION, LIFE_SUGGESTIONS, refractionReadModel } from './input-refraction.mjs';
+import { createAutonomousLife } from './autonomous-life.mjs';
+import { getCompanionWorldContract } from './companion-world-contract.mjs';
 
 import { createInputStore, InputError, normalizeChat, normalizeEvent } from './input-store.mjs';
 import { createStateEngine } from './state-engine.mjs';
 import { createWorldContext } from './world-context.mjs';
+import { MEMORY_VERSION, memoryReadModel } from './lived-memory.mjs';
+import { createLifeChoiceWorker } from './life-choice.mjs';
 import { createFakeLlm, LlmProviderError } from './llm.mjs';
 import { createChatOrchestrator } from './chat-orchestrator.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
@@ -134,14 +144,17 @@ function sendInputAccepted(response, event, duplicate, stateResult) {
 export function createDeskBotServer({
   now = () => new Date(),
   persistence = null,
+  timeMode = 'simulation',
+  timeZone = 'Asia/Shanghai',
   inputStore = createInputStore({ now, persistence }),
   stateEngine = createStateEngine({ now, persistence }),
   worldContext = createWorldContext({ now, persistence }),
   evidenceLedger = createEvidenceLedger({ now, persistence }),
   outputRouter = createOutputRouter({ now, persistence }),
   deviceRegistry = createDeviceRegistry({ now, persistence }),
-  persistentWorld = createPersistentWorld({ now, persistence }),
+  persistentWorld = createPersistentWorld({ now, persistence, timeMode, timeZone }),
   weatherConnector = null,
+  refractionSources = [],
   inputRuntime: configuredInputRuntime = null,
   inputRuntimeIntervalMs = 5 * 60 * 1000,
   contextSources = createContextSourceRegistry({ now, weatherConnector }),
@@ -160,6 +173,9 @@ export function createDeskBotServer({
   websocket = true,
   websocketPath = '/ws',
   worldLifeEnabled = false,
+  autonomousLifeEnabled = false,
+  residentLifeEnabled = false,
+  livedMemoryEnabled = false,
 } = {}) {
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
   const roleEvolution = createRoleEvolution({
@@ -186,7 +202,7 @@ export function createDeskBotServer({
     listMutations: options => persistentWorld.listMutations(options),
   });
   npcGoals = createNpcGoals({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event),
-    reserved: id => sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending', 'failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === id)) });
+    reserved: id => Boolean(activeWorldTask(persistentWorld.get(), id)) || sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending', 'waiting', 'failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === id)) });
   const worldLife = createWorldLife({
     now,
     worldSnapshot: () => persistentWorld.get(),
@@ -198,6 +214,16 @@ export function createDeskBotServer({
     llm,
     enabled: worldLifeEnabled,
   });
+  const reservedForLife=() => persistentWorld.get().npcs.filter(n => npcGoals.reserved(n.npc_id) || sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending','waiting','failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === n.npc_id))).map(n => n.npc_id);
+  const autonomousLife = createAutonomousLife({ world: persistentWorld, now, enabled: autonomousLifeEnabled,reserved:reservedForLife });
+  let lifeChoiceWorker;
+  function tickAutonomousLife(options) {
+    try { const result=autonomousLife.tick(options);void lifeChoiceWorker?.tick().catch(()=>{});return result; }
+    catch (error) { console.error(`[autonomous-life] ${error.message}`); return { error: error.code ?? 'life_tick_failed' }; }
+  }
+  lifeChoiceWorker=createLifeChoiceWorker({world:persistentWorld,llm,now,
+    reserved:reservedForLife,
+    wake:id=>autonomousLife.tick({wakeId:id})});
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -231,7 +257,7 @@ export function createDeskBotServer({
     refreshWeather: weatherConnector
       ? async ({ force = false } = {}) => {
         const weather = await weatherConnector.refresh({ force });
-        const ingested = ingestNonChatEvent(weather.event);
+        const ingested = ingestWeatherEvent(weather.event);
         return { ...weather, ingested };
       }
       : null,
@@ -297,12 +323,17 @@ export function createDeskBotServer({
     });
   }
 
-  function ingestNonChatEvent(eventInput) {
+  function ingestNonChatEvent(eventInput, adapter = {}) {
+    if (eventInput.type === 'world.mutation' && ['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)) {
+      persistentWorld.syncWallClock?.();
+      const recovery = persistentWorld.syncTasks?.();
+      if (recovery?.pending_due || recovery?.environment_pending) throw new PersistentWorldError(409, 'world_catching_up', '世界正在补算之前的事务，请稍后再试。');
+    }
     const event = normalizeEvent(eventInput, { now });
     const result = inputStore.save(event);
     let worldMutation;
     try {
-      worldMutation = persistentWorld.ingest(result.event);
+      worldMutation = persistentWorld.ingest(result.event,adapter);
     } catch (error) {
       if (!result.duplicate) inputStore.remove?.(result.event.event_id);
       throw error;
@@ -345,6 +376,22 @@ export function createDeskBotServer({
     };
   }
 
+  function ingestWeatherEvent(event) {
+    const adapter={attestedKind:'provider',sourceLabel:'上海天气 · Open-Meteo'};
+    const result=ingestNonChatEvent(event,adapter);
+    // A newly installed reference layer must also receive the connector's
+    // still-valid cached observation. Reuse its origin, not a new weather fact.
+    if(result.duplicate && persistentWorld.get().refraction) {
+      const reference={...event,event_id:`weather-reference:${event.event_id}`,type:'weather.observation',
+        observed_at:event.payload?.snapshot?.observed_at??event.observed_at,
+        provenance:{...event.provenance,origin_event_id:event.provenance?.origin_event_id??event.correlation_id??event.event_id}};
+      const saved=inputStore.save(normalizeEvent(reference,{now}));
+      try { persistentWorld.ingest(saved.event,adapter); }
+      catch(error){if(!saved.duplicate)inputStore.remove?.(saved.event.event_id);throw error;}
+    }
+    return result;
+  }
+
   function assertPublicEventWorldMutation(event) {
     if (event.type !== 'world.mutation') return;
     throw new InputError(403, 'world_mutation_requires_review', 'canonical world mutations are server-owned; submit an observation for review or use a validated world action endpoint');
@@ -372,6 +419,49 @@ export function createDeskBotServer({
     persistence,
     intervalMs: inputRuntimeIntervalMs,
   });
+  const sourceAdapters=new Map(refractionSources.map(s=>{
+    if(!s||!['provider','agent'].includes(s.kind)||typeof s.sourceId!=='string'||typeof s.displayName!=='string')throw new TypeError('Refraction sources require a server-owned sourceId, displayName and provider/agent kind');
+    return [s.sourceId,{attestedKind:s.kind,sourceLabel:s.displayName,sourceUrl:s.sourceUrl??null}];
+  }));
+  function ingestRefractionSource(sourceId, event) {
+    const adapter = sourceAdapters.get(sourceId);
+    if (!adapter) throw new InputError(403, 'source_not_configured', '该消息源尚未在服务端配置。');
+    const permitted = adapter.attestedKind === 'agent' ? /^(agent\.|npc\.message$)/ : /^(news\.|external\.)/;
+    if (!permitted.test(event?.type ?? '')) throw new InputError(400, 'source_category_mismatch', '消息类型与接入口不一致。');
+    let sourceUrl = adapter.sourceUrl;
+    try {
+      const item = new URL(event.payload?.source_url), configured = new URL(adapter.sourceUrl);
+      if (item.protocol === 'https:' && item.hostname === configured.hostname && !item.username && !item.password) sourceUrl = item.href;
+    } catch { /* Preserve the server's configured source link. */ }
+    return ingestNonChatEvent({ ...event, source: `refraction-source:${sourceId}`, character_id: DEFAULT_CHARACTER_ID }, { ...adapter, sourceUrl });
+  }
+  for (const source of refractionSources.filter(s => typeof s.refresh === 'function')) {
+    inputRuntime.registerSource({ sourceId: source.sourceId, displayName: source.displayName, kind: 'external_provider',
+      enabled: source.enabled !== false, ttlMs: source.ttlMs, provider: source.sourceId,
+      provenance: { connector: source.sourceId, source_url: source.sourceUrl, mutation: 'attributed_reference' },
+      refresh: async options => {
+        const result = await source.refresh(options);
+        for (const event of result.events ?? []) {
+          ingestRefractionSource(source.sourceId, event);
+          source.acknowledge?.(event.event_id);
+        }
+        return result;
+      } });
+  }
+  function inputReadModel(world = persistentWorld.get()) {
+    const view = refractionReadModel(world, { now: now() });
+    if (!view) return view;
+    const connections = inputRuntime.status().sources.filter(s => sourceAdapters.has(s.source_id));
+    if (connections.length) view.source_status = view.source_status.filter(s => s.id !== 'external');
+    for (const s of connections) view.source_status.push({ id: s.source_id, name: s.display_name,
+      status: s.enabled ? s.status === 'error' ? 'error' : s.freshness === 'fresh' ? 'fresh' : s.freshness === 'stale' ? 'stale' : 'unavailable' : 'disabled',
+      last_success_at: s.last_success_at, next_attempt_at: s.next_attempt_at, ttl_ms: s.ttl_ms, error_code: s.last_error?.code ?? null });
+    if (llm.status) {
+      const model = llm.status();
+      view.source_status.unshift({ id: 'model', name: `${model.model} · ${persistentWorld.get().memory?.planner.enabled?'对话与生活选择':'对话'}`, status: model.status });
+    }
+    return view;
+  }
   if (weatherConnector?.refresh) {
     const weatherStatus = weatherConnector.status?.() ?? {};
     inputRuntime.registerSource({
@@ -383,7 +473,7 @@ export function createDeskBotServer({
       provider: weatherStatus.provider,
       provenance: { connector: 'weather', layer: 'weather', mutation: 'update_weather' },
       refresh: ({ force = false } = {}) => weatherConnector.refresh({ force }),
-      ingest: (event) => ingestNonChatEvent(event),
+      ingest: (event) => ingestWeatherEvent(event),
     });
     if (weatherConnector.forecast) {
       const forecastLabels = {
@@ -447,12 +537,47 @@ export function createDeskBotServer({
       }
       return;
     }
+    if (url.pathname === '/api/world/contract' && request.method === 'GET') {
+      sendJson(response, 200, getCompanionWorldContract(persistentWorld.get()));
+      return;
+    }
     if (url.pathname === '/api/life/npc-goals') {
       if (request.method === 'GET') { sendJson(response, 200, { goals: npcGoals.list() }); return; }
       if (request.method === 'POST') {
         readJson(request).then(body => sendJson(response, 200, body.operation ? npcGoals.control(body.id, body.operation) : npcGoals.add(body)))
           .catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
             { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
+        return;
+      }
+    }
+    if(url.pathname==='/api/life/inputs') {
+      if(request.method==='GET'){sendJson(response,200,inputReadModel());return;}
+      if(request.method==='POST'){readJson(request).then(body=>{
+        if(!persistentWorld.get().refraction)throw new InputError(409,'refraction_not_installed','现实输入参考尚未启用。');
+        if(!Object.hasOwn(LIFE_SUGGESTIONS,body.suggestion))throw new InputError(400,'invalid_life_suggestion','请选择一个具体的生活建议。');
+        const id=body.event_id??`life-suggestion-${randomUUID()}`;
+        const result=ingestNonChatEvent({event_id:id,type:'user.preference.life',source:'life-suggestion-interface',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{suggestion:body.suggestion,text:LIFE_SUGGESTIONS[body.suggestion].title}},{attestedKind:'user',sourceLabel:'用户建议'});
+        sendJson(response,result.duplicate?200:202,{accepted:true,duplicate:result.duplicate,inputs:refractionReadModel(persistentWorld.get(),{now:now()}),world_revision:result.worldMutation.world.world_revision});
+      }).catch(error=>sendJson(response,error.statusCode??400,{error:error.code??'invalid_life_suggestion',message:error.message}));return;}
+    }
+    if(url.pathname==='/api/life/social') {
+      if(request.method==='GET'){sendJson(response,200,socialReadModel(persistentWorld.get()));return;}
+      if(request.method==='POST'){readJson(request).then(body=>{
+        if(!['join','decline','withdraw'].includes(body.operation)||typeof body.invitation_id!=='string')throw new InputError(400,'invalid_social_response','请选择具体约定与参加、不参加或退出。');
+        const id=body.event_id??`social-response-${randomUUID()}`;
+        const result=ingestNonChatEvent({event_id:id,type:'world.mutation',source:'social-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{action:'respond_social_invitation',invitation_id:body.invitation_id,operation:body.operation}});
+        sendJson(response,200,{accepted:true,social:socialReadModel(persistentWorld.get()),world_revision:result.worldMutation.world.world_revision});
+      }).catch(error=>sendJson(response,error.statusCode??500,{error:error.code??'internal_error',message:error.message}));return;}
+    }
+    if (url.pathname === '/api/life/autonomy') {
+      if (request.method === 'GET') { sendJson(response, 200, autonomousLife.snapshot()); return; }
+      if (request.method === 'POST') {
+        readJson(request).then(body => {
+          if (!['pause','resume'].includes(body.operation)) throw new InputError(400,'invalid_autonomy_operation','Use pause or resume');
+          const controlId=body.event_id??`life-control-${randomUUID()}`;
+          const result=ingestNonChatEvent({event_id:controlId,type:'world.mutation',source:'world-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(controlId)?.occurred_at??now().toISOString(),payload:{action:'control_autonomy',operation:body.operation}});
+          sendJson(response,200,{accepted:true,autonomy:autonomousLife.snapshot(),world_revision:result.worldMutation.world.world_revision});
+        }).catch(error=>sendJson(response,error.statusCode??500,{error:error.code??'internal_error',message:error.message}));
         return;
       }
     }
@@ -594,6 +719,12 @@ export function createDeskBotServer({
         version: SERVICE_VERSION,
         time: now().toISOString(),
       });
+      return;
+    }
+
+    if (url.pathname === '/api/life/memory' && request.method==='GET') {sendJson(response,200,memoryReadModel(persistentWorld.get()));return;}
+    if (request.method === 'GET' && url.pathname === '/api/model/status') {
+      sendJson(response, 200, { ...(llm.status?.() ?? { provider: llm.id, configured: llm.id !== 'fake-llm-v0.1', status: llm.id === 'fake-llm-v0.1' ? 'test_provider' : 'configured', role: 'dialogue_only', high_level_decisions: 'bounded_rules' }), ...(persistentWorld.get().memory?.planner.enabled?{role:'dialogue_and_life_choice',high_level_decisions:'bounded_model_choice_v1'}:{}) });
       return;
     }
 
@@ -894,7 +1025,7 @@ export function createDeskBotServer({
       readJson(request, 64 * 1024, { allowEmpty: true })
         .then((body) => weatherConnector.refresh({ force: body.force === true }))
         .then(({ connector, event, snapshot, cached }) => {
-          const result = ingestNonChatEvent(event);
+          const result = ingestWeatherEvent(event);
           sendJson(response, result.duplicate ? 200 : 202, {
             schema: 'foundry.weather-refresh-accepted.v0.1',
             accepted: true,
@@ -1197,7 +1328,7 @@ export function createDeskBotServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/world/schema') {
-      sendJson(response, 200, getWorldSchema());
+      sendJson(response, 200, getWorldSchema(persistentWorld.get()));
       return;
     }
 
@@ -1413,9 +1544,11 @@ export function createDeskBotServer({
         sendJson(response, 404, { error: 'world_not_found', message: `world ${worldId} does not exist` });
         return;
       }
-      sendJson(response, 200, getWorldMap(world, {
+      const map = getWorldMap(world, {
         characterId: url.searchParams.get('character_id') ?? world.protagonist?.character_id,
-      }));
+      });
+      if (map.refraction) map.refraction = inputReadModel(world);
+      sendJson(response, 200, map);
       return;
     }
 
@@ -1446,6 +1579,43 @@ export function createDeskBotServer({
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/world/tasks') {
+      sendJson(response, 200, { schema: 'deskbot.world-task-list.v1', clock: persistentWorld.get().clock ?? { mode: 'simulation' },
+        tasks: worldTaskReadModel(persistentWorld.get(), now().toISOString()) });
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/world/resources/transfer') {
+      readJson(request, 64 * 1024).then(body => {
+        const eventId = body.event_id ?? `transfer-${randomUUID()}`, existing = inputStore.get(eventId);
+        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-resource-interface', character_id: DEFAULT_CHARACTER_ID,
+          occurred_at: existing?.occurred_at ?? now().toISOString(), payload: { action: 'transfer_resource', actor_id: DEFAULT_CHARACTER_ID,
+            object_id: body.object_id, resource: body.resource, count: body.count, operation: body.operation } });
+        sendJson(response, result.duplicate ? 200 : 202, { accepted: true, duplicate: result.duplicate, world_mutation: result.worldMutation });
+      }).catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
+        { error: error.code ?? 'internal_error', message: error.message ?? 'resource transfer failed' }));
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/world/tasks') {
+      readJson(request, 64 * 1024).then(body => {
+        const eventId = body.event_id ?? `activity-${randomUUID()}`;
+        const existing = inputStore.get(eventId);
+        // Whitelist domain fields; clients cannot inject completion effects or deadlines.
+        const payload = body.operation
+          ? { action: 'control_task', task_id: body.task_id, operation: body.operation }
+          : { action: 'start_activity', task_id: body.task_id ?? `activity-${eventId}`, kind: body.kind,
+            title: body.title, duration_seconds: body.duration_seconds, activity_id: body.activity_id,
+            actor_id: DEFAULT_CHARACTER_ID };
+        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-task-interface',
+          character_id: DEFAULT_CHARACTER_ID, occurred_at: existing?.occurred_at ?? now().toISOString(), payload });
+        sendJson(response, result.duplicate ? 200 : 202, { accepted: result.worldMutation.applied || result.duplicate,
+          duplicate: result.duplicate, world_mutation: result.worldMutation, tasks: worldTaskReadModel(persistentWorld.get(), now().toISOString()) });
+      }).catch(error => {
+        const expected = error instanceof InputError || error instanceof PersistentWorldError;
+        sendJson(response, expected ? error.statusCode : 500, { error: expected ? error.code : 'internal_error', message: expected ? error.message : 'task request failed' });
+      });
+      return;
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/world/travel') {
       readJson(request, 64 * 1024)
         .then((body) => {
@@ -1456,7 +1626,8 @@ export function createDeskBotServer({
           const eventId = typeof body.event_id === 'string' && body.event_id.trim() !== ''
             ? body.event_id.trim()
             : `travel-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-          if (body.expected_world_revision !== undefined) {
+          const existing = inputStore.get(eventId);
+          if (!existing && body.expected_world_revision !== undefined) {
             if (!Number.isInteger(body.expected_world_revision) || body.expected_world_revision < 0) {
               throw new InputError(400, 'invalid_travel_request', 'expected_world_revision must be a non-negative integer');
             }
@@ -1475,7 +1646,7 @@ export function createDeskBotServer({
             source: body.source ?? 'deskbot-web',
             character_id: body.character_id ?? 'shaping-001',
             correlation_id: body.correlation_id ?? eventId,
-            occurred_at: body.occurred_at ?? now().toISOString(),
+            occurred_at: body.occurred_at ?? existing?.occurred_at ?? now().toISOString(),
             source_kind: body.source_kind ?? 'user',
             confidence: body.confidence,
             provider: body.provider,
@@ -1487,6 +1658,7 @@ export function createDeskBotServer({
             payload: {
               action: 'move_protagonist',
               location_id: locationId.trim(),
+              ...(body.destination_location_id !== undefined ? { destination_location_id: body.destination_location_id } : {}),
               ...(body.reason !== undefined ? { reason: body.reason } : {}),
             },
           };
@@ -1495,7 +1667,7 @@ export function createDeskBotServer({
           const refreshedWorld = persistentWorld.get();
           sendJson(response, result.duplicate ? 200 : (result.worldMutation.applied ? 202 : 409), {
             schema: 'deskbot.world-travel-response.v0.1',
-            accepted: result.worldMutation.applied,
+            accepted: result.worldMutation.applied || result.duplicate,
             duplicate: result.duplicate,
             event: result.event,
             world_mutation: { ...result.worldMutation, world: refreshedWorld },
@@ -1663,7 +1835,7 @@ export function createDeskBotServer({
           const result = inputStore.save(event);
           let worldMutation;
           try {
-            worldMutation = persistentWorld.ingest(result.event);
+            worldMutation = persistentWorld.ingest(result.event,url.pathname==='/api/chat'?{attestedKind:'user',sourceLabel:'用户对话'}:{});
           } catch (error) {
             if (!result.duplicate) inputStore.remove?.(result.event.event_id);
             throw error;
@@ -1757,6 +1929,7 @@ export function createDeskBotServer({
       stateEngine,
       persistentWorld,
       evidenceLedger,
+      onEvent: ({event,peer}) => ingestNonChatEvent({...event,character_id:peer.characterId??event.character_id},{attestedKind:peer.characterId===DEFAULT_CHARACTER_ID?'device':null,sourceLabel:peer.characterId===DEFAULT_CHARACTER_ID?'设备协议上报':'未绑定设备上报'}),
       onAudioStream: voiceClient
         ? async (stream) => {
           const sidecar = await voiceClient.transcribe({
@@ -1800,22 +1973,39 @@ export function createDeskBotServer({
   server.sharedLife = sharedLife;
   server.sharedLifeReports = sharedLifeReports;
   server.worldLife = worldLife;
+  server.autonomousLife = autonomousLife;
+  server.lifeChoiceWorker=lifeChoiceWorker;
   server.inputRuntime = inputRuntime;
   server.roleEvolution = roleEvolution;
   server.worldCandidates = worldCandidates;
   // Test/in-process adapters use the same canonical path as trusted
   // connectors without weakening the public /api/event boundary.
   server.ingestNonChatEvent = ingestNonChatEvent;
+  server.ingestRefractionSource = ingestRefractionSource;
   server.persistentWorld = persistentWorld;
   server.interactionPolicy = interactionPolicy;
   server.once('listening', () => {
     try {
       persistentWorld.syncWallClock?.();
+      persistentWorld.syncTasks?.();
     } catch (error) {
       console.error(`[world-clock] startup catch-up failed: ${error.message}`);
     }
     sharedLife.tick();
     npcGoals.tick();
+    if (autonomousLifeEnabled) worldLife.seedNpcs();
+    if(residentLifeEnabled && persistentWorld.get().resident_life?.version!==RESIDENT_VERSION) {
+      ingestNonChatEvent({event_id:`resident-install:${RESIDENT_VERSION}`,type:'world.mutation',source:'resident-life-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_resident_life'}});
+    }
+    if(!livedMemoryEnabled)tickAutonomousLife();
+    if(residentLifeEnabled && !persistentWorld.get().refraction) {
+      ingestNonChatEvent({event_id:`refraction-install:${REFRACTION_VERSION}`,type:'world.mutation',source:'input-refraction-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_input_refraction'}});
+    }
+    if(livedMemoryEnabled && persistentWorld.get().memory?.schema!==MEMORY_VERSION) {
+      ingestNonChatEvent({event_id:`memory-install:${MEMORY_VERSION}`,type:'world.mutation',source:'lived-memory-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_lived_memory',planner_enabled:true}});
+    }
+    if(livedMemoryEnabled)tickAutonomousLife();
+    void lifeChoiceWorker.tick().catch(()=>{});
     worldLife.tick();
     try {
       roleEvolution.syncAll();
@@ -1823,14 +2013,24 @@ export function createDeskBotServer({
       console.error(`[role-evolution] startup sync failed: ${error.message}`);
     }
     inputRuntime.start();
+    const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
+    if (externalIds.length) void inputRuntime.tick({ sourceIds: externalIds });
+    if(residentLifeEnabled && weatherConnector?.status?.().enabled===true && weatherConnector.status().configured===true) {
+      // InputRuntime may correctly skip a still-fresh persisted source. Ask
+      // the connector for its cache so installation can adopt that reference.
+      void weatherConnector.refresh({force:false}).then(({event})=>ingestWeatherEvent(event))
+        .catch(error=>console.error(`[input-refraction] current weather unavailable: ${error.message}`));
+    }
     const timer = setInterval(() => {
       try {
         persistentWorld.syncWallClock?.();
+        persistentWorld.syncTasks?.();
       } catch (error) {
         console.error(`[world-clock] scheduled catch-up failed: ${error.message}`);
       }
       sharedLife.tick();
       npcGoals.tick();
+      tickAutonomousLife();
       worldLife.tick();
       try {
         roleEvolution.syncAll();
@@ -1839,9 +2039,19 @@ export function createDeskBotServer({
       }
     }, 60_000);
     timer.unref();
+    const taskTimer = setInterval(() => {
+      try {
+        persistentWorld.syncWallClock?.();
+        const result = persistentWorld.syncTasks?.();
+        if (result?.processed) { sharedLife.tick(); npcGoals.tick(); tickAutonomousLife(); worldLife.tick(); }
+      }
+      catch (error) { console.error(`[world-tasks] scheduled reconciliation failed: ${error.message}`); }
+    }, timeMode === 'realtime' || persistentWorld.get().clock?.mode === 'real_time' ? 1000 : 60_000);
+    taskTimer.unref();
     server.once('close', () => {
       clearInterval(timer);
-      inputRuntime.stop();
+      clearInterval(taskTimer);
+      inputRuntime.stop();lifeChoiceWorker.stop();
     });
   });
   return server;

@@ -1,0 +1,152 @@
+{
+  "schema": "deskbot.resident-design.v1",
+  "version": "2026-10-04",
+  "status": "authored_not_installed",
+  "settlement_id": "morrowmere",
+  "residents": [
+    {
+      "npc_id": "pathfinder-001", "display_name": "阿砾", "legacy_name": "潮痕巡路员", "role": "route_keeper", "home_location_id": "tidal-old-road", "home_area": "旧路标棚",
+      "appearance": "石子一样的圆身体，短角夹着缺角地图，鞋底总沾着不同颜色的泥。",
+      "temperament": "嘴硬、行动快、爱争第一；真带人出门时又格外谨慎。",
+      "desires": ["找到一条大家愿意实际使用的新路", "做一张不用自己在旁边解释的地图"],
+      "flaws": ["会为证明自己抢先出发", "标记看起来很漂亮却不总好懂"],
+      "likes": ["新脚印", "有人指出地图错误"], "aversions": ["被当成只会带路的人"],
+      "daily_life": ["检查路况", "修补标记", "回棚里晾鞋和吃饭"],
+      "speech": {"rhythm": "短句直说，兴奋时抢话，被指出错误会先辩一句再改。", "example": "那块石头是我昨天搬的。嗯，箭头画反了……你先别笑，帮我扶一下。"},
+      "project": {"project_id": "clear-route-map", "goal": "把旧路到水岸的走法画成人人看得懂的图", "steps": ["实走记录", "借材料做标记", "请居民试走", "修正误导处"], "supporting_npc_ids": ["spare-mender-001", "echo-postcarrier-001"], "success_consequence": "标记与路线使用情况保存，居民可采用新走法", "failure_consequence": "错误标记暂时停用，留下返工和信任修复机会"},
+      "relationships": [{"npc_id": "spare-mender-001", "connection": "想借扣扣的零件做路标", "tension": "阿砾想快做，扣扣不愿浪费好零件"}, {"npc_id": "echo-postcarrier-001", "connection": "需要波果试走投递路线", "tension": "波果更在意准时，阿砾偏爱新路"}]
+    },
+    {
+      "npc_id": "shade-collector-001", "display_name": "影栖", "role": "afterlight_collector", "home_location_id": "backlit-grove", "home_area": "晾光架",
+      "appearance": "头顶两片叶芽，袖口沾着颜色，怀里抱着会漏出旧光的叶筒。",
+      "temperament": "审美挑剔，熟人面前会损人；喜欢自己的作品被使用。",
+      "desires": ["做出一块阴天也好看的光色布", "让作品进入别人的生活"],
+      "flaws": ["不舍得交出满意的样片", "挑材料挑到错过约好的时间"],
+      "likes": ["被认真试用的样片", "意外混出的颜色"], "aversions": ["别人不看就说都一样"],
+      "daily_life": ["采集旧光", "试色晾片", "去集市听使用反馈"],
+      "speech": {"rhythm": "观察很具体，偶尔尖刻；谈颜色时话会变多。", "example": "这片昨天还偏蓝。你拿去试两天，别放柜子里——我想知道它碰到雨会怎样。"},
+      "project": {"project_id": "rain-light-cloth", "goal": "做一块能经受阴雨的光色布", "steps": ["收集样片", "与缝缝做试件", "雨后检查", "决定交付或重做"], "supporting_npc_ids": ["thread-tailor-001", "lamp-keeper-001"], "success_consequence": "可用配色与试件保存，能用于衣物和灯罩", "failure_consequence": "褪色样片保留，后续尝试需改变材料或做法"},
+      "relationships": [{"npc_id": "thread-tailor-001", "connection": "与缝缝共同试布", "tension": "影栖重颜色，缝缝重耐用"}, {"npc_id": "lamp-keeper-001", "connection": "灯穗需要它提供灯罩颜色", "tension": "影栖想慢选，灯穗有维修期限"}]
+    },
+    {
+      "npc_id": "echo-postcarrier-001", "display_name": "波果", "role": "echo_postcarrier", "home_location_id": "echo-waterside", "home_area": "水岸邮袋棚",
+      "appearance": "歪邮票一样的耳朵，圆邮包塞得鼓鼓的，带着一张写满提醒的小纸条。",
+      "temperament": "热心、爱打听、自尊强；希望大家信任自己的投递。",
+      "desires": ["让积压的信找到收件人", "给自己留出一个不用赶路的傍晚"],
+      "flaws": ["为了顺路多接一件而迟到", "有时忍不住把猜测当成谈资"],
+      "likes": ["收件人的确认", "路边的新鲜小事"], "aversions": ["被说成只会传闲话"],
+      "daily_life": ["整理投递清单", "按路线送信", "确认未送达原因", "下班去吃热饭"],
+      "speech": {"rhythm": "快、亲近，会补充半句；谈自己的失误时容易解释过多。", "example": "你的信还在我包里。不是丢了，旧路积水了。我换条路，晚一点到，到了再告诉你。"},
+      "project": {"project_id": "dry-mail-route", "goal": "建立雨天也能使用的投递路线", "steps": ["统计未送达件", "请阿砾核对路况", "请缝缝修邮袋", "试送并核对结果"], "supporting_npc_ids": ["pathfinder-001", "thread-tailor-001"], "success_consequence": "雨天投递路线与邮袋状态更新", "failure_consequence": "未送达件继续保留，通知收件人并改约时间"},
+      "relationships": [{"npc_id": "pathfinder-001", "connection": "依靠阿砾的路况记录", "tension": "不愿用重要信件试一条未经确认的新路"}, {"npc_id": "town-reporter-001", "connection": "常与簌簌交换可公开的消息", "tension": "簌簌会追问消息是否亲眼所见"}]
+    },
+    {
+      "npc_id": "wetland-grower-001", "display_name": "苔团", "role": "wetland_grower", "home_location_id": "echo-waterside", "home_area": "苔芽照料区",
+      "appearance": "苔绒一样的矮圆团，头上顶一小片叶子，口袋里装着种子和湿土。",
+      "temperament": "实在、护短、怕麻烦，愿意给认真照料的人留一份收成。",
+      "desires": ["养出一块能随水位起伏的浮圃", "让收成够自己和朋友吃"],
+      "flaws": ["不肯承认自己照料不过来", "对没经验的人不太耐心"],
+      "likes": ["长出新芽", "按约来帮忙的人"], "aversions": ["拔完样本却不补种"],
+      "daily_life": ["看水位和苗况", "补水清理", "记录收成", "留时间晒太阳"],
+      "speech": {"rhythm": "具体直接，嘴上嫌麻烦，常顺手多给一点。", "example": "今天水够了，别再浇。你把那边的叶子扶起来就行。做完拿两颗，锅粒说晚饭缺这个。"},
+      "project": {"project_id": "floating-seedbed", "goal": "做一个随水位起伏的小浮圃", "steps": ["观察水位", "借扣扣的浮框", "种下试苗", "连续照料并检查存活"], "supporting_npc_ids": ["spare-mender-001", "pot-cook-001"], "success_consequence": "浮圃与收成成为持久对象", "failure_consequence": "苗况和材料损失记录，允许补种及调整设计"},
+      "relationships": [{"npc_id": "pot-cook-001", "connection": "愿意给锅粒提供时令食材", "tension": "锅粒常临时改变想要的数量"}, {"npc_id": "spare-mender-001", "connection": "需要扣扣帮忙做浮框", "tension": "扣扣想修旧框，苔团担心旧框漏水"}]
+    },
+    {
+      "npc_id": "pot-cook-001", "display_name": "锅粒", "role": "seasonal_cook", "home_location_id": "whisper-market", "home_area": "暖锅小摊",
+      "appearance": "像一粒鼓起来的米团，戴着歪锅盖，围裙口袋里有好几把小勺。",
+      "temperament": "爽快、好胜、爱请客，做失败时会偷偷先尝第二口。",
+      "desires": ["做出一道大家会主动点的招牌菜", "用每天实际收到的食材开好晚饭摊"],
+      "flaws": ["总想多试一种做法而耗掉食材", "答应的份数超过自己能做的量"],
+      "likes": ["诚实的试吃意见", "下班来吃饭的朋友"], "aversions": ["只说好吃却从不再来"],
+      "daily_life": ["核对食材", "研究一小份新菜", "准备晚饭", "收摊洗锅"],
+      "speech": {"rhythm": "热闹直白，会边做边说；要求反馈时认真得有点较真。", "example": "先别夸，告诉我哪一口怪。今天只剩三份叶芽，我得留两份做晚饭。"},
+      "project": {"project_id": "leaf-signature-soup", "goal": "研发可重复做出的叶芽汤", "steps": ["向苔团订少量食材", "记录配比", "请人试吃", "保存成功做法并安排下一次"], "supporting_npc_ids": ["wetland-grower-001", "market-trader-001"], "success_consequence": "配方、库存与试吃反馈保存", "failure_consequence": "消耗真实库存，留下调整配比或补货的需要"},
+      "relationships": [{"npc_id": "wetland-grower-001", "connection": "向苔团约食材", "tension": "想临时加量却碰上有限收成"}, {"npc_id": "sound-player-001", "connection": "愿意给咚芽的演出供晚饭", "tension": "咚芽的排练声有时盖过点单声"}]
+    },
+    {
+      "npc_id": "spare-mender-001", "display_name": "扣扣", "role": "repair_collector", "home_location_id": "whisper-market", "home_area": "零件屋",
+      "appearance": "身体像两枚扣在一起的纽扣，背着一个装得太满的透明零件盒。",
+      "temperament": "爱拆解、念旧、算得仔细，见到坏东西比见到新东西兴奋。",
+      "desires": ["修好一台能给浮圃供水的小泵", "把旧零件用到真正需要的地方"],
+      "flaws": ["舍不得丢失效零件", "会因拆得太开而错过交付"],
+      "likes": ["能再用一次的材料", "讲清故障的人"], "aversions": ["为了漂亮就扔掉可用东西"],
+      "daily_life": ["整理零件", "接有限维修", "试机记录", "关门后修自己的小东西"],
+      "speech": {"rhythm": "先问具体哪里坏，解释简短；谈旧零件会不自觉多讲。", "example": "这个还能用，别扔。嗯，我桌上确实太满了。给我腾一块地方，我先把你那只浮框补好。"},
+      "project": {"project_id": "small-water-pump", "goal": "用可用旧件修成一台小泵", "steps": ["查零件", "向晃晃换缺件", "组装试机", "交给苔团试用"], "supporting_npc_ids": ["market-trader-001", "wetland-grower-001"], "success_consequence": "小泵状态与维护需要保存", "failure_consequence": "故障原因保留，等待缺件或重新安排用途"},
+      "relationships": [{"npc_id": "market-trader-001", "connection": "从晃晃那里换零件", "tension": "双方对旧件值多少意见不同"}, {"npc_id": "pathfinder-001", "connection": "帮阿砾修标记", "tension": "阿砾催得太急会打乱维修顺序"}]
+    },
+    {
+      "npc_id": "market-trader-001", "display_name": "晃晃", "role": "market_trader", "home_location_id": "whisper-market", "home_area": "晃晃交换摊",
+      "appearance": "身体像一只会摇的透明罐，罐里装着亮片、纽扣和标着日期的小纸签。",
+      "temperament": "精明、爱热闹，遇到喜欢的故事会做一笔自己也觉得亏的交换。",
+      "desires": ["让积压的怪东西找到实际用途", "存够材料给自己的摊修一顶雨棚"],
+      "flaws": ["收进太多自己喜欢却没人要的东西", "容易把一次热闹误判成长期需求"],
+      "likes": ["意外用途", "讲明白条件的交易"], "aversions": ["答应交换又不说明地爽约"],
+      "daily_life": ["清点库存", "摆摊交换", "记录欠件", "收摊检查雨棚"],
+      "speech": {"rhythm": "快、有算盘也有玩笑；遇到喜欢的东西会突然改口。", "example": "两枚换一块。等等，你说它能做浮框？那我留一枚给苔团，剩下这枚你拿故事来换。"},
+      "project": {"project_id": "market-rain-awning", "goal": "用实际交换所得修好摊位雨棚", "steps": ["盘点材料", "处理积压品", "向缝缝约布", "安装并经受一场雨"], "supporting_npc_ids": ["thread-tailor-001", "spare-mender-001"], "success_consequence": "摊位雨天可用，交换和材料账保留", "failure_consequence": "漏雨损耗留下，下一次需改变材料或固定方式"},
+      "relationships": [{"npc_id": "spare-mender-001", "connection": "与扣扣交换旧件", "tension": "想卖整盒，扣扣只要其中两枚"}, {"npc_id": "pot-cook-001", "connection": "帮锅粒找食材和试吃者", "tension": "锅粒的临时订单会压住其他交换"}]
+    },
+    {
+      "npc_id": "thread-tailor-001", "display_name": "缝缝", "role": "thread_tailor", "home_location_id": "whisper-market", "home_area": "布角小屋",
+      "appearance": "软布拼出的圆身体，一只耳朵针脚整齐，另一只总想拆了重缝。",
+      "temperament": "有主见、做事细，喜欢让穿戴者自己试出合适的样子。",
+      "desires": ["做出会随使用痕迹变好看的布件", "安排一个不接单的下午"],
+      "flaws": ["反复修改一个别人已经满意的细节", "因为不好意思推单而排满时间"],
+      "likes": ["实际试穿意见", "有使用痕迹的布"], "aversions": ["只照样复制而不问合不合用"],
+      "daily_life": ["核对排期", "量尺寸和修补", "留一块布自由试做", "收线休息"],
+      "speech": {"rhythm": "讲条件清楚，会直接指出不合适；聊试做时有一点兴奋。", "example": "可以做，但今天只能补邮袋。你把最磨肩的地方圈出来，颜色明天再选。"},
+      "project": {"project_id": "weather-tested-cloth", "goal": "与影栖做一块经得住日常使用的布", "steps": ["明确用途", "拼接试件", "交给居民试用", "根据磨损修订"], "supporting_npc_ids": ["shade-collector-001", "echo-postcarrier-001"], "success_consequence": "可复用做法和磨损反馈保存", "failure_consequence": "返工占用真实材料与时间，重新协商交付"},
+      "relationships": [{"npc_id": "shade-collector-001", "connection": "与影栖共同试色布", "tension": "想交出去试用，影栖不舍得"}, {"npc_id": "echo-postcarrier-001", "connection": "修波果的邮袋", "tension": "波果每天都需要它，留不出维修时间"}]
+    },
+    {
+      "npc_id": "lamp-keeper-001", "display_name": "灯穗", "role": "lamp_keeper", "home_location_id": "tidal-old-road", "home_area": "雾灯检修棚",
+      "appearance": "像一颗有穗的小灯果，头上的光有时因困倦变得忽明忽暗。",
+      "temperament": "可靠、爱记清单，别人玩得开心时也想加入。",
+      "desires": ["让夜路上的灯按需要正常亮", "参加一次不用中途离开的演出"],
+      "flaws": ["习惯自己承担所有维修", "累了也不肯说需要换班"],
+      "likes": ["及时报告的小故障", "有人主动接一班"], "aversions": ["明知坏了却一直凑合"],
+      "daily_life": ["检查耗材", "日间维修", "黄昏巡灯", "安排休息和换班"],
+      "speech": {"rhythm": "直接清楚，疲惫时更短；被邀请玩会露出一点期待。", "example": "第三盏得换罩。咚芽今晚开演？给我留个位置，我想先找人接后半段巡灯。"},
+      "project": {"project_id": "shared-lamp-round", "goal": "形成有人协作的夜路巡灯安排", "steps": ["记录故障", "补齐耗材", "约阿砾试巡", "检查换班后结果"], "supporting_npc_ids": ["pathfinder-001", "shade-collector-001"], "success_consequence": "灯状态与换班安排保存，灯穗得到休息时间", "failure_consequence": "未维修路段标记受限，重新安排照明和换班"},
+      "relationships": [{"npc_id": "pathfinder-001", "connection": "希望阿砾帮忙巡灯", "tension": "阿砾的探索可能撞上换班"}, {"npc_id": "sound-player-001", "connection": "想去咚芽的演出", "tension": "公共照明需求与演出时间冲突"}]
+    },
+    {
+      "npc_id": "sound-player-001", "display_name": "咚芽", "role": "sound_player", "home_location_id": "shaping-field-desk", "home_area": "小声排练角",
+      "appearance": "头上长着两枚小鼓芽，圆身体走起来会有不同节奏，怀里抱着一个空盒。",
+      "temperament": "外向、敏感、爱即兴，想被听见又怕没人来。",
+      "desires": ["办一场居民愿意留下听完的小演出", "找到自己的节奏"],
+      "flaws": ["兴奋时忘记别人正在休息", "把没人空闲误解成没人喜欢"],
+      "likes": ["有人跟着敲一拍", "日常物件的新声音"], "aversions": ["还没听就要求安静"],
+      "daily_life": ["收集声音", "与邻居约排练时间", "练习一小段", "帮忙收拾活动场地"],
+      "speech": {"rhythm": "兴奋时断句快，会模仿一小段节奏；失落时先装不在意。", "example": "刚才那个盒子响了三下！我想放进曲子里。你下午要睡？好，我把这一段挪到傍晚。"},
+      "project": {"project_id": "small-evening-show", "goal": "办一场不影响邻居休息的小演出", "steps": ["收集声段", "协商时间地点", "邀请居民", "演出并听反馈"], "supporting_npc_ids": ["lamp-keeper-001", "pot-cook-001"], "success_consequence": "节目和出席经历保存，形成可再次举办的活动", "failure_consequence": "缺席原因分别记录，允许改时间或缩小规模"},
+      "relationships": [{"npc_id": "pot-cook-001", "connection": "想在锅粒晚饭摊旁演出", "tension": "排练会影响点单"}, {"npc_id": "lamp-keeper-001", "connection": "想给灯穗留位置", "tension": "需要协调巡灯与演出时间"}]
+    },
+    {
+      "npc_id": "town-reporter-001", "display_name": "簌簌", "role": "town_reporter", "home_location_id": "whisper-market", "home_area": "小报板",
+      "appearance": "纸叶一样的耳朵，身上夹着折得不齐的小报，铅笔常滚到脚边。",
+      "temperament": "好奇、较真，喜欢有趣的题目，也在乎别人纠正自己。",
+      "desires": ["写出居民愿意读的小报", "把一件大家意见不同的事问清楚"],
+      "flaws": ["标题比证据跑得快", "追问时忘了对方正在忙"],
+      "likes": ["能核对的细节", "不同立场"], "aversions": ["消息错了却不肯更正"],
+      "daily_life": ["选题", "采访并记出处", "核对和写稿", "收集更正意见"],
+      "speech": {"rhythm": "问题具体，会分清听说与亲见；赶稿时容易连续追问。", "example": "你说旧路通了，是今天走过，还是听阿砾讲的？我先记成待确认，晚些去看一眼。"},
+      "project": {"project_id": "water-route-report", "goal": "写清水位变化怎样影响居民一天", "steps": ["问苔团苗况", "问波果投递", "实地核对", "署名发布并接受更正"], "supporting_npc_ids": ["wetland-grower-001", "echo-postcarrier-001"], "success_consequence": "有出处的小报保存，可成为居民之间共享的信息", "failure_consequence": "未确认说法保留标记，错误报道需要公开修订"},
+      "relationships": [{"npc_id": "echo-postcarrier-001", "connection": "波果常带来消息", "tension": "热闹说法未必能核实"}, {"npc_id": "drifting-visitor-001", "connection": "想记录泡屿的外出见闻", "tension": "泡屿不喜欢被追着交代行程"}]
+    },
+    {
+      "npc_id": "drifting-visitor-001", "display_name": "泡屿", "role": "drifting_visitor", "home_location_id": "backlit-grove", "home_area": "暂住叶棚",
+      "appearance": "像一座漂浮的小岛，头顶有一粒总往外滚的小石子，带着轻便小包。",
+      "temperament": "自由、随性、爱尝鲜，愿意分享见闻但不想处处解释。",
+      "desires": ["找到一处值得暂住的新地方", "在离开前完成答应朋友的一件事"],
+      "flaws": ["兴起就改行程", "太晚通知别人自己的变化"],
+      "likes": ["未去过的地方", "没有催促的邀请"], "aversions": ["每次来访都被当成导游"],
+      "daily_life": ["查看可走路线", "带有限行李出门", "留下可核实的见闻", "有时在熟悉地方多待一天"],
+      "speech": {"rhythm": "轻快、具体，常突然想到另一件事；拒绝时简单明白。", "example": "我想再待一天。你要的那块光片还没找到，我不拿差不多的糊弄你。明早我再去看看。"},
+      "project": {"project_id": "temporary-light-shelter", "goal": "找到能住下并存放行李的临时落脚处", "steps": ["查看合法可达地点", "协商使用时间", "补一件缺少的布件", "试住后决定留下或离开"], "supporting_npc_ids": ["shade-collector-001", "thread-tailor-001"], "success_consequence": "暂住与行李位置保存，可影响后续相遇", "failure_consequence": "原落脚处与未完成约定保留，需重新安排"},
+      "relationships": [{"npc_id": "shade-collector-001", "connection": "想帮影栖带回可核实的光样", "tension": "不喜欢被指定每次外出的任务"}, {"npc_id": "town-reporter-001", "connection": "愿意偶尔讲外出见闻", "tension": "希望保留不公开的部分"}]
+    }
+  ]
+}

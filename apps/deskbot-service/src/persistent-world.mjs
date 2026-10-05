@@ -1,4 +1,14 @@
+import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-memory.mjs';
+import { applyLifeChoice } from './autonomous-life.mjs';
+import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
+import { getWorldEnvironment } from './world-environment.mjs';
+import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
+import { installResidentLife } from './resident-life.mjs';
+import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
+import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
+import { LivingResourceError, installLivingResources, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
 import { createHash } from 'node:crypto';
+import { RealTimeWorldError, activeWorldTask, applyRealTimeClock, localWorldDate, startTravelTask, startActivityTask, controlWorldTask, advanceWorldTask } from './realtime-world.mjs';
 
 import {
   DEFAULT_CHARACTER_DISPLAY_NAME,
@@ -32,43 +42,7 @@ const WALL_CLOCK_SCHEMA = 'deskbot.world-wall-clock.v0.1';
 const WALL_CLOCK_DEFAULT_CATCH_UP_MINUTES = 120;
 const WORLD_RULE_VERSION = 'canonical-world-rules-v0.4';
 
-// Presentation geometry is deliberately separate from canonical world facts.
-// The service owns the legal hop and its endpoints; this table only keeps the
-// Jev Town renderer on the same street polyline as the authored Morrowmere map.
 const PRESENTATION_SPACE = 'jev-town-map-v1';
-const PRESENTATION_ROUTES = Object.freeze({
-  'shaping-field-desk->tidal-old-road': Object.freeze([
-    Object.freeze({ x: 50, y: 90 }),
-    Object.freeze({ x: 50, y: 70 }),
-  ]),
-  'tidal-old-road->whisper-market': Object.freeze([
-    Object.freeze({ x: 50, y: 70 }),
-    Object.freeze({ x: 50, y: 50 }),
-    Object.freeze({ x: 30, y: 50 }),
-  ]),
-  'tidal-old-road->backlit-grove': Object.freeze([
-    Object.freeze({ x: 50, y: 70 }),
-    Object.freeze({ x: 50, y: 50 }),
-    Object.freeze({ x: 90, y: 50 }),
-  ]),
-  'whisper-market->echo-waterside': Object.freeze([
-    Object.freeze({ x: 30, y: 50 }),
-    Object.freeze({ x: 50, y: 50 }),
-    Object.freeze({ x: 50, y: 10 }),
-  ]),
-  'backlit-grove->echo-waterside': Object.freeze([
-    Object.freeze({ x: 90, y: 50 }),
-    Object.freeze({ x: 50, y: 50 }),
-    Object.freeze({ x: 50, y: 10 }),
-  ]),
-});
-
-function presentationRouteFor(fromLocationId, toLocationId) {
-  const direct = PRESENTATION_ROUTES[`${fromLocationId}->${toLocationId}`];
-  if (direct) return clone(direct);
-  const reverse = PRESENTATION_ROUTES[`${toLocationId}->${fromLocationId}`];
-  return reverse ? clone(reverse).reverse() : null;
-}
 
 const MULTISOURCE_LAYERS = Object.freeze([
   {
@@ -116,13 +90,27 @@ const MULTISOURCE_LAYERS = Object.freeze([
 ]);
 
 const SUPPORTED_WORLD_ACTIONS = Object.freeze([
+  { action:'install_input_refraction',layer:'world_line',required:[],optional:[],description:'安装有限的现实输入参考，不回填历史；消息只提供候选，实际任务仍须核验' },
+  { action:'install_lived_memory',layer:'world_line',required:[],optional:['planner_enabled'],description:'从实际记录安装生活记忆与缓慢兴趣' },
+  { action:'claim_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:[],description:'服务端核验可行候选并领取有限思考额度' },
+  { action:'resolve_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:['text','model','error'],description:'服务端验证模型选择，保留理解与执行边界' },
+  { action: 'sync_real_time', layer: 'calendar', required: [], optional: ['time_zone'], description: '服务端同步现实时间，生产默认 Asia/Shanghai、1:1' },
+  { action: 'start_activity', layer: 'world_line', required: ['task_id'], optional: ['activity_id', 'kind', 'title', 'duration_seconds', 'actor_id'], description: '作者生活活动使用固定耗时、材料预留和核验后果；旧活动仅保留经历' },
+  { action: 'advance_living_world', layer: 'world_line', required: ['until'], optional: ['force'], description: '服务端按真实经过时间补算环境，最多七天一批，保留恢复游标' },
+  { action: 'transfer_resource', layer: 'world_line', required: ['object_id', 'resource', 'count', 'operation'], optional: ['actor_id'], description: '同地点从有限库存取放物品，不凭空生成材料' },
+  { action: 'control_task', layer: 'world_line', required: ['task_id', 'operation'], optional: [], description: '暂停、继续或取消未完成任务' },
+  { action: 'advance_task', layer: 'world_line', required: ['task_id', 'expected_task_revision'], optional: [], description: '服务端核验到期任务并原子提交结果' },
   { action: 'advance_time', layer: 'calendar', required: ['minutes'], optional: [], description: '推进连续世界逻辑时间' },
   { action: 'activate_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.source'], description: '创建唯一进行中的世界事件及其可生活切片' },
   { action: 'resolve_active_event', layer: 'world_line', required: [], optional: ['event_id', 'outcome'], description: '结束当前进行中的世界事件' },
   { action: 'enqueue_pending_item', layer: 'world_line', required: ['item.item_id', 'item.summary'], optional: ['item.kind', 'item.source'], description: '按 FIFO 加入待处理事项' },
   { action: 'dequeue_pending_item', layer: 'world_line', required: [], optional: ['item_id'], description: '按 FIFO 取出待处理事项' },
-  { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC，最多 3 个' },
-  { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: ['reason'], description: '沿可见且未被阻断的相邻路线移动主角，并推进旅行时间' },
+  { action: 'upsert_npc', layer: 'world_line', required: ['npc.npc_id', 'npc.display_name'], optional: ['npc.role', 'npc.location_id', 'npc.status'], description: '新增或更新 NPC；容量以当前 canonical_fields.npcs.maximum 为准' },
+  { action: 'install_resident_life', layer: 'world_line', required: [], optional: [], description: '安装居民作者目录及社会生活，保留已有身份与经历' },
+  { action: 'respond_social_invitation', layer: 'world_line', required: ['invitation_id', 'operation'], optional: [], description: '喵呜回应自己的邀请：join、decline 或 withdraw' },
+  { action: 'move_protagonist', layer: 'world_line', required: ['location_id'], optional: ['reason','destination_location_id'], description: '沿合法通路开始持久旅行，抵达时再次验证；研究模式保留模拟旅行' },
+  { action: 'admit_map_content', layer: 'world_line', required: ['content','expected_world_revision'], optional: [], description: '校验完整候选目录后追加地点、区域和对象，保留已有身份和归属' },
+  { action: 'set_passage_access', layer: 'world_line', required: ['passage_id','status','reason','expected_passage_revision'], optional: [], description: '由世界规则封闭或重开通路，保留原因和版本；外部观测不能直接执行' },
   { action: 'set_life_scene', layer: 'world_line', required: ['scene.scene_id', 'scene.location_id', 'scene.title'], optional: ['scene.content_version', 'scene.narration', 'scene.sensory_cue', 'scene.opportunity', 'scene.participants', 'scene.source_factors', 'scene.continuity', 'scene.started_at', 'scene.expires_at', 'scene.arc_id', 'scene.cause_event_ids', 'scene.cause_experience_ids', 'scene.branch_key', 'scene.resolution_state'], description: '由世界生活引擎切换当前可回放 Scene' },
   { action: 'continue_life_scene', layer: 'world_line', required: ['scene_id', 'slot_key', 'expires_at'], optional: ['source_factors', 'continuity'], description: '同一生活事件跨时间槽继续，不重复制造新 Scene' },
   { action: 'npc_interaction', layer: 'world_line', required: ['interaction_id', 'npc_id', 'intent', 'response'], optional: ['idea', 'occurred_at', 'experience', 'role_direction'], description: '记录同地点 NPC 对白名单互动、共同经历与有限关系变化' },
@@ -531,7 +519,7 @@ function migrateWorldToCurrentSetting(world, now) {
     }
     const definition = defaultLocationsById.get(canonicalId);
     if (definition) {
-      Object.assign(migrated, definition);
+      Object.assign(migrated, { ...definition, ...migrated, neighbors: [...new Set([...(migrated.neighbors ?? []), ...definition.neighbors])], presentation: definition.presentation });
     }
     if (canonicalId === DEFAULT_LOCATION_ID) {
       migrated.location_id_aliases = uniqueStrings([
@@ -572,6 +560,27 @@ function migrateWorldToCurrentSetting(world, now) {
         applied_at: timestamp,
       }];
     }
+  }
+
+  if (!next.map_catalog) {
+    const originalIds = new Set(existingLocations.map(place => canonicalLocationId(place.location_id)));
+    installWorldMapContent(next, loadWorldMapContent(), timestamp);
+    const beforeRevision = next.world_revision;
+    next.world_revision += 1;
+    next.schema_migrations = [...(next.schema_migrations ?? []), {
+      id: 'companion-living-map-v1', applied_at: timestamp,
+      before_revision: beforeRevision, after_revision: next.world_revision,
+      content_id: next.map_catalog.content_id, version: next.map_catalog.version,
+      added_location_ids: next.map_catalog.locations.filter(place => !originalIds.has(place.location_id)).map(place => place.location_id),
+      preserved_location_ids: [...originalIds],
+    }];
+    changed = true;
+  }
+
+  if (upgradeAuthoredScene(next, timestamp)) changed = true;
+  if (installLivingResources(next, timestamp)) {
+    changed = true; next.world_revision += 1;
+    next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-living-resources-v1',applied_at:timestamp,scope:'additive_resources',preserved_existing_tasks:true}];
   }
 
   const initialField = createInitialShapingField(
@@ -710,6 +719,7 @@ function normalizeNpc(value, world, existing = null) {
     throw new PersistentWorldError(400, 'invalid_world_mutation', `unknown NPC location ${locationId}`);
   }
   return {
+    ...existing,
     npc_id: requireText(npc.npc_id, 'payload.npc.npc_id'),
     display_name: requireText(npc.display_name, 'payload.npc.display_name'),
     role: optionalText(npc.role, 'payload.npc.role', existing?.role ?? 'visitor'),
@@ -903,7 +913,7 @@ function applyWorldLineEvent(next, payload) {
   return { action: 'apply_world_line_event', details: { event: clone(item) } };
 }
 
-function applyWeatherUpdate(next, payload) {
+function applyWeatherUpdate(next, payload, event) {
   const snapshot = normalizeWeatherSnapshot(payload);
   const previousObservedAt = next.weather.snapshot?.observed_at ?? null;
   if (previousObservedAt && snapshot.observed_at && Date.parse(snapshot.observed_at) < Date.parse(previousObservedAt)) {
@@ -914,6 +924,7 @@ function applyWeatherUpdate(next, payload) {
   }
   next.weather.status = snapshot.condition ?? 'observed';
   next.weather.snapshot = snapshot;
+  next.weather.provenance = event?.provenance ? clone(event.provenance) : null;
   return { action: 'update_weather', details: { accepted: true, snapshot: clone(snapshot) } };
 }
 
@@ -967,7 +978,7 @@ function applyDeviceContext(next, payload) {
   return { action: 'record_device_context', details: { device: clone(item) } };
 }
 
-function applyNpcAction(next, payload) {
+function applyNpcAction(next, payload, event, at) {
   const npcId = requireText(payload.npc_id, 'payload.npc_id');
   const index = next.npcs.findIndex((npc) => npc.npc_id === npcId);
   if (index === -1) {
@@ -975,6 +986,9 @@ function applyNpcAction(next, payload) {
   }
   const npc = { ...next.npcs[index] };
   const actionName = requireText(payload.action_name ?? payload.npc_action ?? payload.command, 'payload.action_name');
+  if (next.clock?.mode === 'real_time' && activeWorldTask(next, npcId)) {
+    throw new PersistentWorldError(409, 'actor_busy', 'NPC has an unfinished task');
+  }
   if (payload.location_id !== undefined) {
     const locationId = canonicalLocationId(requireText(payload.location_id, 'payload.location_id'));
     if (!next.locations.some((location) => location.location_id === locationId)) {
@@ -986,6 +1000,13 @@ function applyNpcAction(next, payload) {
       if (!neighbors.includes(locationId)) {
         throw new PersistentWorldError(409, 'npc_location_not_reachable', `${locationId} is not adjacent to ${npc.location_id}`);
       }
+      const access = worldHopAccess(next, npc.location_id, locationId);
+      if (!access.allowed) throw new PersistentWorldError(409, access.code, access.reason);
+    }
+    if (next.clock?.mode === 'real_time' && locationId !== npc.location_id) {
+      const details = startTravelTask(next, { eventId: event.event_id, at, actorId: npcId, locationId,
+        destinationId: payload.destination_location_id ?? locationId, reason: actionName, arrivalStatus: payload.status ?? npc.status });
+      return { action: 'npc_action', details: { ...details, npc_id: npcId, action_name: actionName } };
     }
     npc.location_id = locationId;
   }
@@ -1036,6 +1057,9 @@ function applyNpcInteraction(next, payload) {
   const index = next.npcs.findIndex((npc) => npc.npc_id === npcId);
   if (index === -1) throw new PersistentWorldError(404, 'npc_not_found', `NPC ${npcId} does not exist`);
   const npc = { ...next.npcs[index] };
+  if (activeWorldTask(next)?.kind === 'travel' || activeWorldTask(next, npcId)?.kind === 'travel') {
+    throw new PersistentWorldError(409, 'actor_travelling', 'Travelling actors cannot have a local encounter');
+  }
   if (npc.location_id !== next.protagonist.location_id) {
     throw new PersistentWorldError(409, 'npc_not_present', `NPC ${npcId} is not at the protagonist location`);
   }
@@ -1081,18 +1105,61 @@ function applyNpcInteraction(next, payload) {
 
 export function previewWorldMutations(world, payloads) {
   let projected = clone(world);
+  // Plan validation projects eventual locations; it never creates real tasks.
+  delete projected.clock;
+  projected.tasks = [];
   for (const payload of payloads) projected = applyExplicitMutation(projected, { payload }).next;
   return projected;
 }
 
-function applyExplicitMutation(world, event) {
+function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? event.occurred_at) {
   const payload = requireObject(event.payload, 'payload');
   const action = requireText(payload.action, 'payload.action');
   const next = clone(world);
   let details;
 
   switch (action) {
+    case 'install_input_refraction':
+      details=installRefraction(next,at);break;
+    case 'install_resident_life':
+      details=installResidentLife(next,at);break;
+    case 'respond_social_invitation':
+      details=respondSocialInvitation(next,at,payload.invitation_id,payload.operation);break;
+    case 'install_lived_memory':
+      details=installLivedMemory(next,at,{plannerEnabled:payload.planner_enabled===true});break;
+    case 'claim_life_choice':
+    case 'resolve_life_choice':
+      details=applyLifeChoice(next,at,payload);break;
+    case 'advance_autonomous_life':
+      details = advanceAutonomousLife(next, at, { eventId: event.event_id, reservedActors: payload.reserved_actors ?? [] });
+      break;
+    case 'control_autonomy':
+      details = controlAutonomy(next, at, payload.operation);
+      break;
+    case 'sync_real_time':
+      details = applyRealTimeClock(next, at, payload.time_zone);
+      break;
+    case 'advance_living_world':
+      if (Date.parse(payload.until) > Date.parse(at)) throw new PersistentWorldError(409, 'living_future_forbidden', 'Cannot advance living resources past server time');
+      details = advanceLivingResources(next, payload.until, { force: payload.force === true });
+      break;
+    case 'transfer_resource':
+      advanceLivingResources(next, at, { force: true });
+      details = transferLivingResource(next, payload, at);
+      break;
+    case 'start_activity':
+      advanceLivingResources(next, at, { force: true });
+      details = startActivityTask(next, payload, { eventId: event.event_id, at });
+      break;
+    case 'control_task':
+      advanceLivingResources(next, at, { force: true });
+      details = controlWorldTask(next, payload, at);
+      break;
+    case 'advance_task':
+      details = advanceWorldTask(next, payload, at);
+      break;
     case 'advance_time': {
+      if (next.clock?.mode === 'real_time') throw new PersistentWorldError(409, 'real_time_clock_locked', 'Real-time worlds cannot fast-forward');
       const minutes = boundedInteger(payload.minutes, 'payload.minutes', 1, 7 * MINUTES_PER_DAY);
       const totalMinutes = next.logical_time.minute_of_day + minutes;
       next.logical_time.day += Math.floor(totalMinutes / MINUTES_PER_DAY);
@@ -1167,7 +1234,10 @@ function applyExplicitMutation(world, event) {
       const requestedNpcId = requireText(requestedNpc.npc_id, 'payload.npc.npc_id');
       const existingIndex = next.npcs.findIndex((existing) => existing.npc_id === requestedNpcId);
       const npc = normalizeNpc(requestedNpc, next, existingIndex >= 0 ? next.npcs[existingIndex] : null);
-      if (existingIndex === -1 && next.npcs.length >= MAX_NPCS) {
+      if (next.clock?.mode === 'real_time' && existingIndex >= 0 && npc.location_id !== next.npcs[existingIndex].location_id) {
+        throw new PersistentWorldError(409, 'npc_travel_required', 'Existing NPCs must use timed travel');
+      }
+      if (existingIndex === -1 && next.npcs.length >= (next.resident_life ? 24 : MAX_NPCS)) {
         throw new PersistentWorldError(409, 'npc_limit_reached', `this world supports at most ${MAX_NPCS} NPCs`);
       }
       if (existingIndex === -1) next.npcs.push(npc);
@@ -1175,7 +1245,19 @@ function applyExplicitMutation(world, event) {
       details = { npc: clone(npc), operation: existingIndex === -1 ? 'insert' : 'replace' };
       break;
     }
+    case 'admit_map_content':
+      if (!Number.isSafeInteger(payload.expected_world_revision) || payload.expected_world_revision !== world.world_revision) throw new PersistentWorldError(409, 'map_revision_conflict', 'Map expansion requires the current world revision');
+      details = installWorldMapContent(next, payload.content, at, { expansion: true });
+      break;
+    case 'set_passage_access':
+      details = setPassageAccess(next, payload, event.event_id, at);
+      break;
     case 'move_protagonist': {
+      if (next.clock?.mode === 'real_time') {
+        details = startTravelTask(next, { eventId: event.event_id, at, locationId: payload.location_id,
+          destinationId: payload.destination_location_id ?? payload.location_id, reason: payload.reason });
+        break;
+      }
       const locationId = canonicalLocationId(requireText(payload.location_id, 'payload.location_id'));
       const destination = next.locations.find((location) => location.location_id === locationId);
       if (!destination) {
@@ -1190,9 +1272,8 @@ function applyExplicitMutation(world, event) {
       if (!neighbors.includes(locationId)) {
         throw new PersistentWorldError(409, 'location_not_reachable', `${locationId} is not adjacent to ${previousLocationId}`);
       }
-      if (next.active_event?.blocks_travel === true) {
-        throw new PersistentWorldError(409, 'travel_blocked', `active event ${next.active_event.event_id} blocks travel`);
-      }
+      const access = worldHopAccess(next, previousLocationId, locationId);
+      if (!access.allowed) throw new PersistentWorldError(409, access.code, access.reason);
       const travelCost = Number.isInteger(destination.travel_cost) && destination.travel_cost > 0
         ? destination.travel_cost
         : 10;
@@ -1228,12 +1309,17 @@ function applyExplicitMutation(world, event) {
       details = applyWorldLineEvent(next, payload).details;
       break;
     case 'update_weather':
-      details = applyWeatherUpdate(next, payload).details;
+      details = applyWeatherUpdate(next, payload, event).details;
+      if (details.accepted) { advanceLivingResources(next, at, { force: true }); setLivingWeatherWindow(next, event, at); }
       break;
     case 'record_external_context':
       details = applyExternalContext(next, payload).details;
       break;
     case 'advance_calendar':
+      if (next.clock?.mode === 'real_time' && ((payload.date && payload.date !== next.calendar.date)
+        || (payload.timezone && payload.timezone !== next.clock.time_zone))) {
+        throw new PersistentWorldError(409, 'real_time_clock_locked', 'Calendar date and timezone follow the real clock');
+      }
       details = applyCalendarAdvance(next, payload).details;
       break;
     case 'observe_user_preference':
@@ -1243,7 +1329,7 @@ function applyExplicitMutation(world, event) {
       details = applyDeviceContext(next, payload).details;
       break;
     case 'npc_action':
-      details = applyNpcAction(next, payload).details;
+      details = applyNpcAction(next, payload, event, at).details;
       break;
     case 'npc_interaction':
       details = applyNpcInteraction(next, payload).details;
@@ -1286,7 +1372,9 @@ export class PersistentWorldError extends Error {
   }
 }
 
-export function createPersistentWorld({ now = () => new Date(), persistence = null } = {}) {
+export function createPersistentWorld({ now = () => new Date(), persistence = null, timeMode = 'simulation', timeZone = 'Asia/Shanghai' } = {}) {
+  if (!['simulation', 'realtime'].includes(timeMode)) throw new TypeError('timeMode must be simulation or realtime');
+  localWorldDate(now().toISOString(), timeZone);
   const storedWorlds = persistence?.list('canonical-world.states') ?? [];
   const worlds = new Map();
   for (const storedWorld of storedWorlds) {
@@ -1296,6 +1384,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   }
   if (!worlds.has(DEFAULT_WORLD_ID)) {
     const initial = createDefaultWorld(now);
+    installWorldMapContent(initial, loadWorldMapContent(), initial.created_at);
+    installLivingResources(initial, initial.created_at);
     worlds.set(initial.world_id, initial);
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }
@@ -1352,6 +1442,16 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   }
 
   function syncWallClock({ maxCatchUpMinutes = WALL_CLOCK_DEFAULT_CATCH_UP_MINUTES } = {}) {
+    const snapshot = get();
+    if (timeMode === 'realtime' || snapshot.clock?.mode === 'real_time') {
+      const at = now().toISOString();
+      const local = localWorldDate(at, snapshot.clock?.time_zone ?? timeZone);
+      if (snapshot.clock?.mode === 'real_time' && at < snapshot.clock.synced_at) return { enabled: true, clock_moved_backwards: true };
+      if (snapshot.clock?.local_date === local.date && snapshot.logical_time.minute_of_day === local.minute_of_day) return { enabled: true, advanced: false };
+      const result = ingest({ event_id: `real-clock:${at}`, type: 'world.mutation', source: 'world-real-clock', character_id: DEFAULT_CHARACTER_ID,
+        occurred_at: at, payload: { action: 'sync_real_time', time_zone: timeZone } });
+      return { enabled: true, advanced: result.applied, clock: result.world.clock };
+    }
     if (!persistence?.get || !persistence?.put) {
       return { enabled: false, reason: 'persistence_required' };
     }
@@ -1485,7 +1585,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     };
   }
 
-  function ingest(event) {
+  function ingest(event, adapter = {}) {
     if (!event || typeof event !== 'object' || Array.isArray(event)) {
       throw new PersistentWorldError(400, 'invalid_world_event', 'event must be an object');
     }
@@ -1542,10 +1642,20 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       };
     } else if (eventType === 'world.mutation') {
       ensureWorldTarget(event, world);
-      projection = applyExplicitMutation(world, event);
+      try { projection = applyExplicitMutation(world, event, now().toISOString()); }
+      catch (error) {
+        if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
+        throw error;
+      }
     } else {
-      return { applied: false, duplicate: false, reason: 'event_does_not_mutate_canonical_world', mutation: null, world: get() };
+      if (!world.refraction) return { applied: false, duplicate: false, reason: 'event_does_not_mutate_canonical_world', mutation: null, world: get() };
+      const next=clone(world),details=refractInput(next,event,now().toISOString(),adapter);
+      if(!details.accepted)return {applied:false,duplicate:details.reason==='origin_already_considered',reason:details.reason,mutation:null,world:get()};
+      projection={next,action:'refract_input',details};
     }
+
+    if(projection.details?.accepted!==false && eventType==='conversation.input')refractInput(projection.next,event,now().toISOString(),adapter);
+    if(projection.details?.accepted!==false && eventType==='world.mutation' && event.payload?.action==='update_weather')refractInput(projection.next,event,now().toISOString(),adapter);
 
     const beforeRevision = world.world_revision;
     const beforeLogicalTime = clone(world.logical_time);
@@ -1553,6 +1663,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     // does not advance canonical revision/tick or overwrite the accepted
     // projection (for example, a stale weather sample).
     const observationAccepted = projection.details?.accepted !== false;
+    if(observationAccepted)syncLivedMemory(projection.next,now().toISOString());
     const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {
@@ -1615,11 +1726,44 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     };
   }
 
+  function syncTasks({ limit = 100 } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new TypeError('task limit must be 1 to 1000');
+    const at = now().toISOString();
+    const world = get();
+    if (world.clock?.mode !== 'real_time') return { processed: 0, enabled: false };
+    if (at < world.clock.synced_at) return { processed: 0, enabled: true, clock_moved_backwards: true };
+    let processed = 0;
+    while (processed < limit) {
+      const task = (get().tasks ?? []).filter(task => task.status === 'running' && task.due_at <= at)
+        .sort((a, b) => a.due_at.localeCompare(b.due_at) || a.task_id.localeCompare(b.task_id))[0];
+      if (!task) break;
+      // Complete tasks in deadline order, with the environment at that deadline.
+      // Never put a late effect behind an already advanced resource cursor.
+      syncEnvironment(task.due_at, true);
+      if (get().living?.simulated_until < task.due_at) break;
+      ingest({ event_id: `task-due:${task.task_id}:${task.revision}:${task.due_at}`, type: 'world.mutation', source: 'world-task-runner',
+        character_id: DEFAULT_CHARACTER_ID, occurred_at: task.due_at, payload: { action: 'advance_task', task_id: task.task_id, expected_task_revision: task.revision } });
+      processed += 1;
+    }
+    const pendingDue = (get().tasks ?? []).filter(task => task.status === 'running' && task.due_at <= at).length;
+    if (!pendingDue) syncEnvironment(at);
+    return { enabled: true, processed, pending_due: pendingDue, environment_pending: get().living?.recovery.pending ?? false };
+  }
+
+  function syncEnvironment(until, force = false) {
+    const cursor = get().living?.simulated_until;
+    if (!cursor || Date.parse(until) <= Date.parse(cursor) || (!force && Date.parse(until) - Date.parse(cursor) < 60_000)) return;
+    ingest({ event_id: `living:${cursor}:${until}`, type: 'world.mutation', source: 'world-living-rules', source_kind: 'world_engine',
+      character_id: DEFAULT_CHARACTER_ID, occurred_at: until, payload: { action: 'advance_living_world', until, force } });
+  }
+
+  if (timeMode === 'realtime' || get().clock?.mode === 'real_time') syncWallClock();
   return {
     get,
     ingest,
     listMutations,
     syncWallClock,
+    syncTasks,
   };
 }
 
@@ -1632,7 +1776,7 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
   const activeEvent = world.active_event || null;
   const locations = (Array.isArray(world.locations) ? world.locations : []).map((location) => {
     const npcs = (Array.isArray(world.npcs) ? world.npcs : [])
-      .filter((npc) => canonicalLocationId(npc.location_id) === location.location_id)
+      .filter((npc) => canonicalLocationId(npc.location_id) === location.location_id && activeWorldTask(world, npc.npc_id)?.kind !== 'travel')
       .map((npc) => ({ npc_id: npc.npc_id, display_name: npc.display_name, role: npc.role, status: npc.status }));
     return {
       location_id: location.location_id,
@@ -1653,6 +1797,10 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       current_event_summary: activeEvent?.daily_consequence || activeEvent?.summary || null,
       npc_summary: npcs,
       arrival_text: location.arrival_text || null,
+      presentation: clone(location.presentation ?? null),
+      areas: (world.map_catalog?.areas ?? []).filter(area => area.location_id === location.location_id).map(area => ({
+        ...clone(area), objects: (world.map_catalog?.objects ?? []).filter(object => object.area_id === area.area_id).map(object => livingObjectReadModel(world, object)),
+      })),
       scene_preview: location.scene ? {
         toy_zone: location.scene.toy_zone ?? null,
         prop_icon: location.scene.prop_icon ?? null,
@@ -1672,14 +1820,15 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       if (!neighbor || location.location_id >= neighbor.location_id) continue;
       const from = location.location_id === currentLocationId;
       const to = neighbor.location_id === currentLocationId;
+      const access = worldHopAccess(world, from ? currentLocationId : to ? currentLocationId : location.location_id, from ? neighbor.location_id : to ? location.location_id : neighbor.location_id);
+      const passage = passageFor(world,location.location_id,neighbor.location_id);
       routes.push({
-        from_location_id: location.location_id,
-        to_location_id: neighbor.location_id,
-        travel_cost_minutes: from
-          ? (neighbor.travel_cost ?? 10)
-          : to ? (location.travel_cost ?? 10) : null,
-        reachable: !activeEvent?.blocks_travel && (from || to),
-        blocked_reason: activeEvent?.blocks_travel ? `事件阻断：${activeEvent.title}` : null,
+        passage_id: passage?.passage_id ?? null,
+        from_location_id: location.location_id, to_location_id: neighbor.location_id,
+        travel_cost_minutes: from ? (neighbor.travel_cost ?? 10) : to ? (location.travel_cost ?? 10) : null,
+        reachable: access.allowed && (from || to), open: access.allowed,
+        blocked_reason: access.reason,
+        state: clone(passage ? world.passage_states?.[passage.passage_id] ?? null : null),
       });
     }
   }
@@ -1693,6 +1842,15 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
     world_id: world.world_id,
     world_revision: world.world_revision,
     logical_time: clone(world.logical_time),
+    clock: clone(world.clock ?? { mode: 'simulation' }),
+    environment: getWorldEnvironment(world),
+    living: livingReadModel(world),
+    autonomy: autonomyReadModel(world),
+    memory: memoryReadModel(world),
+    social: socialReadModel(world),
+    refraction: refractionReadModel(world),
+    resident_life: clone(world.resident_life ?? null),
+    tasks: clone(world.tasks ?? []),
     protagonist: {
       character_id: characterId,
       location_id: currentLocationId,
@@ -1700,6 +1858,10 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
     },
     world_setting: clone(world.setting || WORLD_SETTING),
     settlement: clone(world.settlement || DEFAULT_SETTLEMENT),
+    content: world.map_catalog ? { content_id: world.map_catalog.content_id, version: world.map_catalog.version, objects_have_simulated_state: Boolean(world.living) } : null,
+    regions: clone(world.map_catalog?.regions ?? []),
+    areas: clone(world.map_catalog?.areas ?? []),
+    objects: (world.map_catalog?.objects ?? []).map(object => livingObjectReadModel(world, object)),
     locations,
     paths: routes,
     npcs: clone(Array.isArray(world.npcs) ? world.npcs : []),
@@ -1711,15 +1873,6 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
 // one adjacent move at a time; this helper merely tells a client which legal
 // hops would be needed to reach a farther location.  It deliberately rebuilds
 // from the canonical snapshot so a caller must re-plan after every mutation.
-function compareLocationPaths(first, second) {
-  const commonLength = Math.min(first.length, second.length);
-  for (let index = 0; index < commonLength; index += 1) {
-    if (first[index] === second[index]) continue;
-    return first[index] < second[index] ? -1 : 1;
-  }
-  return first.length - second.length;
-}
-
 export function getWorldRoute(world, { destinationLocationId, characterId = DEFAULT_CHARACTER_ID } = {}) {
   if (!world || typeof world !== 'object') return null;
   const protagonist = world.protagonist || {};
@@ -1751,50 +1904,11 @@ export function getWorldRoute(world, { destinationLocationId, characterId = DEFA
     };
   }
 
-  const travelCostTo = (location) => Number.isInteger(location?.travel_cost) && location.travel_cost > 0
-    ? location.travel_cost
-    : 10;
-  const costs = new Map([[currentLocationId, 0]]);
-  const paths = new Map([[currentLocationId, [currentLocationId]]]);
-  const unsettled = new Set([currentLocationId]);
-  const settled = new Set();
-
-  // The map is deliberately small, so selecting the next lowest-cost node by
-  // scan keeps this simple while preserving a deterministic full-path tie-break.
-  while (unsettled.size) {
-    let locationId = null;
-    for (const candidateId of unsettled) {
-      if (locationId === null
-        || costs.get(candidateId) < costs.get(locationId)
-        || (costs.get(candidateId) === costs.get(locationId)
-          && compareLocationPaths(paths.get(candidateId), paths.get(locationId)) < 0)) {
-        locationId = candidateId;
-      }
-    }
-    unsettled.delete(locationId);
-    if (locationId === destinationId) break;
-    settled.add(locationId);
-
-    const location = byId.get(locationId);
-    const neighbors = Array.isArray(location?.neighbors)
-      ? location.neighbors.map(canonicalLocationId).sort((first, second) => first < second ? -1 : first > second ? 1 : 0)
-      : [];
-    for (const neighborId of neighbors) {
-      const neighbor = byId.get(neighborId);
-      if (!neighbor || settled.has(neighborId)) continue;
-      const nextCost = costs.get(locationId) + travelCostTo(neighbor);
-      const nextPath = [...paths.get(locationId), neighborId];
-      const bestCost = costs.get(neighborId);
-      if (bestCost === undefined
-        || nextCost < bestCost
-        || (nextCost === bestCost && compareLocationPaths(nextPath, paths.get(neighborId)) < 0)) {
-        costs.set(neighborId, nextCost);
-        paths.set(neighborId, nextPath);
-        unsettled.add(neighborId);
-      }
-    }
-  }
-  if (!paths.has(destinationId)) {
+  const travelCostTo = location => Number.isInteger(location?.travel_cost) && location.travel_cost > 0 ? location.travel_cost : 10;
+  // Global event blocking retains the geographic preview for compatibility;
+  // individually closed passages are excluded from actual path planning.
+  const path = findWorldPath(world,currentLocationId,destinationId,{ ignoreGlobalEvent: true });
+  if (!path) {
     return {
       schema: 'deskbot.world-route.v0.1',
       world_id: world.world_id,
@@ -1811,13 +1925,12 @@ export function getWorldRoute(world, { destinationLocationId, characterId = DEFA
     };
   }
 
-  const path = paths.get(destinationId);
   const pathLocations = path.map((locationId) => ({ location_id: locationId, name: byId.get(locationId)?.name ?? locationId }));
   const steps = path.slice(1).map((toLocationId, index) => {
     const fromLocationId = path[index];
     const to = byId.get(toLocationId);
     const travelCost = travelCostTo(to);
-    const presentationPoints = presentationRouteFor(fromLocationId, toLocationId);
+    const presentationPoints = presentationRouteFor(world, fromLocationId, toLocationId);
     return {
       index,
       from_location_id: fromLocationId,
@@ -1847,7 +1960,7 @@ export function getWorldRoute(world, { destinationLocationId, characterId = DEFA
   };
 }
 
-export function getWorldSchema() {
+export function getWorldSchema(world = null) {
   return {
     schema: 'foundry.canonical-world-schema.v0.1',
     world_schema: 'foundry.canonical-world.v0.2',
@@ -1856,11 +1969,15 @@ export function getWorldSchema() {
     canonical_fields: {
       world_id: { type: 'string', immutable: true },
       world_revision: { type: 'integer', minimum: 0, writer: 'accepted world mutation' },
+      clock: { type: 'object', schema: 'deskbot.real-time-clock.v1', rate: 1, writer: 'server clock' },
+      tasks: { type: 'array', item: 'deskbot.world-task.v1', maximum_active: 100, retained_terminal: 100 },
+      map_catalog: { type: 'object', schema: 'deskbot.world-map-content.v1', levels: ['region','location','area','object'], writer: 'validated additive content' },
+      passage_states: { type: 'object', status: ['open','closed'], writer: 'validated world action', revisions: true },
       logical_time: { type: 'object', fields: { day: { type: 'integer', minimum: 1 }, minute_of_day: { type: 'integer', minimum: 0, maximum: MINUTES_PER_DAY - 1 }, tick: { type: 'integer', minimum: 0 } } },
       protagonist: { type: 'object', fields: { character_id: { type: 'string' }, display_name: { type: 'string' }, location_id: { type: 'string' }, travel_state: { type: 'object' }, appearance: { type: 'object', schema: 'deskbot.character-appearance.v0.2' } } },
       settlement: { type: 'object', schema: DEFAULT_SETTLEMENT.schema, immutable: true },
       locations: { type: 'array', item: 'location', maximum: null, fields: ['location_id', 'settlement_id', 'region_id', 'location_kind', 'world_role', 'lore_keys', 'name', 'description', 'x', 'y', 'neighbors', 'travel_cost', 'visibility', 'scene'] },
-      npcs: { type: 'array', item: 'npc', maximum: MAX_NPCS },
+      npcs: { type: 'array', item: 'npc', maximum: world?.resident_life ? 24 : MAX_NPCS },
       life: { type: 'object', schema: 'deskbot.world-life-state.v0.3', fields: ['current_scene', 'recent_scenes', 'recent_experiences'] },
       active_event: { type: ['object', 'null'] },
       pending_items: { type: 'array', maximum: MAX_PENDING_ITEMS },
@@ -1872,6 +1989,8 @@ export function getWorldSchema() {
       user_profile: { type: 'object', path: '/user_profile' },
       device_context: { type: 'object', path: '/device_context' },
       interaction: { type: 'object', path: '/interaction' },
+      memory: {type:['object','null'],schema:'deskbot.lived-memory.v1',path:'/memory',maximum_episodes:1024,writer:'canonical task outcomes and bounded model interpretations'},
+      refraction: {type:['object','null'],schema:'deskbot.input-refraction.v1',path:'/refraction',maximum_records:96},
     },
     input_layers: clone(MULTISOURCE_LAYERS),
     supported_mutations: clone(SUPPORTED_WORLD_ACTIONS),
@@ -1880,8 +1999,8 @@ export function getWorldSchema() {
       { id: 'calendar-monotonic', description: 'calendar.date 不可倒退' },
       { id: 'weather-freshness', description: '较旧 observed_at 不覆盖当前 weather.snapshot，但会进入 mutation ledger' },
       { id: 'preference-stability', description: `同一 preference_key 连续 ${PREFERENCE_STABLE_OBSERVATIONS} 次一致观察后 stable=true` },
-      { id: 'npc-bound', description: `canonical world 最多 ${MAX_NPCS} 个 NPC，位置必须是已知 location_id` },
-      { id: 'travel-adjacency', description: '主角只能沿 location.neighbors 移动；旅行由 move_protagonist mutation 记录并推进逻辑时间' },
+      { id: 'npc-bound', description: `当前阶段容量 ${world?.resident_life ? 24 : MAX_NPCS} 位居民，位置必须是已知 location_id；安装目录可继续扩展` },
+      { id: 'travel-adjacency', description: '主角沿开放相邻通路开始旅行，现实时间到期后核验抵达；研究模式单独模拟' },
       { id: 'npc-travel-adjacency', description: 'NPC 位置变化只能沿 location.neighbors 移动；用户对话不能直接移动 NPC' },
       { id: 'transport-read-only', description: 'ASR partial/final、assistant reply 与 TTS 传输事件不改变 canonical world' },
     ],

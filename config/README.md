@@ -28,7 +28,9 @@ notepad config\weather.env
 .\scripts\start-local.ps1 -StartWeb -WeatherEnvFile (Resolve-Path config\weather.env)
 ```
 
-不传 `-WeatherEnvFile` 时天气 connector 会安全地保持 `disabled`；数据库里的历史快照不代表当前 provider 已连接。
+不传 `-WeatherEnvFile` 时，启动脚本会读取已有的 `config\weather.local.env`；没有本地配置文件时 connector 保持 `disabled`。显式参数优先于该默认文件；数据库里的历史快照不代表当前 provider 已连接。
+
+本工作站按用户指定城市配置了上海 Open-Meteo 天气，保存在忽略提交的 `config\weather.local.env`，不需要天气密钥。城市中心坐标只用于天气请求，不读取设备精确位置。
 
 ## 语音 sidecar
 
