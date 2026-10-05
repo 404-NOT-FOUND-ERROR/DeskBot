@@ -6,7 +6,7 @@ import { installRefraction, refractInput, refractionReadModel } from './input-re
 import { installResidentLife } from './resident-life.mjs';
 import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
-import { LivingResourceError, installLivingResources, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
+import { LivingResourceError, installLivingResources, installResourceRenewal, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
 import { createHash } from 'node:crypto';
 import { RealTimeWorldError, activeWorldTask, applyRealTimeClock, localWorldDate, startTravelTask, startActivityTask, controlWorldTask, advanceWorldTask } from './realtime-world.mjs';
 
@@ -581,6 +581,10 @@ function migrateWorldToCurrentSetting(world, now) {
   if (installLivingResources(next, timestamp)) {
     changed = true; next.world_revision += 1;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-living-resources-v1',applied_at:timestamp,scope:'additive_resources',preserved_existing_tasks:true}];
+  }
+  if (installResourceRenewal(next, timestamp)) {
+    changed = true; next.world_revision += 1;
+    next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-resource-renewal-v1',applied_at:timestamp,scope:'additive_spring_source',preserved_existing_tasks:true,preserved_existing_stocks:true}];
   }
 
   const initialField = createInitialShapingField(

@@ -809,6 +809,8 @@ export interface CitizenFigure {
   pulseRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   /** Cosmetic pose from an admitted task; never changes world state or travel. */
   updateLife?: (seconds: number, kind: string, walking: boolean, reducedMotion: boolean, night?: number, activityId?: string) => void;
+  /** A prop for a real inventory on an admitted trip, not a simulated transfer. */
+  updateCarry?: (stock?: Readonly<Record<string, number>>, travelling?: boolean) => void;
 }
 
 const HAIR_COLORS = [0x3b2a20, 0x6b4a2e, 0xc9a26a, 0x2b2622, 0x8a4b2a, 0x9a9590, 0x5a3a28];

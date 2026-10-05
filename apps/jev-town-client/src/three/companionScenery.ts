@@ -4,6 +4,7 @@ import { mapToWorld } from "@shared/world.ts";
 import type { DeskBotLocation, DeskBotObjectState } from "../deskbot/types.ts";
 import { sceneOperationAt, type SceneLightChannel } from './sceneLife.ts';
 import { addShapingDetails, createSceneLifeEffects, createSoftLightTexture, type SceneLifeContext } from './sceneLifeEffects.ts';
+import { createResourceSupplyEffects } from './resourceSupplyEffects.ts';
 
 const C = { wood:0x997052, dark:0x5e5142, cream:0xe8dfc3, teal:0x508e86, soil:0x765b40, leaf:0x7eab59, water:0x6eabb2, red:0xb6513c };
 const solidMaterial = () => new THREE.MeshLambertMaterial({ vertexColors:true });
@@ -52,6 +53,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
   const root=new THREE.Group();root.name="morrowmere-authored-facilities";
   const objects=new Map<string,THREE.Group>(), water:THREE.Mesh[]=[], lamps:THREE.Mesh[]=[], trees:THREE.Group[]=[], flags:THREE.Group[]=[];
   const lifeEffects:{locationId:string;effect:ReturnType<typeof createSceneLifeEffects>}[]=[];
+  const supplyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResourceSupplyEffects>>}[]=[];
   const cloth:THREE.Group[]=[];
   const glowTexture=createSoftLightTexture();
   const stockSlots=new Map<string,THREE.Group[]>();
@@ -135,8 +137,17 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
           }
           plants.finish("nursery-plant-bodies");soil.finish("soil-moisture");g.userData.visual_channels={growth:"nursery-seedlings",health:"nursery-plant-bodies",moisture:"soil-moisture",quantity:"nursery-seedlings"};
         });
-        fixture("seedling-rack",(b)=>{for(const x of [-5.3,-1.7])b.box(.15,2.5,.15,x,.3,-3.2,C.wood);
-          for(const y of [.7,1.6,2.4]) {b.box(3.8,.14,1.3,-3.5,y,-3.2,C.wood);for(let i=0;i<5;i++){b.box(.42,.35,.42,-5+i*.75,y+.14,-3.2,0xa77850);b.ball(.24,-5+i*.75,y+.7,-3.2,C.leaf);}}});
+        fixture("seedling-rack",(b,g)=>{for(const x of [-5.3,-1.7])b.box(.15,2.5,.15,x,.3,-3.2,C.wood);
+          for(const y of [.7,1.6,2.4]) {b.box(3.8,.14,1.3,-3.5,y,-3.2,C.wood);for(let i=0;i<5;i++){b.box(.42,.35,.42,-5+i*.75,y+.14,-3.2,0xa77850);b.ball(.24,-5+i*.75,y+.7,-3.2,C.leaf);}}
+          // A real drying/sifting station beside the rack, reachable from the path.
+          b.box(2.9,.18,1.3,-3.5,1.05,-.8,C.wood);
+          for(const x of [-4.65,-2.35]) b.box(.15,.75,.15,x,.3,-.8,C.dark);
+          b.box(2.65,.055,1.04,-3.5,1.23,-.8,0xcbb992);
+          for(const z of [-1.38,-.22])b.box(2.9,.13,.07,-3.5,1.22,z,0xb88954);
+          for(const x of [-4.92,-2.08])b.box(.07,.13,1.18,x,1.22,-.8,0xb88954);
+          b.cylinder(.19,.22,-2,1.22,-1.1,C.cream);
+          g.userData.workstations={'save-seeds':{standing:[-3.5,0,.9],facing:[-3.5,1.3,-.8]}};
+        });
         const tank=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,1.8,12,1,true),new THREE.MeshLambertMaterial({color:C.teal,side:THREE.DoubleSide}));
         tank.position.set(6.2,1.2,4.8);group.add(tank);
         const tankWater=new THREE.Mesh(new THREE.CircleGeometry(.83,12),new THREE.MeshStandardMaterial({color:C.water,roughness:.25}));
@@ -153,7 +164,19 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
         fixture("floating-frame",(_b,g)=>{g.position.set(-1,.6,0);
           for(let i=0;i<4;i++){const plank=new THREE.Group();plank.name=`frame-plank:${i}`;g.add(plank);const p=new Model(plank);
             if(i<2)p.box(.3,.22,3,i===0?-2:2,0,0,C.wood);else p.box(4.3,.22,.3,0,0,i===2?-1.5:1.5,C.wood);p.finish("frame-wood");}
+          g.userData.workstations={'collect-water':{standing:[6.1,0,.6],facing:[5.2,1.8,-.75]}};
         });
+        // Bank-mounted spring intake and gravity filter do not float with the decorative frame.
+        m.box(3,.15,.62,5.2,.52,-5.2,C.dark);
+        for(let i=0;i<7;i++)m.box(.055,1.08,.48,3.73+i*.42,.63,-5.2,C.wood);
+        m.box(2.95,.11,.62,5.2,1.64,-5.2,C.cream);
+        m.box(.17,.16,3.5,5.2,.6,-2.7,0xb9ab80);
+        for(const x of [4.62,5.78])m.box(.13,2.3,.13,x,.3,-.75,C.wood);
+        m.box(1.35,.15,.85,5.2,2.6,-.75,C.cream);
+        for(let i=0;i<3;i++)m.cylinder(.42,.24,5.2,1.48+i*.37,-.75,i%2?0xbcb78b:0x819587);
+        m.box(.12,.42,.12,5.2,1.05,-.75,C.teal);
+        m.cylinder(.46,.55,5.2,.3,-.75,C.cream);
+        m.box(.52,.065,.32,5.85,1.9,-.75,C.dark);
         const pointer=new THREE.Mesh(new THREE.BoxGeometry(.8,.1,.1),new THREE.MeshBasicMaterial({color:0xc85945}));
         pointer.name="water-level-pointer";pointer.position.set(-5.4,.55,4.25);group.add(pointer);
         fixture("post-rail",(b)=>{b.box(.18,2.3,.18,4.6,.3,4.2,C.wood);b.box(.18,2.3,.18,6.7,.3,4.2,C.wood);b.box(2.5,.2,.2,5.6,2.4,4.2,C.wood);b.box(.8,.8,.45,5.6,1.5,4.2,C.teal);});
@@ -207,6 +230,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     }
     addShapingDetails(group,m,binding.model);
     lifeEffects.push({locationId:place.location_id,effect:createSceneLifeEffects(group,binding.model,glowTexture)});
+    const supply=createResourceSupplyEffects(group,binding.model);if(supply)supplyEffects.push({locationId:place.location_id,effect:supply});
     if(['workshop','market','nursery'].includes(binding.model)) {
       const sign=new THREE.Mesh(new THREE.PlaneGeometry(binding.model==='market'?1.3:2,.18),new THREE.MeshBasicMaterial({color:0xf3d79c,transparent:true,opacity:0,depthWrite:false}));
       sign.name='closing-store-light';sign.position.set(binding.model==='market'?-3.4:0,binding.model==='market'?2.5:3.2,binding.model==='market'?1.25:-.2);
@@ -282,5 +306,6 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     for(const mesh of water)(mesh.material as THREE.MeshStandardMaterial).roughness=.25-wetness*.12;
     const floating=objects.get("floating-frame");if(floating)floating.rotation.z=(1-(floating.userData.condition??1))*.06+(reducedMotion ? 0 : Math.sin(time*1.1)*.015);
     for(const {locationId,effect} of lifeEffects)effect.update(time,night,wind,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
+    for(const {locationId,effect} of supplyEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
   }};
 }

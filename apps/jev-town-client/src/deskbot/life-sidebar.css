@@ -175,6 +175,7 @@
 .life-choice-origin[open] summary::after { content: '⌃'; }
 .life-choice-origin p { font-size: 11px; margin-top: 8px; padding-left: 16px; }
 .life-choice-origin--model { color: #688a82; }
+.life-supply-note { font-size: 11px; line-height: 1.7; color: #74827a; margin: 10px 0 0; }
 .life-sidebar :is(button,input,textarea,summary,a):focus-visible { outline: 2px solid #719a8b; outline-offset: 3px; }
 .life-sidebar button { transition: background .18s ease, border-color .18s ease, color .18s ease; }
 @media (max-width: 1000px) {

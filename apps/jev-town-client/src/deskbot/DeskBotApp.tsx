@@ -562,12 +562,14 @@ export function DeskBotApp() {
                   {area.objects?.map(object => <div key={object.object_id}><strong>{object.name}</strong><p>{object.status_text??object.description}</p>
                     {object.state?.stock?<div className="deskbot-mode__stock" aria-label={`${object.name}库存`}>{Object.entries(object.state.stock).map(([resource,count])=><div key={resource}><span>{map?.living?.resource_names[resource]??resource} {Math.floor(count)} 份</span>
                       {selectedPlace.current?<><button disabled={busy||Boolean(currentTask)||count<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'take')}>取 1 份</button><button disabled={busy||Boolean(currentTask)||(map?.living?.inventory.stock[resource]??0)<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'store')}>存 1 份</button></>:null}</div>)}</div>:null}
+                    {map?.living?.resource_renewal?.source_object_id===object.object_id?<p className="deskbot-mode__supply-note">{map.living.resource_renewal.description}</p>:null}
                   </div>)}
                 </details>)}
               </div>
               <div className="deskbot-mode__living-actions" aria-label="这里的生活活动">{map?.living?.activities.filter(activity=>activity.location_id===selectedPlace.location_id).map(activity=><div key={activity.activity_id}>
                 <button disabled={busy||!activity.available} onClick={()=>void runLivingAction(activity.activity_id)}>{activity.title} · {Math.ceil(activity.duration_seconds/60)} 分钟</button>
                 <small>{activity.available ? activity.inputs.length?activity.inputs.map(input=>`${input.from}：${input.name} ${input.count} 份`).join('，'):'不需要材料' : activity.unavailable_reason}</small>
+                {activity.output?<small>完成后：{activity.output.name} {activity.output.count} 份，放入{activity.output.to}。</small>:null}
               </div>)}</div>
               {map?.paths?.filter(path => !path.open && [path.from_location_id,path.to_location_id].includes(selectedPlace.location_id)).map(path => <small key={path.passage_id ?? `${path.from_location_id}-${path.to_location_id}`} className="deskbot-mode__closed-path">通路暂时封闭：{path.blocked_reason}</small>)}
               {!selectedPlace.current && selectedRoute?.route.found && !selectedRoute.route.blocked ? (

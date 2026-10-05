@@ -42,7 +42,7 @@ test('material chain travels, crafts and carries an actual tray to the nursery',
   assert.ok(world.tasks.filter(t=>t.kind==='travel'&&t.origin==='autonomous_life').length>=2);
 });
 test('finite stock prevents fabrication and records blocked alternatives',t=>{
-  const h=fixture(t);h.save(s=>{s.living.objects['seedling-rack'].stock.water=0;s.living.objects['garden-bed'].moisture=.2;s.living.objects['parts-drawers'].stock.wood=0;});h.tick();
+  const h=fixture(t);h.save(s=>{s.living.objects['seedling-rack'].stock.water=0;s.living.objects['floating-frame'].stock.raw_water=0;s.living.objects['garden-bed'].moisture=.2;s.living.objects['parts-drawers'].stock.wood=0;});h.tick();
   const state=own(h.world.get());assert.ok(state.last_candidates.find(c=>c.goal==='water'&&!c.available));assert.ok(state.last_candidates.find(c=>c.goal==='tray'&&!c.available));
   assert.equal(h.world.get().living.objects['seedling-rack'].stock.water,0);assert.notEqual(state.plan.goal,'water');
 });

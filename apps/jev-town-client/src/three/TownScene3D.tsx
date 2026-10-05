@@ -23,7 +23,7 @@ import type { DeskBotEnvironment, DeskBotLocation } from "../deskbot/types.ts";
 import { createEnvironmentEffects } from "./environmentEffects.ts";
 import { activityProgressAt, type SceneLifeActivity } from "../deskbot/activityProjection.ts";
 import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
-import { sceneWorkAnchor } from './sceneWorkplace.ts';
+import { sceneWorkAnchor, sceneWorkTarget } from './sceneWorkplace.ts';
 
 export interface TownScene3DProps {
   sceneLocations?: readonly DeskBotLocation[];
@@ -625,14 +625,16 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         const world = mapToWorld(sample.x, sample.y);
         figure.group.position.set(world.x, 0, world.z);
         let workAnchor:THREE.Vector3|undefined;
+        let workTarget:THREE.Vector3|null = null;
         if(activity && !admittedTravel && activity.targetObjectId) {
           workAnchor = workAnchors.get(activity.taskId);
           const object = scenery.companion?.objects.get(activity.targetObjectId);
           if(!workAnchor && object) {
-            workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z));
+            workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z), activity.activityId);
             workAnchors.set(activity.taskId,workAnchor);
             if(workAnchors.size>64)workAnchors.delete(workAnchors.keys().next().value!);
           }
+          if (object) workTarget = sceneWorkTarget(object, activity.activityId);
         }
         const targetOffset = workAnchor ? new THREE.Vector3(workAnchor.x-world.x,0,workAnchor.z-world.z) : new THREE.Vector3();
         if(entry.workOffset.distanceToSquared(targetOffset)>.0001)moving=true;
@@ -642,7 +644,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         // Face the direction of travel; once arrived, face what the decision is about.
         let facing = figure.group.rotation.y;
         if (walking) facing = Math.PI / 2 - sample.heading;
-        else if(workAnchor) facing = Math.atan2(world.x-workAnchor.x,world.z-workAnchor.z)+Math.PI;
+        else if(workAnchor) facing = workTarget ? Math.atan2(workTarget.x-figure.group.position.x,workTarget.z-figure.group.position.z) : Math.atan2(world.x-workAnchor.x,world.z-workAnchor.z)+Math.PI;
         else if (entry.action === "INVESTIGATE" || entry.action === "JOIN")
           facing = Math.atan2(plaza.x - world.x, plaza.z - world.z);
         else if (entry.action === "WARN") facing = Math.atan2(tower.x - world.x, tower.z - world.z);
@@ -697,6 +699,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
           figure.body.position.y = lift;
           figure.body.rotation.x = lean;
         }
+        figure.updateCarry?.(admittedTravel?.carriedStock, Boolean(admittedTravel));
         figure.updateLife?.(t, activity?.status === "paused" ? "idle" : activity?.kind ?? "idle", walking, reducedMotion,night,activity?.activityId);
         if(sceneLocationsRef.current) {
           const glyph = activity?.status === "paused" ? "Ⅱ" : activity?.kind === "travel" ? "↗" : activity?.kind === "rest" ? "☾" : activity?.kind === "craft" ? "✦" : activity?.kind === "care" ? "♧" : activity?.kind === "eat" ? "◡" : activity ? "⋯" : "";

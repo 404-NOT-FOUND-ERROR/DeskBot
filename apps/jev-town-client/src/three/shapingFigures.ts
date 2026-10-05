@@ -184,6 +184,24 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
     pivot.add(p.mesh(material, `rounded-${kind}`)); body.add(pivot); return pivot;
   }
   const limbs = { armLeft: limb("arm", -1), armRight: limb("arm", 1), legLeft: limb("leg", -1), legRight: limb("leg", 1) };
+  const carryBucket = new THREE.Group(); carryBucket.name = 'carried-water-bucket';
+  carryBucket.position.set(.13, -.47, .13); carryBucket.visible = false; limbs.armRight.add(carryBucket);
+  const bucketParts = new FigureParts();
+  bucketParts.add(cylinder, 0xb7a37f, 0, -.21, 0, .24, .34, .24);
+  bucketParts.add(torus, 0x758e8b, 0, -.04, 0, .23, .23, .23, Math.PI / 2);
+  bucketParts.add(torus, 0x758e8b, 0, .14, 0, .20, .26, .14);
+  carryBucket.add(bucketParts.mesh(material, 'bucket-shell-and-handle'));
+  const waterSurface = new THREE.Mesh(new THREE.CircleGeometry(.19, 14), new THREE.MeshBasicMaterial({ color: 0x80c2cb }));
+  waterSurface.name = 'carried-water-surface'; waterSurface.rotation.x = -Math.PI / 2; waterSurface.position.y = -.01; carryBucket.add(waterSurface);
+
+  function updateCarry(stock?: Readonly<Record<string, number>>, travelling = false) {
+    const count = (resource: string) => Number.isFinite(stock?.[resource]) ? Math.max(0, stock![resource]!) : 0;
+    const clean = count('water'), raw = count('raw_water');
+    carryBucket.visible = travelling && clean + raw >= 1;
+    carryBucket.userData.stock = { water: clean, raw_water: raw };
+    // This is a cargo marker, not an estimate of liquid volume in a physical bucket.
+    waterSurface.material.color.set(clean >= 1 ? 0x80c2cb : 0x99ac8d);
+  }
 
   const face = new THREE.Group(); face.name = "seed-eyes"; face.position.set(0, Y0 + 1.73, .446);
   const eyeParts = new FigureParts();
@@ -224,6 +242,7 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
       // The caller owns the gait's x rotation. Clear any earlier stationary gesture.
       limbs.armLeft.rotation.y = 0; limbs.armLeft.rotation.z = 0;
       limbs.armRight.rotation.y = 0; limbs.armRight.rotation.z = 0;
+      if (carryBucket.visible) limbs.armRight.rotation.x = Math.min(.15, Math.max(-.15, limbs.armRight.rotation.x));
     } else {
       const beat = reducedMotion ? 0 : Math.sin(time * 2.1 + phase);
       limbs.armLeft.rotation.set(0, 0, 0); limbs.armRight.rotation.set(0, 0, 0);
@@ -231,6 +250,14 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
       if (resting) { limbs.armLeft.rotation.z = -.14; limbs.armRight.rotation.z = .14; }
       else if (kind === "eat") { limbs.armRight.rotation.x = -.8 - beat * .10; limbs.armLeft.rotation.x = -.25; }
       else if (kind === "social") { limbs.armLeft.rotation.z = -.3; limbs.armRight.rotation.x = -.55 + beat * .20; }
+      else if (activityId === 'collect-water' && kind === 'care') {
+        limbs.armLeft.rotation.x = -.55; limbs.armLeft.rotation.z = -.15;
+        limbs.armRight.rotation.x = -.36 + beat * .10; limbs.armRight.rotation.y = -.18;
+      }
+      else if (activityId === 'save-seeds' && (kind === 'care' || kind === 'craft')) {
+        limbs.armLeft.rotation.x = -.64 + beat * .045; limbs.armLeft.rotation.y = .26;
+        limbs.armRight.rotation.x = -.72 - beat * .045; limbs.armRight.rotation.y = -.26;
+      }
       else if (kind === "care") { limbs.armRight.rotation.x = -.65 + beat * .14; limbs.armLeft.rotation.x = -.35; }
       else if (kind === "craft") { limbs.armLeft.rotation.x = -.7 + beat * .08; limbs.armRight.rotation.x = -.7 - beat * .10; }
       else if (kind === "observe") { limbs.armLeft.rotation.x = -.2; limbs.armRight.rotation.z = .1; }
@@ -251,5 +278,5 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
     group.userData.activity_id = activityId ?? null;
   }
   updateLife(0, "idle", false, true);
-  return { group, body, upper, limbs, focusRing, pulseRing, updateLife };
+  return { group, body, upper, limbs, focusRing, pulseRing, updateLife, updateCarry };
 }

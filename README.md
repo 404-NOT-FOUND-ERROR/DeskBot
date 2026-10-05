@@ -23,6 +23,7 @@
 
 ## 当前执行基线
 
+- **持续生活补给循环（2026-10-05）**：水岸泉眼有有限原水与缓慢补充；角色可以实际出行、汲水净滤、携带并补给厨房/苗圃。收获的一部分能制种并存回育苗架，收获和餐食可进入共用库存。新增活动仍使用真实耗时、预留材料、失败退款与重启恢复。见 [补给循环验收](research/milestones/companion-world-supply-cycle.md)；这不是完整经济，也不保证当前单块苗床足够供养全部居民。
 - **聚形域视觉更新（2026-10-05）**：保留低多边形小镇，新增喵呜与十二位居民的光粒首批造型、任务驱动动作、设施细节、连续昼夜与渐息灯火；生活侧栏整理为清楚的当前活动、居民近况、约定与记忆。见 [图文说明与预览边界](documentation/shaping-field-visual-life.md)，独立美术预览为 `/scene-review.html`。
 - 第一至第六步已完成基本世界合同、现实 1:1 时钟、分层地图、实际设施、天气表现与有限资源。十三名角色共用规则生活循环；邀请、协作、交换、赴约与关系后果使用真实事务记录。见 [第六步验收](research/milestones/companion-world-step6.md) 与 [社会生活规则](research/world/social-life-v1.md)。
 - 第七步已接入现实输入折射：上海天气、对话和有限生活建议影响下一次空闲选择，保留出处、暂缓理由与实际任务引用。本地已启用 DeepSeek Flash 对话、NASA Science 新闻与上海区域空气质量。其他 agent 等待真实来源，设备联调仍属第九步。见 [第七步验收](research/milestones/companion-world-step7.md)、[输入折射规则](research/world/input-refraction-v1.md) 与 [外界来源配置](research/milestones/external-input-configuration.md)。独立专项为 `/life-review.html?sample=inputs`。

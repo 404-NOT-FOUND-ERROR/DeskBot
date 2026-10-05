@@ -37,6 +37,7 @@ export interface DeskBotObjectState {
 export interface DeskBotLivingActivity {
   activity_id: string; title: string; kind: "care"|"craft"; target_object_id: string; location_id: string;
   duration_seconds: number; inputs: { resource:string; name:string; count:number; from:string }[];
+  output?: { resource:string; name:string; count:number; to:string };
   available:boolean; unavailable_reason:string|null;
 }
 export interface DeskBotLiving {
@@ -45,6 +46,7 @@ export interface DeskBotLiving {
   resource_names:Record<string,string>; inventory:{stock:Record<string,number>;capacity:number};
   recent_changes: { at:string; text:string; kind:string; task_id?:string; actor_id?:string }[];
   activities:DeskBotLivingActivity[];
+  resource_renewal?: { id:string; installed_at:string; source_object_id:string; source_kind:'authored_world_physics'; resource:string; units_per_hour:number; description:string; preserved_existing_stocks_and_tasks:boolean }|null;
 }
 export interface DeskBotAutonomy {
   schema:string;enabled:boolean;installed_at:string;revision:number;policy:string;

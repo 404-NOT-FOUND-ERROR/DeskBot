@@ -23,6 +23,8 @@ export interface SceneLifeActivity {
   route?: Point[];
   projectedAt?: string;
   realTime?: boolean;
+  /** Actual carried inventory from this same snapshot, never a recipe's future output. */
+  carriedStock?: Readonly<Record<string, number>>;
 }
 
 export function sceneCitizenId(actorId: string, isProtagonist = false): number {
@@ -61,6 +63,9 @@ export function projectSceneActivities(map: DeskBotWorldMap | null | undefined):
         route: task.kind === "travel" && from && to ? canonicalRouteBetween(from, to) : undefined,
         projectedAt: map.environment?.projected_at,
         realTime: map.environment?.time.mode === "real_time",
+        carriedStock: { ...(task.actor_id === map.protagonist.character_id
+          ? map.living?.inventory.stock
+          : map.autonomy?.actors.find(actor => actor.actor_id === task.actor_id)?.inventory) },
       };
     });
 }

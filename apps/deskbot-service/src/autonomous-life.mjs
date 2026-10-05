@@ -3,7 +3,7 @@ import { findWorldPath } from './world-map-content.mjs';
 import { activeWorldTask, startTravelTask, startActivityTask, localWorldDate } from './realtime-world.mjs';
 import { AUTONOMY_VERSION, installAutonomy, syncLifeNeeds, lifeNote } from './life-state.mjs';
 
-import { activitySteps } from './life-planning.mjs';
+import { activitySteps, waterSupplySteps, seedSupplySteps, depositSteps } from './life-planning.mjs';
 import { RESIDENT_PROFILES } from './resident-life.mjs';
 import { advanceSocialLife, reservedSocialActors } from './social-life.mjs';
 import { influenceLifeChoices, recordInputDecision, settleRefraction } from './input-refraction.mjs';
@@ -48,12 +48,17 @@ function candidates(world, state, at) {
   if(bed.quantity>0 && bed.health<.65)activity('tend','tend-bed','这一批苗有些衰弱，想整理一下。',profile.interests.includes('care')?80:55);
   if(bed.quantity>0 && bed.growth>=.85)activity('harvest','harvest-bed','苔芽已经成熟，收下后还能继续播种或做饭。',profile.interests.includes('care')?78:58);
   if(!bed.quantity)activity('sow','sow-bed','苗床空下来了，想让下一批苔芽继续长。',profile.interests.includes('care')?72:45);
+  if(stock(world,'trial-stove','water')<2) add('water-supply:kitchen','给厨房送一桶清水','灶边的清水不多了，先去水岸取水，再带回来。',profile.interests.includes('cook')?76:53,()=>waterSupplySteps(world,id,'trial-stove'));
+  if(bed.quantity>0&&stock(world,'seedling-rack','water')<3) add('water-supply:nursery','给苗圃补清水','给下一次照料留些水，去水岸取水带回育苗架。',profile.interests.includes('care')?81:56,()=>waterSupplySteps(world,id,'seedling-rack'));
+  if(carried(world,id,'seeds')>0) add('store-seeds','把留好的种子放回苗圃','下一次播种时，大家都能找到这些种子。',80,()=>depositSteps(world,id,'seedling-rack','seeds'));
+  if(stock(world,'seedling-rack','seeds')<4) add('seed-supply','为下一批苔芽留种','从收获里分出一部分挑选种子，给下次播种留下余地。',profile.interests.includes('care')?83:66,()=>seedSupplySteps(world,id));
+  if(carried(world,id,'moss')>0&&(stock(world,'seedling-rack','seeds')>=4||carried(world,id,'moss')<2)) add('store-harvest','把收获留到共用育苗架','把鲜苔芽放好，厨房需要时就能来取。',64,()=>depositSteps(world,id,'seedling-rack','moss'));
   for(const [objectId,recipeId] of [['floating-frame','repair-frame'],['market-canopy','stitch-canopy'],['repair-bench','repair-bench'],['seedling-rack','repair-rack'],['trial-stove','repair-stove']]) {
     if(objects[objectId].condition<.55)activity(`repair:${objectId}`,recipeId,'设施磨损了，先把材料备齐再修。',profile.interests.includes('repair')||profile.interests.includes('craft')?82:52);
   }
   if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
-  if(world.resident_life && profile.interests.includes('cook') && carried(world,id,'rations')>0)add('store-meals','把做好的饭留到长桌','有人晚点回来也能吃上一份。',60,()=>[{kind:'travel',location_id:'warm-pot-courtyard'},{kind:'transfer',object_id:'shared-table',resource:'rations',count:carried(world,id,'rations'),operation:'store'}]);
-  if(profile.interests.includes('cook') && carried(world,id,'moss')>=2)activity('cook','cook-moss','手边有鲜苔芽，想试做一餐。',40);
+  if(world.resident_life && carried(world,id,'rations')>0)add('store-meals','把做好的饭留到长桌','有人晚点回来也能吃上一份。',60,()=>depositSteps(world,id,'shared-table','rations'));
+  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<4 && (carried(world,id,'moss')>=2||stock(world,'seedling-rack','moss')>=2||bed.growth>=.85))activity('cook','cook-moss','苗圃的收获可以做成饭，给晚归的人也留一份。',65);
   const index=hash(`${id}:${localWorldDate(at,world.clock.time_zone).date}:${Math.floor(minute/180)}`)%profile.places.length;
   for(const destination of world.memory ? profile.places : [profile.places[index]]) {
   add(`interest:${destination}`,world.memory?`${world.locations.find(l=>l.location_id===destination)?.name??destination} · ${profile.quiet}`:profile.quiet,'留点时间做自己感兴趣的事。',30,()=>{

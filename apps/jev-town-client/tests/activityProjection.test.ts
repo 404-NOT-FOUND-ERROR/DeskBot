@@ -55,4 +55,20 @@ describe("canonical scene activity projection", () => {
       {...map.tasks![0]!,kind:'care',life_action:'activity',activity_id:'share-meal'}];
     expect(projectSceneActivities(changed).map(task=>task.kind)).toEqual(['craft','eat']);
   });
+  it('projects actual carried water from the same actor snapshot rather than future recipe output', () => {
+    const changed = structuredClone(map);
+    changed.living = { schema: 'deskbot.world-living.v1', simulated_until: '2026-10-05T04:05:00Z', revision: 1,
+      rule_version: 'test', recovery: { pending: false, target_at: '2026-10-05T04:05:00Z' },
+      resource_names: { water: '清水', seeds: '种子' }, inventory: { stock: { water: 4, seeds: 2 }, capacity: 24 },
+      recent_changes: [], activities: [] };
+    changed.autonomy = { schema: 'deskbot.autonomous-life.v1', enabled: true, installed_at: '2026-10-05T04:00:00Z',
+      revision: 1, policy: 'test', recent: [], actors: [{ actor_id: 'gardener-001', display_name: '园丁', location_id: 'home',
+        energy: .8, appetite: .2, paused: false, next_decision_at: '2026-10-05T04:10:00Z', plan: null,
+        last_feedback: null, inventory: { water: 1, raw_water: 2 } }] };
+    changed.tasks = [map.tasks![0]!, { ...map.tasks![0]!, actor_id: 'shaping-001', task_id: 'own-trip' }];
+    const activities = projectSceneActivities(changed);
+    expect(activities[0]!.carriedStock).toEqual({ water: 1, raw_water: 2 });
+    expect(activities[1]!.carriedStock).toEqual({ water: 4, seeds: 2 });
+    changed.living!.inventory.stock.water = 0; expect(activities[1]!.carriedStock!.water).toBe(4);
+  });
 });

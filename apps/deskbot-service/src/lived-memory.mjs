@@ -16,7 +16,7 @@ export function installLivedMemory(w, at, { plannerEnabled = false } = {}) {
   return {accepted:true,version:MEMORY_VERSION,imported_records:w.memory.episodes.length};
 }
 export function goalTopic(goal='') {
-  if(/water|drain|tend|harvest|sow/.test(goal))return 'care';
+  if(/water|drain|tend|harvest|sow|seed/.test(goal))return 'care';
   if(/repair|stitch/.test(goal))return 'repair';
   if(/tray|craft/.test(goal))return 'craft';
   if(/cook/.test(goal))return 'cook';

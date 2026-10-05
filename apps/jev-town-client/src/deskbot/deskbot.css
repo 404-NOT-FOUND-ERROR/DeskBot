@@ -402,3 +402,4 @@
 @media (prefers-reduced-motion: reduce) {
   .deskbot-mode *, .deskbot-mode *::before, .deskbot-mode *::after { scroll-behavior: auto; transition: none; }
 }
+.deskbot-mode__supply-note { font-size: 11px; line-height: 1.7; color: #71847d; padding-left: 9px; border-left: 2px solid #abc8bc; }

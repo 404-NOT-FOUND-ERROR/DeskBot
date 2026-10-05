@@ -1,6 +1,8 @@
 // Server-owned rules for the first continuing nursery/workshop/kitchen loop.
 // Quantities describe this fictional world, not measurements of real Shanghai.
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
+export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
+export const SPRING_UNITS_PER_HOUR = .75;
 const MINUTE = 60_000;
 const clamp = (x, low = 0, high = 1) => Math.min(high, Math.max(low, x));
 const copy = value => structuredClone(value);
@@ -8,9 +10,9 @@ export class LivingResourceError extends Error {
   constructor(code, message, statusCode = 409) { super(message); this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, status) => { throw new LivingResourceError(code, message, status); };
-export const RESOURCES = Object.freeze({ water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '苔芽餐' });
+export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '苔芽餐' });
 const INITIAL = {
-  'floating-frame': { kind: 'waterside', water_level: .46, condition: .67 },
+  'floating-frame': { kind: 'waterside', water_level: .46, condition: .67, stock: { raw_water: 12 }, capacity: 24 },
   'garden-bed': { kind: 'plant_bed', moisture: .58, health: .88, growth: .25, quantity: 10 },
   'seedling-rack': { kind: 'nursery_store', condition: .94, stock: { water: 12, seeds: 8, moss: 0, trays: 0 }, capacity: 24 },
   'repair-bench': { kind: 'facility', condition: .94 },
@@ -35,6 +37,8 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'stitch-canopy', title: '缝补交换摊雨棚', kind: 'craft', target: 'market-canopy', seconds: 1080, inputs: [{ container: 'bag', resource: 'cloth', count: 2 }, { container: 'bag', resource: 'fasteners', count: 1 }] },
   { activity_id: 'cook-moss', title: '试做苔芽餐', kind: 'craft', target: 'trial-stove', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }, { container: 'trial-stove', resource: 'water', count: 1 }], output: { container: 'bag', resource: 'rations', count: 2 } },
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
+  { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
+  { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
 ]);
 function definition(world, objectId) {
   const object = world.map_catalog?.objects?.find(o => o.object_id === objectId);
@@ -64,6 +68,24 @@ export function installLivingResources(world, at) {
     migration: { id: LIVING_RULE_VERSION, initial_state: 'authored_starting_resources', legacy_task_effects_preserved: true } };
   note(world, at, '苗圃、水岸和生活设施开始记录日常变化。', { kind: 'installation' });
   if (world.weather?.provenance) setLivingWeatherWindow(world, { event_id: 'installed-current-weather', source_kind: 'external_provider', provenance: world.weather.provenance }, at);
+  installResourceRenewal(world, at);
+  return true;
+}
+// Add only the new spring source. Existing clean water, seeds, reservations and
+// simulation cursors survive; keeping LIVING_RULE_VERSION preserves old tasks.
+export function installResourceRenewal(world, at) {
+  const living = world.living, spring = living?.objects?.['floating-frame'];
+  if (!spring || living.resource_renewal?.id === RESOURCE_RENEWAL_VERSION) return false;
+  spring.stock ??= {};
+  if (!Object.hasOwn(spring.stock, 'raw_water')) spring.stock.raw_water = 12;
+  if (!Number.isFinite(spring.capacity)) spring.capacity = 24;
+  living.resource_renewal = { id: RESOURCE_RENEWAL_VERSION, installed_at: at,
+    source_object_id: 'floating-frame', source_kind: 'authored_world_physics',
+    resource: 'raw_water', units_per_hour: SPRING_UNITS_PER_HOUR,
+    description: '聚形域泉眼按作者设定每小时补充 0.75 份原水，与现实天气观测无关。',
+    preserved_existing_stocks_and_tasks: true };
+  living.revision += 1;
+  note(world, at, '泉眼开始缓慢补充原水；居民可以汲水净滤，也可以从收获的苔芽中留种。', { kind: 'resource_renewal_installation', migration_id: RESOURCE_RENEWAL_VERSION });
   return true;
 }
 function localMinute(world, milliseconds) {
@@ -101,6 +123,14 @@ function step(world, start, end, daylight) {
   const water = l.objects['floating-frame'];
   if (water) {
     water.water_level = clamp(water.water_level + hours * (rain - evaporation * .4 - Math.max(0, water.water_level - .65) * .16));
+    if (water.stock && Object.hasOwn(water.stock, 'raw_water')) {
+      // A fictional spring is an authored source, never a weather measurement.
+      // A migration must not produce supplies for time before it was installed.
+      const installed = Date.parse(l.resource_renewal?.installed_at ?? l.installed_at);
+      const springHours = Math.max(0, end - Math.max(start, installed)) / 3_600_000;
+      const availableCapacity = Math.max(0, water.capacity - heldCount(world, 'floating-frame', 'raw_water'));
+      water.stock.raw_water = clamp(water.stock.raw_water + springHours * SPRING_UNITS_PER_HOUR, 0, availableCapacity);
+    }
   }
   const bed = l.objects['garden-bed'];
   if (bed) {
@@ -168,6 +198,11 @@ function eligibility(world, recipe, actorId, { completion = false, taskId = null
   if (recipe.activity_id === 'water-bed' && bed?.moisture > .82) return '苗床已经很湿，不宜再浇水。';
   if (recipe.activity_id === 'drain-bed' && bed?.moisture < .72) return '苗床现在没有积水。';
   if (recipe.activity_id === 'repair-frame' && state.water_level > .88) return '水位过高，暂时无法安全修补浮框。';
+  if (recipe.activity_id === 'collect-water') {
+    if (state.water_level < .15) return '水位过低，暂时无法汲水。';
+    if (state.water_level > .88) return '水位过高，暂时无法安全汲水。';
+    if (state.condition < .4) return '浮框已经损坏，需要先修缮再汲水。';
+  }
   if (['craft-tray', 'craft-frame-kit', 'cook-moss'].includes(recipe.activity_id) && state.condition < .4) return '设施已经损坏，需要先修缮。';
   if (['repair-frame', 'repair-bench', 'repair-rack', 'repair-stove', 'stitch-canopy'].includes(recipe.activity_id) && state.condition > .9) return '设施状况良好，暂时无需修缮。';
   if (!completion) for (const input of recipe.inputs) if (countIn(world, input.container, actorId, input.resource) < input.count) return `缺少${RESOURCES[input.resource]}，需要 ${input.count} 份${input.container === 'bag' ? '随身携带' : ''}。`;
@@ -263,19 +298,21 @@ export function livingObjectReadModel(world, object) {
 function objectStatus(state) {
   const percent = x => Math.round(x * 100);
   if (state.kind === 'plant_bed') return state.quantity ? `土壤湿润 ${percent(state.moisture)}% · 苗况 ${percent(state.health)}% · 生长 ${percent(state.growth)}%${state.growth >= .85 ? ' · 可收获' : ''}` : state.dead_quantity ? '留下了枯苗，重新播种时需要清理' : '苗床空着，等待播种';
-  if (state.kind === 'waterside') return `水位 ${percent(state.water_level)}% · 浮框完好 ${percent(state.condition)}%`;
+  if (state.kind === 'waterside') return `水位 ${percent(state.water_level)}% · 浮框完好 ${percent(state.condition)}%${state.stock && Object.hasOwn(state.stock, 'raw_water') ? ` · 原水 ${Math.round(state.stock.raw_water * 10) / 10}/${state.capacity} 份` : ''}`;
   return typeof state.condition === 'number' ? `完好 ${percent(state.condition)}%` : '有限库存';
 }
 export function livingReadModel(world, actorId = world.protagonist.character_id) {
   if (!world.living) return null;
   return { schema: world.living.schema, rule_version: LIVING_RULE_VERSION, simulated_until: world.living.simulated_until,
     revision: world.living.revision, recovery: copy(world.living.recovery), resource_names: RESOURCES,
+    resource_renewal: copy(world.living.resource_renewal ?? null),
     inventory: copy(world.living.inventories[actorId] ?? { stock: {}, capacity: 24 }), recent_changes: copy(world.living.recent_changes.slice(-8)),
     activities: ACTIVITIES.map(recipe => {
       const reason = eligibility(world, recipe, actorId);
       return { activity_id: recipe.activity_id, title: recipe.title, kind: recipe.kind, target_object_id: recipe.target,
         location_id: definition(world, recipe.target)?.location_id ?? null, duration_seconds: recipe.seconds,
         inputs: recipe.inputs.map(input => ({ resource: input.resource, name: RESOURCES[input.resource], count: input.count, from: input.container === 'bag' ? '随身袋' : definition(world, input.container)?.name ?? input.container })),
+        ...(recipe.output ? { output: { resource: recipe.output.resource, name: RESOURCES[recipe.output.resource], count: recipe.output.count, to: recipe.output.container === 'bag' ? '随身袋' : definition(world, recipe.output.container)?.name ?? recipe.output.container } } : {}),
         available: !reason, unavailable_reason: reason };
     }) };
 }

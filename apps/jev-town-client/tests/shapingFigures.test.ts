@@ -87,4 +87,27 @@ describe("light-condensed town inhabitants", () => {
     expect(disposeMaterial).toHaveBeenCalledOnce();
     expect(disposeInstances).toHaveBeenCalledOnce();
   });
+  it('carries a water prop only for actual water inventory on an admitted trip and keeps the hand stable', () => {
+    const figure = createCitizenFigure(0, 1, 'shaping-001');
+    const bucket = figure.group.getObjectByName('carried-water-bucket')!;
+    figure.updateCarry!({ water: 4 }, false); expect(bucket.visible).toBe(false);
+    figure.updateCarry!({ water: 0, moss: 2 }, true); expect(bucket.visible).toBe(false);
+    figure.updateCarry!({ water: Number.NaN, raw_water: Infinity }, true); expect(bucket.visible).toBe(false);
+    figure.updateCarry!({ water: 4 }, true); expect(bucket.visible).toBe(true); expect(bucket.userData.stock.water).toBe(4);
+    figure.limbs.armRight.rotation.x = .8; figure.updateLife!(5, 'travel', true, false); expect(figure.limbs.armRight.rotation.x).toBe(.15);
+    // A paused trip retains its real cargo without a walking animation.
+    figure.updateLife!(5, 'idle', false, true); expect(bucket.visible).toBe(true); expect(figure.group.userData.life_pose).toBe('idle');
+    figure.updateCarry!(undefined, false); expect(bucket.visible).toBe(false);
+    disposeObject(figure.group);
+  });
+  it('has distinct collection and seed-sifting gestures, and clears them when paused', () => {
+    const figure = createCitizenFigure(0, 1, 'wetland-grower-001');
+    figure.updateLife!(5, 'care', false, true, 0, 'collect-water');
+    expect(figure.limbs.armRight.rotation.x).toBe(-.36); expect(figure.limbs.armLeft.rotation.z).toBe(-.15);
+    figure.updateLife!(5, 'care', false, true, 0, 'save-seeds');
+    expect(figure.limbs.armRight.rotation.x).toBe(-.72); expect(figure.limbs.armLeft.rotation.y).toBe(.26);
+    figure.updateLife!(5, 'idle', false, true, 0, 'save-seeds');
+    expect(figure.limbs.armRight.rotation.x).toBe(0); expect(figure.limbs.armLeft.rotation.y).toBe(0);
+    disposeObject(figure.group);
+  });
 });
