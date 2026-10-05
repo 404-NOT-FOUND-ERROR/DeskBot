@@ -219,37 +219,39 @@ export function advanceLivingResources(world, at, { force = false, maxMinutes = 
   for (const key of Object.keys(after)) if (after[key] && before[key] !== after[key]) note(world, l.simulated_until, after[key], { kind: 'environment', rule_version: LIVING_RULE_VERSION });
   return { accepted: true, from: new Date(start).toISOString(), until: l.simulated_until, recovered: end - start > 5 * MINUTE, pending: stop < end, weather_event_id: l.weather_window?.event_id ?? null };
 }
-function eligibility(world, recipe, actorId, { completion = false, taskId = null, task = null, at = world.clock?.synced_at } = {}) {
-  if (!world.living || world.clock?.mode !== 'real_time') return '生活资源规则尚未启用。';
+function activityBlocker(world, recipe, actorId, { completion = false, taskId = null, task = null, at = world.clock?.synced_at } = {}) {
+  const blocked = (code, classification, reason) => ({code, classification, reason});
+  if (!world.living || world.clock?.mode !== 'real_time') return blocked('living_not_enabled', 'condition', '生活资源规则尚未启用。');
   const actor = person(world, actorId), target = definition(world, recipe.target), state = world.living.objects[recipe.target];
-  if (!target || !state) return '这个设施还没有安装。';
-  if (actor.location_id !== target.location_id) return '需要先到这个地点。';
-  if (!canUse(world, target, actorId)) return '需要住户同意。';
-  if ((world.tasks ?? []).some(t => ['running', 'paused'].includes(t.status) && t.task_id !== taskId && (t.actor_id === actorId || t.target_object_id === recipe.target))) return '有人正在使用这个设施，或还有未完成的活动。';
-  if (!completion && world.living.recovery.pending) return '世界正在补算此前经过的时间。';
+  if (!target || !state) return blocked('facility_missing', 'condition', '这个设施还没有安装。');
+  if (actor.location_id !== target.location_id) return blocked('activity_location_changed', 'route', '需要先到这个地点。');
+  if (!canUse(world, target, actorId)) return blocked('permission_required', 'coordination', '需要住户同意。');
+  if ((world.tasks ?? []).some(t => ['running', 'paused'].includes(t.status) && t.task_id !== taskId && (t.actor_id === actorId || t.target_object_id === recipe.target))) return blocked('facility_busy', 'coordination', '有人正在使用这个设施，或还有未完成的活动。');
+  if (!completion && world.living.recovery.pending) return blocked('world_recovery_pending', 'condition', '世界正在补算此前经过的时间。');
   const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task });
-  if (projectReason) return projectReason;
+  if (projectReason) return blocked('project_conditions_changed', 'condition', projectReason);
   const bed = world.living.objects['garden-bed'];
-  if (recipe.activity_id === 'harvest-bed' && (!bed || bed.quantity === 0 || bed.growth < .85 || bed.health < .35)) return '苔芽还未成熟，或苗况不适合收获。';
-  if (recipe.activity_id === 'sow-bed' && bed?.quantity > 0 && bed.health > .08) return '苗床还有活苗，先照料或收获。';
-  if (['water-bed', 'tend-bed', 'drain-bed'].includes(recipe.activity_id) && !bed?.quantity) return '苗床空着，需要重新播种。';
-  if (recipe.activity_id === 'water-bed' && bed?.moisture > .82) return '苗床已经很湿，不宜再浇水。';
-  if (recipe.activity_id === 'drain-bed' && bed?.moisture < .72) return '苗床现在没有积水。';
-  if (recipe.activity_id === 'repair-frame' && state.water_level > .88) return '水位过高，暂时无法安全修补浮框。';
+  if (recipe.activity_id === 'harvest-bed' && (!bed || bed.quantity === 0 || bed.growth < .85 || bed.health < .35)) return blocked('crop_not_harvestable', 'condition', '苔芽还未成熟，或苗况不适合收获。');
+  if (recipe.activity_id === 'sow-bed' && bed?.quantity > 0 && bed.health > .08) return blocked('crop_present', 'condition', '苗床还有活苗，先照料或收获。');
+  if (['water-bed', 'tend-bed', 'drain-bed'].includes(recipe.activity_id) && !bed?.quantity) return blocked('crop_absent', 'condition', '苗床空着，需要重新播种。');
+  if (recipe.activity_id === 'water-bed' && bed?.moisture > .82) return blocked('crop_already_wet', 'condition', '苗床已经很湿，不宜再浇水。');
+  if (recipe.activity_id === 'drain-bed' && bed?.moisture < .72) return blocked('crop_not_waterlogged', 'condition', '苗床现在没有积水。');
+  if (recipe.activity_id === 'repair-frame' && state.water_level > .88) return blocked('water_level_high', 'condition', '水位过高，暂时无法安全修补浮框。');
   if (recipe.activity_id === 'collect-water') {
-    if (state.water_level < .15) return '水位过低，暂时无法汲水。';
-    if (state.water_level > .88) return '水位过高，暂时无法安全汲水。';
-    if (state.condition < .4) return '浮框已经损坏，需要先修缮再汲水。';
+    if (state.water_level < .15) return blocked('water_level_low', 'condition', '水位过低，暂时无法汲水。');
+    if (state.water_level > .88) return blocked('water_level_high', 'condition', '水位过高，暂时无法安全汲水。');
+    if (state.condition < .4) return blocked('facility_damaged', 'condition', '浮框已经损坏，需要先修缮再汲水。');
   }
-  if (['craft-tray', 'craft-frame-kit', 'cook-moss', 'cook-grove-stew'].includes(recipe.activity_id) && state.condition < .4) return '设施已经损坏，需要先修缮。';
-  if (['repair-frame', 'repair-bench', 'repair-rack', 'repair-stove', 'stitch-canopy'].includes(recipe.activity_id) && state.condition > .9) return '设施状况良好，暂时无需修缮。';
-  if (!completion) for (const input of recipe.inputs) if (countIn(world, input.container, actorId, input.resource) < input.count) return `缺少${RESOURCES[input.resource]}，需要 ${input.count} 份${input.container === 'bag' ? '随身携带' : ''}。`;
+  if (['craft-tray', 'craft-frame-kit', 'cook-moss', 'cook-grove-stew'].includes(recipe.activity_id) && state.condition < .4) return blocked('facility_damaged', 'condition', '设施已经损坏，需要先修缮。');
+  if (['repair-frame', 'repair-bench', 'repair-rack', 'repair-stove', 'stitch-canopy'].includes(recipe.activity_id) && state.condition > .9) return blocked('facility_healthy', 'condition', '设施状况良好，暂时无需修缮。');
+  if (!completion) for (const input of recipe.inputs) if (countIn(world, input.container, actorId, input.resource) < input.count) return blocked('material_shortage', 'resource', `缺少${RESOURCES[input.resource]}，需要 ${input.count} 份${input.container === 'bag' ? '随身携带' : ''}。`);
   if (recipe.output) {
     const destination = recipe.output.container === 'bag' ? world.living.inventories[actorId] : world.living.objects[recipe.output.container];
-    if ((destination?.stock?.[recipe.output.resource] ?? 0) + heldCount(world, recipe.output.container === 'bag' ? `bag:${actorId}` : recipe.output.container, recipe.output.resource) + recipe.output.count > (destination?.capacity ?? 24)) return '产物没有足够的存放空间。';
+    if ((destination?.stock?.[recipe.output.resource] ?? 0) + heldCount(world, recipe.output.container === 'bag' ? `bag:${actorId}` : recipe.output.container, recipe.output.resource) + recipe.output.count > (destination?.capacity ?? 24)) return blocked('output_storage_full', 'resource', '产物没有足够的存放空间。');
   }
   return null;
 }
+function eligibility(world, recipe, actorId, options) { return activityBlocker(world, recipe, actorId, options)?.reason ?? null; }
 export function prepareLivingActivity(world, activityId, actorId, at) {
   const recipe = ACTIVITIES.find(a => a.activity_id === activityId);
   if (!recipe) fail('activity_unknown', '没有这项生活活动。', 400);
@@ -276,8 +278,8 @@ export function releaseLivingReservation(world, task, at) {
 export function completeLivingActivity(world, task, at) {
   const recipe = ACTIVITIES.find(a => a.activity_id === task.activity_id);
   if (!recipe || task.completion_effect !== LIVING_RULE_VERSION || task.reservation?.status !== 'held') fail('activity_rules_changed', '这项活动的规则或材料预留不一致。');
-  const reason = eligibility(world, recipe, task.actor_id, { completion: true, taskId: task.task_id, task, at });
-  if (reason) return { success: false, reason };
+  const blocker = activityBlocker(world, recipe, task.actor_id, { completion: true, taskId: task.task_id, task, at });
+  if (blocker) return { success: false, ...blocker };
   const target = world.living.objects[recipe.target], before = copy(target), bed = world.living.objects['garden-bed'];
   const changes = [];
   switch (recipe.activity_id) {
@@ -288,7 +290,7 @@ export function completeLivingActivity(world, task, at) {
     case 'harvest-bed': {
       const yieldCount = Math.max(1, Math.floor(bed.quantity * bed.health));
       const stock = bag(world, task.actor_id);
-      if ((stock.stock.moss ?? 0) + heldCount(world, `bag:${task.actor_id}`, 'moss') + yieldCount > stock.capacity) return { success: false, reason: '随身袋装不下这次收获。' };
+      if ((stock.stock.moss ?? 0) + heldCount(world, `bag:${task.actor_id}`, 'moss') + yieldCount > stock.capacity) return { success: false, code: 'harvest_storage_full', classification: 'resource', reason: '随身袋装不下这次收获。' };
       stock.stock.moss = (stock.stock.moss ?? 0) + yieldCount;
       changes.push({ container: `bag:${task.actor_id}`, resource: 'moss', count: yieldCount });
       target.quantity = 0; target.dead_quantity = 0; target.growth = 0; break;

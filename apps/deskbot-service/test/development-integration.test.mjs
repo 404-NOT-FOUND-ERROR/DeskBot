@@ -30,7 +30,8 @@ test('owner suggestion enters choice and execution, then one outcome is shared b
   assert.deepEqual(frog.root_outcome_ids, [record.root_outcome_id]);
   assert.equal(frog.counts.owner_linked, 1);
   assert.equal(frog.unlocked, false);
-  assert.equal(frog.preference, null);
+  assert.equal(frog.preference.topics.find(t=>t.topic==='care').status,'unobserved');
+  assert.deepEqual(frog.capability.success_roots,[record.root_outcome_id]);
   assert.equal(roles.evidence.length, 0);
   assert.equal(roles.candidates.length, 0);
   assert.equal(sample.proof.input_store_event_count, 0);
@@ -47,7 +48,10 @@ test('ordinary completion validation preserves a failed attempt, without prefere
   assert.equal(w.memory.actors['shaping-001'].interests.care, undefined);
   const frog = sample.evolution.snapshot().development.directions.find(d => d.direction_id === 'wetland_frog');
   assert.equal(frog.counts.failed, 1); assert.equal(frog.counts.completed, 0);
-  assert.equal(frog.preference, null); assert.equal(frog.capability, null); assert.equal(frog.unlocked, false);
+  assert.equal(frog.preference.topics.find(t=>t.topic==='care').status,'unobserved');
+  assert.deepEqual(frog.capability.success_roots,[]);
+  assert.deepEqual(frog.capability.condition_failure_roots,[record.root_outcome_id]);
+  assert.equal(frog.unlocked, false);
 });
 
 test('repeat input and restart retain one shared outcome', () => {

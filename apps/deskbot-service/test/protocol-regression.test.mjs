@@ -4,6 +4,7 @@ import { afterEach, test } from 'node:test';
 
 import { createFakeDevice } from '../src/fake-device.mjs';
 import { createOutputRouter } from '../src/output-router.mjs';
+import { listenOnFetchSafePort, closeTestServer } from './support/fetch-safe-server.mjs';
 import {
   BRIDGE_PROTOCOL_VERSION,
   createWebSocketBridge,
@@ -135,28 +136,22 @@ function waitForMessage(ws, predicate, timeoutMs = 1500) {
 }
 
 async function startBridge({ outputRouter, audioArtifacts = null } = {}) {
-  const httpServer = createServer();
-  const bridge = createWebSocketBridge({
-    server: httpServer,
-    now: () => fixedTime,
-    heartbeatIntervalMs: 0,
-    outboxPollIntervalMs: 0,
-    outputRouter,
-    audioArtifacts,
-  });
-  await new Promise((resolve, reject) => {
-    httpServer.once('error', reject);
-    httpServer.listen(0, '127.0.0.1', resolve);
+  let bridge;
+  const {server:httpServer,baseUrl}=await listenOnFetchSafePort(()=>{
+    const httpServer=createServer();
+    const attemptBridge=createWebSocketBridge({server:httpServer,now:()=>fixedTime,
+      heartbeatIntervalMs:0,outboxPollIntervalMs:0,outputRouter,audioArtifacts});
+    httpServer.once('close',()=>attemptBridge.close());bridge=attemptBridge;return httpServer;
   });
   resources.push({
     close: async () => {
       bridge.close();
-      await new Promise((resolve, reject) => httpServer.close((error) => (error ? reject(error) : resolve())));
+      await closeTestServer(httpServer);
     },
   });
   return {
     bridge,
-    wsUrl: `ws://127.0.0.1:${httpServer.address().port}/ws`,
+    wsUrl: `${baseUrl.replace('http:','ws:')}/ws`,
   };
 }
 

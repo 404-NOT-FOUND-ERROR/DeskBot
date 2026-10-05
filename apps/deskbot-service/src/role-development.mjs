@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { developmentReadModel } from './development-evidence.mjs';
 import { localWorldDate } from './realtime-world.mjs';
+import { developmentFacetsReadModel } from './development-facets.mjs';
 
 export const ROLE_DEVELOPMENT_SCHEMA = 'deskbot.role-development.v1';
 const MAX_ROOTS = 2048;
@@ -21,6 +22,38 @@ const barriers = () => [
   { id: 'practical_trial_not_connected', label: '实际方向试用尚未接入' },
   { id: 'capability_self_assessment_next_stage', label: '能力自评留待下一阶段' },
 ];
+const facetBarriers=()=>[
+  {id:'self_wish_not_established',label:'主动愿望还未建立'},
+  {id:'practical_trial_not_connected',label:'实际方向试用尚未接入'},
+  {id:'role_prerequisites_not_authored',label:'各方向的成为条件尚待设计'},
+];
+
+function directionFacets(direction,model,actorId,mappedRoots,records) {
+  if(!model.enabled)return {preference:null,capability:null,self_assessment:null,wish_stability:null};
+  const topics=(model.actors.find(a=>a.actor_id===actorId)?.topics??[]).filter(t=>direction.topics.includes(t.topic));
+  const ids=new Set(mappedRoots.map(r=>r.root_outcome_id));
+  const practiceIds=new Set(records.map(r=>r.root_outcome_id));
+  const filter=(roots,subset=ids)=>[...(roots??[])].filter(id=>subset.has(id));
+  return {
+    preference:{basis:'explicit_continuation_separate_from_success',scope:'related_topic_attention',
+      topics:topics.map(t=>({topic:t.topic,status:t.interest.status,summary:t.interest.summary,
+        active_roots:filter(t.interest.active_roots),invited_roots:filter(t.interest.invited_roots),
+        obligation_roots:filter(t.interest.obligation_roots),unknown_roots:filter(t.interest.unknown_roots)}))},
+    capability:{basis:'actual_registered_activity_outcomes',scope:'direction_mapped_activity_roots',
+      success_roots:unique(topics.flatMap(t=>filter(t.capability.success_roots,practiceIds))),
+      performance_failure_roots:unique(topics.flatMap(t=>filter(t.capability.performance_failure_roots,practiceIds))),
+      condition_failure_roots:unique(topics.flatMap(t=>filter(t.capability.condition_failure_roots,practiceIds))),
+      unknown_failure_roots:unique(topics.flatMap(t=>filter(t.capability.unknown_failure_roots,practiceIds))),
+      topics:topics.map(t=>({topic:t.topic,scope:'related_topic_summary',status:t.capability.status,summary:t.capability.summary})),
+      prerequisite_evidence_basis:'direction_mapped_activity_roots_only'},
+    self_assessment:{basis:'rules',scope:'related_topic_summary',
+      topics:topics.map(t=>({topic:t.topic,status:t.self_assessment.status,summary:t.self_assessment.summary})),
+      root_outcome_ids:unique(topics.flatMap(t=>filter(t.self_assessment.root_outcome_ids)))},
+    wish_stability:{status:'not_established',automatic:false,
+      related_topics_stable:topics.filter(t=>t.wish?.stable_interest===true).map(t=>t.topic),
+      direction_prerequisites_ready:false},
+  };
+}
 
 function practiceRoots(model, actorId) {
   const roots = new Map();
@@ -40,10 +73,13 @@ function ownerLinked(record) {
 export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.character_id ?? 'shaping-001' } = {}) {
   const ledger = developmentReadModel(world, { actorId, limit: MAX_ROOTS });
   const roots = practiceRoots(ledger, actorId);
+  const facets=ledger?.facets??developmentFacetsReadModel(world,{actorId,at:world?.clock?.synced_at??world?.updated_at});
   const timeZone = world?.clock?.time_zone ?? 'Asia/Shanghai';
   const directions = DEVELOPMENT_DIRECTIONS.map(direction => {
     const records = roots.filter(record => direction.topics.includes(record.topic)
       && (!direction.locations || direction.locations.includes(record.location_id)));
+    const mappedRoots=(ledger?.recent??[]).filter(record=>record.actor_ids.includes(actorId)&&direction.topics.includes(record.topic)
+      &&(!direction.locations||direction.locations.includes(record.location_id)));
     const days = unique(records.map(record => localWorldDate(record.at, timeZone)?.date));
     const contexts = unique(records.map(record => record.activity_id && record.location_id ? `${record.activity_id}:${record.location_id}` : null));
     return {
@@ -81,10 +117,9 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
         // View references identify the same root. They never add to counts.
         views: structuredClone(record.views ?? {}),
       })),
-      preference: null,
-      capability: null,
+      ...directionFacets(direction,facets,actorId,mappedRoots,records),
       unlocked: false,
-      barriers: barriers(),
+      barriers: facets.enabled?facetBarriers():barriers(),
     };
   });
   const evidenceFingerprint = createHash('sha256').update(JSON.stringify(roots.map(record => ({
@@ -95,7 +130,7 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
   return {
     schema: ROLE_DEVELOPMENT_SCHEMA,
     enabled: ledger?.enabled === true,
-    mode: 'direction_observation_only',
+    mode: facets.enabled?'direction_facets_only':'direction_observation_only',
     character_id: actorId,
     evidence_basis: 'canonical_unique_root_outcomes',
     practice_counts_scope: 'completed_or_failed_recipe_outcomes',
@@ -109,6 +144,7 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
       successful_practice_is_preference: false,
       failed_practice_is_negative_preference: false,
       practice_count_is_capability: false,
+      capability_basis:'registered_activity_outcomes_with_classified_difficulties',
       observed_direction_is_self_wish: false,
       automatic_proposals_enabled: false,
       appearance_changes_enabled: false,
@@ -127,7 +163,7 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
 export function candidateDevelopmentContext(candidate, development) {
   const direction = development?.directions.find(item => item.direction_id === candidate.direction_id);
   return {
-    mode: 'direction_observation_only',
+    mode: development?.mode??'direction_observation_only',
     evidence_basis: 'canonical_unique_root_outcomes',
     mapped: Boolean(direction),
     root_outcome_ids: [...(direction?.root_outcome_ids ?? [])],
@@ -135,10 +171,12 @@ export function candidateDevelopmentContext(candidate, development) {
     counts: structuredClone(direction?.counts ?? { completed: 0, failed: 0, autonomous: 0, invited: 0, owner_linked: 0, unknown_trigger: 0 }),
     practice_days: [...(direction?.practice_days ?? [])],
     contexts: [...(direction?.contexts ?? [])],
-    preference: null,
-    capability: null,
+    preference:structuredClone(direction?.preference??null),
+    capability:structuredClone(direction?.capability??null),
+    self_assessment:structuredClone(direction?.self_assessment??null),
+    wish_stability:structuredClone(direction?.wish_stability??null),
     unlocked: false,
     lifecycle_changed: false,
-    barriers: barriers(),
+    barriers:structuredClone(direction?.barriers??barriers()),
   };
 }

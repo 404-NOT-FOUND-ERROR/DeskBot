@@ -2,11 +2,30 @@ import { createHash } from 'node:crypto';
 import { localWorldDate } from './realtime-world.mjs';
 import { ACTIVITIES } from './living-resources.mjs';
 import { syncDevelopmentEvidence, developmentReadModel } from './development-evidence.mjs';
+import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 
 export const MEMORY_VERSION = 'deskbot.lived-memory.v1';
 export const TOPICS = { care:'照料', craft:'制作', repair:'修缮', cook:'做饭', explore:'观察小镇', connection:'与人相处' };
 const digest = s => createHash('sha256').update(s).digest('hex').slice(0,24);
 const clip = s => String(s ?? '').slice(0,400);
+const failureMetadata=task=>({
+  ...(typeof task.failure_code==='string'&&/^[a-z][a-z0-9_]{0,79}$/.test(task.failure_code)?{failure_code:task.failure_code}:{}),
+  ...(['resource','condition','route','coordination','performance','cancelled','unclassified'].includes(task.failure_classification)?{failure_classification:task.failure_classification}:{}),
+});
+const knownFailureReasons=Object.freeze({
+  living_not_enabled:'生活资源规则尚未启用。',facility_missing:'需要的设施尚未安装。',
+  activity_location_changed:'活动地点发生变化，没有在指定地点完成。',location_changed:'活动地点发生变化，没有在指定地点完成。',
+  permission_required:'所需的住户使用同意尚未取得。',facility_busy:'设施有人使用，或仍有未结束的活动。',
+  world_recovery_pending:'世界仍在补算此前经过的时间。',project_conditions_changed:'项目的可行条件发生变化，具体细节未记录。',
+  crop_not_harvestable:'苔芽尚未达到可收获条件。',crop_present:'苗床仍有活苗，不宜再次播种。',
+  crop_absent:'苗床已经空了，照料所需的苗木不在。',crop_already_wet:'苗床已经过湿，不宜重复浇水。',
+  crop_not_waterlogged:'苗床没有积水，无需疏通排水。',water_level_high:'水位过高，安全条件不满足。',
+  water_level_low:'水位过低，无法汲水。',facility_damaged:'需要的设施损坏，应先修缮。',
+  facility_healthy:'设施状况良好，无需再次修缮。',material_shortage:'所需材料不足。',
+  output_storage_full:'没有足够空间保存产物。',harvest_storage_full:'随身袋没有足够空间保存收获。',
+  route_changed:'通行路线发生变化。',passage_closed:'原来的通道已关闭。',location_closed:'目的地已关闭。',
+  location_not_reachable:'目的地无法经当前通路到达。',activity_cancelled:'这次活动已取消。',
+});
 const people = w => [w.protagonist, ...w.npcs].map(p => p.character_id ?? p.npc_id);
 export function installLivedMemory(w, at, { plannerEnabled = false } = {}) {
   if(w.memory)return {accepted:true,duplicate:true};
@@ -34,7 +53,7 @@ export function remember(w,record) {
   memory.seen.push(id);memory.seen=memory.seen.slice(-4096);
   memory.episodes.push({id,...record,text:clip(record.text)});memory.episodes.sort((a,b)=>a.at.localeCompare(b.at));memory.episodes=memory.episodes.slice(-1024);memory.revision++;
   // Growth uses independent executed outcomes, never accounts, choices or model prose.
-  if(record.kind!=='world_fact'||!record.independent_evidence||!record.topic)return true;
+  if(memory.development?.facets || record.kind!=='world_fact'||!record.independent_evidence||!record.topic)return true;
   const date=localWorldDate(record.at,w.clock.time_zone).date;
   for(const actorId of record.actor_ids) {
     const actor=memory.actors[actorId]??={actor_id:actorId,interests:{}};
@@ -59,16 +78,21 @@ export function remember(w,record) {
 }
 export function syncLivedMemory(w,at) {
   if(!w.memory)return;
+  // Install the common-root projection before adding views so legacy interest
+  // counters remain an unchanged historical record after the stage-3 migration.
+  syncDevelopmentEvidence(w,at);
   for(const id of people(w))w.memory.actors[id]??={actor_id:id,interests:{}};
   for(const task of [...(w.tasks??[])].sort((a,b)=>String(a.finished_at).localeCompare(String(b.finished_at)))) {
     if(!['completed','failed','cancelled'].includes(task.status))continue;
     const date=task.completion?.due_at??task.finished_at;
     if(!date||date>at)continue;
-    const goal=task.life_goal??task.activity_id??'', topic=goalTopic(goal);
+    const goal=task.life_goal??task.activity_id??'', topic=task.activity_id?activityTopic(task.activity_id)
+      :task.life_action==='observe'?(Object.hasOwn(TOPICS,task.life_topic??'')?task.life_topic:null):goalTopic(goal);
     remember(w,{origin_id:`task:${task.task_id}:${task.status}`,kind:'world_fact',actor_ids:[task.actor_id],at:date,
       text:task.status==='completed'?(task.completion?.result?.text??`${task.title}完成了。`):`${task.title}${task.status==='cancelled'?'已取消':'未完成'}：${task.failure_reason??'活动停下了'}。`,
       topic,location_id:task.to_location_id??task.location_id??task.destination_location_id??null,outcome:task.status,
-      source:{kind:'canonical_task',task_id:task.task_id,activity_id:task.activity_id??null,plan_id:task.life_plan_id??null},
+      source:{kind:'canonical_task',task_id:task.task_id,activity_id:task.activity_id??null,plan_id:task.life_plan_id??null,
+        life_action:task.life_action??null,motivation:structuredClone(task.life_motivation??{kind:'unknown',facet_root_ids:[]}),...failureMetadata(task)},
       model_safe:['autonomous_life','social_life'].includes(task.origin),
       model_text:`镇内${task.kind==='travel'?'旅行':ACTIVITIES.find(a=>a.activity_id===task.activity_id)?.title??(task.life_action==='rest'?'休息':'观察活动')}：${task.status==='completed'?'完成':task.status==='failed'?'未完成':'取消'}。`,
       independent_evidence:task.status!=='cancelled'&&task.kind!=='travel'&&task.life_action!=='rest'&&Boolean(topic)&&!(task.life_source_ids?.length)});
@@ -82,7 +106,7 @@ export function syncLivedMemory(w,at) {
       const actorId=record.actor_id??taskEvidence?.actor_id??project.owner_id;
       remember(w,{origin_id:`project:${project.project_id}:${record.task_id}:${record.outcome}`,kind:'world_fact',actor_ids:[actorId],at:record.at,
         text:record.text??`${project.name}：${record.outcome==='completed'?'实际阶段完成':'这次尝试没有完成'}。`,
-        topic:goalTopic(project.project_id),location_id:record.location_id??null,outcome:record.outcome,
+        topic:activityTopic(record.activity_id??taskEvidence?.activity_id)??goalTopic(project.project_id),location_id:record.location_id??null,outcome:record.outcome,
         source:{kind:'resident_project',project_id:project.project_id,task_id:record.task_id,stage_id:record.stage_id??null},
         model_safe:true,model_text:record.text??`${project.name}的实际阶段：${record.outcome}。`,independent_evidence:false});
     }
@@ -107,12 +131,52 @@ export function syncLivedMemory(w,at) {
   syncDevelopmentEvidence(w, at);
 }
 export function influenceRememberedChoices(w,state,choices) {
-  const interests=w.memory?.actors[state.actor_id]?.interests??{};
+  const model=developmentFacetsReadModel(w,{actorId:state.actor_id,at:w.clock?.synced_at??w.updated_at});
+  const topics=model.enabled?model.actors.find(a=>a.actor_id===state.actor_id)?.topics??[]:[];
+  const records=w.memory?.development?.records??[];
   return choices.map(c=>{
-    const preference=interests[goalTopic(c.goal)],bonus=preference?.bonus??0;
-    return {...c,score:c.score+bonus,memory_bonus:bonus,memory_ids:bonus?preference.evidence_ids:[],
-      reason:bonus?`${c.reason} 这些天的实际经历让我想继续试试${TOPICS[preference.topic]}。`:c.reason};
+    const topic=Object.hasOwn(c,'development_topic')?c.development_topic:activityTopic(c.activity_id)??goalTopic(c.goal);
+    const preference=topics.find(t=>t.topic===topic)?.interest;
+    const baseScore=c.score-(c.memory_bonus??0),bonus=c.available&&Number.isFinite(preference?.bonus)?Math.max(0,Math.min(6,preference.bonus)):0;
+    // Keep the full quantitative evidence in the shared ledger. A choice only
+    // carries a small set that actually participated in the interest threshold.
+    const roots=bonus?[...(preference.threshold_root_ids??[])].slice(-16):[];
+    const memoryIds=[...new Set(records.filter(r=>roots.includes(r.root_outcome_id)).flatMap(r=>r.views?.memory_ids??[]))].slice(-8);
+    return {...c,score:baseScore+bonus,memory_bonus:bonus,memory_ids:memoryIds,facet_root_ids:roots,
+      development_topic:topic??null,
+      reason:bonus?`${c.reason} 最近我还主动留意过${TOPICS[topic]}，想继续看看。`:c.reason};
   }).sort((a,b)=>b.score-a.score);
+}
+
+// Provider-facing summaries contain authored labels and numeric observations,
+// never owner input text, private task titles, failure prose or source IDs.
+export function modelDevelopmentContext(w,actorId=w?.protagonist?.character_id) {
+  const model=developmentFacetsReadModel(w,{actorId,at:w?.clock?.synced_at??w?.updated_at});
+  const actor=model.actors.find(a=>a.actor_id===actorId);
+  const at=Date.parse(w?.clock?.synced_at??w?.updated_at??'');
+  const recentActual=(w?.memory?.development?.records??[]).filter(r=>r.actor_ids?.includes(actorId)&&r.effect?.practice===true
+    &&activityTopic(r.activity_id)&&['completed','failed','cancelled'].includes(r.outcome)&&Date.parse(r.at)<=at)
+    .sort((a,b)=>a.at.localeCompare(b.at)||a.root_outcome_id.localeCompare(b.root_outcome_id)).slice(-4).reverse()
+    .map(r=>({activity_id:r.activity_id,title:ACTIVITIES.find(a=>a.activity_id===r.activity_id).title,topic:activityTopic(r.activity_id),
+      outcome:r.outcome,motivation:r.causes?.trigger==='invited'?'invited'
+        :['self_continuation','need','invited'].includes(r.causes?.motivation?.kind)?r.causes.motivation.kind:'unknown',
+      ...(r.outcome==='completed'?{}:{failure:{classification:['resource','condition','route','coordination','performance','cancelled'].includes(r.failure?.classification)?r.failure.classification:'unclassified',
+        ...(Object.hasOwn(knownFailureReasons,r.failure?.code??'')?{known_reason:knownFailureReasons[r.failure.code]}:{})}})}));
+  return {enabled:model.enabled,schema:model.schema,basis:'canonical_unique_root_outcomes',automatic_wishes:false,
+    recent_actual_outcomes:recentActual,
+    topics:(actor?.topics??[]).map(t=>({topic:t.topic,label:TOPICS[t.topic]??t.topic,
+      contact_count:t.contact?.count??0,
+      interest:{status:t.interest.status,active_days:t.interest.active_days?.length??0,
+        active_continuations:t.interest.active_roots?.length??0,invited_practice:t.interest.invited_roots?.length??0,
+        obligations:t.interest.obligation_roots?.length??0},
+      capability:{status:t.capability.status,successful_practice:t.capability.success_roots?.length??0,
+        condition_failures:t.capability.condition_failure_roots?.length??0,
+        performance_failures:t.capability.performance_failure_roots?.length??0,unknown_failures:t.capability.unknown_failure_roots?.length??0,
+        activities:(t.capability.activities??[]).filter(a=>ACTIVITIES.some(r=>r.activity_id===a.activity_id))
+          .map(a=>({activity_id:a.activity_id,title:ACTIVITIES.find(r=>r.activity_id===a.activity_id).title,
+            successes:a.successes,failures:a.failures,status:a.status}))},
+      self_assessment:{status:t.self_assessment.status,basis:'rules'},
+      wish:{status:'not_established',stable_interest:t.wish?.stable_interest===true}}))};
 }
 export function retrieveLivedMemory(w,{actorId=w.protagonist.character_id,query='',limit=8,at=w.clock?.synced_at??w.updated_at}={}) {
   const tokens=String(query).match(/[a-z0-9_-]+|[\u4e00-\u9fff]{2,4}/gi)??[];

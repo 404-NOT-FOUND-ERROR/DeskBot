@@ -2,6 +2,8 @@ import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {LivedMemory} from './deskbot/LivedMemory.tsx';
 import type {DeskBotLivedMemory} from './deskbot/types.ts';
+import {facetsReviewCounts,readDevelopmentFacetsReview} from './developmentFacetsReview.ts';
+import type {DevelopmentFacetsReviewFixture} from './developmentFacetsReview.ts';
 import './styles.css';
 import './deskbot/life-sidebar.css';
 import './development-review.css';
@@ -13,6 +15,40 @@ interface Review {
 }
 const samples=[['suggestion','听到建议'],['executing','开始照料'],['completed','核验完成'],['failed','事情没办成'],['restart','重复与重启']] as const;
 const fixtureUrl=new URLSearchParams(location.search).get('developmentReviewUrl')??'http://127.0.0.1:4314';
+const facetMode=new URLSearchParams(location.search).get('sample')==='facets';
+function FacetsReview() {
+  const [fixture,setFixture]=useState<DevelopmentFacetsReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
+  async function load() {
+    setError('');
+    try {
+      const response=await fetch('/development-facets-review.json');
+      if(!response.ok)throw Error();
+      const value=readDevelopmentFacetsReview(await response.json());
+      if(!value)throw Error();
+      setFixture(value);setSelected(value.samples[0]!.id);
+    } catch {setError('隔离验收样本暂时不可用，重新载入后再试。');}
+  }
+  useEffect(()=>{void load();},[]);
+  const sample=fixture?.samples.find(value=>value.id===selected)??fixture?.samples[0];
+  const counts=sample?facetsReviewCounts(sample):null;
+  return <main className="development-review development-review--facets">
+    <header><div><span className="development-review__eyebrow">聚形域 · 发展管线 03</span><h1>做过、喜欢、做得到</h1><p>同一段生活，分别留下兴趣、实际能力和对自己的暂时判断。</p></div><span className="development-review__badge">隔离样本 · 不写入正式生活</span></header>
+    <nav aria-label="兴趣、能力与自评样本">{fixture?.samples.map(value=><button key={value.id} aria-pressed={sample?.id===value.id} onClick={()=>setSelected(value.id)}>{value.label}</button>)}</nav>
+    {error?<p role="alert" className="development-review__error">{error}<button onClick={()=>void load()}>重试</button></p>:null}
+    {sample&&counts?<>
+      <section className="development-review__sample" aria-live="polite"><span className="development-review__eyebrow">这一段生活 · {sample.label}</span><h2>经历怎样影响判断</h2><p>{sample.summary}</p>{sample.restart_verified?<small>重复处理与重启已核对：仍读取同一份经历。</small>:null}</section>
+      <div className="development-review__columns">
+        <aside className="life-sidebar development-review__memory"><LivedMemory memory={sample.memory} actorId={sample.memory.owner_id} journal/></aside>
+        <section className="development-review__direction"><span className="development-review__eyebrow">各自有依据</span><h2>把三个问题分开看</h2><p>听到消息可以带来接触。实际做过，才能进一步观察能力；自己愿意再做，才可能形成持续兴趣。</p>
+          <div className="development-review__stat"><strong>{counts.actual}</strong><span>件共同的实际经历</span></div>
+          <dl><div><dt>相关接触</dt><dd>{counts.contact} 条</dd></div><div><dt>核验做成</dt><dd>{counts.successful} 件</dd></div><div><dt>受条件影响</dt><dd>{counts.conditions} 件</dd></div><div><dt>操作待练习</dt><dd>{counts.performance} 件</dd></div><div><dt>角色愿望</dt><dd>{counts.ongoing?'出现持续倾向，尚未提出愿望':'尚未建立'}</dd></div><div><dt>外观与身份</dt><dd>保持当前形态</dd></div></dl>
+          <p className="development-review__note">主人促成的实践也算真实经历。缺料、环境变化和操作失误分别保留，做成不直接等于喜欢。</p><p className="development-review__note">下一阶段会在这些依据上设计主动角色愿望，再通过实际试用判断是否合适。</p>
+        </section>
+      </div>
+      <footer>隔离时钟：{new Date(sample.now).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}（样本时间） · 正式世界继续使用上海现实时间</footer>
+    </>:!error?<p className="development-review__note">正在载入隔离验收样本……</p>:null}
+  </main>;
+}
 function DevelopmentReview() {
   const [data,setData]=useState<Review|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   async function load(phase?:string) {
@@ -42,7 +78,7 @@ function DevelopmentReview() {
       </section>
       <div className="development-review__columns">
         <aside className="life-sidebar development-review__memory"><LivedMemory memory={data.memory} actorId={data.memory.owner_id} journal/></aside>
-        <section className="development-review__direction"><span className="development-review__eyebrow">角色方向读取</span><h2>经历开始有了关联</h2><p>照料苗圃与“荷叶青蛙”方向相关，但只有做过，尚不能说明想成为它。</p><div className="development-review__stat"><strong>{direction?.root_outcome_ids.length??0}</strong><span>件相关的实际经历</span></div><dl><div><dt>做完</dt><dd>{direction?.counts.completed??0} 次</dd></div><div><dt>未办成</dt><dd>{direction?.counts.failed??0} 次</dd></div><div><dt>主人促成</dt><dd>{direction?.counts.owner_linked??0} 次</dd></div><div><dt>角色愿望</dt><dd>尚未提出</dd></div><div><dt>外观与身份</dt><dd>保持当前形态</dd></div></dl><p className="development-review__note">先连接经历，下一阶段稳住生活供给，再细分兴趣、能力与自评，逐步形成主动愿望和实际试用。</p>{result?<details><summary>同一件事的编号</summary><code>{result.root_outcome_id}</code><p>任务、记忆、项目或约定只是它的不同视角，不会叠加成多次实践。</p></details>:null}</section>
+      <section className="development-review__direction"><span className="development-review__eyebrow">角色方向读取</span><h2>经历开始有了关联</h2><p>照料苗圃与“荷叶青蛙”方向相关，但只有做过，尚不能说明想成为它。</p><div className="development-review__stat"><strong>{direction?.root_outcome_ids.length??0}</strong><span>件相关的实际经历</span></div><dl><div><dt>做完</dt><dd>{direction?.counts.completed??0} 次</dd></div><div><dt>未办成</dt><dd>{direction?.counts.failed??0} 次</dd></div><div><dt>主人促成</dt><dd>{direction?.counts.owner_linked??0} 次</dd></div><div><dt>角色愿望</dt><dd>尚未提出</dd></div><div><dt>外观与身份</dt><dd>保持当前形态</dd></div></dl><p className="development-review__note">共同经历与生活供给已连接。现在分别观察兴趣、能力和自评，再为主动愿望与实际试用建立依据。</p>{result?<details><summary>同一件事的编号</summary><code>{result.root_outcome_id}</code><p>任务、记忆、项目或约定只是它的不同视角，不会叠加成多次实践。</p></details>:null}</section>
       </div>
       <footer>隔离时钟：{new Date(data.now).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}（样本时间） · 正式世界继续使用上海现实时间</footer>
     </>:<p className="development-review__note">正在连接隔离验收服务……</p>}
@@ -50,4 +86,4 @@ function DevelopmentReview() {
 }
 const root=import.meta.hot?.data.developmentReviewRoot??createRoot(document.getElementById('root')!);
 if(import.meta.hot)import.meta.hot.data.developmentReviewRoot=root;
-root.render(<DevelopmentReview/>);
+root.render(facetMode?<FacetsReview/>:<DevelopmentReview/>);

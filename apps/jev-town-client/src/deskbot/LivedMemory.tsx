@@ -40,7 +40,7 @@ export function LivedMemory({memory,actorId,journal=false}:{memory?:DeskBotLived
       <div className="life-row"><span className={`life-chip life-memory__kind--${e.kind}`}>{kinds[e.kind]}</span><time>{day(e.at)}</time></div>
       <p>{e.text}</p>
       <details><summary>为什么记得{related.length?' · 同一经历的多个视角':''}</summary>
-        <small>{e.source.task_id?'来自实际任务':e.source.commitment_id?'来自实际约定':e.source.kind==='model_choice'?'一次选择时的理解，行动尚需看结果':e.source.label??'带来源的生活记录'}{e.independent_evidence?' · 是兴趣相关的实际经历':' · 不单独改变兴趣'}</small>
+        <small>{e.source.task_id?'来自实际任务':e.source.commitment_id?'来自实际约定':e.source.kind==='model_choice'?'一次选择时的理解，行动尚需看结果':e.source.label??'带来源的生活记录'}{e.independent_evidence?' · 参与共同经历判断':' · 记作参考信息'}</small>
         {e.source.url&&/^https:\/\//.test(e.source.url)?<a href={e.source.url} target="_blank" rel="noreferrer">查看原始出处 ↗</a>:null}
         {e.evidence_ids?.length?<small>参考了 {e.evidence_ids.length} 条已有记忆</small>:null}
         {e.root_outcome_id?<small>共同经历编号：{e.root_outcome_id} · 多个记录视角只计一次结果</small>:null}

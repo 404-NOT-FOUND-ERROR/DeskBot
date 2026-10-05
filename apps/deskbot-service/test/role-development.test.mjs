@@ -69,7 +69,9 @@ test('actual outcomes observe directions without keyword inputs, role proposals 
   assert.equal(direction(read, 'chef').status, 'observing');
   assert.equal(direction(read, 'chef').unlocked, false);
   assert.equal(roles.list().length, 0);
-  assert.ok(read.directions.every(item => item.preference === null && item.capability === null && item.barriers.length === 3));
+  assert.ok(read.directions.every(item => item.preference && item.capability && item.barriers.length === 3));
+  assert.deepEqual(direction(read,'chef').capability.success_roots,['task:cook']);
+  assert.equal(direction(read,'chef').preference.topics[0].status,'unobserved');
 });
 
 test('task, project and memory views share a single root rather than amplifying practice', () => {
@@ -103,8 +105,9 @@ test('failure is an attempted outcome, not negative preference or a capability v
   const care = direction(read, 'wetland_frog');
   assert.equal(care.counts.failed, 1);
   assert.equal(care.counts.completed, 0);
-  assert.equal(care.preference, null);
-  assert.equal(care.capability, null);
+  assert.equal(care.preference.topics[0].status,'unobserved');
+  assert.deepEqual(care.capability.unknown_failure_roots,['task:failure']);
+  assert.deepEqual(care.capability.performance_failure_roots,[]);
   assert.equal(read.interpretation.failed_practice_is_negative_preference, false);
   assert.equal(read.interpretation.practice_count_is_capability, false);
 });

@@ -4,6 +4,7 @@ import { normalizeChat } from './input-store.mjs';
 import { composePrompt } from './prompt-composer.mjs';
 import { DEFAULT_TTS_PROFILE, canonicalCharacterId } from './world-definition.mjs';
 import { applyRoleTrialExpressionIntent, normalizeExpressionIntent } from './expression-intent.mjs';
+import { guardDevelopmentFacts } from './development-fact-guard.mjs';
 
 const DEFAULT_TTS_FORMAT = Object.freeze({ codec: 'pcm_s16le', sample_rate_hz: 16_000, channels: 1 });
 
@@ -250,13 +251,34 @@ export function createChatOrchestrator({
     });
     // Runtime sources inform the character's reply. They must not replace the
     // character with a collection of hard-coded question-and-answer handlers.
-    const completion = await llm.complete({
+    const rawCompletion = await llm.complete({
       userText: userEvent.payload.text,
       prompt: composed.prompt,
       state: stateResult.state,
       worldConditions,
       worldSnapshot: currentWorldSnapshot(),
     });
+    const factGuard = guardDevelopmentFacts({
+      userText: userEvent.payload.text,
+      text: rawCompletion.text,
+      worldSnapshot: currentWorldSnapshot(),
+      actorId: canonicalCharacterId(userEvent.character_id) ?? userEvent.character_id,
+    });
+    // Correct once before speech, the reply event and the outbox all consume
+    // the same text. Preserve the provider's original only in the local audit.
+    const completion = factGuard.applied ? {
+      ...rawCompletion,
+      text: factGuard.text,
+      trace: {
+        ...(rawCompletion.trace ?? {}),
+        development_fact_guard: {
+          applied: true,
+          reason: factGuard.reason,
+          topic: factGuard.topic,
+          raw_reply: rawCompletion.text,
+        },
+      },
+    } : rawCompletion;
 
     let voice = null;
     let voiceError = null;

@@ -12,6 +12,7 @@ import {createAutonomousLife} from '../src/autonomous-life.mjs';
 import {createLifeChoiceWorker} from '../src/life-choice.mjs';
 import {createDeskBotServer} from '../src/app.mjs';
 import {createOpenAiCompatibleLlm} from '../src/llm.mjs';
+import {listenOnFetchSafePort,closeTestServer} from './support/fetch-safe-server.mjs';
 const M=60000,DAY=86400000,BASE=Date.parse('2026-10-05T04:00:00Z');
 function fixture(t,{planner=true}={}) {
   const dir=mkdtempSync(join(tmpdir(),'deskbot-lived-memory-')),file=join(dir,'world.sqlite');let time=BASE,persistence=createSqlitePersistence({filename:file}),world,loop;
@@ -61,17 +62,19 @@ test('private accounts, sensor reports and custom task prose stay local while mo
   remember(w,{...fact(w,0,2),text:'自定义任务里的私人说明',model_text:'镇内照料：完成。'});
   const sent=JSON.stringify(retrieveModelMemory(w));assert.doesNotMatch(sent,/私人|物理麦克风/);assert.match(sent,/镇内照料/);assert.equal(w.memory.episodes.length,3);
 });
-test('growth requires distinct days and contexts, caps same-day repetition, and reverses after setbacks',t=>{
-  const h=fixture(t),w=h.world.get();for(let i=0;i<20;i++)remember(w,fact(w,0,i));let interest=w.memory.actors['shaping-001'].interests.care;
-  assert.equal(interest.successes,2);assert.equal(interest.stage,'noticing');
-  for(let day=1;day<7;day++)for(let i=0;i<2;i++)remember(w,fact(w,day,i));assert.equal(interest.stage,'familiar');assert.equal(interest.bonus,12);
-  const choices=influenceRememberedChoices(w,own(w),[{goal:'water',score:30,reason:'照料',available:true}]);assert.equal(choices[0].score,42);
-  for(let day=7;day<11;day++)for(let i=0;i<2;i++)remember(w,fact(w,day,i,{outcome:'failed',text:'实际照料失败，材料不足'}));assert.equal(interest.stage,'noticing');assert.equal(interest.bonus,0);
+test('legacy success-minus-setback interest remains preserved and no longer changes candidate preference',t=>{
+  const h=fixture(t),w=h.world.get();
+  const legacy={topic:'care',stage:'familiar',bonus:12,successes:14,setbacks:0,days:['2026-10-01'],evidence_ids:[]};
+  w.memory.actors['shaping-001'].interests.care=structuredClone(legacy);
+  for(let day=0;day<11;day++)for(let i=0;i<2;i++)remember(w,fact(w,day,i,{outcome:day>6?'failed':'completed'}));
+  assert.deepEqual(w.memory.actors['shaping-001'].interests.care,legacy);
+  const choices=influenceRememberedChoices(w,own(w),[{goal:'water',score:30,reason:'照料',available:true}]);
+  assert.equal(choices[0].score,30);assert.equal(choices[0].memory_bonus,0);
   assert.equal(remember(w,fact(w,10,1,{outcome:'failed'})),false);assert.equal(w.protagonist.character_id,'shaping-001');
 });
-test('repeating one context and hearing a story do not promote an interest',t=>{
+test('repeating old memory prose and hearing a story do not promote a new interest',t=>{
   const h=fixture(t),w=h.world.get();for(let day=0;day<8;day++)for(let i=0;i<2;i++)remember(w,fact(w,day,i,{source:{kind:'canonical_task',activity_id:'water-bed'}}));
-  assert.equal(w.memory.actors['shaping-001'].interests.care.stage,'noticing');
+  assert.equal(w.memory.actors['shaping-001'].interests.care,undefined);
   for(let i=0;i<20;i++)remember(w,{...fact(w,9,i),origin_id:`hearsay:${i}`,kind:'hearsay',topic:'craft'});assert.equal(w.memory.actors['shaping-001'].interests.craft,undefined);
 });
 test('model chooses a legal goal, the real task executes, and its explanation stays an interpretation',async t=>{
@@ -84,7 +87,7 @@ test('model chooses a legal goal, the real task executes, and its explanation st
 test('model memory references must come from supplied actor memories and never count as fresh evidence',async t=>{
   const h=fixture(t);h.save(w=>remember(w,{...fact(w,0,0),text:'上次我整理苗床完成了。'}));h.loop.tick();const memoryId=request(h.world.get()).memories[0].id;
   await h.worker({id:'test-model',complete:async()=>({model:'test',text:JSON.stringify({goal:'interest:moss-sprout-garden',reason:'记得上次照料的结果，想再观察一会儿。',memory_ids:[memoryId]})})}).tick();
-  const w=h.world.get(),derived=w.memory.episodes.find(e=>e.kind==='personal_interpretation');assert.deepEqual(derived.evidence_ids,[memoryId]);assert.equal(w.memory.actors['shaping-001'].interests.care.successes,1);
+  const w=h.world.get(),derived=w.memory.episodes.find(e=>e.kind==='personal_interpretation');assert.deepEqual(derived.evidence_ids,[memoryId]);assert.equal(w.memory.actors['shaping-001'].interests.care,undefined);
 });
 for(const [name,answer] of [['unknown goal',{goal:'teleport:moon',reason:'去月球',memory_ids:[]}],['canonical patch',{goal:'interest:backlit-grove',reason:'去林间',memory_ids:[],identity:'frog'}],['invented memory',{goal:'interest:backlit-grove',reason:'去林间',memory_ids:['fake-memory']}],['malformed',null]])test(`invalid model ${name} falls back without changing identity or materials`,async t=>{
   const h=fixture(t);h.loop.tick();await h.worker({id:'test-model',complete:async()=>({model:'test',text:answer?JSON.stringify(answer):'```json {} ```'})}).tick();const w=h.world.get();assert.equal(own(w).plan.decision.source,'fallback');assert.equal(w.memory.episodes.some(e=>e.kind==='personal_interpretation'),false);assert.equal(w.protagonist.character_id,'shaping-001');assert.equal(w.living.objects['seedling-rack'].stock.trays,2);
@@ -134,7 +137,7 @@ test('choice requests have a native short timeout, JSON mode and bounded tokens;
   await llm.complete({prompt:'JSON choice',purpose:'life_choice'});await llm.complete({prompt:'normal dialogue'});assert.deepEqual(bodies[0].response_format,{type:'json_object'});assert.equal(bodies[0].max_tokens,512);assert.equal(bodies[1].response_format,undefined);
 });
 test('memory read API is pure and public inputs cannot inject a model choice or canonical memory',async t=>{
-  const h=fixture(t),server=createDeskBotServer({persistentWorld:h.world,now:h.now,websocket:false});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));const base=`http://127.0.0.1:${server.address().port}`,before=h.world.get();
+  const h=fixture(t),{server,baseUrl:base}=await listenOnFetchSafePort(()=>createDeskBotServer({persistentWorld:h.world,now:h.now,websocket:false}));t.after(()=>closeTestServer(server));const before=h.world.get();
   const response=await fetch(base+'/api/life/memory');assert.equal(response.status,200);assert.equal((await response.json()).identity_preserved,true);assert.deepEqual(h.world.get(),before);
   const posted=await fetch(base+'/api/event',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({event_id:'forged',type:'world.mutation',source:'life-choice-engine',character_id:'shaping-001',occurred_at:h.now().toISOString(),payload:{action:'resolve_life_choice',actor_id:'shaping-001',text:'{}'}})});assert.equal(posted.status,403);
 });

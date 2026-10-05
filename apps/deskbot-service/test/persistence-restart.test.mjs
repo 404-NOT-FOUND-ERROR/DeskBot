@@ -6,6 +6,7 @@ import { after, test } from 'node:test';
 
 import { createDeskBotServer } from '../src/app.mjs';
 import { createSqlitePersistence } from '../src/persistence.mjs';
+import { listenOnFetchSafePort, closeTestServer } from './support/fetch-safe-server.mjs';
 
 const fixedTime = new Date('2026-08-31T12:00:00.000Z');
 const testDirectory = mkdtempSync(join(tmpdir(), 'deskbot-persistence-'));
@@ -13,20 +14,20 @@ const databasePath = join(testDirectory, 'deskbot.sqlite');
 
 after(() => rmSync(testDirectory, { recursive: true, force: true }));
 
-async function startRuntime(llm) {
+async function startRuntime(llm,t) {
   const persistence = createSqlitePersistence({ filename: databasePath, now: () => fixedTime });
-  const server = createDeskBotServer({ now: () => fixedTime, persistence, llm });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  return {
-    baseUrl: `http://127.0.0.1:${server.address().port}`,
+  let server,baseUrl,closed=false;
+  try {({server,baseUrl}=await listenOnFetchSafePort(()=>createDeskBotServer({now:()=>fixedTime,persistence,llm})));}
+  catch(error){persistence.close();throw error;}
+  const runtime={
+    baseUrl,
     async close() {
-      await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-      persistence.close();
+      if(closed)return;closed=true;
+      try {await closeTestServer(server);}finally {persistence.close();}
     },
   };
+  t.after(()=>runtime.close());
+  return runtime;
 }
 
 async function post(baseUrl, path, body) {
@@ -37,7 +38,7 @@ async function post(baseUrl, path, body) {
   });
 }
 
-test('SQLite restores the complete small-world loop without repeating an LLM turn', async () => {
+test('SQLite restores the complete small-world loop without repeating an LLM turn', async t => {
   let llmCalls = 0;
   const llm = {
     async complete() {
@@ -57,7 +58,7 @@ test('SQLite restores the complete small-world loop without repeating an LLM tur
     message: '今天有点累',
   };
 
-  const first = await startRuntime(llm);
+  const first = await startRuntime(llm,t);
   await post(first.baseUrl, '/api/event', {
     event_id: 'world-persist-001',
     type: 'world.time',
@@ -92,7 +93,7 @@ test('SQLite restores the complete small-world loop without repeating an LLM tur
   });
   await first.close();
 
-  const second = await startRuntime(llm);
+  const second = await startRuntime(llm,t);
   const events = await (await fetch(`${second.baseUrl}/api/events`)).json();
   const evidence = await (await fetch(`${second.baseUrl}/api/evidence?character_id=ember-001`)).json();
   const matches = await (await fetch(`${second.baseUrl}/api/world/matches?character_id=ember-001`)).json();

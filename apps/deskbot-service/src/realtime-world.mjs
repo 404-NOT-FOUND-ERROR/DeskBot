@@ -197,6 +197,8 @@ export function controlWorldTask(world, payload, at) {
     task.status = 'running';
   } else {
     task.status = 'cancelled';
+    task.failure_code = 'activity_cancelled';
+    task.failure_classification = 'cancelled';
     task.finished_at = timestamp;
     if (task.activity_id) releaseLivingReservation(world, task, timestamp);
   }
@@ -252,7 +254,10 @@ export function advanceWorldTask(world, payload, at) {
       else error = activityResult.reason;
     } else task.status = 'completed';
   }
-  if (error) { task.status = 'failed'; task.failure_reason = error; if (task.activity_id) releaseLivingReservation(world, task, timestamp); }
+  if (error) { task.status = 'failed'; task.failure_reason = error;
+    task.failure_code = activityResult?.code ?? error;
+    task.failure_classification = activityResult?.classification ?? (['location_changed', 'route_changed', 'passage_closed', 'location_closed', 'location_not_reachable'].includes(error) ? 'route' : 'unclassified');
+    if (task.activity_id) releaseLivingReservation(world, task, timestamp); }
   if (task.status !== 'running') {
     finishLifeTask(world, task, dueAt);
     task.finished_at = timestamp;

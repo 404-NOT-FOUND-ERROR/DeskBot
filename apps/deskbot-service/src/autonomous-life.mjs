@@ -11,6 +11,7 @@ import { influenceRememberedChoices } from './lived-memory.mjs';
 import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote } from './life-choice.mjs';
 import { projectCandidates, settleResidentProjects, updateProjectScheduling } from './resident-projects.mjs';
 import { influenceBodyChoices, recordBodyLifeDecision } from './body-perception.mjs';
+import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -48,6 +49,46 @@ function mealTurn(world,id) {
   return !people.length||people[0].actor_id===id;
 }
 
+const observationTopic=(destination,profile)=>destination==='moss-sprout-garden'?'care'
+  :destination==='warm-pot-courtyard'?'cook'
+  :destination==='spare-parts-house'?(profile.interests.includes('repair')?'repair':'craft')
+  :['backlit-grove','echo-waterside','tidal-old-road','fog-lamp-square','lamp-street-homes','whisper-market','shaping-field-desk'].includes(destination)?'explore':null;
+
+function addDiscretionaryPractice(world,state,at,result,add) {
+  if(state.energy<.55||state.appetite>.5||result.some(c=>c.available&&c.score>=50))return;
+  const facets=developmentFacetsReadModel(world,{actorId:state.actor_id,at});
+  if(!facets.enabled)return;
+  const date=localWorldDate(at,world.clock.time_zone).date;
+  if((world.memory?.development?.records??[]).some(r=>r.actor_ids.includes(state.actor_id)&&r.activity_id
+    &&r.causes?.motivation?.kind==='self_continuation'&&localWorldDate(r.at,world.clock.time_zone).date===date))return;
+  const topics=(facets.actors.find(a=>a.actor_id===state.actor_id)?.topics??[])
+    .filter(t=>(t.contact?.count??0)+(t.interest.active_roots?.length??0)+(t.interest.invited_roots?.length??0)>0)
+    .sort((a,b)=>(b.interest.bonus??0)-(a.interest.bonus??0)||a.topic.localeCompare(b.topic));
+  const count=(id,resource)=>stock(world,id,resource)+carried(world,state.actor_id,resource);
+  for(const topic of topics) {
+    let recipe=null,build=null;
+    const bed=world.living.objects['garden-bed'];
+    if(topic.topic==='care'&&bed.quantity>0&&bed.health>=.65&&bed.health<.95&&bed.moisture>=.32&&bed.moisture<=.72
+      &&stock(world,'seedling-rack','water')>=6)recipe='tend-bed';
+    if(topic.topic==='craft'&&count('seedling-rack','trays')<2&&stock(world,'parts-drawers','wood')>=3&&stock(world,'parts-drawers','fasteners')>=5)recipe='craft-tray';
+    if(topic.topic==='cook'&&stock(world,'shared-table','rations')>=6&&stock(world,'shared-table','rations')<=12
+      &&stock(world,'trial-stove','water')>=3&&(count('seedling-rack','moss')>=4||count('seedling-rack','light_fruit')>=4)) {
+      recipe='cook';build=()=>cookAndStoreSteps(world,state.actor_id);
+    }
+    if(!recipe||result.some(c=>c.available&&c.steps?.some(s=>s.kind==='activity'&&s.activity_id===recipe)))continue;
+    const activity=ACTIVITIES.find(a=>a.activity_id===recipe);
+    const goal=`continue:${topic.topic}`;
+    add(goal,topic.topic==='cook'?'再试一次做饭并放到长桌':activity.title,
+      `手头的事和基本需要已经留好余地，想把之前关注的${topic.label}实际试一小次。`,31,
+      build??(()=>activitySteps(world,state.actor_id,recipe)));
+    const candidate=result.find(c=>c.goal===goal);
+    if(candidate)Object.assign(candidate,{development_topic:topic.topic,discretionary_practice:true});
+    // One attempted plan per decision and one enacted practice per local day.
+    // A blocked preparation has no settled outcome and awards no evidence.
+    if(candidate?.available)return;
+  }
+}
+
 function candidates(world, state, at) {
   const id=state.actor_id, profile=(world.resident_life?RESIDENT_PROFILES[id]:null)??PROFILE[id]??{interests:['explore'],places:[actor(world,id).location_id],rest:actor(world,id).location_id,quiet:'在这里待一会儿'};
   const bed=world.living.objects['garden-bed'], objects=world.living.objects;
@@ -57,7 +98,8 @@ function candidates(world, state, at) {
     try { result.push({goal,title,reason,score,steps:checkSupplyClaim(world,at,id,build()),available:true}); }
     catch(error) { result.push({goal,title,reason,score,available:false,blocked_reason:error.message}); }
   }
-  function activity(goal,id,reason,score){add(goal,ACTIVITIES.find(r=>r.activity_id===id).title,reason,score,()=>activitySteps(world,state.actor_id,id));}
+  function activity(goal,id,reason,score){add(goal,ACTIVITIES.find(r=>r.activity_id===id).title,reason,score,()=>activitySteps(world,state.actor_id,id));
+    const candidate=result.find(c=>c.goal===goal);if(candidate)Object.assign(candidate,{activity_id:id,development_topic:activityTopic(id)});}
   const night=minute>=1380||minute<360;
   if(state.energy<.4 || night) add('rest','休息一会儿',night?'天晚了，先留出休息的时间。':'有些累了，先恢复精神。',state.energy<.2?150:night?115:100,()=>{
     const destination=world.locations.some(l=>l.location_id===profile.rest)?profile.rest:actor(world,id).location_id;
@@ -107,12 +149,15 @@ function candidates(world, state, at) {
     if(choice)Object.assign(choice,{project_id:project.project_id,project_stage_id:project.project_stage_id,activity_id:project.activity_id});
   }
   updateProjectScheduling(world,id,at,result.filter(c=>c.project_id));
+  addDiscretionaryPractice(world,state,at,result,add);
   const index=hash(`${id}:${localWorldDate(at,world.clock.time_zone).date}:${Math.floor(minute/180)}`)%profile.places.length;
   for(const destination of world.memory ? profile.places : [profile.places[index]]) {
   add(`interest:${destination}`,world.memory?`${world.locations.find(l=>l.location_id===destination)?.name??destination} · ${profile.quiet}`:profile.quiet,'留点时间做自己感兴趣的事。',30,()=>{
     if(!findWorldPath(world,actor(world,id).location_id,destination))throw planError('这条路暂时不通。');
     return [...(actor(world,id).location_id===destination?[]:[{kind:'travel',location_id:destination}]),{kind:'observe',title:profile.quiet,duration_seconds:900}];
   });
+  const observation=result.find(c=>c.goal===`interest:${destination}`);
+  if(observation)observation.development_topic=observationTopic(destination,profile);
   }
   add('quiet-rest','在这里歇一歇','眼前能做的事暂时有限，先歇一会儿。',5,()=>[{kind:'rest',title:'在这里歇一歇',duration_seconds:1800}]);
   return influenceRememberedChoices(world,state,influenceBodyChoices(world,state,at,influenceLifeChoices(world,state,at,profile,result)));
@@ -152,6 +197,9 @@ function executeStep(world,state,at,eventId) {
     memory_ids:[...(plan.decision?.memory_ids??[])]};
   stored.life_source_context=(world.refraction?.records??[]).filter(r=>stored.life_source_ids.includes(r.id))
     .map(r=>({record_id:r.id,event_id:r.event_id,origin_id:r.origin_id,category:r.category,attested:r.attested}));
+  stored.life_motivation={...structuredClone(plan.motivation??{kind:'unknown',basis_score:null}),
+    facet_root_ids:[...(plan.motivation?.facet_root_ids??[])].slice(-16)};
+  if(step.kind==='observe'&&['care','craft','repair','cook','explore','connection'].includes(plan.development_topic))stored.life_topic=plan.development_topic;
   for(const record of world.refraction?.records??[])if(plan.source_ids?.includes(record.id))record.source_task_ids=[...(record.source_task_ids??[]),task.task_id].slice(-16);
   plan.task_id=task.task_id;plan.status='executing';
   if(id!==world.protagonist.character_id && step.kind!=='travel')actor(world,id).status=step.kind==='rest'?'正在休息':task.title;
@@ -193,6 +241,10 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.sequence++;
       state.plan={plan_id:`life-plan:${state.actor_id}:${state.sequence}`,goal:choice.goal,title:choice.title,reason:choice.reason,steps:choice.steps,index:0,status:'planned',task_id:null,created_at:at};
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
+      const invited=(world.refraction?.records??[]).some(r=>choice.source_ids?.includes(r.id)&&r.attested===true&&['dialogue','user','agent'].includes(r.category));
+      state.plan.motivation={kind:invited?'invited':choice.goal.startsWith('interest:')||choice.discretionary_practice?'self_continuation':'need',
+        basis_score:choice.score-(choice.memory_bonus??0),facet_root_ids:[...(choice.facet_root_ids??[])].slice(-16)};
+      state.plan.development_topic=choice.development_topic??null;
       if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
       recordBodyLifeDecision(world,state,choice,at);

@@ -2,21 +2,18 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
 import { createDeskBotServer } from '../src/app.mjs';
+import { listenOnFetchSafePort, closeTestServer } from './support/fetch-safe-server.mjs';
 
 const fixedTime = new Date('2026-08-21T00:00:00.000Z');
-const server = createDeskBotServer({ now: () => fixedTime });
+let server;
 let baseUrl;
 
 before(async () => {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  ({server,baseUrl}=await listenOnFetchSafePort(()=>createDeskBotServer({now:()=>fixedTime})));
 });
 
 after(async () => {
-  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  await closeTestServer(server);
 });
 
 test('chat output is available through the device outbox and ACK is retry-safe', async () => {

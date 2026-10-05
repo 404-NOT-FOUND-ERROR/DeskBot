@@ -2,7 +2,9 @@
 
 当前产品目标：让同一个桌边个体在伴生奇幻世界持续生活；多源输入和主人互动影响其选择，实际实践逐渐形成兴趣与角色愿望，再通过可逆试用改变生活角色、外观和表达。形态与职业可以组合，保留识别锚点，成功、喜欢、能力和想成为各有含义。后续开发按 [v0.5 九阶段管线](research/development-roadmap-v0.5.md) 推进。
 
-**角色发展第 1 阶段（2026-10-05）：** 实际任务、居民项目、约定与记忆已共享结果根；原角色方向能读取相同实践，主人促成的真实行动也可追溯。重复视图、重复输入和重启不叠加次数。生活侧栏展示前因、行动和结果，`/development-review.html` 提供五种隔离样本。当前是证据连接与方向观察，能力、主动愿望和实际试用留待后续阶段。见 [验收图与实验效果](research/milestones/role-development-stage1.md) 和 [共同证据规则](research/world/development-evidence-v1.md)。
+**角色发展第 3 阶段（2026-10-06）：** 同一批经历分别呈现接触、主动继续、受邀实践、具体配方能力和规则自评，连接正常生活候选、有限模型摘要和原侧栏。旧兴趣分保留为历史记录，条件失败不扣成能力不足；主人促成的真实实践也可作为能力依据。三日 SQLite 隔离实验与重载已验证，尚未建立主动角色愿望。见 [验收与实验边界](research/milestones/role-development-stage3.md) 和 [分维度规则](research/world/development-facets-v1.md)，独立页面为 `/development-review.html?sample=facets`。
+
+**角色发展第 1 阶段（2026-10-05）：** 实际任务、居民项目、约定与记忆已共享结果根；原角色方向能读取相同实践，主人促成的真实行动也可追溯。重复视图、重复输入和重启不叠加次数。生活侧栏展示前因、行动和结果，`/development-review.html` 提供五种隔离样本。能力分维度已在第 3 阶段接入，主动愿望和实际试用留待后续阶段。见 [验收图与实验效果](research/milestones/role-development-stage1.md) 和 [共同证据规则](research/world/development-evidence-v1.md)。
 
 **角色发展第 2 阶段（2026-10-05）：** 十三人的生活供给增加有限光果来源、实际采集和炖餐，整锅饭进入长桌，采收与厨房错开安排，送饭约定需实际吃完才兑现。地图显示枝上果实、搬运篮、饭碗和正在工作的锅气，侧栏区分可取、携带与预留。原苗床、浮圃、项目和共同经历继续使用；没有补发旧存档食物。见 [供给验收与实验边界](research/milestones/community-supply-stage2.md)，独立规则回放为 `/life-review.html?sample=supply`。
 

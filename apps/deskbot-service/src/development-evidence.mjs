@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { ACTIVITIES, LIVING_RULE_VERSION } from './living-resources.mjs';
 import { goalTopic } from './lived-memory.mjs';
+import { activityTopic, syncDevelopmentFacets, developmentFacetsReadModel } from './development-facets.mjs';
 
 // A projection of already settled world results, not another reward engine.
 export const DEVELOPMENT_VERSION = 'deskbot.development-evidence.v1';
@@ -22,6 +23,12 @@ function safeDecision(decision) {
   return { source: string(decision.source), model: string(decision.model), request_id: string(decision.request_id), memory_ids: strings(decision.memory_ids) };
 }
 
+function safeMotivation(value) {
+  if (!value || !['need', 'self_continuation', 'invited', 'unknown'].includes(value.kind)) return { kind: 'unknown', facet_root_ids: [] };
+  return { kind: value.kind, ...(Number.isFinite(value.basis_score) ? { basis_score: value.basis_score } : {}),
+    facet_root_ids: strings(value.facet_root_ids).filter(id => /^(task|commitment):/.test(id)).slice(0, 16) };
+}
+
 function sourceDetails(w, task, ids) {
   return ids.map(recordId => {
     // Execution-time metadata survives short input retention. Current references
@@ -41,13 +48,15 @@ function taskCauses(w, task) {
     || sources.some(s => s.attested && ['user', 'agent'].includes(s.category));
   const unresolved = sources.some(s => !s.attested || s.category === 'unknown');
   return { source_record_ids: ids, source_event_ids: strings([task.cause_event_id, ...sources.flatMap(s => [s.event_id, s.origin_id])]), sources,
-    plan_id: string(task.life_plan_id), decision: safeDecision(task.life_decision),
+    plan_id: string(task.life_plan_id), decision: safeDecision(task.life_decision), motivation: safeMotivation(task.life_motivation),
     trigger: invited ? 'invited' : !unresolved && task.origin === 'autonomous_life' && Array.isArray(task.life_source_ids) ? 'own' : 'unknown' };
 }
 
-const unknownCauses = () => ({ source_record_ids: [], source_event_ids: [], sources: [], plan_id: null, decision: null, trigger: 'unknown' });
-function failureFor(outcome, reason, code = null) {
-  return outcome === 'failed' || outcome === 'cancelled' ? { reason: string(reason)?.slice(0, 400) ?? null, code: string(code), classification: 'unclassified' } : null;
+const unknownCauses = () => ({ source_record_ids: [], source_event_ids: [], sources: [], plan_id: null, decision: null, trigger: 'unknown', motivation: { kind: 'unknown', facet_root_ids: [] } });
+function failureFor(outcome, reason, code = null, classification = null) {
+  const categories = new Set(['resource', 'condition', 'route', 'coordination', 'performance', 'unclassified']);
+  return outcome === 'failed' || outcome === 'cancelled' ? { reason: string(reason)?.slice(0, 400) ?? null, code: string(code),
+    classification: outcome === 'cancelled' ? 'cancelled' : categories.has(classification) ? classification : 'unclassified' } : null;
 }
 
 function titleFor(activityId, kind, action) {
@@ -66,13 +75,17 @@ function fromTask(w, task, at, registered) {
   const date = task.completion?.due_at ?? task.finished_at;
   if (!string(task.task_id) || !registered.has(task.actor_id) || !TERMINAL_TASKS.has(task.status) || !validAt(date, at)) return null;
   const r = recordBase(rootForTask(task.task_id), [task.actor_id], date, task.status,
-    { kind: 'canonical_task', task_id: task.task_id, commitment_id: string(task.social_commitment_id), task_kind: string(task.kind) });
+    { kind: 'canonical_task', task_id: task.task_id, commitment_id: string(task.social_commitment_id), task_kind: string(task.kind),
+      life_action: ['observe', 'rest'].includes(task.life_action) ? task.life_action : null });
   r.activity_id = string(task.activity_id);
   r.title = titleFor(r.activity_id, task.kind, task.life_action);
   // The new finite gathering outcome joins the existing common ledger. Its
   // enacted recipe supplies the topic; a food-preparation plan is not cooking
-  // competence and does not change the legacy interest scoring in this stage.
-  r.topic = task.activity_id === 'gather-light-fruit' ? 'care' : goalTopic(task.life_goal ?? '') ?? goalTopic(task.activity_id ?? '');
+  // competence. An observation needs an explicit authored topic; an interest
+  // plan title cannot fill an unknown place's missing observation meaning.
+  r.topic = r.activity_id ? activityTopic(r.activity_id) : task.life_action === 'observe'
+    ? ['care', 'craft', 'repair', 'cook', 'explore', 'connection'].includes(task.life_topic) ? task.life_topic : null
+    : goalTopic(task.life_goal ?? '');
   r.location_id = string(task.to_location_id ?? task.location_id ?? task.destination_location_id);
   r.project_ids = strings([task.project_id]);
   r.causes = taskCauses(w, task);
@@ -87,7 +100,7 @@ function fromTask(w, task, at, registered) {
     completion_effect: string(task.completion?.effect ?? task.completion_effect) ?? 'unknown' };
   if (task.project_id) r.views.project_stages.push({ project_id: task.project_id, stage_id: string(task.project_stage_id) });
   if (task.social_commitment_id) r.views.commitment_ids.push(task.social_commitment_id);
-  r.failure = failureFor(r.outcome, task.failure_reason, task.failure_code);
+  r.failure = failureFor(r.outcome, task.failure_reason, task.failure_code, task.failure_classification);
   return r;
 }
 
@@ -99,7 +112,7 @@ function fromProject(w, project, history, at, registered) {
     { kind: 'resident_project', task_id: history.task_id, commitment_id: null, task_kind: null, project_id: project.project_id });
   r.activity_id = string(history.activity_id ?? evidence?.activity_id);
   r.title = titleFor(r.activity_id);
-  r.topic = goalTopic(r.activity_id ?? '') ?? goalTopic(project.project_id ?? '');
+  r.topic = r.activity_id ? activityTopic(r.activity_id) : goalTopic(project.project_id ?? '');
   r.location_id = string(history.location_id);
   r.project_ids = strings([project.project_id]);
   r.effect.practice = Boolean(r.topic && ACTIVITIES.some(a => a.activity_id === r.activity_id));
@@ -119,13 +132,15 @@ function fromEpisode(episode, at, registered) {
   const actorIds = strings(episode.actor_ids).filter(id => registered.has(id));
   if (!actorIds.length) return null;
   const r = recordBase(root, actorIds, episode.at, episode.outcome,
-    { kind: 'legacy_memory_fact', task_id: string(s.task_id), commitment_id: string(s.commitment_id), task_kind: null, original_kind: s.kind });
+    { kind: 'legacy_memory_fact', task_id: string(s.task_id), commitment_id: string(s.commitment_id), task_kind: null, original_kind: s.kind,
+      life_action: ['observe', 'rest'].includes(s.life_action) ? s.life_action : null });
   r.activity_id = string(s.activity_id);
   r.title = s.kind === 'canonical_commitment' ? '实际约定结果' : titleFor(r.activity_id);
-  r.topic = r.activity_id === 'gather-light-fruit' ? 'care' : string(episode.topic) ?? goalTopic(r.activity_id ?? s.project_id ?? '');
+  r.topic = r.activity_id ? activityTopic(r.activity_id) : string(episode.topic) ?? goalTopic(s.project_id ?? '');
   r.location_id = string(episode.location_id);
   r.project_ids = strings([s.project_id]);
   r.causes.plan_id = string(s.plan_id);
+  r.causes.motivation = safeMotivation(s.motivation);
   r.effect = { practice: Boolean(s.kind !== 'canonical_commitment' && r.topic && ACTIVITIES.some(a => a.activity_id === r.activity_id)),
     relationship: s.kind === 'canonical_commitment', legacy_interest_eligible: episode.independent_evidence === true,
     legacy_interest_known: ['canonical_task', 'canonical_commitment'].includes(s.kind) && typeof episode.independent_evidence === 'boolean',
@@ -134,7 +149,7 @@ function fromEpisode(episode, at, registered) {
   if (s.project_id) r.views.project_stages.push({ project_id: s.project_id, stage_id: string(s.stage_id) });
   if (s.commitment_id) r.views.commitment_ids = [s.commitment_id];
   r.views.linked_task_roots = strings(s.task_ids).map(rootForTask);
-  r.failure = failureFor(r.outcome, null);
+  r.failure = failureFor(r.outcome, null, s.failure_code, s.failure_classification);
   return r;
 }
 
@@ -168,6 +183,7 @@ function mergeRecord(old, incoming) {
   const best = (sourceRank[incoming.source.kind] ?? 0) > (sourceRank[old.source.kind] ?? 0) ? incoming : old;
   const other = best === old ? incoming : old;
   const r = copy(best);
+  r.source.life_action ??= other.source.life_action ?? null;
   r.historical_import = old.historical_import;
   r.first_observed_at = old.first_observed_at;
   // Canonical task/commitment participants are authoritative. A historical
@@ -185,12 +201,16 @@ function mergeRecord(old, incoming) {
   causes.sources = unionObjects(old.causes.sources.filter(s => s.category !== 'unknown'), incoming.causes.sources.filter(s => s.category !== 'unknown'), s => s.record_id);
   causes.sources = unionObjects(causes.sources, [...old.causes.sources, ...incoming.causes.sources], s => s.record_id);
   causes.plan_id ??= other.causes.plan_id; causes.decision ??= other.causes.decision;
+  causes.motivation ??= { kind: 'unknown', facet_root_ids: [] };
+  if (causes.motivation.kind === 'unknown' && other.causes.motivation?.kind && other.causes.motivation.kind !== 'unknown') causes.motivation = copy(other.causes.motivation);
   if (causes.trigger === 'unknown' && other.causes.trigger !== 'unknown') causes.trigger = other.causes.trigger;
   for (const key of ['memory_ids', 'commitment_ids', 'linked_task_roots']) r.views[key] = strings([...old.views[key], ...incoming.views[key]]);
   r.views.project_stages = unionObjects(old.views.project_stages, incoming.views.project_stages, s => `${s.project_id}:${s.stage_id ?? ''}`);
   r.views.conflicting_outcomes = unionObjects(old.views.conflicting_outcomes ?? [], incoming.views.conflicting_outcomes ?? [], s => `${s.source_kind}:${s.outcome}`);
   if (old.outcome !== incoming.outcome) r.views.conflicting_outcomes = unionObjects(r.views.conflicting_outcomes, [{ source_kind: other.source.kind, outcome: other.outcome }], s => `${s.source_kind}:${s.outcome}`);
   if (!r.failure?.reason && other.failure?.reason && best.outcome === other.outcome) r.failure = copy(other.failure);
+  if (r.failure?.classification === 'unclassified' && other.failure?.code && other.failure.classification !== 'unclassified' && best.outcome === other.outcome)
+    r.failure = { ...r.failure, code: other.failure.code, classification: other.failure.classification };
   return r;
 }
 
@@ -199,7 +219,7 @@ export function syncDevelopmentEvidence(w, at) {
   const fresh = !w.memory.development;
   w.memory.development ??= { schema: DEVELOPMENT_VERSION, installed_at: at, revision: 0, records: [], retention: { max_records: MAX_RECORDS, counts_scope: 'retained_unique_root_outcomes' } };
   const development = w.memory.development;
-  const before = JSON.stringify(development.records), registered = actorsIn(w);
+  const before = JSON.stringify(development.records), beforeContacts = JSON.stringify(development.contacts ?? []), registered = actorsIn(w);
   const records = new Map(development.records.map(r => [r.root_outcome_id, copy(r)]));
   let added = 0;
   function add(candidate) {
@@ -224,10 +244,28 @@ export function syncDevelopmentEvidence(w, at) {
     const record = records.get(rootForTask(taskId));
     if (record) record.views.commitment_ids = strings([...record.views.commitment_ids, c.id]);
   }
-  development.records = [...records.values()].sort((a, b) => a.at.localeCompare(b.at) || a.root_outcome_id.localeCompare(b.root_outcome_id)).slice(-MAX_RECORDS);
-  const changed = fresh || before !== JSON.stringify(development.records);
+  development.records = [...records.values()].map(record => {
+    // Stage 3 reinterprets the enacted activity, never its enclosing plan title.
+    // The result root, original causal metadata and retained facts are preserved.
+    if (record.activity_id) { record.topic = activityTopic(record.activity_id); if (!record.topic) record.effect.practice = false; }
+    return record;
+  }).sort((a, b) => a.at.localeCompare(b.at) || a.root_outcome_id.localeCompare(b.root_outcome_id)).slice(-MAX_RECORDS);
+  // Received topics stay in the same development namespace, but are contact
+  // references rather than task outcomes. No private text is copied or rewarded.
+  const contacts = new Map((development.contacts ?? []).map(c => [c.source_record_id, c]));
+  const suggestionTopics = { water: 'care', tend: 'care', tray: 'craft', waterside: 'explore', grove: 'explore' };
+  for (const r of w.refraction?.records ?? []) {
+    if (r.attested !== true || r.freshness !== 'fresh' || !validAt(r.received_at, at) || contacts.has(r.id)) continue;
+    const topic = suggestionTopics[r.suggestion] ?? (r.category === 'external' && r.meaning === 'sourced_report' ? 'explore' : null);
+    if (!topic || !['dialogue', 'external', 'agent'].includes(r.category)) continue;
+    contacts.set(r.id, { source_record_id: r.id, actor_id: w.protagonist.character_id, topic, at: r.received_at,
+      category: r.category === 'dialogue' ? 'user' : r.category, expires_at: string(r.expires_at) });
+  }
+  development.contacts = [...contacts.values()].sort((a, b) => a.at.localeCompare(b.at) || a.source_record_id.localeCompare(b.source_record_id)).slice(-384);
+  const changed = fresh || before !== JSON.stringify(development.records) || beforeContacts !== JSON.stringify(development.contacts);
   if (changed) development.revision++;
-  return { enabled: true, installed: fresh, changed, added_roots: added, revision: development.revision };
+  const facets = syncDevelopmentFacets(w, at);
+  return { enabled: true, installed: fresh, changed: changed || facets.changed, added_roots: added, revision: development.revision };
 }
 
 export function developmentReadModel(w, { actorId = null, limit = 48 } = {}) {
@@ -259,8 +297,9 @@ export function developmentReadModel(w, { actorId = null, limit = 48 } = {}) {
   }
   return { schema: DEVELOPMENT_VERSION, enabled: Boolean(development), installed_at: development?.installed_at ?? null, revision: development?.revision ?? 0, owner_id: ownerId,
     counts, actors: [...actors.values()].sort((a, b) => a.actor_id.localeCompare(b.actor_id)), recent: copy(requestedLimit ? records.slice(-requestedLimit).reverse() : []),
+    facets: developmentFacetsReadModel(w, { actorId }),
     coverage: { retention: copy(development?.retention ?? { max_records: MAX_RECORDS, counts_scope: 'retained_unique_root_outcomes' }),
       historical_import_roots: counts.historical_import,
       causality_unknown_roots: records.filter(r => r.causes.trigger === 'unknown' || r.causes.sources.some(s => s.category === 'unknown')).length,
-      limitations: ['统计是保留的唯一结果及其连接数量，不是经验值、技能等级或兴趣成熟度。', '历史导入只使用仍保留的任务、项目与记忆；缺失的旧经历和前因保持未知。', '观察、出行和休息保留事实，但本阶段不记为产生资源或设施变化的实践。', '失败原因保持原事务记录，尚不推断不喜欢某事或个人能力不足。', '来源只展示类别和编号，不复制私人输入、模型理由或自定义活动说明。'] } };
+      limitations: ['统计是保留的唯一结果及其连接数量，不是经验值或技能等级；兴趣与能力分别读取相同结果。', '历史导入只使用仍保留的任务、项目与记忆；缺失的旧经历和前因保持未知。', '观察、出行和休息保留事实，但不记为产生资源或设施变化的配方实践。', '失败沿用原事务的机器分类；条件困难、执行不足和原因未知分别保留，不推断讨厌某事。', '来源只展示类别和编号，不复制私人输入、模型理由或自定义活动说明。'] } };
 }

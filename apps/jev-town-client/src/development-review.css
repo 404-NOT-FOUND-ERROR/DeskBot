@@ -29,4 +29,15 @@
 .development-review code { display:block; overflow-wrap:anywhere; margin-top:10px; color:#7c876d; font-size:10px; }
 .development-review footer { font-size:10px; color:#87917c; margin-top:24px; }
 .development-review__error { background:#faebdd; padding:15px; border-radius:12px; }
+.development-review__sample { padding:20px 24px; background:#fdfcf5; border:1px solid #e0e4d5; border-radius:16px; }
+.development-review__sample h2 { margin-bottom:5px; }.development-review__sample p { margin:5px 0; }
+.development-review__sample small { font-size:10px; color:#87917c; }
+.development-review--facets .life-development__topics { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+.development-review--facets .life-development__facet:only-child { grid-column:1 / -1; }
+.development-review--facets .life-development__facets > div { grid-template-columns:58px minmax(0,1fr); }
+.development-review--facets .life-development__facet-basis dl { grid-template-columns:1fr; }
+.development-review--facets .development-review__columns { grid-template-columns:minmax(0,1.65fr) minmax(270px,1fr); }
+.development-review--facets .life-development__counts { max-width:440px; }
+@media (max-width:1000px) { .development-review--facets .development-review__columns { grid-template-columns:1fr; }.development-review--facets .life-development__facet-basis dl { grid-template-columns:1fr 1fr; } }
+@media (max-width:600px) { .development-review--facets .life-development__topics { grid-template-columns:1fr; } }
 @media (max-width:760px) { .development-review{padding:24px 16px}.development-review header{display:block}.development-review__badge{display:inline-block;margin-top:8px}.development-review h1{font-size:26px}.development-review__chain,.development-review__columns{grid-template-columns:1fr} }
