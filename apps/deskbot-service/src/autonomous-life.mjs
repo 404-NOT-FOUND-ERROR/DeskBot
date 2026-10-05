@@ -109,6 +109,14 @@ function executeStep(world,state,at,eventId) {
     task=startTravelTask(world,{eventId:actionId,at,actorId:id,locationId:path[1],destinationId:step.location_id,reason:plan.reason}).task;
   } else task=startActivityTask(world,{actor_id:id,task_id:`life-${actionId}`,...(step.kind==='activity'?{activity_id:step.activity_id}:{kind:'care',title:step.title,duration_seconds:step.duration_seconds})},{eventId:actionId,at}).task;
   const stored=world.tasks.find(t=>t.task_id===task.task_id);stored.origin='autonomous_life';stored.life_plan_id=plan.plan_id;stored.life_action=step.kind;stored.life_goal=plan.goal;stored.life_source_ids=plan.source_ids??[];
+  // Preserve the bounded choice and its input references at execution time.
+  // Later plans and short-lived input records must not rewrite this task's cause.
+  stored.life_decision={source:plan.decision?.source??'rules',at:plan.created_at,
+    ...(plan.decision?.model?{model:plan.decision.model}:{}),
+    ...(plan.decision?.request_id?{request_id:plan.decision.request_id}:{}),
+    memory_ids:[...(plan.decision?.memory_ids??[])]};
+  stored.life_source_context=(world.refraction?.records??[]).filter(r=>stored.life_source_ids.includes(r.id))
+    .map(r=>({record_id:r.id,event_id:r.event_id,origin_id:r.origin_id,category:r.category,attested:r.attested}));
   for(const record of world.refraction?.records??[])if(plan.source_ids?.includes(record.id))record.source_task_ids=[...(record.source_task_ids??[]),task.task_id].slice(-16);
   plan.task_id=task.task_id;plan.status='executing';
   if(id!==world.protagonist.character_id && step.kind!=='travel')actor(world,id).status=step.kind==='rest'?'正在休息':task.title;

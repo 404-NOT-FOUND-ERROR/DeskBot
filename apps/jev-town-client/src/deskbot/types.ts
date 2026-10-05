@@ -65,13 +65,35 @@ export interface DeskBotAutonomy {
 
 export interface DeskBotMemoryEpisode {
   id:string;kind:'world_fact'|'personal_interpretation'|'hearsay';actor_ids:string[];at:string;text:string;topic:string|null;outcome:string;
+  root_outcome_id?:string|null;
   independent_evidence:boolean;evidence_ids?:string[];expires_at?:string;
   source:{kind:string;task_id?:string;commitment_id?:string;label?:string;url?:string|null;model?:string;request_id?:string};
+}
+export interface DeskBotDevelopmentTopic {
+  roots:number;practice:number;completed:number;failed:number;cancelled:number;own:number;invited:number;unknown_trigger:number;
+}
+export interface DeskBotDevelopmentRecord {
+  id:string;root_outcome_id:string;actor_ids:string[];topic:string|null;outcome:string;at:string;
+  title?:string;activity_id:string|null;location_id:string|null;project_ids:string[];
+  source:{kind:string;task_id?:string|null;commitment_id?:string|null;task_kind?:string|null};
+  causes:{source_record_ids:string[];source_event_ids:string[];sources:{record_id:string;event_id:string|null;origin_id?:string|null;category:string;input_category?:string|null;attested:boolean}[];
+    plan_id:string|null;decision:{source:string|null;model?:string|null;request_id?:string|null;memory_ids?:string[]}|null;trigger:'own'|'invited'|'unknown'};
+  effect:{practice:boolean;relationship:boolean;legacy_interest_eligible:boolean;legacy_interest_known?:boolean;completion_effect:string|null};
+  views:{memory_ids:string[];project_stages:{project_id:string;stage_id:string|null}[];commitment_ids:string[];linked_task_roots:string[]};
+  failure:{reason:string|null;code:string|null;classification?:string}|null;historical_import:boolean;
+}
+export interface DeskBotDevelopmentEvidence {
+  schema:'deskbot.development-evidence.v1';enabled:boolean;installed_at:string|null;revision:number;owner_id:string;
+  counts:{roots:number;practice:number;relationship:number;historical_import:number;completed:number;failed:number;cancelled:number};
+  actors:{actor_id:string;display_name:string;roots:number;practice:number;relationship:number;topics:Record<string,DeskBotDevelopmentTopic>}[];
+  recent:DeskBotDevelopmentRecord[];
+  coverage:{retention:{max_records:number;counts_scope:'retained_unique_root_outcomes'};historical_import_roots:number;causality_unknown_roots:number;limitations:string[]};
 }
 export interface DeskBotLivedMemory {
   schema:string;owner_id:string;installed_at:string;revision:number;identity_preserved:boolean;counts:Record<string,number>;
   actors:{actor_id:string;display_name:string;interests:Record<string,{topic:string;days:string[];stage:string;successes:number;setbacks:number;bonus:number;evidence_ids:string[]}>}[];
   own:DeskBotMemoryEpisode[];recent:DeskBotMemoryEpisode[];
+  development?:DeskBotDevelopmentEvidence|null;
   planner:{enabled:boolean;policy:string;limits:{per_hour:number;per_day:number;actor_cooldown_minutes:number};attempts_last_hour:number;
     requests:{id:string;actor_id:string;status:string;failure?:string;model?:string;choice?:{goal:string;reason:string;memory_ids:string[]}|null}[];
     recent:{id:string;actor_id:string;at:string;status:string;reason:string;model:string|null;goal:string|null}[]};
@@ -154,6 +176,7 @@ export interface DeskBotWorldMap {
   living?: DeskBotLiving|null;
   autonomy?: DeskBotAutonomy|null;
   memory?:DeskBotLivedMemory|null;
+  development?:DeskBotDevelopmentEvidence|null;
   projects?:DeskBotResidentProjects|null;
   social?:DeskBotSocial|null;
   refraction?:DeskBotRefraction|null;

@@ -17,6 +17,7 @@ import { createInputStore, InputError, normalizeChat, normalizeEvent } from './i
 import { createStateEngine } from './state-engine.mjs';
 import { createWorldContext } from './world-context.mjs';
 import { MEMORY_VERSION, memoryReadModel } from './lived-memory.mjs';
+import { DEVELOPMENT_VERSION, developmentReadModel } from './development-evidence.mjs';
 import { createLifeChoiceWorker } from './life-choice.mjs';
 import { createFakeLlm, LlmProviderError } from './llm.mjs';
 import { createChatOrchestrator } from './chat-orchestrator.mjs';
@@ -761,6 +762,9 @@ export function createDeskBotServer({
     }
 
     if (url.pathname === '/api/life/memory' && request.method==='GET') {sendJson(response,200,memoryReadModel(persistentWorld.get()));return;}
+    if (url.pathname === '/api/life/development' && request.method==='GET') {
+      sendJson(response,200,developmentReadModel(persistentWorld.get(),{actorId:url.searchParams.get('actor_id')??undefined,limit:url.searchParams.get('limit')??48}));return;
+    }
     if (request.method === 'GET' && url.pathname === '/api/model/status') {
       sendJson(response, 200, { ...(llm.status?.() ?? { provider: llm.id, configured: llm.id !== 'fake-llm-v0.1', status: llm.id === 'fake-llm-v0.1' ? 'test_provider' : 'configured', role: 'dialogue_only', high_level_decisions: 'bounded_rules' }), ...(persistentWorld.get().memory?.planner.enabled?{role:'dialogue_and_life_choice',high_level_decisions:'bounded_model_choice_v1'}:{}) });
       return;
@@ -2070,6 +2074,10 @@ export function createDeskBotServer({
     }
     if(livedMemoryEnabled && persistentWorld.get().memory?.schema!==MEMORY_VERSION) {
       ingestNonChatEvent({event_id:`memory-install:${MEMORY_VERSION}`,type:'world.mutation',source:'lived-memory-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_lived_memory',planner_enabled:true}});
+    }
+    if(livedMemoryEnabled && persistentWorld.get().memory && !persistentWorld.get().memory.development) {
+      ingestNonChatEvent({event_id:`development-install:${DEVELOPMENT_VERSION}`,type:'world.mutation',source:'lived-memory-engine',
+        source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_development_evidence'}});
     }
     if(bodyPerceptionEnabled && !persistentWorld.get().body) {
       ingestNonChatEvent({event_id:`body-install:${BODY_PERCEPTION_VERSION}`,type:'world.mutation',source:'body-perception-engine',

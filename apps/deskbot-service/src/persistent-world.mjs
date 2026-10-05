@@ -1,4 +1,5 @@
 import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-memory.mjs';
+import { syncDevelopmentEvidence } from './development-evidence.mjs';
 import { installBodyPerception, applyBodyObservation, markBodyCommands, markBodyCommandDispatched, applyBodyCommandAck, applyBodyCommandLocalFailure, settleBodyPerception } from './body-perception.mjs';
 import { applyLifeChoice } from './autonomous-life.mjs';
 import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
@@ -94,6 +95,7 @@ const MULTISOURCE_LAYERS = Object.freeze([
 const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action:'install_input_refraction',layer:'world_line',required:[],optional:[],description:'安装有限的现实输入参考，不回填历史；消息只提供候选，实际任务仍须核验' },
   { action:'install_lived_memory',layer:'world_line',required:[],optional:['planner_enabled'],description:'从实际记录安装生活记忆与缓慢兴趣' },
+  { action:'install_development_evidence',layer:'world_line',required:[],optional:[],description:'在生活记忆内连接同根的实际任务、项目与约定结果' },
   { action:'claim_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:[],description:'服务端核验可行候选并领取有限思考额度' },
   { action:'resolve_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:['text','model','error'],description:'服务端验证模型选择，保留理解与执行边界' },
   { action: 'sync_real_time', layer: 'calendar', required: [], optional: ['time_zone'], description: '服务端同步现实时间，生产默认 Asia/Shanghai、1:1' },
@@ -1139,6 +1141,10 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
       details=respondSocialInvitation(next,at,payload.invitation_id,payload.operation);break;
     case 'install_lived_memory':
       details=installLivedMemory(next,at,{plannerEnabled:payload.planner_enabled===true});break;
+    case 'install_development_evidence':
+      if(!next.memory)throw new PersistentWorldError(409,'memory_required','先安装现有生活记忆，再连接发展经历。');
+      syncDevelopmentEvidence(next,at);
+      details={accepted:true,version:next.memory.development.schema};break;
     case 'claim_life_choice':
     case 'resolve_life_choice':
       details=applyLifeChoice(next,at,payload);break;

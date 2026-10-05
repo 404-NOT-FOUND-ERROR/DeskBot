@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { localWorldDate } from './realtime-world.mjs';
 import { ACTIVITIES } from './living-resources.mjs';
+import { syncDevelopmentEvidence, developmentReadModel } from './development-evidence.mjs';
 
 export const MEMORY_VERSION = 'deskbot.lived-memory.v1';
 export const TOPICS = { care:'照料', craft:'制作', repair:'修缮', cook:'做饭', explore:'观察小镇', connection:'与人相处' };
@@ -103,6 +104,7 @@ export function syncLivedMemory(w,at) {
       topic:null,outcome:'received',source:{kind:r.category,record_id:r.id,label:r.source_label,url:r.source_url,published_at:r.published_at},
       expires_at:r.expires_at,independent_evidence:false});
   }
+  syncDevelopmentEvidence(w, at);
 }
 export function influenceRememberedChoices(w,state,choices) {
   const interests=w.memory?.actors[state.actor_id]?.interests??{};
@@ -131,6 +133,7 @@ export function memoryReadModel(w) {
   if(!w.memory)return null;
   const m=w.memory;
   return {schema:m.schema,installed_at:m.installed_at,revision:m.revision,identity_preserved:true,owner_id:w.protagonist.character_id,
+    development:developmentReadModel(w),
     counts:Object.fromEntries(['world_fact','personal_interpretation','hearsay'].map(kind=>[kind,m.episodes.filter(e=>e.kind===kind).length])),
     actors:Object.values(m.actors).map(a=>({...structuredClone(a),display_name:a.actor_id===w.protagonist.character_id?w.protagonist.display_name:w.npcs.find(n=>n.npc_id===a.actor_id)?.display_name})),
     recent:structuredClone(m.episodes.slice(-48).reverse()),own:structuredClone(m.episodes.filter(e=>e.actor_ids.includes(w.protagonist.character_id)).slice(-24).reverse()),

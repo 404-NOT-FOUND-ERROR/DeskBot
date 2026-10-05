@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { localWorldDate } from './realtime-world.mjs';
 
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
+import { roleDevelopmentReadModel, candidateDevelopmentContext } from './role-development.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
 const EVIDENCE_NAMESPACE = 'role.evidence';
@@ -526,10 +527,16 @@ export function createRoleEvolution({
 
   function snapshot({ characterId = null, limit = 50 } = {}) {
     const bounded = Math.min(Math.max(Number(limit) || 50, 1), MAX_CANDIDATES);
+    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const development = roleDevelopmentReadModel(world, { actorId: characterKey(characterId, activeCharacter) });
     const candidateList = [...candidates.values()]
       .filter((item) => !characterId || item.character_id === characterId)
       .slice(-bounded)
-      .map(clone);
+      .map(item => {
+        const ownDevelopment = item.character_id === development.character_id ? development
+          : roleDevelopmentReadModel(world, { actorId: item.character_id });
+        return { ...clone(item), evidence_basis: 'legacy_input_cues', development_context: candidateDevelopmentContext(item, ownDevelopment) };
+      });
     const runList = [...runs.values()]
       .filter((item) => !characterId || item.character_id === characterId)
       .slice(-bounded)
@@ -547,6 +554,7 @@ export function createRoleEvolution({
       rule_version: RULE_VERSION,
       active_character_id: activeCharacter,
       character_id: characterId,
+      development,
       evidence: evidenceList,
       pulls: pullList,
       candidates: candidateList,

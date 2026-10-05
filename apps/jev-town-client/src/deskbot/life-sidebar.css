@@ -167,6 +167,44 @@
 .life-memory__kind--hearsay { background: #f4eddd !important; color: #9a8253 !important; }
 .life-memory__kind--personal_interpretation { background: #eeebf3 !important; color: #8b7c99 !important; }
 .life-memory__stage--trying,.life-memory__stage--familiar { background: #e6efde !important; color: #64835b !important; }
+.life-development { display: grid; gap: 10px; margin: 12px 0 18px; }
+.life-development__counts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.life-development__counts > span { display: flex; align-items: baseline; gap: 7px; padding: 12px; border-radius: 11px; background: #eef3e9; color: #758575; font-size: 10px; }
+.life-development__counts strong { font-size: 23px; font-weight: 550; color: #537b6c; font-variant-numeric: tabular-nums; line-height: 1; }
+.life-sidebar .life-development__note { font-size: 10px; color: #8b9380; margin: 0; line-height: 1.7; }
+.life-development__topics { display: grid; gap: 7px; }
+.life-development__topics article { border: 1px solid #e5e9dc; border-radius: 11px; padding: 10px 12px; background: #fafbf3; }
+.life-development__topics .life-row { margin-bottom: 2px; font-size: 11px; }
+.life-development__topics .life-row > span { color: #88957e; font-size: 10px; }
+.life-development__topics small { font-size: 10px; }
+.life-development__trails { display: grid; gap: 7px; }
+.life-development__trails h3 { font-size: 11px; font-weight: 500; color: #7d8b78; margin: 2px 0 0; }
+.life-development__trail { border: 1px solid #e2e7d9; border-radius: 12px; padding: 10px 12px; background: #fffef9; }
+.life-development__trail > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; }
+.life-development__trail > summary::-webkit-details-marker { display: none; }
+.life-development__trail > summary > span:first-child { display: grid; gap: 5px; min-width: 0; }
+.life-development__trail > summary strong { font-size: 11px; font-weight: 550; color: #526f61; overflow-wrap: anywhere; }
+.life-development__trail time { font-size: 10px; color: #9ca28e; font-variant-numeric: tabular-nums; }
+.life-development__trail > summary .life-chip::after { content: '⌄'; margin-left: 5px; }
+.life-development__trail[open] > summary .life-chip::after { content: '⌃'; }
+.life-development__trail--failed .life-chip,.life-development__trail--missed .life-chip,.life-development__trail--cancelled .life-chip { background: #f4eddf; color: #a08862; }
+.life-development__steps { list-style: none; padding: 11px 0 0; margin: 10px 0; border-top: 1px solid #edf0e4; display: grid; gap: 0; }
+.life-development__steps li { display: grid; grid-template-columns: 35px minmax(0,1fr); column-gap: 9px; padding: 5px 0; }
+.life-development__steps li > span { font-size: 10px; color: #96a086; line-height: 1.85; }
+.life-sidebar .life-development__steps p { font-size: 11px; line-height: 1.85; margin: 0; color: #71816c; }
+.life-sidebar .life-development__same { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: #f4f5ec; color: #89917b; font-size: 10px; }
+.life-development__source,.life-development__coverage { font-size: 10px; color: #89917b; }
+.life-development__source summary,.life-development__coverage summary { cursor: pointer; }
+.life-development__source dl { display: grid; gap: 7px; margin: 10px 0; }
+.life-development__source dl > div { display: grid; grid-template-columns: 82px minmax(0,1fr); gap: 8px; line-height: 1.7; }
+.life-development__source dt { color: #9da48f; }.life-development__source dd { margin: 0; overflow-wrap: anywhere; }
+.life-sidebar .life-development__source p,.life-sidebar .life-development__coverage p { font-size: 10px; line-height: 1.7; color: #89917b; margin-bottom: 0; }
+.life-development__coverage ul { padding-left: 16px; line-height: 1.85; }
+.life-sidebar .life-development__empty { font-size: 11px; color: #8b9581; line-height: 1.8; margin: 9px 0 13px; }
+.life-memory__related { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.life-memory__related li { border: 0; border-left: 2px solid #e5e7da; border-radius: 0; padding: 2px 0 2px 9px; background: transparent; }
+.life-memory__related span { font-size: 10px; color: #9aa48d; }
+.life-sidebar .life-memory__related p { margin: 4px 0; font-size: 11px; color: #7c8a75; }
 .life-choice-origin { margin: 10px 0 14px; color: #73907c; font-size: 11px; }
 .life-choice-origin summary { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; list-style: none; }
 .life-choice-origin summary::-webkit-details-marker { display: none; }
