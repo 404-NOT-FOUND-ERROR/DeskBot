@@ -1,0 +1,3 @@
+.body-status { display: flex; flex-wrap: wrap; gap: 5px 10px; align-items: center; color: #627265; font-size: 11px; line-height: 1.5; }
+.body-status > strong { color: #42664f; font-weight: 600; }
+.body-status > span { overflow-wrap: anywhere; }

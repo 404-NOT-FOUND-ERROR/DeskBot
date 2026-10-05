@@ -15,6 +15,9 @@ import {projectSceneActivities} from './activityProjection.ts';
 import {activeActorTask,taskDisplayTitle,taskTimeLabel,worldGlance} from './lifeGlance.ts';
 import {ResidentProject,residentProjectFor} from './ResidentProject.tsx';
 import {ProjectFacilityState} from './ProjectFacilityState.tsx';
+import {BodyStatus} from './BodyStatus.tsx';
+import type {DeskBotBodyPerception} from './bodyTypes.ts';
+import './body-status.css';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -56,6 +59,7 @@ export function DeskBotApp() {
   const socialRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const [map, setMap] = useState<DeskBotWorldMap | null>(null);
   const [life, setLife] = useState<DeskBotLifeWorld | null>(null);
+  const [body, setBody] = useState<DeskBotBodyPerception | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<DeskBotActionCandidate | null>(null);
   const [idea, setIdea] = useState("");
@@ -163,6 +167,18 @@ export function DeskBotApp() {
     const timer = window.setInterval(() => void refresh(), 15000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    let active=true;
+    const read=async()=>{try {
+      const response=await fetch(`${baseUrl}/api/life/body`,{signal:controller.signal});
+      const snapshot=await response.json();
+      if(active)setBody(response.ok&&snapshot.schema==='deskbot.body-perception.v1'?snapshot:null);
+    }catch{if(active)setBody(null);}};
+    void read();const timer=window.setInterval(()=>void read(),5000);
+    return()=>{active=false;controller.abort();window.clearInterval(timer);};
+  },[baseUrl]);
 
   useEffect(() => {
     if (!selectedPlaceId || !map) {
@@ -507,6 +523,8 @@ export function DeskBotApp() {
           <div className="deskbot-mode__header-actions"><button type="button" disabled={!map} onClick={()=>map&&handlePlaceClick(map.protagonist.location_id)}>看看喵呜 <span aria-hidden="true">↗</span></button><button type="button" onClick={() => void refresh()} aria-label="刷新小镇近况">↻</button></div>
         </div>
       </header>
+
+      <BodyStatus body={body}/>
 
       <main className="deskbot-mode__grid">
         <section className="deskbot-mode__stage">

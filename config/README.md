@@ -1,5 +1,9 @@
 # 本地配置
 
+## 身体设备调试登记
+
+`body_devices.example.json` 提供模板，真实副本 `body_devices.json` 被 Git 忽略。未配置或 `commissioned:false` 时不授予身体感知/动作权限；USB 接上小智固件不代表已经完成 DeskBot 协议适配。完成后续实机归位、方向、能力和换壳校准后再登记。服务也支持 `DESKBOT_BODY_DEVICES_CONFIG` 指定文件。字段与证明边界见 [身体协议](../research/protocol/body-perception-v1.md)。隔离模拟从独立脚本启动，不写入正式配置。
+
 这里放只在本机使用的配置。`*.json` 中的真实 `api_key`、`*.env` 中的 token 和运行数据库都被 `.gitignore` 排除，不得提交到公开仓库。
 
 ## DeepSeek

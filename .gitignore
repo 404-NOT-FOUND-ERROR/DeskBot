@@ -14,6 +14,7 @@ venv/
 *.env
 !*.env.example
 **/llm_config.json
+**/body_devices.json
 **/*credentials*.json
 **/*secrets*.json
 

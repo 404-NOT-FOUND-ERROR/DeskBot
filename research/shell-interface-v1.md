@@ -1,5 +1,7 @@
 # `shell-interface-v1` 可打印外壳接口规范草案
 
+> **当前身体合同（2026-10-05）：** 用户样机只有一个左右 yaw 自由度，换壳依靠地磁传感器；本文中的 NFC、额外 head/base 轴是历史设计参考，不能当成当前硬件能力。尺寸仍需实测。现用小智固件结构与适配缺口见 [硬件审计](hardware/body-bridge-audit-v0.1.md)，软件感知与校准换壳以 [身体协议](protocol/body-perception-v1.md) 为准。
+
 > **适配基线说明（2026-08-14）：** 当前可执行硬件基底已调整为 ESP-VoCat v1.2 成品。本文中的 Ditto-specific 描述保留为历史参考；所有最终 CAD 尺寸必须以实际 VoCat v1.2 测量结果替换，不能直接沿用 Ditto 或 v1.0 外壳数据。
 
 ## 目标

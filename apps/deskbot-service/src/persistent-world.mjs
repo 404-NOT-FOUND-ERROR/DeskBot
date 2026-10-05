@@ -1,4 +1,5 @@
 import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-memory.mjs';
+import { installBodyPerception, applyBodyObservation, markBodyCommands, markBodyCommandDispatched, applyBodyCommandAck, applyBodyCommandLocalFailure, settleBodyPerception } from './body-perception.mjs';
 import { applyLifeChoice } from './autonomous-life.mjs';
 import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
 import { getWorldEnvironment } from './world-environment.mjs';
@@ -121,6 +122,7 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action: 'advance_calendar', layer: 'calendar', required: [], optional: ['date', 'timezone', 'season', 'solar_term', 'holiday', 'observed_at'], description: '推进日历，日期不可倒退' },
   { action: 'observe_user_preference', layer: 'user_profile', required: ['preference_key', 'value'], optional: [], description: '记录一次用户偏好观察，连续 3 次一致后 stable' },
   { action: 'record_device_context', layer: 'device_context', required: ['device_id'], optional: ['status', 'metrics', 'state', 'observed_at'], description: '写入设备或传感器上下文' },
+  { action: 'install_body_perception', layer: 'device_context', required: [], optional: [], description: '添加身体感知与设备回执，不回填历史感受' },
   { action: 'npc_action', layer: 'world_line', required: ['npc_id', 'action_name'], optional: ['location_id', 'status', 'occurred_at'], description: '更新已有 NPC 的行动；位置变化只能沿相邻路线' },
 ]);
 
@@ -1338,6 +1340,9 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
     case 'record_device_context':
       details = applyDeviceContext(next, payload).details;
       break;
+    case 'install_body_perception':
+      details = { installed: installBodyPerception(next, at) };
+      break;
     case 'npc_action':
       details = applyNpcAction(next, payload, event, at).details;
       break;
@@ -1657,9 +1662,22 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
         throw error;
       }
+    } else if (['body.commands.linked', 'body.command.dispatched', 'body.command.acknowledged','body.command.failed'].includes(eventType)) {
+      if (adapter.bodyInternal !== true) return { applied: false, duplicate: false, reason: 'body_internal_event_requires_server_adapter', mutation: null, world: get() };
+      const next=clone(world), at=now().toISOString();
+      const details=eventType==='body.commands.linked' ? markBodyCommands(next,event.payload.turn_id,event.payload.commands,at,adapter)
+        : eventType==='body.command.dispatched' ? markBodyCommandDispatched(next,event.payload.command,at,adapter)
+        : eventType==='body.command.failed' ? applyBodyCommandLocalFailure(next,event.payload.command,at,adapter)
+        : applyBodyCommandAck(next,event.payload.ack,at,adapter);
+      projection={next,action:eventType,details};
     } else {
-      if (!world.refraction) return { applied: false, duplicate: false, reason: 'event_does_not_mutate_canonical_world', mutation: null, world: get() };
-      const next=clone(world),details=refractInput(next,event,now().toISOString(),adapter);
+      if (!world.refraction && !world.body) return { applied: false, duplicate: false, reason: 'event_does_not_mutate_canonical_world', mutation: null, world: get() };
+      const next=clone(world),at=now().toISOString();
+      const bodyObservation=(eventType.startsWith('sensor.') || eventType==='shell.install.detected') && world.body
+        ? applyBodyObservation(next,event,at,adapter) : null;
+      const details=world.refraction ? refractInput(next,event,at,{...adapter,bodyObservation}) : {accepted:bodyObservation?.accepted===true};
+      if(bodyObservation?.accepted)details.accepted=true;
+      if(bodyObservation)details.body=bodyObservation;
       if(!details.accepted)return {applied:false,duplicate:details.reason==='origin_already_considered',reason:details.reason,mutation:null,world:get()};
       projection={next,action:'refract_input',details};
     }
@@ -1673,7 +1691,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     // does not advance canonical revision/tick or overwrite the accepted
     // projection (for example, a stale weather sample).
     const observationAccepted = projection.details?.accepted !== false;
-    if(observationAccepted)syncLivedMemory(projection.next,now().toISOString());
+    if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
     const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {

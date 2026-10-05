@@ -43,6 +43,7 @@ export const DEFAULT_EVENT_TYPES = Object.freeze(new Set([
 
 export const SUPPORTED_COMMAND_TYPES = Object.freeze(new Set([
   'render.expression',
+  'orientation.base_yaw',
   'audio.play',
   'audio.stop',
   'device.set_volume',
@@ -800,6 +801,8 @@ export function createWebSocketBridge({
   onEvent = null,
   onAudioStream = null,
   onCommandAck = null,
+  onCommandSent = null,
+  onCommandFailure = null,
   getRoleRevision = 0,
 } = {}) {
   if (typeof path !== 'string' || !path.startsWith('/')) throw new TypeError('path must start with /');
@@ -855,6 +858,7 @@ export function createWebSocketBridge({
     peer.characterId = bindingCharacter;
     peer.shellId = bindingShell;
     peer.roleRevision = roleRevision;
+    peer.capabilities = clone(hello.capabilities);
     peer.captureFormat = selected.capture_format;
     peer.playbackFormat = selected.playback_format;
     peer.lastCorrelationId = hello.correlation_id;
@@ -1212,7 +1216,7 @@ export function createWebSocketBridge({
     peer.sentCommandIds.add(command.command_id);
     if (!outputRouter?.ack) return;
     try {
-      await outputRouter.ack({
+      const result = await outputRouter.ack({
         command_id: command.command_id,
         device_id: command.device_id ?? peer.deviceId,
         target: command.target ?? target,
@@ -1225,6 +1229,7 @@ export function createWebSocketBridge({
         error: { code, message },
         payload: { retryable: false },
       });
+      await onCommandFailure?.({ command: clone(command), result: clone(result), peer });
     } catch (error) {
       // A local terminal classification is only durable after the ACK write
       // succeeds. If the adapter fails, keep the command retryable and do not
@@ -1360,6 +1365,19 @@ function sendPreparedDownlink(peer, prepared) {
       await markLocalCommandFailure(peer, command, 'command_not_supported', `command type ${command.type} is not allowed on the bridge`);
       return;
     }
+    if (command.type === 'orientation.base_yaw') {
+      const payload = commandPayload(command);
+      if (peer.capabilities?.['output.orientation.base_yaw'] !== true
+        || peer.capabilities?.['device.command.orientation.base_yaw'] !== true) {
+        await markLocalCommandFailure(peer, command, 'yaw_contract_not_supported', 'device has not negotiated the single-yaw command contract');
+        return;
+      }
+      if (!Number.isFinite(payload.yaw_degrees) || Math.abs(payload.yaw_degrees) > 60) {
+        await markLocalCommandFailure(peer, command, 'yaw_out_of_range', 'yaw_degrees must be within -60..60 relative to calibrated forward');
+        return;
+      }
+      if (peer.phase !== 'idle') return;
+    }
     if (command.type === 'audio.play' && peer.phase !== 'idle') {
       // Playback is half-duplex. Leave the command queued until the current
       // capture/reply/playback phase has completed; this is not a terminal
@@ -1387,6 +1405,7 @@ function sendPreparedDownlink(peer, prepared) {
         peer.phase = 'playing';
         sendPreparedDownlink(peer, preparedDownlink);
       }
+      await onCommandSent?.({ command: clone(command), peer });
     } catch (error) {
       peer.inFlightCommands.delete(command.command_id);
       if (error?.retryable === true) {

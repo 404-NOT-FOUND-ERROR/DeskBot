@@ -1,0 +1,26 @@
+{
+  "schema": "deskbot.body-devices.v1",
+  "devices": [
+    {
+      "device_id": "replace-with-actual-device-id",
+      "character_id": "shaping-001",
+      "commissioned": false,
+      "capabilities": {
+        "input.touch": true,
+        "input.microphone.direction": true,
+        "input.shell.magnetic": true,
+        "display.expression": true,
+        "output.orientation.base_yaw": true,
+        "device.command.orientation.base_yaw": true,
+        "sensor.yaw_feedback": false
+      },
+      "shellCalibration": {
+        "calibrated": false,
+        "calibration_id": "replace-after-physical-calibration",
+        "device_id": "replace-with-actual-device-id",
+        "mappings": {}
+      },
+      "shellCatalog": []
+    }
+  ]
+}

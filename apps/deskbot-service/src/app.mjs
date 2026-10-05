@@ -9,6 +9,7 @@ import { createWorldLife } from './world-life.mjs';
 import { RESIDENT_VERSION } from './resident-life.mjs';
 import { socialReadModel } from './social-life.mjs';
 import { REFRACTION_VERSION, LIFE_SUGGESTIONS, refractionReadModel } from './input-refraction.mjs';
+import { BODY_PERCEPTION_VERSION, bodyReadModel } from './body-perception.mjs';
 import { createAutonomousLife } from './autonomous-life.mjs';
 import { getCompanionWorldContract } from './companion-world-contract.mjs';
 
@@ -176,7 +177,23 @@ export function createDeskBotServer({
   autonomousLifeEnabled = false,
   residentLifeEnabled = false,
   livedMemoryEnabled = false,
+  bodyPerceptionEnabled = residentLifeEnabled,
+  bodyDeviceProfiles = [],
 } = {}) {
+  const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
+  function bodyContextForPeer(peer) {
+    const registered=deviceRegistry.get(peer.deviceId),profile=bodyProfiles.get(peer.deviceId);
+    const allowed=profile && profile.character_id===DEFAULT_CHARACTER_ID && (profile.commissioned===true || profile.simulated===true);
+    const capabilities=Object.fromEntries(Object.entries(peer.capabilities??{}).map(([key,value])=>[key,
+      value===true && (!profile?.capabilities || profile.capabilities[key]===true)]));
+    return {attestedKind:peer.characterId===DEFAULT_CHARACTER_ID && allowed?'device':null,
+      sourceLabel:profile?.simulated===true?'隔离模拟设备上报':allowed?'已调试设备协议上报':'设备协议上报 · 待实机调试',
+      device:registered?{...registered,character_id:peer.characterId,capabilities}:null,connected:peer.ready===true && !peer.ws.closed,
+      deviceStatus:peer.phase==='idle'?'idle':'busy',session_id:peer.id,
+      simulated:profile?.simulated===true,hardwareVerified:allowed && profile?.commissioned===true && profile.simulated!==true,
+      supportedCommandTypes:allowed?['render.expression','orientation.base_yaw']:[],
+      shellCalibration:allowed?profile.shellCalibration:null,shellCatalog:allowed?profile.shellCatalog:[]};
+  }
   const roles = roleProposalStore ?? createRoleProposalStore({ now, persistence });
   const roleEvolution = createRoleEvolution({
     now,
@@ -359,6 +376,16 @@ export function createDeskBotServer({
       source_event: result.event,
       output_plan: stateResult.outputs,
     });
+    const bodyObservation = worldMutation.mutation?.details?.body;
+    let bodyOutputRoute = null;
+    if (bodyObservation?.accepted && bodyObservation.output_plan?.length) {
+      bodyOutputRoute = outputRouter.enqueue({source_event:bodyObservation.source_event,output_plan:bodyObservation.output_plan});
+      const linked=persistentWorld.get().body?.turns.find(turn=>turn.turn_id===bodyObservation.turn_id)?.commands.length;
+      if(!linked)persistentWorld.ingest({event_id:`body-link:${bodyObservation.turn_id}`,type:'body.commands.linked',source:'body-output-router',
+        character_id:DEFAULT_CHARACTER_ID,occurred_at:bodyObservation.turn.received_at,
+        payload:{turn_id:bodyObservation.turn_id,commands:bodyOutputRoute.commands.map(command=>({...command,status:'queued',acknowledgment:null}))}},
+      {...adapter,bodyInternal:true,commandAttested:true});
+    }
     const roleEvolutionResult = result.duplicate
       ? null
       : roleEvolution.observeEvent(result.event);
@@ -371,6 +398,7 @@ export function createDeskBotServer({
       stateResult,
       evidence: evidenceResult?.evidence ?? null,
       outputRoute,
+      bodyOutputRoute,
       roleEvolution: roleEvolutionResult,
       worldCandidate: worldCandidateResult,
     };
@@ -549,6 +577,16 @@ export function createDeskBotServer({
             { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
         return;
       }
+    }
+    if(url.pathname==='/api/life/body' && request.method==='GET') {
+      const devices=(deviceBridge?.peers?.()??[]).filter(peer=>peer.character_id===DEFAULT_CHARACTER_ID).map(peer=>{
+        const profile=bodyProfiles.get(peer.device_id),device=deviceRegistry.get(peer.device_id);
+        return {device_id:peer.device_id,connected:peer.ready,transport:'websocket',simulated:profile?.simulated===true,
+          hardware_verified:profile?.character_id===DEFAULT_CHARACTER_ID && profile.commissioned===true && profile.simulated!==true,
+          capabilities:device?.capabilities??{},last_seen_at:device?.last_seen_at??null};
+      });
+      sendJson(response,200,{...(bodyReadModel(persistentWorld.get(),now().toISOString())??{enabled:false}),
+        connection:{devices,hardware_verified:devices.some(device=>device.connected&&device.hardware_verified)}});return;
     }
     if(url.pathname==='/api/life/inputs') {
       if(request.method==='GET'){sendJson(response,200,inputReadModel());return;}
@@ -1766,7 +1804,12 @@ export function createDeskBotServer({
     if (request.method === 'POST' && url.pathname.startsWith('/api/outbox/') && url.pathname.endsWith('/ack')) {
       const commandId = decodeURIComponent(url.pathname.slice('/api/outbox/'.length, -'/ack'.length));
       readJson(request)
-        .then((body) => outputRouter.ack({ ...body, command_id: commandId }))
+        .then((body) => {
+          if(outputRouter.get(commandId)?.source_event_id?.startsWith('body-perception:')) {
+            throw new OutputRouterError(403,'body_ack_requires_device_bridge','身体动作回执必须来自绑定设备的 WebSocket 连接。');
+          }
+          return outputRouter.ack({ ...body, command_id: commandId });
+        })
         .then((result) => sendJson(response, 200, {
           schema: 'foundry.device-command-ack.v0.1',
           accepted: true,
@@ -1929,7 +1972,31 @@ export function createDeskBotServer({
       stateEngine,
       persistentWorld,
       evidenceLedger,
-      onEvent: ({event,peer}) => ingestNonChatEvent({...event,character_id:peer.characterId??event.character_id},{attestedKind:peer.characterId===DEFAULT_CHARACTER_ID?'device':null,sourceLabel:peer.characterId===DEFAULT_CHARACTER_ID?'设备协议上报':'未绑定设备上报'}),
+      onEvent: ({event,peer}) => ingestNonChatEvent({...event,character_id:peer.characterId??event.character_id},bodyContextForPeer(peer)),
+      onCommandSent: ({command,peer}) => {
+        if(!command.source_event_id?.startsWith('body-perception:'))return;
+        const linked=persistentWorld.get().body?.turns.flatMap(turn=>turn.commands).find(row=>row.command_id===command.command_id);
+        if(!linked || linked.status!=='queued')return;
+        persistentWorld.ingest({event_id:`body-dispatch:${command.command_id}`,type:'body.command.dispatched',source:'device-bridge',
+          character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{command}},
+        {...bodyContextForPeer(peer),bodyInternal:true,commandAttested:true});
+      },
+      onCommandAck: ({ack,result,peer}) => {
+        if(!result.command?.source_event_id?.startsWith('body-perception:'))return;
+        const receipt=result.command.acknowledgment;
+        const stableAck={command_id:result.command.command_id,device_id:receipt.device_id,status:receipt.status,
+          occurred_at:receipt.occurred_at,correlation_id:receipt.correlation_id,...(receipt.error?{error:receipt.error}:{})};
+        persistentWorld.ingest({event_id:`body-ack:${ack.command_id}:${ack.status}`,type:'body.command.acknowledged',source:'device-bridge',
+          character_id:DEFAULT_CHARACTER_ID,occurred_at:receipt.occurred_at,payload:{ack:stableAck}},
+        {...bodyContextForPeer(peer),bodyInternal:true,routerAccepted:true,command:result.command});
+      },
+      onCommandFailure: ({result}) => {
+        const command=result.command;
+        if(!command?.source_event_id?.startsWith('body-perception:'))return;
+        persistentWorld.ingest({event_id:`body-failed:${command.command_id}`,type:'body.command.failed',source:'device-bridge',
+          character_id:DEFAULT_CHARACTER_ID,occurred_at:command.acknowledgment.occurred_at,payload:{command}},
+        {bodyInternal:true,commandAttested:true});
+      },
       onAudioStream: voiceClient
         ? async (stream) => {
           const sidecar = await voiceClient.transcribe({
@@ -2003,6 +2070,10 @@ export function createDeskBotServer({
     }
     if(livedMemoryEnabled && persistentWorld.get().memory?.schema!==MEMORY_VERSION) {
       ingestNonChatEvent({event_id:`memory-install:${MEMORY_VERSION}`,type:'world.mutation',source:'lived-memory-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_lived_memory',planner_enabled:true}});
+    }
+    if(bodyPerceptionEnabled && !persistentWorld.get().body) {
+      ingestNonChatEvent({event_id:`body-install:${BODY_PERCEPTION_VERSION}`,type:'world.mutation',source:'body-perception-engine',
+        character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_body_perception'}});
     }
     if(livedMemoryEnabled)tickAutonomousLife();
     void lifeChoiceWorker.tick().catch(()=>{});

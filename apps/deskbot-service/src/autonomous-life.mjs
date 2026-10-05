@@ -10,6 +10,7 @@ import { influenceLifeChoices, recordInputDecision, settleRefraction } from './i
 import { influenceRememberedChoices } from './lived-memory.mjs';
 import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote } from './life-choice.mjs';
 import { projectCandidates, settleResidentProjects, updateProjectScheduling } from './resident-projects.mjs';
+import { influenceBodyChoices, recordBodyLifeDecision } from './body-perception.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -80,7 +81,7 @@ function candidates(world, state, at) {
   });
   }
   add('quiet-rest','在这里歇一歇','眼前能做的事暂时有限，先歇一会儿。',5,()=>[{kind:'rest',title:'在这里歇一歇',duration_seconds:1800}]);
-  return influenceRememberedChoices(world,state,influenceLifeChoices(world,state,at,profile,result));
+  return influenceRememberedChoices(world,state,influenceBodyChoices(world,state,at,influenceLifeChoices(world,state,at,profile,result)));
 }
 function feedback(world,state,at,kind,text,more={}) {
   state.last_feedback={at,kind,text,...more}; lifeNote(world,at,state.actor_id,kind,text,more);
@@ -151,6 +152,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
       if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
+      recordBodyLifeDecision(world,state,choice,at);
       feedback(world,state,at,'decided',`想${choice.title}：${choice.reason}`,{plan_id:state.plan.plan_id});
     }
     try {

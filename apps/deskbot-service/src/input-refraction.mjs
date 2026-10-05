@@ -70,7 +70,7 @@ function interpreted(event,kind) {
 
 // adapter is explicit server context. Payload source_kind/provenance never
 // authenticates itself. Installation does not backfill invented past inputs.
-export function refractInput(world,event,at,{attestedKind=null,sourceLabel=null,sourceUrl=null}={}) {
+export function refractInput(world,event,at,{attestedKind=null,sourceLabel=null,sourceUrl=null,bodyObservation=null}={}) {
   if(!world.refraction)return {accepted:false,reason:'refraction_not_installed'};
   if(event.character_id && event.character_id!==world.protagonist.character_id)return {accepted:false,reason:'character_outside_default_world'};
   let sample=event;
@@ -80,8 +80,15 @@ export function refractInput(world,event,at,{attestedKind=null,sourceLabel=null,
   const origin=assessment.origin_id??event.event_id;
   const originKey=digest(`${assessment.category}:${sourceLabel??'unverified'}:${origin}`);
   if(world.refraction.origin_keys.includes(originKey))return {accepted:false,reason:'origin_already_considered'};
-  const interpretation=interpreted(sample,assessment.category);
+  let interpretation=interpreted(sample,assessment.category);
+  if(assessment.category==='body' && world.body) {
+    const turn=bodyObservation?.turn;
+    interpretation={text:'',meaning:turn?.kind?.includes('touch')?'attention':'body_awareness',
+      summary:turn?.summary??'身体输入尚未通过连接、能力或时效检查，保留来源记录。',
+      body:bodyObservation?.usable?{turn_id:turn.turn_id,kind:turn.kind,shell_status:world.body.shell?.status??null}:null};
+  }
   let eligible=assessment.attested&&assessment.freshness==='fresh';
+  if(assessment.category==='body' && world.body)eligible=eligible&&bodyObservation?.usable===true;
   let expiry=iso(Number.isFinite(Date.parse(sample.observed_at??sample.occurred_at))?sample.observed_at??sample.occurred_at:at,assessment.category==='body'?300000:assessment.category==='weather'?3600000:86400000);
   if(assessment.category==='weather') {
     const environment=getWorldEnvironment(world,{now:new Date(at)});
