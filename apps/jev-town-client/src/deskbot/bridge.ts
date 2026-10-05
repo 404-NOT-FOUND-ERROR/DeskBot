@@ -13,6 +13,8 @@ import type {
   DeskBotRoleProposal,
   DeskBotRoleWishChoice,
   DeskBotRoleWishSnapshot,
+  DeskBotPracticalTrialOperation,
+  DeskBotPracticalTrialActionResponse,
 } from "./types.ts";
 
 function cleanBaseUrl(value: string): string {
@@ -339,9 +341,24 @@ export async function fetchRoleWishes(characterId:string,baseUrl=deskbotBaseUrl(
 }
 
 export async function respondRoleWish(proposalId:string,choice:DeskBotRoleWishChoice,baseUrl=deskbotBaseUrl()) {
-  // A wish response only records preparation. Practical trials are a later
-  // stage and cannot be substituted by the legacy chat-overlay trial API.
+  // Preparing a wish and starting its actual task are separate owner actions.
   return postJson<{proposal:DeskBotRoleProposal}>(baseUrl,`/api/roles/proposals/${encodeURIComponent(proposalId)}/choose`,{choice},'愿望回应暂时没有保存。');
+}
+
+export async function controlPracticalTrial(proposalId:string,operation:DeskBotPracticalTrialOperation,eventId:string,variant:string|undefined,baseUrl=deskbotBaseUrl()):Promise<DeskBotPracticalTrialActionResponse> {
+  return postJson<DeskBotPracticalTrialActionResponse>(baseUrl,`/api/roles/proposals/${encodeURIComponent(proposalId)}/practical-trial/${operation}`,{event_id:eventId,...(variant?{variant}:{})},'实际试做暂时没有更新。');
+}
+
+export function createPracticalTrialController(baseUrl:string,newEventId=()=>`role-practical-${crypto.randomUUID()}`) {
+  const pending=new Map<string,string>();
+  return async(proposalId:string,operation:DeskBotPracticalTrialOperation,variant?:string)=>{
+    const key=JSON.stringify([proposalId,operation,variant??null]);
+    const eventId=pending.get(key)??newEventId();
+    pending.set(key,eventId);
+    const result=await controlPracticalTrial(proposalId,operation,eventId,variant,baseUrl);
+    pending.delete(key);
+    return result;
+  };
 }
 
 export async function controlWorldTask(taskId: string, operation: "pause" | "resume" | "cancel", baseUrl = deskbotBaseUrl()): Promise<void> {

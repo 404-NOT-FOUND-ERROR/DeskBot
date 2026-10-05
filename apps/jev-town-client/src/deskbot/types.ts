@@ -262,6 +262,7 @@ export interface DeskBotWorldTask {
   activity_id?: string;
   origin?:string;
   life_action?:string;
+  role_trial?:{trial_id:string;proposal_id:string;direction_id:string;axis:'form'|'vocation';attempt_id:string;step_role:'primary'|'support';primary_activity_id:string};
   target_object_id?: string;
   completion?: { effect:string; result?:{ success:boolean; text?:string; reason?:string } }|null;
   reservation?: { status: 'held'|'consumed'|'returned'; inputs: { container:string; resource:string; count:number }[] };
@@ -361,6 +362,23 @@ export interface DeskBotRoleDirection {
 
 export type DeskBotRoleWishAxis = 'form' | 'vocation';
 export type DeskBotRoleWishChoice = 'try' | 'later' | 'reject';
+export type DeskBotPracticalTrialOperation = 'start' | 'pause' | 'resume' | 'adjust' | 'exit';
+export interface DeskBotPracticalRoleTrial {
+  schema:'deskbot.practical-role-trial.v1';trial_id:string;proposal_id:string;actor_id:string;direction_id:string;axis:DeskBotRoleWishAxis;
+  status:'running'|'paused'|'blocked'|'review'|'exited';variant_id:string;variant_label:string;
+  variant_choices:{id:string;label:string}[];allowed_actions:Exclude<DeskBotPracticalTrialOperation,'start'>[];
+  started_at:string;updated_at:string;
+  active_task:null|{task_id:string;title:string;activity_id:string|null;status:string;due_at:string|null;remaining_ms:number|null;step_role:'primary'|'support'};
+  current_step:null|{kind:string;activity_id:string|null;location_id:string|null;step_role:'primary'|'support'};
+  outcomes:{root_outcome_id:string;at:string;outcome:string;activity_id:string|null;location_id:string|null;step_role:'primary'|'support';attempt_id:string;classification:null|'resource'|'condition'|'route'|'coordination'|'performance'|'unclassified'|'cancelled';failure_code:string|null}[];
+  progress:{successful_primary:number;condition_failures:number;performance_failures:number;unknown_failures:number;cancelled:number;primary_days:string[];root_outcome_ids:string[];support_roots:string[];started_attempts:number};
+  review:{ready:boolean;reason:null|'repeated_actual_success'|'execution_difficulties';basis:'canonical_unique_task_results';summary:string;quality_proven:false;qualification_proven:false;preference_proven:false;changes_appearance:false};
+  blockers:{code:string;label:string;classification:string|null}[];next_step:string;frozen_wish_root_ids:string[];
+}
+export interface DeskBotPracticalTrialActionResponse {
+  schema:'deskbot.practical-role-trial-action-response.v1';accepted:boolean;duplicate:boolean;
+  proposal:DeskBotRoleProposal;practical_trial:DeskBotPracticalRoleTrial;world_mutation?:unknown;
+}
 export interface DeskBotRoleWishReadiness {
   eligible:boolean;
   barriers:{id:string;label:string;scope:'evidence'|'circumstance'}[];
@@ -387,6 +405,7 @@ export interface DeskBotRoleProposal {
   wish_basis?:DeskBotRoleWishBasis;current_gate?:DeskBotRoleWishReadiness;
   proposal_gate?:{eligible?:boolean;barriers?:{id:string;label:string;scope?:string}[]};
   cooldown_until?:string|null;created_at?:string;updated_at?:string;reason?:string;
+  practical_trial_available?:boolean;practical_trial_connected?:boolean;practical_trial?:DeskBotPracticalRoleTrial|null;
   evidence_ids?:string[];trial?:{status:string;started_at?:string;turns_observed:number;max_turns:number;positive_feedback:number;negative_feedback:number}|null;
 }
 export interface DeskBotRoleEvolution {

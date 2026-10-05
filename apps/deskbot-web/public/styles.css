@@ -522,3 +522,10 @@ body { overflow-x:hidden; background:#0b2430; }
 .role-wish-barriers ul { margin:6px 0; padding-left:16px; color:#8b8064; font-size:12px; line-height:1.8; }
 .role-item.lived-wish details { margin-top:12px; font-size:11px; overflow-wrap:anywhere; }
 .role-item.lived-wish summary { cursor:pointer; color:#718770; }
+.role-practical { padding:14px; margin:14px 0; border:1px solid #c9dbc5; border-radius:10px; background:#f7fbf1; }
+.role-practical.blocked,.role-practical.paused { border-color:#e0d8b8; background:#faf7eb; }
+.role-practical-task { display:grid; gap:5px; padding:12px; margin:12px 0; background:#eaf2e3; border-radius:9px; font-size:12px; }
+.role-practical-task > strong { color:#597858; }.role-practical-review { padding:10px; background:#e7efde; border-radius:8px; }
+.role-practical-outcomes { list-style:none; padding:0; display:grid; gap:9px; }.role-practical-outcomes li { display:grid; gap:4px; border-top:1px solid #dce4d2; padding-top:9px; font-size:11px; }
+.role-practical-outcomes strong { font-weight:500; color:#708464; }.role-practical-outcomes code { font-size:10px; overflow-wrap:anywhere; color:#98a28b; }
+.role-practical-variant { display:grid; gap:6px; font-size:11px; margin:10px 0; }.role-practical-variant select { width:100%; border:1px solid #d6dfcb; border-radius:8px; padding:9px; background:#fffdf5; color:#6f8066; }

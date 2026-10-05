@@ -4,6 +4,7 @@ import { localWorldDate } from './realtime-world.mjs';
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 import { roleDevelopmentReadModel, candidateDevelopmentContext } from './role-development.mjs';
 import { roleWishReadModel } from './role-wishes.mjs';
+import { practicalTrialReadModel, practicalTrialsReadModel } from './role-practical-trials.mjs';
 import { RoleProposalError } from './role-proposals.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
@@ -512,11 +513,11 @@ export function createRoleEvolution({
       if (proposal.origin !== 'lived_wish') return proposal;
       const model = wishView({ characterId: proposal.character_id });
       const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
-      return { ...proposal,
+      return projectPracticalTrial({ ...proposal,
         current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [{ id: 'direction_unavailable', label: '这个方向当前没有可用的生活依据', scope: 'evidence' }], checks: [] }),
         proposal_gate: clone(direction?.proposal_gate ?? null),
         current_authored_reason: direction?.authored_reason ?? null,
-      };
+      });
     });
   }
 
@@ -525,8 +526,41 @@ export function createRoleEvolution({
     if (!proposal || proposal.origin !== 'lived_wish') return proposal;
     const model = wishView({ characterId: proposal.character_id });
     const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
-    return { ...proposal, current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [], checks: [] }),
-      proposal_gate: clone(direction?.proposal_gate ?? null), current_authored_reason: direction?.authored_reason ?? null };
+    return projectPracticalTrial({ ...proposal, current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [], checks: [] }),
+      proposal_gate: clone(direction?.proposal_gate ?? null), current_authored_reason: direction?.authored_reason ?? null });
+  }
+
+  function projectPracticalTrial(proposal) {
+    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const trial = practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
+    const registered = world?.protagonist?.character_id === proposal.character_id || world?.npcs?.some(item => item.npc_id === proposal.character_id);
+    const available = proposal.status === 'prepared' && proposal.user_choice === 'try' && registered
+      && Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time'
+      && ['wetland_frog', 'workshop_maker', 'chef'].includes(proposal.direction_id) && !trial;
+    return { ...proposal, practical_trial: trial, practical_trial_connected: Boolean(trial), practical_trial_available: Boolean(available) };
+  }
+
+  function reconcilePracticalExit(proposalId, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null) {
+    const proposal = roles.get(proposalId);
+    if (!proposal || proposal.origin !== 'lived_wish') return proposal;
+    const trial = practicalTrialReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+    if (trial?.status !== 'exited' || proposal.practical_trial_exited_at) return proposal;
+    const exitedAt = trial.exited_at ?? trial.ended_at;
+    // Recovery can occur days after exit. Freeze only the canonical basis
+    // that existed at the decision, so later actual life remains new evidence.
+    const direction = roleWishReadModel(world, { actorId: proposal.character_id, at: exitedAt }).directions.find(item => item.direction_id === proposal.direction_id);
+    return roles.exitPracticalWish(proposalId, { eventId: trial.exit_event_id ?? `practical-exit:${trial.trial_id}`,
+      at: exitedAt, rootOutcomeIds: direction?.basis?.root_outcome_ids ?? [],
+      reason: inputStore.get?.(trial.exit_event_id)?.payload?.reason ?? 'owner_exited_practical_trial' });
+  }
+
+  function archive(proposalId, options = {}) {
+    const proposal = roles.get(proposalId);
+    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const trial = proposal?.origin === 'lived_wish' ? practicalTrialReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() }) : null;
+    if (trial && trial.status !== 'exited') throw new RoleProposalError(409, 'practical_trial_requires_exit', '请先退出这份实际试做，再归档愿望，实际任务和经历会保留。');
+    if (trial?.status === 'exited') reconcilePracticalExit(proposalId, world);
+    return roles.archive(proposalId, options);
   }
 
   function proposeWish({ characterId = activeCharacter, directionId, proposalId = null } = {}) {
@@ -581,6 +615,12 @@ export function createRoleEvolution({
   function syncWishes(characterId, at, world) {
     const model = roleWishReadModel(world, { actorId: characterId, at: at.toISOString() });
     const created = [];
+    for (const proposal of roles.list({ characterId, limit: 200 })) {
+      if (proposal.origin === 'lived_wish' && !proposal.practical_trial_exited_at
+        && practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: characterId, at: at.toISOString() })?.status === 'exited') {
+        reconcilePracticalExit(proposal.proposal_id, world);
+      }
+    }
     if (model.enabled) {
       for (const proposal of roles.list({ characterId, limit: 200 })) {
         if (proposal.origin !== 'lived_wish' || !['proposed', 'deferred', 'prepared'].includes(proposal.status)) continue;
@@ -701,6 +741,8 @@ export function createRoleEvolution({
       character_id: characterId,
       development,
       wishes,
+      practical_trials: { ...practicalTrialsReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: now().toISOString() }),
+        available: Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time' },
       evidence: evidenceList,
       pulls: pullList,
       candidates: candidateList,
@@ -724,6 +766,8 @@ export function createRoleEvolution({
     proposeWish,
     chooseWish,
     startTrial,
+    archive,
+    reconcilePracticalExit,
     constants: {
       activeCharacter,
       evidenceNamespace: EVIDENCE_NAMESPACE,

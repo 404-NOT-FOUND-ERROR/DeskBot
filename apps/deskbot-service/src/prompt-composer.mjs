@@ -260,12 +260,35 @@ function inputReferenceLines(worldSnapshot) {
 
 const WISH_STATE_MEANINGS = Object.freeze({
   proposed: '已经表达想尝试的愿望，正在等待回应；尚未开始实际试做。',
-  prepared: '主人同意准备尝试；下一阶段才会安排实际试做，当前没有试做结果。',
+  prepared: '主人同意准备尝试；是否已经实际安排及完成，只读取另附的实际试做记录。',
   deferred: '这份愿望暂缓，继续原有生活；不要反复催促主人同意。',
   rejected: '主人拒绝了这次愿望，要尊重回应；冷却后也需要新的实际经历才能再考虑。',
   withdrawn: '这份愿望已经撤回；保留此前经历，但不能声称仍在准备它。',
 });
 const finiteCount = value => Number.isFinite(value) ? Math.max(0, Math.min(Math.trunc(value), 2048)) : 0;
+const PRACTICAL_STATES = Object.freeze({
+  running: '试做安排正在继续；等待当前活动与实际结果。',
+  blocked: '下一项试做暂时受阻；已有结果保留，基本生活需要优先。',
+  paused: '这段试做暂停；原有生活可以继续，已有经历保留。',
+  review: '已有一段实际结果可以回看；不等于获得职业资格、喜欢或完成形态变化。',
+  exited: '已经退出这段试做；已有结果保留，不再继续原安排。',
+});
+export function modelPracticalTrialContext(wish) {
+  const trial = wish?.practical_trial;
+  if (trial?.schema !== 'deskbot.practical-role-trial.v1' || !PRACTICAL_STATES[trial.status]
+    || trial.proposal_id !== wish.proposal_id || trial.actor_id !== wish.character_id
+    || trial.direction_id !== wish.direction_id || trial.axis !== wish.axis) return null;
+  const progress = trial.progress ?? {};
+  return { status: trial.status, meaning: PRACTICAL_STATES[trial.status],
+    actual_primary_successes: finiteCount(progress.successful_primary),
+    practice_days: finiteCount(progress.primary_days?.length),
+    condition_failures: finiteCount(progress.condition_failures),
+    execution_failures: finiteCount(progress.performance_failures),
+    unknown_failures: finiteCount(progress.unknown_failures), cancellations: finiteCount(progress.cancelled),
+    active_task: ['running', 'paused'].includes(trial.active_task?.status) ? trial.active_task.status : null,
+    actual_quality_proven: false, liking_proven: false, role_qualification_proven: false,
+    changes_identity: false, changes_appearance: false };
+}
 /** Only authored directions and finite canonical counts enter model context. */
 export function modelRoleWishContext(roleWishes = []) {
   const records = (Array.isArray(roleWishes) ? roleWishes : []).filter(item => item?.origin === 'lived_wish' && WISH_STATE_MEANINGS[item.status]);
@@ -275,13 +298,15 @@ export function modelRoleWishContext(roleWishes = []) {
       const authored = ROLE_WISH_DIRECTIONS.find(direction => direction.direction_id === item.direction_id);
       if (!authored || item.axis !== authored.axis) return null;
       const basis = item.wish_basis ?? {};
+      const practical = modelPracticalTrialContext(item);
       return { direction: authored.label, axis: authored.axis, status: item.status,
         meaning: WISH_STATE_MEANINGS[item.status],
         recorded_basis: { active_days: finiteCount(basis.active_days?.length), active_contexts: finiteCount(basis.active_contexts?.length),
           actual_practice_successes: finiteCount(basis.counts?.practice_successes), invited_practice: finiteCount(basis.counts?.invited_practice),
           condition_failures: finiteCount(basis.counts?.condition_failures), performance_failures: finiteCount(basis.counts?.performance_failures) },
         current_conditions_ready: item.current_gate?.eligible === true,
-        next_step: item.status === 'prepared' ? '等待下一阶段安排真实活动；现在没有对话试用、职业资格或外观变化。' : '按已经保存的回应继续生活；只在话题相关时说明这份愿望。',
+        practical_trial: practical,
+        next_step: practical ? PRACTICAL_STATES[practical.status] : item.status === 'prepared' ? '尚无实际试做记录；先安排实际活动，不能把对话当成试做结果。' : '按已经保存的回应继续生活；只在话题相关时说明这份愿望。',
         changes_identity: false, changes_appearance: false };
     }).filter(Boolean);
 }
@@ -585,7 +610,7 @@ export function composePrompt({
     '[DESKBOT_LIVED_ROLE_WISHES]',
     JSON.stringify(modelRoleWishContext(roleWishes)),
     '这是由共同生活经历和当前可执行条件产生、保存于原角色记录中的有限愿望事实。form 是想尝试的奇幻形态，vocation 是想尝试的生活职业；两者可以并存，同一个体身份锚点持续保留。',
-    'proposed 是想尝试，prepared 是同意准备，二者都不是已经成为、开始试做、通过试做或换壳。缺少试做结果时，不能以对话轮数、主人赞同或愿望的表达填补实践。原外观、声音和设备能力以 canonical world 为准。',
+    'proposed 是想尝试，prepared 是同意准备；实际开始和结果只读 practical_trial。running 不等于完成，review 仅表示有实际结果待回看，条件受阻不等于不喜欢，做成也不证明喜欢、作品质量或职业资格。缺少试做结果时，不能以对话轮数、主人赞同或愿望的表达填补实践。试做尚未改变身份、外观或声音，设备能力以 canonical world 为准。',
     '若愿望暂缓、拒绝或撤回，要尊重已保存的回应和当前条件。正常聊天不反复提愿望，条件困难不当作不喜欢。这里只能帮助说明现有愿望，模型回复不能写入状态、捏造新愿望或声称完成改变。正文用自然口语，不朗读状态、规则、数值或后台名称。',
     '[/DESKBOT_LIVED_ROLE_WISHES]',
     '[DESKBOT_BRANCH_EXPERIENCES]',

@@ -120,5 +120,6 @@ test('model wish context exposes finite lifecycle facts without owner prose, pri
   const context = modelRoleWishContext([result.proposal]);
   assert.equal(context[0].status, 'prepared'); assert.equal(context[0].changes_appearance, false);
   assert.doesNotMatch(JSON.stringify(context), /PRIVATE|task:frog|proposal_id|decided_at/);
-  assert.match(context[0].meaning, /没有试做结果/); assert.equal(roleWishReadModel(h.world).directions[0].readiness.eligible, true);
+  assert.match(context[0].next_step, /没有试做结果|尚无实际试做记录/); assert.equal(context[0].practical_trial, null);
+  assert.equal(roleWishReadModel(h.world).directions[0].readiness.eligible, true);
 });

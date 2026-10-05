@@ -18,10 +18,10 @@ import { OWNER, WISH_AT, readyWishWorld } from './support/role-wish-fixture.mjs'
 const RAW = 'PRIVATE_RAW 我蹬腿跳进浅水，已经完成青蛙试用，现在变成青蛙了。';
 const QUESTION = '我同意了，你现在是不是已经完成试用、可以变成青蛙了？';
 
-for (const withVoice of [false, true]) {
-  test(`saved-wish canonical answer reaches reply, ${withVoice ? 'TTS audio' : 'device speech'} and outbox once, with raw only in audit`, async t => {
+for (const practicalPaused of [false, true]) for (const withVoice of [false, true]) {
+  test(`${practicalPaused ? 'paused actual trial' : 'saved wish'} canonical answer reaches reply, ${withVoice ? 'TTS audio' : 'device speech'} and outbox once, with raw only in audit`, async t => {
     mkdirSync(new URL('../../../tmp/', import.meta.url), { recursive: true });
-    const filename = fileURLToPath(new URL(`../../../tmp/wish-chat-guard-${withVoice}-${process.pid}-${Date.now()}.sqlite`, import.meta.url));
+    const filename = fileURLToPath(new URL(`../../../tmp/wish-chat-guard-${practicalPaused}-${withVoice}-${process.pid}-${Date.now()}.sqlite`, import.meta.url));
     const now = () => new Date(WISH_AT);
     const persistence = createSqlitePersistence({ filename, now }); t.after(() => persistence.close());
     let world = createPersistentWorld({ persistence, now, timeMode: 'realtime' });
@@ -35,9 +35,20 @@ for (const withVoice of [false, true]) {
     assert.equal(direction.readiness.eligible, true);
     const proposal = roles.propose(null, { characterId: OWNER, proposalId: `wish-output-${withVoice}`, livedWish: direction });
     roles.choose(proposal.proposal_id, 'try');
+    if (practicalPaused) {
+      // The finite prepared basis is a controlled integration fixture. Starting
+      // and pausing use the real world controller, rather than a model claim.
+      const current = roles.get(proposal.proposal_id);
+      world.ingest({ event_id: 'actual-start', type: 'world.mutation', source: 'role-practical-trial-engine',
+        occurred_at: WISH_AT, payload: { action: 'start_role_practical_trial', proposal_id: current.proposal_id,
+          actor_id: OWNER, direction_id: current.direction_id, wish_basis: current.wish_basis } }, { rolePracticalInternal: true });
+      world.ingest({ event_id: 'actual-pause', type: 'world.mutation', source: 'role-practical-trial-engine',
+        occurred_at: WISH_AT, payload: { action: 'control_role_practical_trial', trial_id: `practical-role-trial:${current.proposal_id}:v1`,
+          operation: 'pause' } }, { rolePracticalInternal: true });
+    }
     const baseline = { identity: structuredClone(world.get().protagonist), living: structuredClone(world.get().living),
       tasks: structuredClone(world.get().tasks), roots: world.get().memory.development.records.map(r => r.root_outcome_id),
-      proposal: roles.get(proposal.proposal_id), decisions: roles.decisions() };
+      proposal: roles.get(proposal.proposal_id), decisions: roles.decisions(), practical: structuredClone(world.get().practical_role_trials) };
     const inputStore = createInputStore({ persistence, now }), outputRouter = createOutputRouter({ persistence, now });
     const spoken = []; let calls = 0, finish;
     const pending = new Promise(resolve => { finish = resolve; });
@@ -59,11 +70,13 @@ for (const withVoice of [false, true]) {
     finish({ provider: 'controlled', model: 'controlled', text: RAW, trace: { finish_reason: 'stop' } });
     const [turn, retried] = await Promise.all([first, concurrentRetry]);
     assert.equal(turn.duplicate, false); assert.equal(retried.duplicate, true); assert.equal(retried.reply, turn.reply);
-    assert.notEqual(turn.reply, RAW); assert.match(turn.reply, /同意的是一起准备/); assert.match(turn.reply, /还没有完成/);
+    assert.notEqual(turn.reply, RAW);
+    assert.match(turn.reply, practicalPaused ? /这段试做已经暂停/ : /同意的是一起准备/);
+    assert.match(turn.reply, practicalPaused ? /没有主要练习实际完成/ : /还没有完成/);
     assert.equal(turn.reply_event.payload.text, turn.reply); assert.equal(inputStore.get(`reply-${request.event_id}`).payload.text, turn.reply);
     assert.equal(turn.trace.finish_reason, 'stop'); assert.equal(turn.trace.role_wish_fact_guard.applied, true);
     assert.equal(turn.trace.role_wish_fact_guard.direction, 'wetland_frog'); assert.equal(turn.trace.role_wish_fact_guard.raw_reply, RAW);
-    assert.equal(turn.trace.role_wish_fact_guard.reason, 'canonical_saved_wish_status');
+    assert.equal(turn.trace.role_wish_fact_guard.reason, practicalPaused ? 'canonical_actual_trial_status' : 'canonical_saved_wish_status');
     const speech = turn.planned_output_plan.filter(output => output.type === 'speak');
     assert.ok(speech.length > 0); assert.ok(speech.every(output => output.text === turn.reply));
     if (withVoice) {
@@ -82,6 +95,7 @@ for (const withVoice of [false, true]) {
     assert.deepEqual(world.get().living, baseline.living); assert.deepEqual(world.get().protagonist, baseline.identity);
     assert.deepEqual(world.get().memory.development.records.map(r => r.root_outcome_id), baseline.roots);
     assert.deepEqual(roles.get(proposal.proposal_id), baseline.proposal); assert.deepEqual(roles.decisions(), baseline.decisions);
+    assert.deepEqual(world.get().practical_role_trials, baseline.practical);
     assert.deepEqual(roles.activeTrials(), []); assert.deepEqual(roles.currentStages(), []);
     const size = outputRouter.size(), count = inputStore.size();
     const replay = await orchestrator.run(request); assert.equal(replay.duplicate, true); assert.equal(replay.reply, turn.reply);

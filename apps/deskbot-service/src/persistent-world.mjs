@@ -1,5 +1,6 @@
 import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-memory.mjs';
 import { syncDevelopmentEvidence } from './development-evidence.mjs';
+import { startPracticalTrial, controlPracticalTrial, settlePracticalTrials, PracticalRoleTrialError } from './role-practical-trials.mjs';
 import { installBodyPerception, applyBodyObservation, markBodyCommands, markBodyCommandDispatched, applyBodyCommandAck, applyBodyCommandLocalFailure, settleBodyPerception } from './body-perception.mjs';
 import { applyLifeChoice } from './autonomous-life.mjs';
 import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, upgradeCommunitySupplyMap, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
@@ -98,11 +99,13 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action:'install_development_evidence',layer:'world_line',required:[],optional:[],description:'在生活记忆内连接同根的实际任务、项目与约定结果' },
   { action:'claim_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:[],description:'服务端核验可行候选并领取有限思考额度' },
   { action:'resolve_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:['text','model','error'],description:'服务端验证模型选择，保留理解与执行边界' },
+  { action:'start_role_practical_trial',layer:'world_line',required:['proposal_id','actor_id','direction_id','wish_basis'],optional:['variant'],description:'服务器核验已保存愿望后，登记有限实际试做安排；不直接接受角色或改变外观' },
+  { action:'control_role_practical_trial',layer:'world_line',required:['trial_id','operation'],optional:['variant','reason'],description:'服务器暂停、恢复、调整或退出实际试做，只处理本试做绑定的原事务' },
   { action: 'sync_real_time', layer: 'calendar', required: [], optional: ['time_zone'], description: '服务端同步现实时间，生产默认 Asia/Shanghai、1:1' },
   { action: 'start_activity', layer: 'world_line', required: ['task_id'], optional: ['activity_id', 'kind', 'title', 'duration_seconds', 'actor_id'], description: '作者生活活动使用固定耗时、材料预留和核验后果；旧活动仅保留经历' },
   { action: 'advance_living_world', layer: 'world_line', required: ['until'], optional: ['force'], description: '服务端按真实经过时间补算环境，最多七天一批，保留恢复游标' },
   { action: 'transfer_resource', layer: 'world_line', required: ['object_id', 'resource', 'count', 'operation'], optional: ['actor_id'], description: '同地点从有限库存取放物品，不凭空生成材料' },
-  { action: 'control_task', layer: 'world_line', required: ['task_id', 'operation'], optional: [], description: '暂停、继续或取消未完成任务' },
+  { action: 'control_task', layer: 'world_line', required: ['task_id', 'operation'], optional: [], description: '暂停、继续或取消普通未完成任务；角色试做任务必须通过试做卡操作，以释放个体和退还材料' },
   { action: 'advance_task', layer: 'world_line', required: ['task_id', 'expected_task_revision'], optional: [], description: '服务端核验到期任务并原子提交结果' },
   { action: 'advance_time', layer: 'calendar', required: ['minutes'], optional: [], description: '推进连续世界逻辑时间' },
   { action: 'activate_event', layer: 'world_line', required: ['event.event_id', 'event.title'], optional: ['event.summary', 'event.daily_consequence', 'event.opportunity', 'event.unresolved_hook', 'event.source'], description: '创建唯一进行中的世界事件及其可生活切片' },
@@ -1154,6 +1157,12 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
     case 'claim_life_choice':
     case 'resolve_life_choice':
       details=applyLifeChoice(next,at,payload);break;
+    case 'start_role_practical_trial':
+      details=startPracticalTrial(next,{proposalId:payload.proposal_id,actorId:payload.actor_id,directionId:payload.direction_id,
+        wishBasis:payload.wish_basis,at,eventId:event.event_id,variant:payload.variant});break;
+    case 'control_role_practical_trial':
+      details=controlPracticalTrial(next,{trialId:payload.trial_id,operation:payload.operation,at,eventId:event.event_id,
+        variant:payload.variant,reason:payload.reason});break;
     case 'advance_autonomous_life':
       details = advanceAutonomousLife(next, at, { eventId: event.event_id, reservedActors: payload.reserved_actors ?? [] });
       break;
@@ -1176,6 +1185,9 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
       details = startActivityTask(next, payload, { eventId: event.event_id, at });
       break;
     case 'control_task':
+      if (next.tasks?.find(task => task.task_id === payload.task_id)?.role_trial) {
+        throw new PersistentWorldError(409, 'practical_trial_requires_trial_controls', '这项任务属于实际角色试做，请在试做卡上暂停、恢复或退出；暂停会释放当前任务并退还预留材料。');
+      }
       advanceLivingResources(next, at, { force: true });
       details = controlWorldTask(next, payload, at);
       break;
@@ -1670,9 +1682,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       };
     } else if (eventType === 'world.mutation') {
       ensureWorldTarget(event, world);
+      if (['start_role_practical_trial','control_role_practical_trial'].includes(event.payload?.action)
+        && (event.source !== 'role-practical-trial-engine' || adapter.rolePracticalInternal !== true)) {
+        throw new PersistentWorldError(403,'practical_trial_requires_server_adapter','实际角色试做只能由已核验愿望的服务端接口安排。');
+      }
       try { projection = applyExplicitMutation(world, event, now().toISOString()); }
       catch (error) {
-        if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
+        if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError || error instanceof PracticalRoleTrialError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
         throw error;
       }
     } else if (['body.commands.linked', 'body.command.dispatched', 'body.command.acknowledged','body.command.failed'].includes(eventType)) {
@@ -1704,7 +1720,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     // does not advance canonical revision/tick or overwrite the accepted
     // projection (for example, a stale weather sample).
     const observationAccepted = projection.details?.accepted !== false;
-    if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
+    if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settlePracticalTrials(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
     const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {
@@ -2032,6 +2048,7 @@ export function getWorldSchema(world = null) {
       device_context: { type: 'object', path: '/device_context' },
       interaction: { type: 'object', path: '/interaction' },
       memory: {type:['object','null'],schema:'deskbot.lived-memory.v1',path:'/memory',maximum_episodes:1024,writer:'canonical task outcomes and bounded model interpretations'},
+      practical_role_trials: {type:['object','null'],schema:'deskbot.practical-role-trials.v1',path:'/practical_role_trials',writer:'validated role-practical-trial-engine and actual common task outcomes'},
       refraction: {type:['object','null'],schema:'deskbot.input-refraction.v1',path:'/refraction',maximum_records:96},
     },
     input_layers: clone(MULTISOURCE_LAYERS),

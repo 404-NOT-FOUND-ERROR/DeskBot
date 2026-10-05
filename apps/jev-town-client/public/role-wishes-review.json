@@ -7291,6 +7291,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -17307,6 +17314,13 @@
             "evidence_basis": "same_canonical_root_outcomes",
             "window_is_real_elapsed_time": true
           }
+        },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
         },
         "evidence": [],
         "pulls": [],
@@ -30871,6 +30885,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -34040,7 +34061,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": false
         }
       ]
     },
@@ -45004,6 +45027,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -48254,7 +48284,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": true
         }
       ]
     },
@@ -59215,6 +59247,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -62555,7 +62594,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，苗圃和水岸有 3 个上海日的主动继续、2 种情境和 7 次对应配方完成。路线、材料、设施或协作条件暂不支持继续尝试。条件困难不表示不喜欢，也不直接说明不会做。"
+          "current_authored_reason": "过去 14 天，苗圃和水岸有 3 个上海日的主动继续、2 种情境和 7 次对应配方完成。路线、材料、设施或协作条件暂不支持继续尝试。条件困难不表示不喜欢，也不直接说明不会做。",
+          "practical_trial": null,
+          "practical_trial_available": true
         }
       ]
     },
@@ -73764,6 +73805,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -77142,7 +77190,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": true
         },
         {
           "schema": "deskbot.role-direction-proposal.v0.2",
@@ -77418,7 +77468,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": false
         }
       ]
     },
@@ -88625,6 +88677,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -92062,7 +92121,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": true
         },
         {
           "schema": "deskbot.role-direction-proposal.v0.2",
@@ -92361,7 +92422,9 @@
             "needs_new_actual_root": true,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": false
         }
       ]
     },
@@ -103568,6 +103631,13 @@
             "window_is_real_elapsed_time": true
           }
         },
+        "practical_trials": {
+          "schema": "deskbot.practical-role-trials.v1",
+          "enabled": false,
+          "revision": 0,
+          "trials": [],
+          "available": true
+        },
         "evidence": [],
         "pulls": [],
         "candidates": [
@@ -107005,7 +107075,9 @@
             "needs_new_actual_root": false,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在苗圃和水岸主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 7 次对应配方。我想试试荷叶青蛙的形态，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": true
         },
         {
           "schema": "deskbot.role-direction-proposal.v0.2",
@@ -107304,7 +107376,9 @@
             "needs_new_actual_root": true,
             "new_actual_root_ids": []
           },
-          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。"
+          "current_authored_reason": "过去 14 天，我在灶边做饭主动继续了 3 个上海日，有 2 种实际情境；也跨日做成了 3 次对应配方。我想试着当一个会帮忙做饭的厨师，但这些记录还不说明技能或形态已经成熟。",
+          "practical_trial": null,
+          "practical_trial_available": false
         }
       ],
       "restart_verified": true

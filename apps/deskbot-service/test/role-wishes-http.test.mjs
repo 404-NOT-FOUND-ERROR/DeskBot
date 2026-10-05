@@ -114,7 +114,7 @@ test('HTTP prepared wish cannot use dialogue trials, accept appearance or affect
   const chat = await h.post('/api/chat', { event_id: 'prepared-chat', character_id: OWNER, message: '你现在已经变成青蛙了吗？' });
   assert.equal(chat.status, 202); assert.deepEqual(chat.body.turn.active_role_trials, []);
   assert.match(chat.body.turn.prompt.text, /DESKBOT_LIVED_ROLE_WISHES/); assert.match(chat.body.turn.prompt.text, /"status":"prepared"/);
-  assert.match(chat.body.turn.prompt.text, /尚未开始实际试做|当前没有试做结果/);
+  assert.match(chat.body.turn.prompt.text, /尚未开始实际试做|当前没有试做结果|尚无实际试做记录/);
   assert.equal(chat.body.turn.expression_intent.role_trial == null, true);
   assert.deepEqual(h.roles.currentStages(), []); assert.equal(h.roles.get(proposal.proposal_id).status, 'prepared');
   assert.deepEqual(h.persistentWorld.get().protagonist.appearance, before.protagonist.appearance);

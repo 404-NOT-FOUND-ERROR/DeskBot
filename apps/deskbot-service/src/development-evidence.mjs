@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { ACTIVITIES, LIVING_RULE_VERSION } from './living-resources.mjs';
 import { goalTopic } from './lived-memory.mjs';
 import { activityTopic, syncDevelopmentFacets, developmentFacetsReadModel } from './development-facets.mjs';
+import { safePracticalTrialMetadata } from './role-practical-trials.mjs';
 
 // A projection of already settled world results, not another reward engine.
 export const DEVELOPMENT_VERSION = 'deskbot.development-evidence.v1';
@@ -77,6 +78,8 @@ function fromTask(w, task, at, registered) {
   const r = recordBase(rootForTask(task.task_id), [task.actor_id], date, task.status,
     { kind: 'canonical_task', task_id: task.task_id, commitment_id: string(task.social_commitment_id), task_kind: string(task.kind),
       life_action: ['observe', 'rest'].includes(task.life_action) ? task.life_action : null });
+  const trialLink = safePracticalTrialMetadata(task.role_trial);
+  if (trialLink) r.source.role_trial = trialLink;
   r.activity_id = string(task.activity_id);
   r.title = titleFor(r.activity_id, task.kind, task.life_action);
   // The new finite gathering outcome joins the existing common ledger. Its
@@ -134,6 +137,8 @@ function fromEpisode(episode, at, registered) {
   const r = recordBase(root, actorIds, episode.at, episode.outcome,
     { kind: 'legacy_memory_fact', task_id: string(s.task_id), commitment_id: string(s.commitment_id), task_kind: null, original_kind: s.kind,
       life_action: ['observe', 'rest'].includes(s.life_action) ? s.life_action : null });
+  const trialLink = safePracticalTrialMetadata(s.role_trial);
+  if (trialLink) r.source.role_trial = trialLink;
   r.activity_id = string(s.activity_id);
   r.title = s.kind === 'canonical_commitment' ? '实际约定结果' : titleFor(r.activity_id);
   r.topic = r.activity_id ? activityTopic(r.activity_id) : string(episode.topic) ?? goalTopic(s.project_id ?? '');
@@ -184,6 +189,7 @@ function mergeRecord(old, incoming) {
   const other = best === old ? incoming : old;
   const r = copy(best);
   r.source.life_action ??= other.source.life_action ?? null;
+  if (!r.source.role_trial && other.source.role_trial) r.source.role_trial = copy(other.source.role_trial);
   r.historical_import = old.historical_import;
   r.first_observed_at = old.first_observed_at;
   // Canonical task/commitment participants are authoritative. A historical

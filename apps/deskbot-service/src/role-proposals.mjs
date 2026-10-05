@@ -46,19 +46,20 @@ export function roleWishProposalGate(history, direction, { characterId = null, a
   const currentMs = timestamp(at instanceof Date ? at.toISOString() : at);
   const barriers = [...(direction?.readiness?.barriers ?? [])].map(item => structuredClone(item));
   const sameDirection = records.filter(item => item.direction_id === direction?.direction_id && item.proposal_id !== excludeProposalId)
-    .sort((left, right) => timestamp(right.decided_at ?? right.proposed_at) - timestamp(left.decided_at ?? left.proposed_at));
+    .sort((left, right) => timestamp(right.practical_trial_exited_at ?? right.decided_at ?? right.proposed_at) - timestamp(left.practical_trial_exited_at ?? left.decided_at ?? left.proposed_at));
   const last = sameDirection[0] ?? null;
   const axisConflict = records.find(item => item.proposal_id !== excludeProposalId && item.axis === direction?.axis && LIVE_WISH_STATUSES.has(item.status));
   if (axisConflict) barriers.push({ id: 'axis_occupied', label: '这个方向轴已有等待回应或准备实践的愿望', scope: 'policy', proposal_id: axisConflict.proposal_id });
   const lastAnnouncement = records.filter(item => item.proposal_id !== excludeProposalId).reduce((latest, item) => Math.max(latest, timestamp(item.proposed_at)), 0);
   const announceUntil = lastAnnouncement ? lastAnnouncement + WISH_ANNOUNCE_MS : 0;
   if (announceUntil > currentMs) barriers.push({ id: 'announcement_cooldown', label: '刚表达过一份愿望，先继续生活', scope: 'policy' });
-  const needsNewRoot = last && ['later', 'reject'].includes(last.user_choice);
+  const needsNewRoot = last && (['later', 'reject'].includes(last.user_choice) || Boolean(last.practical_trial_exited_at));
   const ownerCooldown = needsNewRoot ? timestamp(last.cooldown_until) : 0;
-  if (ownerCooldown > currentMs) barriers.push({ id: 'owner_choice_cooldown', label: last.user_choice === 'reject' ? '尊重这次拒绝，暂不重提' : '尊重稍后再说，暂不重提', scope: 'policy' });
+  if (ownerCooldown > currentMs) barriers.push({ id: 'owner_choice_cooldown', label: last.practical_trial_exited_at ? '尊重这次退出，先继续生活' : last.user_choice === 'reject' ? '尊重这次拒绝，暂不重提' : '尊重稍后再说，暂不重提', scope: 'policy' });
   const previousRoots = new Set(last?.reconsider_after_roots ?? last?.wish_basis?.root_outcome_ids ?? []);
   const datedRoots = direction?.basis?.root_outcomes ?? [];
-  const newRoots = rootIds(direction).filter(id => !previousRoots.has(id) && datedRoots.some(root => root.root_outcome_id === id && timestamp(root.at) > timestamp(last?.decided_at)));
+  const reconsiderAt = last?.practical_trial_exited_at ?? last?.decided_at;
+  const newRoots = rootIds(direction).filter(id => !previousRoots.has(id) && datedRoots.some(root => root.root_outcome_id === id && timestamp(root.at) > timestamp(reconsiderAt)));
   if (needsNewRoot && !newRoots.length) barriers.push({ id: 'new_actual_outcome_required', label: '回应后还没有新的实际经历，不重复劝说', scope: 'policy' });
   return {
     eligible: direction?.readiness?.eligible === true && barriers.length === 0,
@@ -379,6 +380,28 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
       ...(status !== proposal.status ? { stage_history: [...(proposal.stage_history ?? []), { from: proposal.status, to: status, at: stamp, reason, source: 'lived_rules' }], ...(status === 'withdrawn' ? { withdrawn_at: stamp, withdrawal_reason: reason } : {}) } : {}) };
     proposals.set(proposalId, updated); persistence?.put('role.proposals', proposalId, updated); return clone(updated);
   }
+  // Execution stays in the canonical world. This records only the owner's
+  // lifecycle decision, retaining the original try and frozen wish basis.
+  function exitPracticalWish(proposalId, { eventId, at = now(), reason = null, rootOutcomeIds = [] } = {}) {
+    const proposal = proposals.get(proposalId);
+    if (!proposal) return null;
+    if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'practical_trial_requires_lived_wish', '实际试做需要已经登记的生活愿望。');
+    if (proposal.practical_trial_exited_at) return clone(proposal);
+    const stamp = new Date(at).toISOString();
+    const decisionId = `${proposalId}:practical-exit:${eventId}`;
+    const decision = { schema: 'deskbot.role-proposal-decision.v0.2', decision_id: decisionId,
+      proposal_id: proposalId, choice: 'exit_practical_trial', reason, decided_at: stamp, origin: 'lived_wish', event_id: eventId };
+    const updated = { ...proposal, status: 'withdrawn', withdrawn_at: stamp, withdrawal_reason: reason ?? 'owner_exited_practical_trial',
+      practical_trial_exited_at: stamp, practical_trial_exit_event_id: eventId,
+      cooldown_until: new Date(timestamp(stamp) + WISH_LATER_MS).toISOString(),
+      reconsider_after_roots: [...new Set([...rootOutcomeIds, ...(proposal.wish_basis?.root_outcome_ids ?? [])])].slice(-64),
+      stage_history: [...(proposal.stage_history ?? []), { from: proposal.status, to: 'withdrawn', at: stamp,
+        reason: reason ?? 'owner_exited_practical_trial', source: 'owner_practical_exit', event_id: eventId }] };
+    const persist = () => { persistence?.put('role.proposal-decisions', decisionId, decision); persistence?.put('role.proposals', proposalId, updated); };
+    if (typeof persistence?.transaction === 'function') persistence.transaction(persist); else persist();
+    decisions.set(decisionId, decision); proposals.set(proposalId, updated);
+    return clone(updated);
+  }
   function chooseWish(proposal, choice, { reason = null } = {}) {
     const decisionId = `${proposal.proposal_id}:${choice}`;
     const existingDecision = decisions.get(decisionId);
@@ -402,7 +425,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     if (!existingDecision) decisions.set(decisionId, decision); proposals.set(proposal.proposal_id, updated);
     return clone({ proposal: updated, decision });
   }
-  return { propose, refreshEvidence, refreshWish, wishGate, nextWishId, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
+  return { propose, refreshEvidence, refreshWish, wishGate, nextWishId, choose, startTrial, recordTrialObservation, completeTrial, archive, exitPracticalWish, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
 }
 
 export { ROLE_TRIAL_OVERLAYS };

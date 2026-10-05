@@ -36,6 +36,7 @@ import { createInputRuntime } from './input-runtime.mjs';
 import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import { createRoleEvolution } from './role-evolution.mjs';
+import { practicalTrialReadModel } from './role-practical-trials.mjs';
 import { createWorldCandidateStore, WorldCandidateError } from './world-candidates.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
@@ -307,7 +308,7 @@ export function createDeskBotServer({
   }
 
   function sendRoleError(response, error) {
-    const expected = error instanceof InputError || error instanceof RoleProposalError || error instanceof TypeError;
+    const expected = error instanceof InputError || error instanceof RoleProposalError || error instanceof PersistentWorldError || error instanceof TypeError;
     sendJson(response, expected ? (error.statusCode ?? 400) : 500, {
       error: expected ? (error.code ?? 'invalid_role_request') : 'internal_error',
       message: expected ? error.message : 'role proposal operation failed',
@@ -343,7 +344,9 @@ export function createDeskBotServer({
   }
 
   function ingestNonChatEvent(eventInput, adapter = {}) {
-    if (eventInput.type === 'world.mutation' && ['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)) {
+    const trialAction = ['start_role_practical_trial', 'control_role_practical_trial'].includes(eventInput.payload?.action);
+    if (eventInput.type === 'world.mutation' && (['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)
+      || (trialAction && adapter.rolePracticalInternal === true && !inputStore.get(eventInput.event_id)))) {
       persistentWorld.syncWallClock?.();
       const recovery = persistentWorld.syncTasks?.();
       if (recovery?.pending_due || recovery?.environment_pending) throw new PersistentWorldError(409, 'world_catching_up', '世界正在补算之前的事务，请稍后再试。');
@@ -1343,6 +1346,45 @@ export function createDeskBotServer({
       return;
     }
 
+    const practicalActionMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/practical-trial\/(start|pause|resume|adjust|exit)$/);
+    if (request.method === 'POST' && practicalActionMatch) {
+      const proposalId = decodeURIComponent(practicalActionMatch[1]), operation = practicalActionMatch[2];
+      readJson(request, 16 * 1024, { allowEmpty: true }).then(body => {
+        const allowedKeys = operation === 'start' ? ['event_id', 'variant'] : ['event_id', 'variant', 'reason'];
+        if (Object.keys(body).some(key => !allowedKeys.includes(key))) throw new InputError(400, 'invalid_practical_trial_request', '实际试做只接受已设计的方式和操作；不能指定活动、时长、经历或结果。');
+        const proposal = roles.get(proposalId);
+        if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
+        if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'practical_trial_requires_lived_wish', '旧草稿不能启动实际角色试做，需要从实际生活中产生新的愿望。');
+        const world = persistentWorld.get();
+        const trial = practicalTrialReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+        const eventId = optionalRoleText(body.event_id, 'event_id') ?? (operation === 'start' ? `role-practical:start:${proposalId}` : `role-practical:${operation}:${randomUUID()}`);
+        const savedEvent = inputStore.get(eventId);
+        const sameStartReplay = operation === 'start' && trial && savedEvent?.source === 'role-practical-trial-engine'
+          && savedEvent.payload?.action === 'start_role_practical_trial' && savedEvent.payload?.proposal_id === proposalId;
+        if (operation === 'start' && !sameStartReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
+          throw new RoleProposalError(409, 'practical_trial_requires_prepared_wish', '先回应这份已经具备生活依据的愿望，再安排实际试做。');
+        }
+        if (operation !== 'start' && !trial) throw new RoleProposalError(404, 'practical_trial_not_found', '这份愿望还没有实际试做记录。');
+        const registered = world.protagonist.character_id === proposal.character_id || world.npcs?.some(item => item.npc_id === proposal.character_id);
+        if (!registered || !world.autonomy?.actors?.[proposal.character_id]) throw new RoleProposalError(409, 'practical_trial_actor_unknown', '这份愿望需要对应已经住在世界里的个体。');
+        const variant = optionalRoleText(body.variant, 'variant'), reason = optionalRoleText(body.reason, 'reason');
+        const payload = operation === 'start' ? { action: 'start_role_practical_trial', proposal_id: proposalId,
+          actor_id: proposal.character_id, direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
+          ...(variant ? { variant } : {}) } : { action: 'control_role_practical_trial', trial_id: trial.trial_id,
+          operation, ...(variant ? { variant } : {}), ...(reason ? { reason } : {}) };
+        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-practical-trial-engine',
+          source_kind: 'world_engine', character_id: world.protagonist.character_id,
+          occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { rolePracticalInternal: true });
+        if (operation === 'exit') roleEvolution.reconcilePracticalExit(proposalId);
+        const current = practicalTrialReadModel(persistentWorld.get(), { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+        return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
+          proposal: roleEvolution.wishProposal(proposalId), practical_trial: current, world_mutation: result.worldMutation };
+      }).then(result => sendJson(response, result.duplicate ? 200 : 202, {
+        schema: 'deskbot.practical-role-trial-action-response.v1', accepted: true, ...result,
+      })).catch(error => sendRoleError(response, error));
+      return;
+    }
+
     const roleActionMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/(choose|trial\/start|trial\/observations|trial\/complete|archive)$/);
     if (request.method === 'POST' && roleActionMatch) {
       const proposalId = decodeURIComponent(roleActionMatch[1]);
@@ -1358,7 +1400,7 @@ export function createDeskBotServer({
           }
           if (action === 'trial/observations') return roles.recordTrialObservation(proposalId, { eventId: requiredRoleText(body.event_id ?? body.eventId, 'event_id'), signal: body.signal ?? 'neutral', evidenceId: optionalRoleText(body.evidence_id ?? body.evidenceId, 'evidence_id') });
           if (action === 'trial/complete') return roles.completeTrial(proposalId, { decision: body.decision ?? 'deferred', reason });
-          return roles.archive(proposalId, { reason });
+          return roleEvolution.archive(proposalId, { reason });
         })
         .then((result) => {
           if (!result) {

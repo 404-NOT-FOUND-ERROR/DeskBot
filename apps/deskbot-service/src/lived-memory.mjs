@@ -3,6 +3,7 @@ import { localWorldDate } from './realtime-world.mjs';
 import { ACTIVITIES } from './living-resources.mjs';
 import { syncDevelopmentEvidence, developmentReadModel } from './development-evidence.mjs';
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
+import { safePracticalTrialMetadata } from './role-practical-trials.mjs';
 
 export const MEMORY_VERSION = 'deskbot.lived-memory.v1';
 export const TOPICS = { care:'照料', craft:'制作', repair:'修缮', cook:'做饭', explore:'观察小镇', connection:'与人相处' };
@@ -92,7 +93,8 @@ export function syncLivedMemory(w,at) {
       text:task.status==='completed'?(task.completion?.result?.text??`${task.title}完成了。`):`${task.title}${task.status==='cancelled'?'已取消':'未完成'}：${task.failure_reason??'活动停下了'}。`,
       topic,location_id:task.to_location_id??task.location_id??task.destination_location_id??null,outcome:task.status,
       source:{kind:'canonical_task',task_id:task.task_id,activity_id:task.activity_id??null,plan_id:task.life_plan_id??null,
-        life_action:task.life_action??null,motivation:structuredClone(task.life_motivation??{kind:'unknown',facet_root_ids:[]}),...failureMetadata(task)},
+        life_action:task.life_action??null,motivation:structuredClone(task.life_motivation??{kind:'unknown',facet_root_ids:[]}),
+        ...(safePracticalTrialMetadata(task.role_trial)?{role_trial:safePracticalTrialMetadata(task.role_trial)}:{}),...failureMetadata(task)},
       model_safe:['autonomous_life','social_life'].includes(task.origin),
       model_text:`镇内${task.kind==='travel'?'旅行':ACTIVITIES.find(a=>a.activity_id===task.activity_id)?.title??(task.life_action==='rest'?'休息':'观察活动')}：${task.status==='completed'?'完成':task.status==='failed'?'未完成':'取消'}。`,
       independent_evidence:task.status!=='cancelled'&&task.kind!=='travel'&&task.life_action!=='rest'&&Boolean(topic)&&!(task.life_source_ids?.length)});

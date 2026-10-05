@@ -752,7 +752,8 @@ function renderMapDetail() {
   if (!location.current && !location.reachable) action = '<span class="map-distant-label">要先经过相邻地点</span>';
   if (task) {
     const seconds = task.status === 'paused' ? Math.ceil(task.remaining_ms / 1000) : Math.max(0, Math.ceil((Date.parse(task.due_at) - Date.now()) / 1000));
-    action = `<div class="map-event-note"><strong>${escapeHtml(task.title)} · ${task.status === 'paused' ? '暂停中' : task.kind === 'travel' ? '在路上' : '正在忙'}</strong><p>这一段还需约 ${Math.ceil(seconds / 60)} 分钟${task.kind === 'travel' ? '；抵达后更新位置' : ''}</p><button type="button" data-task-operation="${task.status === 'paused' ? 'resume' : 'pause'}" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>${task.status === 'paused' ? '继续' : '暂停'}</button> <button type="button" data-task-operation="cancel" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>取消这次活动</button></div>`;
+    const controls = task.role_trial ? '<small>这是实际试做中的活动。请到试做卡暂停或退出，材料会归还，日常生活继续。</small>' : `<button type="button" data-task-operation="${task.status === 'paused' ? 'resume' : 'pause'}" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>${task.status === 'paused' ? '继续' : '暂停'}</button> <button type="button" data-task-operation="cancel" data-task-id="${escapeHtml(task.task_id)}" ${state.mapTravelBusy ? 'disabled' : ''}>取消这次活动</button>`;
+    action = `<div class="map-event-note"><strong>${escapeHtml(task.title)} · ${task.status === 'paused' ? '暂停中' : task.kind === 'travel' ? '在路上' : '正在忙'}</strong><p>这一段还需约 ${Math.ceil(seconds / 60)} 分钟${task.kind === 'travel' ? '；抵达后更新位置' : ''}</p>${controls}</div>`;
   }
   const autonomy=state.worldMap?.autonomy,ownLife=autonomy?.actors.find(actor=>actor.actor_id===CHARACTER_ID);
   const social=state.worldMap?.social,livePromises=(social?.commitments||[]).filter(c=>['proposed','accepted','meeting','working'].includes(c.status));
@@ -1269,6 +1270,14 @@ function renderRolePulls(pulls = []) {
 function roleActionButtons(proposal, wishesEnabled = false) {
   const id = escapeHtml(proposal.proposal_id);
   if (proposal.origin === 'lived_wish') {
+    if (proposal.practical_trial) {
+      const trial = proposal.practical_trial;
+      const allowed = trial.allowed_actions || [];
+      const button = (operation, label) => `<button class="quiet-button role-action" type="button" data-role-action="practical" data-role-operation="${operation}" data-role-id="${id}">${label}</button>`;
+      const adjust = allowed.includes('adjust') ? `<label class="role-practical-variant">接下来采用的实际做法<select data-role-practical-variant>${(trial.variant_choices || []).map(value => `<option value="${escapeHtml(value.id)}"${value.id === trial.variant_id ? ' selected' : ''}>${escapeHtml(value.label)}</option>`).join('')}</select></label>${button('adjust', trial.status === 'review' ? '按这个做法继续试做' : '调整试做安排')}` : '';
+      return `<div class="role-actions">${allowed.includes('pause') ? button('pause', '先暂停试做') : ''}${allowed.includes('resume') ? button('resume', '继续实际试做') : ''}${allowed.includes('exit') ? button('exit', '退出这次试做') : ''}</div>${adjust}`;
+    }
+    if (proposal.status === 'prepared' && proposal.practical_trial_available) return `<button class="quiet-button role-action" type="button" data-role-action="practical" data-role-operation="start" data-role-id="${id}">开始实际试做</button>`;
     if (proposal.status !== 'proposed') return '';
     const disabled = proposal.current_gate?.eligible === true ? '' : ' disabled';
     return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="try"${disabled}>准备实际试做</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">以后再说</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">这次不尝试</button></div>`;
@@ -1297,11 +1306,11 @@ function renderRoleProposals(proposals = []) {
   target.innerHTML = state.roleProposals.length ? [...state.roleProposals].reverse().map((proposal) => {
     if (proposal.origin === 'lived_wish') {
       const axis = proposal.axis === 'form' ? '形态兴趣' : '职业愿望';
-      const barriers = [...(proposal.current_gate?.barriers || []), ...(['deferred', 'rejected', 'withdrawn'].includes(proposal.status) ? proposal.proposal_gate?.barriers || [] : [])];
+      const barriers = proposal.practical_trial ? [] : [...(proposal.current_gate?.barriers || []), ...(['deferred', 'rejected', 'withdrawn'].includes(proposal.status) ? proposal.proposal_gate?.barriers || [] : [])];
       const cooldown = proposal.cooldown_until ? interactionDate(proposal.cooldown_until) : '';
-      const next = proposal.status === 'prepared' ? '已经记录试做意向。实际试做尚未开始，等下一阶段接上行动与结果。' : ['deferred', 'rejected'].includes(proposal.status) ? `${cooldown ? `${cooldown} 后再考虑；` : '先留一段时间；'}还需要新的实际经历，再决定要不要重新提出。` : proposal.status === 'withdrawn' ? '这个想法已收回，实际经历仍会保留。' : proposal.next_step || '先准备一次实际试做，再看结果。';
+      const next = proposal.practical_trial ? '' : proposal.status === 'prepared' ? `已经记录试做意向。实际试做尚未开始。${proposal.practical_trial_available ? '可以进入实际生活任务；已有安排和身体需要优先。' : '等实际行动与结果连接后再开始。'}` : ['deferred', 'rejected'].includes(proposal.status) ? `${cooldown ? `${cooldown} 后再考虑；` : '先留一段时间；'}还需要新的实际经历，再决定要不要重新提出。` : proposal.status === 'withdrawn' ? '这个想法已收回，实际经历仍会保留。' : proposal.next_step || '先准备一次实际试做，再看结果。';
       const roots = [...new Set(proposal.wish_basis?.root_outcome_ids || [])];
-      return `<article class="role-item proposal lived-wish ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${axis} · 从生活经历提出</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.authored_reason || '')}</p>${barriers.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${barriers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}<p>${escapeHtml(next)}</p><small>形态兴趣与职业愿望可以组合；目前没有变身，也没有认定职业资格。</small>${roots.length ? `<details><summary>这些日子给了什么依据</summary><p>同一件实际结果，多个记录视角不会叠加。</p><small>${escapeHtml(roots.join(' · '))}</small></details>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
+      return `<article class="role-item proposal lived-wish ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${axis} · 从生活经历提出</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.authored_reason || '')}</p>${barriers.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${barriers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}${next ? `<p>${escapeHtml(next)}</p>` : ''}${renderPracticalTrial(proposal.practical_trial)}<small>形态兴趣与职业愿望可以组合；目前没有变身，也没有认定职业资格。</small>${roots.length ? `<details><summary>这些日子给了什么依据</summary><p>同一件实际结果，多个记录视角不会叠加。</p><small>${escapeHtml(roots.join(' · '))}</small></details>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
     }
     const trial = proposal.trial;
     const trialSummary = trial ? `试行 ${trial.turns_observed}/${trial.max_turns} · 正 ${trial.positive_feedback} / 负 ${trial.negative_feedback} · ${trial.status}` : '尚未开始试行';
@@ -1442,7 +1451,7 @@ async function handleRoleAction(actionTarget) {
     const proposalId = actionTarget.dataset.roleId;
     const selectedProposal = state.roleProposals.find(proposal => proposal.proposal_id === proposalId);
     const livedWish = selectedProposal?.origin === 'lived_wish';
-    if (livedWish && action !== 'choose') throw new Error('这个愿望需要实际试做，聊天试行尚未连接。');
+    if (livedWish && !['choose', 'practical'].includes(action)) throw new Error('这个愿望需要实际试做，不能用聊天试行代替。');
     if (state.roleWishesEnabled && selectedProposal && !livedWish && !selectedProposal.trial?.started_at && (action === 'start' || (action === 'choose' && actionTarget.dataset.choice === 'try'))) throw new Error('历史方向记录；新尝试需要实际生活依据。');
     let result;
     if (action === 'propose') {
@@ -1454,6 +1463,18 @@ async function handleRoleAction(actionTarget) {
         result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
       }
       setRoleResult('ok', '选择已记录', livedWish ? (actionTarget.dataset.choice === 'try' ? '试做意向已记下。实际试做尚未开始，形态与身份保持当前。' : '这个想法先放下，冷却后仍需新的实际经历再考虑。') : `当前阶段：${ROLE_STATUS_LABELS[result.proposal?.status] || result.proposal?.status || '已更新'}`);
+    } else if (action === 'practical') {
+      const operation = actionTarget.dataset.roleOperation;
+      const trial = selectedProposal?.practical_trial;
+      if (!livedWish || !['start', 'pause', 'resume', 'adjust', 'exit'].includes(operation)) throw new Error('实际试做操作不在当前可用范围。');
+      if (operation === 'start' ? selectedProposal.status !== 'prepared' || !selectedProposal.practical_trial_available || trial : !trial?.allowed_actions?.includes(operation)) throw new Error('当前阶段不能这样操作实际试做。');
+      const variant = operation === 'adjust' ? actionTarget.closest('.role-item')?.querySelector('[data-role-practical-variant]')?.value : undefined;
+      if (operation === 'adjust' && !trial.variant_choices.some(value => value.id === variant)) throw new Error('请选择已有的实际做法。');
+      const fingerprint = JSON.stringify([proposalId, operation, variant || null]);
+      if (state.rolePracticalRetry?.fingerprint !== fingerprint) state.rolePracticalRetry = { fingerprint, event_id: `role-practical-${crypto.randomUUID()}` };
+      result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/practical-trial/${operation}`, { event_id: state.rolePracticalRetry.event_id, ...(variant ? { variant } : {}) });
+      state.rolePracticalRetry = null;
+      setRoleResult('ok', '实际试做已更新', result.practical_trial.next_step);
     } else if (action === 'start') {
       result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
       setRoleResult('ok', '试行已开始', `观察窗口 ${result.proposal.trial.max_turns} 回合`);
@@ -1493,6 +1514,31 @@ async function refreshDashboard({ allowEncounterAutoOpen = true } = {}) {
   // Candidate read model is intentionally independent from the dashboard
   // batch: a missing management endpoint must not hide world/weather data.
   await refreshInteractionLab();
+}
+
+function renderPracticalTrial(trial) {
+  if (!trial) return '';
+  const labels = { running: '实际试做中', paused: '试做先停一停', blocked: '等生活条件允许', review: '这一段可以回看了', exited: '这次试做已退出' };
+  const task = trial.active_task;
+  const timeLeft = task?.status === 'paused' ? '活动已暂停' : task?.due_at ? `预计 ${escapeHtml(interactionDate(task.due_at))} 核验结果` : '等待活动到期核验';
+  const step = trial.current_step;
+  const stepLabel = step?.kind === 'travel' ? '去往实际活动地点' : step?.kind === 'activity' ? '动手进行实际活动' : '准备实际活动';
+  const roots = [...new Map((trial.outcomes || []).map(value => [value.root_outcome_id, value])).values()];
+  const outcomes = roots.map(value => {
+    const result = value.outcome === 'completed' ? '核验完成' : value.outcome === 'cancelled' ? '这次已取消' : ['resource', 'condition', 'route', 'coordination'].includes(value.classification) ? '受条件影响，没办成' : value.classification === 'performance' ? '操作还需要练习' : '未办成，原因尚不能归类';
+    return `<li><span>${value.step_role === 'primary' ? '主要实践' : '准备与补给'} · ${escapeHtml(value.activity_id || '一次实际活动')}</span><strong>${result}</strong><small>${escapeHtml(formatTime(value.at))}</small><code>${escapeHtml(value.root_outcome_id)}</code></li>`;
+  }).join('');
+  return `<section class="role-practical ${escapeHtml(trial.status)}">
+    <div class="role-item-heading"><strong>${escapeHtml(labels[trial.status] || trial.status)}</strong><small>${escapeHtml(trial.variant_label)}</small></div>
+    <p>${escapeHtml(trial.next_step)}</p>
+    ${task ? `<div class="role-practical-task"><small>${task.step_role === 'primary' ? '正在做的主要实践' : '为这次实践做准备'}</small><strong>${escapeHtml(task.title)}</strong><span>${timeLeft}</span><small>开始与在路上都不提前算作做成。</small></div>` : ''}
+    ${step ? `<small>当前步骤：${stepLabel} · ${step.step_role === 'primary' ? '主要实践' : '准备与补给'}</small>` : ''}
+    ${trial.blockers?.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${trial.blockers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}
+    <p>已核验 ${Number(trial.progress?.successful_primary || 0)} 次主要实践，分布在 ${trial.progress?.primary_days?.length || 0} 个上海日期。</p>
+    ${trial.review?.ready ? `<p class="role-practical-review">${escapeHtml(trial.review.summary)}</p>` : ''}
+    <small>做成、做得熟练和愿意继续分别判断；目前不能从这次试做认定喜欢、作品质量或职业资格。</small>
+    ${roots.length ? `<details><summary>实际留下的结果 · ${roots.length}</summary><ul class="role-practical-outcomes">${outcomes}</ul><p>这些结果与生活记忆共用编号，同一件事只计算一次。</p></details>` : ''}
+  </section>`;
 }
 
 function currentWorldTask() {

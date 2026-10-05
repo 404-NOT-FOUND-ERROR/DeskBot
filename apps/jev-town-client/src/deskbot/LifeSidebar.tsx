@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type ReactNode,type CSSProperties} from 'react';
-import type {DeskBotWorldMap,DeskBotSocialCommitment,DeskBotRoleWishSnapshot,DeskBotRoleWishChoice} from './types.ts';
+import type {DeskBotWorldMap,DeskBotSocialCommitment,DeskBotRoleWishSnapshot,DeskBotRoleWishChoice,DeskBotPracticalTrialOperation} from './types.ts';
 import './life-sidebar.css';
 import {InputInfluences} from './InputInfluences.tsx';
 import {LivedMemory} from './LivedMemory.tsx';
@@ -19,8 +19,9 @@ interface Props {
   onAutonomy:()=>void;onRespond:(id:string,operation:'join'|'decline'|'withdraw')=>void;
   replay?:boolean;onSuggest?:(id:string)=>void;
   roleWishes?:DeskBotRoleWishSnapshot|null;onRoleWish?:(id:string,choice:DeskBotRoleWishChoice)=>void;
+  onPracticalTrial?:(id:string,operation:DeskBotPracticalTrialOperation,variant?:string)=>void;
 }
-export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,taskDetail,experienceDetail,onSelectNpc,onPlace,onAutonomy,onRespond,onSuggest,roleWishes,onRoleWish,replay=false}:Props) {
+export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,taskDetail,experienceDetail,onSelectNpc,onPlace,onAutonomy,onRespond,onSuggest,roleWishes,onRoleWish,onPracticalTrial,replay=false}:Props) {
   const [tab,setTab]=useState('now'),[query,setQuery]=useState('');
   const tabRefs=useRef<(HTMLButtonElement|null)[]>([]),inputArea=useRef<HTMLDivElement>(null),residentDetail=useRef<HTMLDivElement>(null);
   useEffect(()=>{if(selectionRequest){setTab('people');requestAnimationFrame(()=>residentDetail.current?.scrollIntoView({block:'nearest',behavior:scrollBehavior()}));}},[selectionRequest]);
@@ -64,7 +65,7 @@ export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,t
         </section>
         {invites.length?<section className="life-block"><div className="life-row"><h2>有人约你</h2><button className="life-place-link" onClick={()=>setTab('social')}>全部约定 ↗</button></div>{card(invites[0]!)}</section>:null}
         <CommunitySupply map={map} onPlace={onPlace}/>
-        <RoleWishes snapshot={roleWishes} memory={map?.memory} busy={busy} readOnly={replay} onChoose={onRoleWish}/>
+        <RoleWishes snapshot={roleWishes} memory={map?.memory} busy={busy} readOnly={replay} onChoose={onRoleWish} onPracticalTrial={onPracticalTrial}/>
         {map?<LivedMemory memory={map.memory} actorId={map.protagonist.character_id}/>:null}
         <div ref={inputArea}><InputInfluences inputs={map?.refraction} busy={busy} onSuggest={onSuggest} replay={replay}/></div>
         <section className="life-block"><h2>随身带着</h2><div className="life-bag">{Object.entries(map?.living?.inventory.stock??{}).filter(([,n])=>n>=1).map(([r,n])=><span key={r}>{map?.living?.resource_names[r]??r}<strong>{Math.floor(n)}</strong></span>)}</div>{!Object.values(map?.living?.inventory.stock??{}).some(n=>n>=1)?<p className="life-empty">包里暂时空着，出门时再准备。</p>:null}{map?.living?.resource_renewal?<p className="life-supply-note">清水要去泉眼汲取净滤；收获的苔芽也可以留种。带回来，再补给苗圃和灶台。</p>:null}</section>

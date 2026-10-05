@@ -1,5 +1,6 @@
 import { ROLE_WISH_DIRECTIONS } from './role-wishes.mjs';
 import { ACTIVITIES } from './living-resources.mjs';
+import { practicalTrialReadModel } from './role-practical-trials.mjs';
 
 const AUTHOR = new Map(ROLE_WISH_DIRECTIONS.map(direction => [direction.direction_id, direction]));
 const RECIPE_TITLES = new Map(ACTIVITIES.map(recipe => [recipe.activity_id, recipe.title]));
@@ -20,6 +21,7 @@ const RESPONSE_QUERY = /(?:先不|暂时不|暂缓|稍后|以后再).{0,16}(?:�
 const SELF = /你|喵呜/u;
 const WISH_WORDS = /想|愿望|成为|变身|变形|变成|角色|形态|准备|试用|试做|催|答应/u;
 const QUESTION = /[?？]|吗|么|是否|是不是|算不算|为什么|为何|哪|怎么|什么|会不会|还会|会一直/u;
+const PRACTICE_INCLINATION = /喜欢|适合|愿意继续|还想继续/u;
 
 function unquotedQuery(value) {
   // Quoted character names remain useful anchors. Reported speech and long
@@ -82,8 +84,21 @@ function stateFor(wish) {
   return `${label}那一份愿望已经收回。原来的经历会保留，但不能把它说成仍在准备、已经试做或已经改变形象。`;
 }
 
+function stateForPractice(trial) {
+  const count = trial.progress?.successful_primary ?? 0;
+  const practice = count > 0 ? `这份安排已经有 ${count} 项主要练习实际完成。` : '这份安排还没有主要练习实际完成的记录。';
+  const states = {
+    running: '现在这段试做还在安排和执行中，要等实际活动结算。',
+    blocked: '下一项试做暂时受阻，先处理条件和生活需要；这不能说明我不喜欢或不会做。',
+    paused: '这段试做已经暂停，我会继续原有生活，已经发生的结果会保留。',
+    review: '这段试做已经可以一起回看实际结果；有成功或困难的记录，也仍不能直接认定喜欢或获得职业资格。',
+    exited: '这段试做已经退出，已经发生的结果会保留，原安排不会继续。',
+  };
+  return `${practice}${states[trial.status]}这些记录还没有改变我的形象或身份。`;
+}
+
 /**
- * Canonical rendering only for explicit questions about a saved stage-4 wish.
+ * Canonical rendering only for explicit questions about a saved wish or trial.
  * This does not evaluate ordinary conversation or promise general grounding.
  * It never changes wishes, memories, tasks, identity, appearance or hardware.
  */
@@ -94,7 +109,7 @@ export function guardRoleWishFacts({ userText, text, worldSnapshot, roleWishes, 
   if (!query.trim() || HELP_OR_IMAGINATION.test(query) || REPORTED.test(query) || OTHER_SUBJECT.test(query)) return unchanged('outside_explicit_saved_wish_inquiry');
   if (!QUESTION.test(query)) return unchanged('outside_explicit_saved_wish_inquiry');
   const reasonQuestion = REASON_QUERY.test(query) && WISH_WORDS.test(query);
-  const statusQuestion = STATUS_QUERY.test(query), responseQuestion = RESPONSE_QUERY.test(query);
+  const statusQuestion = STATUS_QUERY.test(query) || PRACTICE_INCLINATION.test(query) && /试做|试用|角色|形态|愿望/u.test(query), responseQuestion = RESPONSE_QUERY.test(query);
   if (!reasonQuestion && !statusQuestion && !responseQuestion) return unchanged('outside_explicit_saved_wish_inquiry');
   if (!SELF.test(query) && !(reasonQuestion && /(?:想|愿望|角色|形态)/u.test(query))) return unchanged('not_a_self_wish_inquiry');
   if (!actorId || !worldSnapshot?.memory?.development) return unchanged('wish_world_facts_unavailable');
@@ -109,6 +124,15 @@ export function guardRoleWishFacts({ userText, text, worldSnapshot, roleWishes, 
   if (!wish) return unchanged(named.length ? 'saved_wish_unavailable' : 'ambiguous_or_missing_saved_wish');
   const direction = wish.direction_id;
   if (!wish.wish_basis || !Array.isArray(wish.wish_basis.root_outcome_ids)) return unchanged('saved_wish_basis_unavailable', direction);
+  const practical = practicalTrialReadModel(worldSnapshot, { proposalId: wish.proposal_id, actorId });
+  if (practical?.schema === 'deskbot.practical-role-trial.v1'
+    && practical.actor_id === actorId && practical.direction_id === direction && practical.axis === wish.axis
+    && ['running', 'blocked', 'paused', 'review', 'exited'].includes(practical.status)) {
+    const explanation = reasonQuestion ? reasonFor(wish, worldSnapshot) : null;
+    if (reasonQuestion && !explanation) return unchanged('saved_wish_reason_basis_unavailable', direction);
+    return { text: `${explanation ?? ''}${stateForPractice(practical)}`, applied: true,
+      reason: 'canonical_actual_trial_status', direction };
+  }
   if (wish.practical_trial_connected === true || wish.trial?.started_at) return unchanged('actual_wish_trial_outside_stage4', direction);
   const explanation = reasonQuestion ? reasonFor(wish, worldSnapshot) : null;
   if (reasonQuestion && !explanation) return unchanged('saved_wish_reason_basis_unavailable', direction);

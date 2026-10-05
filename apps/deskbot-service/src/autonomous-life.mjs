@@ -12,6 +12,7 @@ import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoi
 import { projectCandidates, settleResidentProjects, updateProjectScheduling } from './resident-projects.mjs';
 import { influenceBodyChoices, recordBodyLifeDecision } from './body-perception.mjs';
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
+import { practicalTrialCandidates, practicalTrialPlanMayContinue, recordPracticalTrialTask } from './role-practical-trials.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -149,6 +150,10 @@ function candidates(world, state, at) {
     if(choice)Object.assign(choice,{project_id:project.project_id,project_stage_id:project.project_stage_id,activity_id:project.activity_id});
   }
   updateProjectScheduling(world,id,at,result.filter(c=>c.project_id));
+  for(const trial of practicalTrialCandidates(world,state,at)) {
+    try { result.push({...trial,steps:checkSupplyClaim(world,at,id,trial.steps)}); }
+    catch(error) { result.push({...trial,available:false,blocked_reason:error.message}); }
+  }
   addDiscretionaryPractice(world,state,at,result,add);
   const index=hash(`${id}:${localWorldDate(at,world.clock.time_zone).date}:${Math.floor(minute/180)}`)%profile.places.length;
   for(const destination of world.memory ? profile.places : [profile.places[index]]) {
@@ -200,6 +205,10 @@ function executeStep(world,state,at,eventId) {
   stored.life_motivation={...structuredClone(plan.motivation??{kind:'unknown',basis_score:null}),
     facet_root_ids:[...(plan.motivation?.facet_root_ids??[])].slice(-16)};
   if(step.kind==='observe'&&['care','craft','repair','cook','explore','connection'].includes(plan.development_topic))stored.life_topic=plan.development_topic;
+  if(plan.role_trial) {
+    stored.role_trial={...plan.role_trial,step_role:step.role_trial_primary?'primary':'support'};
+    recordPracticalTrialTask(world,stored,at);
+  }
   for(const record of world.refraction?.records??[])if(plan.source_ids?.includes(record.id))record.source_task_ids=[...(record.source_task_ids??[]),task.task_id].slice(-16);
   plan.task_id=task.task_id;plan.status='executing';
   if(id!==world.protagonist.character_id && step.kind!=='travel')actor(world,id).status=step.kind==='rest'?'正在休息':task.title;
@@ -232,6 +241,9 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       if(state.actor_id!==world.protagonist.character_id){actor(world,state.actor_id).status=state.last_feedback.text;actor(world,state.actor_id).last_action=task.title;}
       plan.task_id=null;plan.index++;plan.status='planned';
     }
+    if(state.plan?.role_trial&&!practicalTrialPlanMayContinue(world,state,at)) {
+      state.plan=null;state.next_decision_at=at;
+    }
     if(state.paused || reservedActors.includes(state.actor_id) || socialReserved.includes(state.actor_id))continue;
     if(Date.parse(state.next_decision_at)>Date.parse(at))continue;
     if(!state.plan || ['completed','failed','cancelled'].includes(state.plan.status)) {
@@ -245,6 +257,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.plan.motivation={kind:invited?'invited':choice.goal.startsWith('interest:')||choice.discretionary_practice?'self_continuation':'need',
         basis_score:choice.score-(choice.memory_bonus??0),facet_root_ids:[...(choice.facet_root_ids??[])].slice(-16)};
       state.plan.development_topic=choice.development_topic??null;
+      if(choice.role_trial)state.plan.role_trial=structuredClone(choice.role_trial);
       if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
       recordBodyLifeDecision(world,state,choice,at);

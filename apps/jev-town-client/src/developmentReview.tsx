@@ -6,6 +6,8 @@ import {facetsReviewCounts,readDevelopmentFacetsReview} from './developmentFacet
 import type {DevelopmentFacetsReviewFixture} from './developmentFacetsReview.ts';
 import {readRoleWishesReview} from './roleWishesReview.ts';
 import type {RoleWishesReviewFixture} from './roleWishesReview.ts';
+import {readRolePracticalTrialsReview} from './rolePracticalTrialsReview.ts';
+import type {RolePracticalTrialsReviewFixture} from './rolePracticalTrialsReview.ts';
 import {RoleWishes,RoleWishDirection,roleWishView} from './deskbot/RoleWishes.tsx';
 import './styles.css';
 import './deskbot/life-sidebar.css';
@@ -20,6 +22,33 @@ const samples=[['suggestion','听到建议'],['executing','开始照料'],['comp
 const fixtureUrl=new URLSearchParams(location.search).get('developmentReviewUrl')??'http://127.0.0.1:4314';
 const facetMode=new URLSearchParams(location.search).get('sample')==='facets';
 const wishMode=new URLSearchParams(location.search).get('sample')==='wishes';
+const trialMode=new URLSearchParams(location.search).get('sample')==='trials';
+function PracticalTrialsReview() {
+  const [fixture,setFixture]=useState<RolePracticalTrialsReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
+  async function load() {
+    setError('');
+    try {
+      const response=await fetch('/role-practical-trials-review.json');
+      if(!response.ok)throw Error();
+      const value=readRolePracticalTrialsReview(await response.json());
+      if(!value)throw Error();
+      setFixture(value);setSelected(value.samples[0]!.id);
+    } catch {setError('实际试做验收样本暂时不可用，重新载入后再试。');}
+  }
+  useEffect(()=>{void load();},[]);
+  const sample=fixture?.samples.find(value=>value.id===selected)??fixture?.samples[0];
+  return <main className="development-review development-review--wishes development-review--trials">
+    <header><div><span className="development-review__eyebrow">聚形域 · 发展管线 05</span><h1>想试试看，真的动手做</h1><p>带着一个愿望走进日常生活，做过之后再回看。</p></div><span className="development-review__badge">受控前提与实际任务样本</span></header>
+    <nav aria-label="实际试做生命周期样本">{fixture?.samples.map(value=><button key={value.id} aria-pressed={sample?.id===value.id} onClick={()=>setSelected(value.id)}>{value.label}</button>)}</nav>
+    {error?<p role="alert" className="development-review__error">{error}<button onClick={()=>void load()}>重试</button></p>:null}
+    {sample?<>
+      <section className="development-review__sample" aria-live="polite"><span className="development-review__eyebrow">这一段生活 · {sample.label}</span><h2>愿望怎样变成一次实际尝试</h2><p>{sample.summary}</p>{sample.restart_verified?<small>重启与重复处理已核对：任务与结果沿用同一根经历。</small>:null}</section>
+      <div className="development-review__columns"><aside className="life-sidebar development-review__memory"><RoleWishes snapshot={{evolution:sample.evolution,proposals:sample.proposals}} memory={sample.memory} readOnly/></aside>
+        <section className="development-review__direction"><span className="development-review__eyebrow">行动之后，再判断</span><h2>有结果，也保留不知道</h2><p>实际试做使用原来的旅行、活动、材料和耗时。已有日常任务与身体需要优先；暂停或退出会退回试做预留的材料，生活继续。</p><p>两次主要实践在两个上海日期核验做成后，可以回看这一段。补给与在路上的经历单独保留，聊天回合不会替代实际结果。</p><p className="development-review__note">做成不直接证明喜欢、熟练或作品质量。这一阶段没有变身，也没有认定职业资格。</p><details><summary>试做与生活共用的经历</summary><LivedMemory memory={sample.memory} actorId={sample.memory.owner_id} journal/></details></section>
+      </div><footer>隔离时钟：{new Date(sample.now).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})} · 只读受控样本，不写入正式世界</footer>
+    </>:!error?<p className="development-review__note">正在载入实际试做样本……</p>:null}
+  </main>;
+}
 function WishesReview() {
   const [fixture,setFixture]=useState<RoleWishesReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
   async function load() {
@@ -122,4 +151,4 @@ function DevelopmentReview() {
 }
 const root=import.meta.hot?.data.developmentReviewRoot??createRoot(document.getElementById('root')!);
 if(import.meta.hot)import.meta.hot.data.developmentReviewRoot=root;
-root.render(wishMode?<WishesReview/>:facetMode?<FacetsReview/>:<DevelopmentReview/>);
+root.render(trialMode?<PracticalTrialsReview/>:wishMode?<WishesReview/>:facetMode?<FacetsReview/>:<DevelopmentReview/>);
