@@ -5,6 +5,7 @@ import { composePrompt } from './prompt-composer.mjs';
 import { DEFAULT_TTS_PROFILE, canonicalCharacterId } from './world-definition.mjs';
 import { applyRoleTrialExpressionIntent, normalizeExpressionIntent } from './expression-intent.mjs';
 import { guardDevelopmentFacts } from './development-fact-guard.mjs';
+import { guardRoleWishFacts } from './role-wish-fact-guard.mjs';
 
 const DEFAULT_TTS_FORMAT = Object.freeze({ codec: 'pcm_s16le', sample_rate_hz: 16_000, channels: 1 });
 
@@ -57,6 +58,7 @@ export function createChatOrchestrator({
   refreshWeatherForecast = null,
   activeRoleTrials = null,
   currentRoleStages = null,
+  currentRoleWishes = null,
   relationshipMemories = null,
   branchExperiences = null,
   continuityContext = null,
@@ -215,6 +217,7 @@ export function createChatOrchestrator({
     const recentConversation = recentConversationFor(userEvent.character_id);
     const roleTrials = activeRoleTrials?.(userEvent.character_id) ?? [];
     const roleStages = currentRoleStages?.(userEvent.character_id) ?? [];
+    const roleWishes = currentRoleWishes?.(userEvent.character_id) ?? [];
     const expressionIntent = applyRoleTrialExpressionIntent(
       normalizeExpressionIntent(stateResult.state?.interaction?.expression_intent, {
         evidenceRefs: stateResult.state?.last_event_id ? [stateResult.state.last_event_id] : [],
@@ -247,6 +250,7 @@ export function createChatOrchestrator({
       continuityContext: continuityContext?.(userEvent.character_id, currentWorldSnapshot()) ?? null,
       activeRoleTrials: roleTrials,
       currentRoleStages: roleStages,
+      roleWishes,
       userText: userEvent.payload.text,
     });
     // Runtime sources inform the character's reply. They must not replace the
@@ -266,7 +270,7 @@ export function createChatOrchestrator({
     });
     // Correct once before speech, the reply event and the outbox all consume
     // the same text. Preserve the provider's original only in the local audit.
-    const completion = factGuard.applied ? {
+    const developmentCompletion = factGuard.applied ? {
       ...rawCompletion,
       text: factGuard.text,
       trace: {
@@ -279,6 +283,26 @@ export function createChatOrchestrator({
         },
       },
     } : rawCompletion;
+    const wishFactGuard = guardRoleWishFacts({
+      userText: userEvent.payload.text,
+      text: developmentCompletion.text,
+      worldSnapshot: currentWorldSnapshot(),
+      roleWishes,
+      actorId: canonicalCharacterId(userEvent.character_id) ?? userEvent.character_id,
+    });
+    const completion = wishFactGuard.applied ? {
+      ...developmentCompletion,
+      text: wishFactGuard.text,
+      trace: {
+        ...(developmentCompletion.trace ?? {}),
+        role_wish_fact_guard: {
+          applied: true,
+          reason: wishFactGuard.reason,
+          direction: wishFactGuard.direction,
+          raw_reply: rawCompletion.text,
+        },
+      },
+    } : developmentCompletion;
 
     let voice = null;
     let voiceError = null;

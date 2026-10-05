@@ -4,6 +4,9 @@ import {LivedMemory} from './deskbot/LivedMemory.tsx';
 import type {DeskBotLivedMemory} from './deskbot/types.ts';
 import {facetsReviewCounts,readDevelopmentFacetsReview} from './developmentFacetsReview.ts';
 import type {DevelopmentFacetsReviewFixture} from './developmentFacetsReview.ts';
+import {readRoleWishesReview} from './roleWishesReview.ts';
+import type {RoleWishesReviewFixture} from './roleWishesReview.ts';
+import {RoleWishes,RoleWishDirection,roleWishView} from './deskbot/RoleWishes.tsx';
 import './styles.css';
 import './deskbot/life-sidebar.css';
 import './development-review.css';
@@ -16,6 +19,39 @@ interface Review {
 const samples=[['suggestion','听到建议'],['executing','开始照料'],['completed','核验完成'],['failed','事情没办成'],['restart','重复与重启']] as const;
 const fixtureUrl=new URLSearchParams(location.search).get('developmentReviewUrl')??'http://127.0.0.1:4314';
 const facetMode=new URLSearchParams(location.search).get('sample')==='facets';
+const wishMode=new URLSearchParams(location.search).get('sample')==='wishes';
+function WishesReview() {
+  const [fixture,setFixture]=useState<RoleWishesReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
+  async function load() {
+    setError('');
+    try {
+      const response=await fetch('/role-wishes-review.json');
+      if(!response.ok)throw Error();
+      const value=readRoleWishesReview(await response.json());
+      if(!value)throw Error();
+      setFixture(value);setSelected(value.samples[0]!.id);
+    } catch {setError('愿望验收样本暂时不可用，重新载入后再试。');}
+  }
+  useEffect(()=>{void load();},[]);
+  const sample=fixture?.samples.find(value=>value.id===selected)??fixture?.samples[0];
+  const snapshot=sample?{evolution:sample.evolution,proposals:sample.proposals}:null;
+  const view=roleWishView(snapshot);
+  const focal=view?.directions.find(value=>value.basis.root_outcome_ids.length>0)??view?.directions[0];
+  const current=sample?.proposals.filter(value=>value.origin==='lived_wish'&&['proposed','prepared'].includes(value.status))??[];
+  return <main className="development-review development-review--wishes">
+    <header><div><span className="development-review__eyebrow">聚形域 · 发展管线 04</span><h1>想成为的下一种自己</h1><p>从持续关注和实际经历，走到一个有理由、也能暂缓的愿望。</p></div><span className="development-review__badge">受控前提与生命周期样本</span></header>
+    <nav aria-label="角色愿望与回应样本">{fixture?.samples.map(value=><button key={value.id} aria-pressed={sample?.id===value.id} onClick={()=>setSelected(value.id)}>{value.label}</button>)}</nav>
+    {error?<p role="alert" className="development-review__error">{error}<button onClick={()=>void load()}>重试</button></p>:null}
+    {sample?<>
+      <section className="development-review__sample" aria-live="polite"><span className="development-review__eyebrow">这一段生活 · {sample.label}</span><h2>{current.length?'经历带来了一个想法':'先让日子继续积累'}</h2><p>{sample.summary}</p>{sample.restart_verified?<small>重启与重复处理已核对：沿用同一份经历与回应。</small>:null}</section>
+      <div className="development-review__columns">
+        <aside className="life-sidebar development-review__memory"><RoleWishes snapshot={snapshot} memory={sample.memory} readOnly/>{!current.length&&focal?<RoleWishDirection direction={focal} memory={sample.memory}/>:null}</aside>
+        <section className="development-review__direction"><span className="development-review__eyebrow">形态与生活方向</span><h2>两个方向，可以一起长出来</h2><p>想亲近湿地、尝试青蛙的形态，也可以想学做饭。前一个关乎怎么成为光粒造物，后一个关乎想做什么。</p><p>提出愿望需要已有经历、持续关注和眼下可行的条件。主人可以参与实践；收到一句要求不会直接替代这些前提。</p><p className="development-review__note">“准备实际试做”只记录下一步意向。实际试做将在第五阶段接入，现在没有变身，也没有认定职业资格。</p><details><summary>这些想法之前，实际发生了什么</summary><LivedMemory memory={sample.memory} actorId={sample.memory.owner_id} journal/></details></section>
+      </div>
+      <footer>隔离时钟：{new Date(sample.now).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})} · 只读受控样本，不写入正式世界</footer>
+    </>:!error?<p className="development-review__note">正在载入愿望验收样本……</p>:null}
+  </main>;
+}
 function FacetsReview() {
   const [fixture,setFixture]=useState<DevelopmentFacetsReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
   async function load() {
@@ -86,4 +122,4 @@ function DevelopmentReview() {
 }
 const root=import.meta.hot?.data.developmentReviewRoot??createRoot(document.getElementById('root')!);
 if(import.meta.hot)import.meta.hot.data.developmentReviewRoot=root;
-root.render(facetMode?<FacetsReview/>:<DevelopmentReview/>);
+root.render(wishMode?<WishesReview/>:facetMode?<FacetsReview/>:<DevelopmentReview/>);

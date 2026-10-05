@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { developmentReadModel } from './development-evidence.mjs';
 import { localWorldDate } from './realtime-world.mjs';
 import { developmentFacetsReadModel } from './development-facets.mjs';
+import { roleWishReadModel } from './role-wishes.mjs';
 
 export const ROLE_DEVELOPMENT_SCHEMA = 'deskbot.role-development.v1';
 const MAX_ROOTS = 2048;
@@ -25,7 +26,7 @@ const barriers = () => [
 const facetBarriers=()=>[
   {id:'self_wish_not_established',label:'主动愿望还未建立'},
   {id:'practical_trial_not_connected',label:'实际方向试用尚未接入'},
-  {id:'role_prerequisites_not_authored',label:'各方向的成为条件尚待设计'},
+  {id:'appearance_not_unlocked',label:'愿望与准备不直接改变形象或获得职业资格'},
 ];
 
 function directionFacets(direction,model,actorId,mappedRoots,records) {
@@ -70,12 +71,16 @@ function ownerLinked(record) {
 }
 
 /** Pure read: the canonical ledger supplies all evidence; no input events are manufactured. */
-export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.character_id ?? 'shaping-001' } = {}) {
+export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.character_id ?? 'shaping-001', at = world?.clock?.synced_at ?? world?.updated_at } = {}) {
   const ledger = developmentReadModel(world, { actorId, limit: MAX_ROOTS });
+  const time = Date.parse(at ?? '');
+  ledger.recent = ledger.recent.filter(record => Number.isFinite(time) && Number.isFinite(Date.parse(record.at)) && Date.parse(record.at) <= time);
   const roots = practiceRoots(ledger, actorId);
-  const facets=ledger?.facets??developmentFacetsReadModel(world,{actorId,at:world?.clock?.synced_at??world?.updated_at});
+  const facets=developmentFacetsReadModel(world,{actorId,at});
+  const wishes=roleWishReadModel(world,{actorId,at});
   const timeZone = world?.clock?.time_zone ?? 'Asia/Shanghai';
   const directions = DEVELOPMENT_DIRECTIONS.map(direction => {
+    const wish=wishes.directions.find(item=>item.direction_id===direction.direction_id);
     const records = roots.filter(record => direction.topics.includes(record.topic)
       && (!direction.locations || direction.locations.includes(record.location_id)));
     const mappedRoots=(ledger?.recent??[]).filter(record=>record.actor_ids.includes(actorId)&&direction.topics.includes(record.topic)
@@ -118,6 +123,15 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
         views: structuredClone(record.views ?? {}),
       })),
       ...directionFacets(direction,facets,actorId,mappedRoots,records),
+      axis: wish.axis,
+      readiness: structuredClone(wish.readiness),
+      basis: structuredClone(wish.basis),
+      authored_reason: wish.authored_reason,
+      next_step: wish.next_step,
+      fingerprint: wish.fingerprint,
+      wish_stability: {status:'not_established',automatic:false,
+        direction_prerequisites_ready:wish.readiness.eligible,
+        evidence_basis:'direction_mapped_canonical_roots_in_window'},
       unlocked: false,
       barriers: facets.enabled?facetBarriers():barriers(),
     };
@@ -138,6 +152,7 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
     ledger_schema: ledger?.schema ?? null,
     evidence_count: roots.length,
     evidence_fingerprint: evidenceFingerprint,
+    role_wishes: wishes,
     directions,
     coverage: structuredClone(ledger?.coverage ?? {}),
     interpretation: {
@@ -146,7 +161,9 @@ export function roleDevelopmentReadModel(world, { actorId = world?.protagonist?.
       practice_count_is_capability: false,
       capability_basis:'registered_activity_outcomes_with_classified_difficulties',
       observed_direction_is_self_wish: false,
-      automatic_proposals_enabled: false,
+      automatic_proposals_enabled: wishes.enabled,
+      proposal_basis: 'authored_actual_life_prerequisites',
+      practical_trials_enabled: false,
       appearance_changes_enabled: false,
     },
     legacy_context: {
@@ -175,6 +192,9 @@ export function candidateDevelopmentContext(candidate, development) {
     capability:structuredClone(direction?.capability??null),
     self_assessment:structuredClone(direction?.self_assessment??null),
     wish_stability:structuredClone(direction?.wish_stability??null),
+    axis: direction?.axis??null,
+    readiness:structuredClone(direction?.readiness??null),
+    wish_basis:structuredClone(direction?.basis??null),
     unlocked: false,
     lifecycle_changed: false,
     barriers:structuredClone(direction?.barriers??barriers()),

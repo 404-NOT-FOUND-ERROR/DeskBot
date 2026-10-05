@@ -346,7 +346,7 @@ function objectStatus(state) {
   if (state.kind === 'waterside') return `水位 ${percent(state.water_level)}% · 浮框完好 ${percent(state.condition)}%${state.stock && Object.hasOwn(state.stock, 'raw_water') ? ` · 原水 ${Math.round(state.stock.raw_water * 10) / 10}/${state.capacity} 份` : ''}`;
   return typeof state.condition === 'number' ? `完好 ${percent(state.condition)}%` : '有限库存';
 }
-export function livingReadModel(world, actorId = world.protagonist.character_id) {
+export function livingReadModel(world, actorId = world.protagonist.character_id, { at = world.clock?.synced_at } = {}) {
   if (!world.living) return null;
   return { schema: world.living.schema, rule_version: LIVING_RULE_VERSION, simulated_until: world.living.simulated_until,
     revision: world.living.revision, recovery: copy(world.living.recovery), resource_names: RESOURCES,
@@ -354,7 +354,7 @@ export function livingReadModel(world, actorId = world.protagonist.character_id)
     community_supply: copy(world.living.community_supply ?? null),
     inventory: copy(world.living.inventories[actorId] ?? { stock: {}, capacity: 24 }), recent_changes: copy(world.living.recent_changes.slice(-8)),
     activities: ACTIVITIES.filter(recipe => projectActivityVisible(world, recipe, actorId)).map(recipe => {
-      const reason = eligibility(world, recipe, actorId);
+      const reason = eligibility(world, recipe, actorId, { at });
       return { activity_id: recipe.activity_id, title: recipe.title, kind: recipe.kind, target_object_id: recipe.target,
         location_id: definition(world, recipe.target)?.location_id ?? null, duration_seconds: recipe.seconds,
         inputs: recipe.inputs.map(input => ({ resource: input.resource, name: RESOURCES[input.resource], count: input.count, from: input.container === 'bag' ? '随身袋' : definition(world, input.container)?.name ?? input.container })),

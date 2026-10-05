@@ -257,6 +257,7 @@ export function createDeskBotServer({
     audioArtifacts,
     activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
     currentRoleStages: (characterId) => roles.currentStages({ characterId }),
+    currentRoleWishes: (characterId) => roleEvolution.wishProposals({ characterId }),
     relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
     branchExperiences: (query, worldSnapshot) => sharedLife.retrieveExperiences(query, worldSnapshot),
     conversationHistoryAfter: (characterId) => sharedLife.historyAfter(characterId),
@@ -1253,7 +1254,7 @@ export function createDeskBotServer({
         accepted: true,
         character_id: characterId,
         ...snapshot,
-        proposals: roles.list({ characterId, limit: url.searchParams.get('limit') ?? 50 }),
+        proposals: roleEvolution.wishProposals({ characterId, limit: url.searchParams.get('limit') ?? 50 }),
         active_trials: roles.activeTrials({ characterId, limit: url.searchParams.get('limit') ?? 20 }),
         current_stages: roles.currentStages({ characterId, limit: 10 }),
         ...(url.pathname === '/api/role-evolution/status'
@@ -1283,7 +1284,7 @@ export function createDeskBotServer({
     if (request.method === 'GET' && url.pathname === '/api/roles/proposals') {
       sendJson(response, 200, {
         schema: 'deskbot.role-direction-proposal-list.v0.1',
-        proposals: roles.list({
+        proposals: roleEvolution.wishProposals({
           characterId: url.searchParams.get('character_id') ?? null,
           status: url.searchParams.get('status') ?? null,
           limit: url.searchParams.get('limit') ?? 50,
@@ -1306,7 +1307,7 @@ export function createDeskBotServer({
 
     const roleProposalMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)$/);
     if (request.method === 'GET' && roleProposalMatch) {
-      const proposal = roles.get(decodeURIComponent(roleProposalMatch[1]));
+      const proposal = roleEvolution.wishProposal(decodeURIComponent(roleProposalMatch[1]));
       if (!proposal) {
         sendJson(response, 404, { error: 'role_proposal_not_found', message: 'role proposal not found' });
       } else {
@@ -1321,6 +1322,7 @@ export function createDeskBotServer({
           const characterId = requiredRoleText(body.character_id, 'character_id');
           const directionId = requiredRoleText(body.direction_id, 'direction_id');
           const requestedProposalId = optionalRoleText(body.proposal_id, 'proposal_id');
+          if (persistentWorld.get()?.memory?.development?.facets) return roleEvolution.proposeWish({ characterId, directionId, proposalId: requestedProposalId });
           const pulls = rolePulls({ characterId });
           const pull = directionId
             ? pulls.find((item) => item.direction_id === directionId)
@@ -1348,11 +1350,11 @@ export function createDeskBotServer({
       readJson(request, 64 * 1024, { allowEmpty: action === 'trial/start' || action === 'archive' })
         .then((body) => {
           const reason = optionalRoleText(body.reason, 'reason');
-          if (action === 'choose') return roles.choose(proposalId, body.choice, { reason });
+          if (action === 'choose') return roleEvolution.chooseWish(proposalId, body.choice, { reason });
           if (action === 'trial/start') {
             const rawWindow = body.window_turns ?? body.windowTurns ?? 5;
             const windowTurns = typeof rawWindow === 'string' && /^\d+$/.test(rawWindow.trim()) ? Number(rawWindow) : rawWindow;
-            return roles.startTrial(proposalId, { windowTurns });
+            return roleEvolution.startTrial(proposalId, { windowTurns });
           }
           if (action === 'trial/observations') return roles.recordTrialObservation(proposalId, { eventId: requiredRoleText(body.event_id ?? body.eventId, 'event_id'), signal: body.signal ?? 'neutral', evidenceId: optionalRoleText(body.evidence_id ?? body.evidenceId, 'evidence_id') });
           if (action === 'trial/complete') return roles.completeTrial(proposalId, { decision: body.decision ?? 'deferred', reason });
@@ -2083,14 +2085,14 @@ export function createDeskBotServer({
       ingestNonChatEvent({event_id:`body-install:${BODY_PERCEPTION_VERSION}`,type:'world.mutation',source:'body-perception-engine',
         character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_body_perception'}});
     }
-    if(livedMemoryEnabled)tickAutonomousLife();
-    void lifeChoiceWorker.tick().catch(()=>{});
-    worldLife.tick();
     try {
       roleEvolution.syncAll();
     } catch (error) {
       console.error(`[role-evolution] startup sync failed: ${error.message}`);
     }
+    if(livedMemoryEnabled)tickAutonomousLife();
+    void lifeChoiceWorker.tick().catch(()=>{});
+    worldLife.tick();
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
     if (externalIds.length) void inputRuntime.tick({ sourceIds: externalIds });
@@ -2107,22 +2109,22 @@ export function createDeskBotServer({
       } catch (error) {
         console.error(`[world-clock] scheduled catch-up failed: ${error.message}`);
       }
-      sharedLife.tick();
-      npcGoals.tick();
-      tickAutonomousLife();
-      worldLife.tick();
       try {
         roleEvolution.syncAll();
       } catch (error) {
         console.error(`[role-evolution] scheduled sync failed: ${error.message}`);
       }
+      sharedLife.tick();
+      npcGoals.tick();
+      tickAutonomousLife();
+      worldLife.tick();
     }, 60_000);
     timer.unref();
     const taskTimer = setInterval(() => {
       try {
         persistentWorld.syncWallClock?.();
         const result = persistentWorld.syncTasks?.();
-        if (result?.processed) { sharedLife.tick(); npcGoals.tick(); tickAutonomousLife(); worldLife.tick(); }
+        if (result?.processed) { roleEvolution.syncAll(); sharedLife.tick(); npcGoals.tick(); tickAutonomousLife(); worldLife.tick(); }
       }
       catch (error) { console.error(`[world-tasks] scheduled reconciliation failed: ${error.message}`); }
     }, timeMode === 'realtime' || persistentWorld.get().clock?.mode === 'real_time' ? 1000 : 60_000);

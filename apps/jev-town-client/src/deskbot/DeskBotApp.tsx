@@ -7,8 +7,8 @@ import { TownMap } from "../components/TownMap.tsx";
 import type { LabelSpec } from "../three/sceneSpec.ts";
 import { buildRoutePreview, buildTravelVisual, resolveTravelRoute, type DeskBotTravelVisual } from "./routeVisual.ts";
 import { canonicalPointForLocation, canonicalRouteBetween } from "./canonicalGeometry.ts";
-import { buildNpcCandidates, controlWorldTask, controlAutonomousLife, respondSocialInvitation, suggestLifeIdea, deskbotBaseUrl, executeCandidate, fetchDeskBotWorld, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation, startLivingActivity, transferResource } from "./bridge.ts";
-import type { DeskBotActionCandidate, DeskBotInteractionIntent, DeskBotLifeWorld, DeskBotNpc, DeskBotNpcInteractionResponse, DeskBotWorldMap, DeskBotWorldRouteResponse } from "./types.ts";
+import { buildNpcCandidates, controlWorldTask, controlAutonomousLife, respondSocialInvitation, suggestLifeIdea, deskbotBaseUrl, executeCandidate, fetchDeskBotWorld, fetchRoleWishes, respondRoleWish, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation, startLivingActivity, transferResource } from "./bridge.ts";
+import type { DeskBotActionCandidate, DeskBotInteractionIntent, DeskBotLifeWorld, DeskBotNpc, DeskBotNpcInteractionResponse, DeskBotWorldMap, DeskBotWorldRouteResponse, DeskBotRoleWishSnapshot, DeskBotRoleWishChoice } from "./types.ts";
 import "./deskbot.css";
 import { LifeSidebar } from "./LifeSidebar.tsx";
 import {projectSceneActivities} from './activityProjection.ts';
@@ -59,6 +59,7 @@ export function DeskBotApp() {
   const socialRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const [map, setMap] = useState<DeskBotWorldMap | null>(null);
   const [life, setLife] = useState<DeskBotLifeWorld | null>(null);
+  const [roleWishes,setRoleWishes]=useState<DeskBotRoleWishSnapshot|null>(null);
   const [body, setBody] = useState<DeskBotBodyPerception | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<DeskBotActionCandidate | null>(null);
@@ -150,12 +151,14 @@ export function DeskBotApp() {
 
   async function toggleAutonomy(){if(!ownLife)return;setBusy(true);try{await controlAutonomousLife(ownLife.paused?'resume':'pause',baseUrl);await refresh();setMessage(ownLife.paused?'喵呜恢复自行安排生活。':'下一次自发安排暂缓，手里的活动仍会继续。');}catch(error){setMessage(error instanceof Error?error.message:'更新失败');}finally{setBusy(false);}}
   async function respondInvitation(id:string,operation:'join'|'decline'|'withdraw'){const fingerprint=id+':'+operation;if(socialRetry.current?.fingerprint!==fingerprint)socialRetry.current={fingerprint,id:newWorldEventId('social')};setBusy(true);try{await respondSocialInvitation(id,operation,socialRetry.current.id,baseUrl);socialRetry.current=null;await refresh();setMessage(operation==='join'?'愿意参加，手头的事忙完再赴约。':operation==='decline'?'已经告诉对方这次不参加。':'已经告诉对方退出，实际做过的事会保存。');}catch(error){setMessage(error instanceof Error?error.message:'约定更新失败');}finally{setBusy(false);}}
+  async function chooseWish(id:string,choice:DeskBotRoleWishChoice){setBusy(true);try{await respondRoleWish(id,choice,baseUrl);await refresh();setMessage(choice==='try'?'试做意向已记下。实际试做还没有开始，形态与身份保持当前。':choice==='later'?'这个想法先放一放，等有新的实际经历再考虑。':'已经记下这次不尝试，先继续过自己的日子。');}catch(error){setMessage(error instanceof Error?error.message:'愿望回应未保存');}finally{setBusy(false);}}
 
   const refresh = useCallback(async () => {
     try {
       const snapshot = await fetchDeskBotWorld(baseUrl);
       applyMap(snapshot.map);
       applyLife(snapshot.life);
+      try {setRoleWishes(await fetchRoleWishes(snapshot.map.protagonist.character_id,baseUrl));} catch {setRoleWishes(null);}
       setMessage("小镇的近况已更新。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "无法读取 DeskBot 世界");
@@ -643,7 +646,7 @@ export function DeskBotApp() {
           </form>
         </section>
 
-        <LifeSidebar onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
+        <LifeSidebar roleWishes={roleWishes} onRoleWish={(id,choice)=>void chooseWish(id,choice)} onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
             <p className="deskbot-mode__task-time">{taskTimeLabel(currentTask)}</p>
             {travelling ? <small>正从{map?.locations.find(place => place.current)?.name??'上一处地点'}出发，尚未抵达。</small> : null}
             <div className="deskbot-mode__task-controls"><button type="button" disabled={busy} onClick={() => { void (async () => { setBusy(true); try { await controlWorldTask(currentTask.task_id, currentTask.status === "paused" ? "resume" : "pause", baseUrl); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败"); } finally { setBusy(false); } })(); }}>{currentTask.status === "paused" ? "继续" : "暂停"}</button>

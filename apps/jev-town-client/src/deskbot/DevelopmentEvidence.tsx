@@ -30,7 +30,7 @@ function Facet({facet}:{facet:DeskBotDevelopmentFacetTopic}) {
       <p>做成一次不会直接证明喜欢；材料或环境受限，也不会直接说明做不到。主人促成的真实实践同样保留。</p>
       <p>自评是生活规则对这些经历的暂时归纳，尚不是它独立说出的自述。</p>
       {roots.length?<details><summary>共同经历编号 · {roots.length} 件</summary><ul>{roots.map(root=><li key={root}>{root}</li>)}</ul></details>:null}
-      <p>角色愿望尚未建立，外观仍由后续选择与试用决定。</p>
+      <p>这些经历为角色愿望提供依据；是否提出、准备试做，还要看当前方向与回应。外观仍由后续实际试用决定。</p>
     </details>
   </article>;
 }

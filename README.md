@@ -1,5 +1,7 @@
 # DeskBot / 聚形域软件端
 
+**角色发展第 4 阶段（2026-10-06）：** 持续兴趣、具体配方实践与当前生活条件连接原角色提案，形态与职业分轴；支持准备、暂缓、拒绝、撤回和有冷却的新经历重提。主人支持不会开始聊天试用或改变外观。八种 SQLite 隔离样本和七日普通循环分别验证生命周期与未满足前提的情况。见 [阶段验收](research/milestones/role-development-stage4.md) 与 [愿望规则](research/world/role-wishes-v1.md)，验收页面为 `/development-review.html?sample=wishes`。
+
 当前产品目标：让同一个桌边个体在伴生奇幻世界持续生活；多源输入和主人互动影响其选择，实际实践逐渐形成兴趣与角色愿望，再通过可逆试用改变生活角色、外观和表达。形态与职业可以组合，保留识别锚点，成功、喜欢、能力和想成为各有含义。后续开发按 [v0.5 九阶段管线](research/development-roadmap-v0.5.md) 推进。
 
 **角色发展第 3 阶段（2026-10-06）：** 同一批经历分别呈现接触、主动继续、受邀实践、具体配方能力和规则自评，连接正常生活候选、有限模型摘要和原侧栏。旧兴趣分保留为历史记录，条件失败不扣成能力不足；主人促成的真实实践也可作为能力依据。三日 SQLite 隔离实验与重载已验证，尚未建立主动角色愿望。见 [验收与实验边界](research/milestones/role-development-stage3.md) 和 [分维度规则](research/world/development-facets-v1.md)，独立页面为 `/development-review.html?sample=facets`。

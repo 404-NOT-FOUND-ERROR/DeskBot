@@ -9,6 +9,10 @@ import type {
   DeskBotWorldRouteResponse,
   DeskBotWorldMap,
   DeskBotPresentationPoint,
+  DeskBotRoleEvolution,
+  DeskBotRoleProposal,
+  DeskBotRoleWishChoice,
+  DeskBotRoleWishSnapshot,
 } from "./types.ts";
 
 function cleanBaseUrl(value: string): string {
@@ -323,6 +327,21 @@ export async function travelRouteToLocation(
     }
     if (completed >= 50) throw new Error("路线已行进 50 段仍未抵达，旅行已暂停以避免无限绕行。 ");
   }
+}
+
+export async function fetchRoleWishes(characterId:string,baseUrl=deskbotBaseUrl()):Promise<DeskBotRoleWishSnapshot> {
+  const query=new URLSearchParams({character_id:characterId}).toString();
+  const [evolution,result]=await Promise.all([
+    getJson<DeskBotRoleEvolution>(baseUrl,`/api/roles/evolution?${query}`),
+    getJson<{proposals:DeskBotRoleProposal[]}>(baseUrl,`/api/roles/proposals?${query}`),
+  ]);
+  return {evolution,proposals:result.proposals??[]};
+}
+
+export async function respondRoleWish(proposalId:string,choice:DeskBotRoleWishChoice,baseUrl=deskbotBaseUrl()) {
+  // A wish response only records preparation. Practical trials are a later
+  // stage and cannot be substituted by the legacy chat-overlay trial API.
+  return postJson<{proposal:DeskBotRoleProposal}>(baseUrl,`/api/roles/proposals/${encodeURIComponent(proposalId)}/choose`,{choice},'愿望回应暂时没有保存。');
 }
 
 export async function controlWorldTask(taskId: string, operation: "pause" | "resume" | "cancel", baseUrl = deskbotBaseUrl()): Promise<void> {

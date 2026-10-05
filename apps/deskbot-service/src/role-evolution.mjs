@@ -3,6 +3,8 @@ import { localWorldDate } from './realtime-world.mjs';
 
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 import { roleDevelopmentReadModel, candidateDevelopmentContext } from './role-development.mjs';
+import { roleWishReadModel } from './role-wishes.mjs';
+import { RoleProposalError } from './role-proposals.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
 const EVIDENCE_NAMESPACE = 'role.evidence';
@@ -17,6 +19,7 @@ const MAX_PULLS = 500;
 const EVIDENCE_WINDOW_DAYS = 30;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const RULE_VERSION = 'role-evolution-rules.v0.8';
+const WISH_RULE_VERSION = 'role-wish-lifecycle.v1';
 
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
@@ -400,6 +403,10 @@ export function createRoleEvolution({
     const resolvedCharacterId = characterKey(characterId);
     const at = now();
     if (!(at instanceof Date) || !Number.isFinite(at.getTime())) throw new TypeError('role evolution now() must return a valid Date');
+    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    // Once canonical facets are installed, words, weather cues and old dialogue
+    // trial scores must never bypass the actual-life prerequisite gate.
+    if (world?.memory?.development?.facets) return syncWishes(resolvedCharacterId, at, world);
     expireEvidence(at, resolvedCharacterId);
     const events = stableEvents(inputStore, resolvedCharacterId, limit)
       .filter((event) => withinEvidenceWindow(event, at, evidenceWindowDays));
@@ -493,6 +500,143 @@ export function createRoleEvolution({
     });
   }
 
+  function wishView({ characterId = activeCharacter, at = now() } = {}) {
+    const model = roleWishReadModel(typeof worldSnapshot === 'function' ? worldSnapshot() : null, { actorId: characterKey(characterId), at: new Date(at).toISOString() });
+    return { ...model, directions: model.directions.map(direction => ({ ...direction,
+      proposal_gate: roles.wishGate(direction, { characterId: model.character_id, at }),
+    })) };
+  }
+
+  function wishProposals({ characterId = activeCharacter, status = null, limit = 50 } = {}) {
+    return roles.list({ characterId, status, limit }).map(proposal => {
+      if (proposal.origin !== 'lived_wish') return proposal;
+      const model = wishView({ characterId: proposal.character_id });
+      const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
+      return { ...proposal,
+        current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [{ id: 'direction_unavailable', label: '这个方向当前没有可用的生活依据', scope: 'evidence' }], checks: [] }),
+        proposal_gate: clone(direction?.proposal_gate ?? null),
+        current_authored_reason: direction?.authored_reason ?? null,
+      };
+    });
+  }
+
+  function wishProposal(proposalId) {
+    const proposal = roles.get(proposalId);
+    if (!proposal || proposal.origin !== 'lived_wish') return proposal;
+    const model = wishView({ characterId: proposal.character_id });
+    const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
+    return { ...proposal, current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [], checks: [] }),
+      proposal_gate: clone(direction?.proposal_gate ?? null), current_authored_reason: direction?.authored_reason ?? null };
+  }
+
+  function proposeWish({ characterId = activeCharacter, directionId, proposalId = null } = {}) {
+    const resolvedId = characterKey(characterId);
+    const at = now();
+    const model = wishView({ characterId: resolvedId, at });
+    const direction = model.directions.find(item => item.direction_id === directionId);
+    if (!model.enabled || direction?.readiness?.eligible !== true) throw new RoleProposalError(409, 'role_wish_not_ready', direction?.readiness?.barriers?.map(item => item.label).join('；') || '这个方向当前没有满足实际生活前提');
+    const existing = proposalId ? roles.get(proposalId) : roles.list({ characterId: resolvedId, limit: 200 }).reverse().find(item => item.origin === 'lived_wish' && item.direction_id === directionId && ['proposed', 'prepared'].includes(item.status));
+    if (existing) {
+      if (existing.origin !== 'lived_wish' || existing.character_id !== resolvedId || existing.direction_id !== directionId || !['proposed', 'prepared'].includes(existing.status)) throw new RoleProposalError(409, 'role_wish_proposal_conflict', '这个提案编号已经属于另一份记录，不能覆盖或重开');
+      return { duplicate: true, proposal: existing };
+    }
+    const proposal = roles.propose(null, { characterId: resolvedId, proposalId: proposalId ?? nextWishId(resolvedId, directionId), now: at, livedWish: direction });
+    return { duplicate: false, proposal };
+  }
+
+  function chooseWish(proposalId, choice, { reason = null } = {}) {
+    const proposal = roles.get(proposalId);
+    if (!proposal || proposal.origin !== 'lived_wish') {
+      if (choice === 'try') assertLegacyTrialCanStart(proposal);
+      return roles.choose(proposalId, choice, { reason });
+    }
+    const model = wishView({ characterId: proposal.character_id });
+    const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
+    if (direction) roles.refreshWish(proposalId, direction, { at: now() });
+    return roles.choose(proposalId, choice, { reason });
+  }
+
+  function assertLegacyTrialCanStart(proposal) {
+    const facetsInstalled = typeof worldSnapshot === 'function' && Boolean(worldSnapshot()?.memory?.development?.facets);
+    if (proposal && proposal.origin !== 'lived_wish' && facetsInstalled && !proposal.trial?.started_at) {
+      throw new RoleProposalError(409, 'legacy_role_trial_requires_lived_wish', '这份旧草稿尚未开始试用；需要根据实际生活经历产生新的愿望，聊天轮次不能绕过生活前提。');
+    }
+  }
+
+  function startTrial(proposalId, options = {}) {
+    assertLegacyTrialCanStart(roles.get(proposalId));
+    return roles.startTrial(proposalId, options);
+  }
+
+  function nextWishId(characterId, directionId) {
+    if (typeof roles.nextWishId === 'function') return roles.nextWishId(characterId, directionId);
+    const base = `role-wish:${characterId}:${directionId}`;
+    const history = roles.list({ characterId, limit: 200 });
+    if (!history.some(item => item.proposal_id === base)) return base;
+    let revision = 2;
+    while (history.some(item => item.proposal_id === `${base}-r${revision}`)) revision += 1;
+    return `${base}-r${revision}`;
+  }
+
+  function syncWishes(characterId, at, world) {
+    const model = roleWishReadModel(world, { actorId: characterId, at: at.toISOString() });
+    const created = [];
+    if (model.enabled) {
+      for (const proposal of roles.list({ characterId, limit: 200 })) {
+        if (proposal.origin !== 'lived_wish' || !['proposed', 'deferred', 'prepared'].includes(proposal.status)) continue;
+        const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
+        if (direction) roles.refreshWish(proposal.proposal_id, direction, { at });
+      }
+      for (const direction of model.directions) {
+        const gate = roles.wishGate(direction, { characterId, at });
+        if (!gate.eligible) continue;
+        const proposal = roles.propose(null, { characterId, proposalId: nextWishId(characterId, direction.direction_id), now: at, livedWish: direction });
+        if (proposal) created.push(proposal);
+        // A single announcement consumes the shared 24-hour window. Other
+        // eligible axes remain visible and can be considered on a later day.
+        break;
+      }
+    }
+    const materialized = model.directions.map(direction => {
+      const gate = roles.wishGate(direction, { characterId, at });
+      const proposal = roles.list({ characterId, limit: 200 }).reverse().find(item => item.origin === 'lived_wish' && item.direction_id === direction.direction_id);
+      const current = { ...direction, proposal_gate: gate, proposal_id: proposal?.proposal_id ?? null, proposal_status: proposal?.status ?? null };
+      const stateFingerprint = fingerprint({ direction: direction.fingerprint, gate: { eligible: gate.eligible,
+        barriers: gate.barriers.map(item => item.id), cooldown_until: gate.cooldown_until, axis_conflict_id: gate.axis_conflict_id,
+        last_proposal_id: gate.last_proposal_id, new_actual_root_ids: gate.new_actual_root_ids },
+      proposal_id: current.proposal_id, proposal_status: current.proposal_status });
+      const previous = candidates.get(candidateKey(characterId, direction.direction_id));
+      if (previous?.state_fingerprint !== stateFingerprint) saveCandidate({
+        schema: 'deskbot.role-evolution-candidate.v0.4', rule_version: WISH_RULE_VERSION,
+        candidate_key: candidateKey(characterId, direction.direction_id), character_id: characterId,
+        origin: 'lived_wish', evidence_basis: 'canonical_life_outcomes', direction_id: direction.direction_id,
+        label: direction.label, life: direction.label, axis: direction.axis,
+        status: direction.readiness.eligible ? 'candidate' : 'observing', fantasy_pull: null, score: null,
+        evidence_ids: [...direction.basis.root_outcome_ids], evidence_count: direction.basis.root_outcome_ids.length,
+        evidence_fingerprint: direction.fingerprint, state_fingerprint: stateFingerprint,
+        readiness: clone(direction.readiness), wish_basis: clone(direction.basis), authored_reason: direction.authored_reason,
+        next_step: direction.next_step, proposal_gate: clone(gate),
+        proposal_id: proposal?.proposal_id ?? null, proposal_status: proposal?.status ?? null,
+        first_seen_at: previous?.first_seen_at ?? at.toISOString(), updated_at: at.toISOString(),
+      });
+      return { direction_id: direction.direction_id, proposal_id: proposal?.proposal_id ?? null, proposal_status: proposal?.status ?? null,
+        created: created.some(item => item.direction_id === direction.direction_id),
+        suppressed: gate.barriers[0]?.id ?? null, evidence_fingerprint: direction.fingerprint };
+    });
+    const stateFingerprint = fingerprint({ model: model.fingerprint, materialized: materialized.map(({ created: _created, ...item }) => item) });
+    const runId = `role-wish:${characterId}:${stateFingerprint.slice(0, 24)}`;
+    const existingRun = runs.get(runId);
+    if (existingRun && !created.length) { lastRunId = runId; return clone({ ...existingRun, created: [], duplicate: true }); }
+    const run = saveRun({ schema: 'deskbot.role-evolution-run.v0.5', rule_version: WISH_RULE_VERSION,
+      run_id: runId, character_id: characterId, started_at: at.toISOString(), completed_at: at.toISOString(),
+      event_count: 0, event_ids: [], result_event_ids: [], event_fingerprint: null,
+      evidence_basis: 'canonical_life_outcomes', evidence_revision: model.evidence_revision,
+      wish_fingerprint: model.fingerprint, pulls: [], materialized, evidence_count: world?.memory?.development?.records?.length ?? 0,
+      pull_count: 0, world_revision: world?.world_revision ?? null,
+    });
+    return clone({ ...run, created, duplicate: false });
+  }
+
   function observeEvent(event) {
     if (!eventIsEligible(event)) return { ignored: true, reason: 'ineligible_event', run: null, trials: [] };
     const characterId = characterKey(event.character_id);
@@ -529,13 +673,14 @@ export function createRoleEvolution({
     const bounded = Math.min(Math.max(Number(limit) || 50, 1), MAX_CANDIDATES);
     const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
     const development = roleDevelopmentReadModel(world, { actorId: characterKey(characterId, activeCharacter) });
+    const wishes = wishView({ characterId: characterKey(characterId, activeCharacter) });
     const candidateList = [...candidates.values()]
       .filter((item) => !characterId || item.character_id === characterId)
       .slice(-bounded)
       .map(item => {
         const ownDevelopment = item.character_id === development.character_id ? development
           : roleDevelopmentReadModel(world, { actorId: item.character_id });
-        return { ...clone(item), evidence_basis: 'legacy_input_cues', development_context: candidateDevelopmentContext(item, ownDevelopment) };
+        return { ...clone(item), evidence_basis: item.origin === 'lived_wish' ? 'canonical_life_outcomes' : 'legacy_input_cues', development_context: candidateDevelopmentContext(item, ownDevelopment) };
       });
     const runList = [...runs.values()]
       .filter((item) => !characterId || item.character_id === characterId)
@@ -555,6 +700,7 @@ export function createRoleEvolution({
       active_character_id: activeCharacter,
       character_id: characterId,
       development,
+      wishes,
       evidence: evidenceList,
       pulls: pullList,
       candidates: candidateList,
@@ -572,6 +718,12 @@ export function createRoleEvolution({
     syncAll,
     observeEvent,
     snapshot,
+    wishView,
+    wishProposals,
+    wishProposal,
+    proposeWish,
+    chooseWish,
+    startTrial,
     constants: {
       activeCharacter,
       evidenceNamespace: EVIDENCE_NAMESPACE,

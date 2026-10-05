@@ -137,7 +137,7 @@ test('a bounded recent conversation and the character seed reach the next turn p
   });
 
   assert.equal(prompts.length, 2);
-  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v6/);
+  assert.match(prompts[1], /seed_version=miaowu-expression-seed-v7/);
   assert.match(prompts[1], /name=喵呜/);
   assert.match(prompts[1], /identity=聚形域中持续存在的同一个个体/);
   assert.match(prompts[1], /core=喵呜先有感觉再做事/);

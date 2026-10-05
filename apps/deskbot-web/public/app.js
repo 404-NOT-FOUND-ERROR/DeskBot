@@ -166,7 +166,7 @@ function initializeLife() {
   lifeAction(async () => {});
 }
 window.addEventListener('DOMContentLoaded', initializeLife);
-const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, npcChatTargetId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], interactionCandidates: [], interactionSettings: null, worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false, interactionBusy: false };
+const state = { world: null, worldMap: null, worldLife: null, announcedSceneId: null, selectedNpcId: null, npcChatTargetId: null, mapSelectedLocationId: null, mapArrivalLocationId: null, runtimeContext: null, weatherForecast: null, shortState: null, voice: null, worldSchema: null, scenarioCatalog: null, probeCatalog: null, rolePulls: [], roleProposals: [], roleWishesEnabled: false, interactionCandidates: [], interactionSettings: null, worldLineSelected: null, multisourceMutations: [], contextPanelBusy: {}, busy: false, npcBusy: false, mapTravelBusy: false, mutationBusy: false, worldLineBusy: false, scenarioBusy: false, probeBusy: false, roleBusy: false, interactionBusy: false };
 const $ = (selector) => document.querySelector(selector);
 const messageList = $('#message-list');
 const emptyState = $('#empty-state');
@@ -1240,7 +1240,7 @@ function updateTrace(turn) { if (!turn) return; const event = turn.input_event |
 function renderEventLog(events = []) { const target = $('#event-log'); target.innerHTML = events.length ? [...events].reverse().map((event) => `<div><b>${escapeHtml(event.layer || event.type || 'event')}</b> · ${escapeHtml(event.type || '')} · ${escapeHtml(event.source_kind || 'unknown')} · ${escapeHtml(event.payload?.text || event.event_id || '')}</div>`).join('') : '<span>还没有事件记录</span>'; }
 function renderEvidenceLog(evidence = []) { const target = $('#evidence-log'); target.innerHTML = evidence.length ? evidence.map((item) => `<div><b>${escapeHtml(item.eligibility?.status || 'unknown')}</b> · ${escapeHtml(item.event_type || item.event_id || '')}</div>`).join('') : '<span>还没有证据记录</span>'; }
 
-const ROLE_STATUS_LABELS = { proposed: '待选择', trying: '试行中', accepted: '已确认', rejected: '已拒绝', deferred: '稍后再议', archived: '已归档' };
+const ROLE_STATUS_LABELS = { proposed: '待选择', prepared: '已准备试做', trying: '试行中', accepted: '已确认', rejected: '已拒绝', deferred: '稍后再议', withdrawn: '这次已收回', archived: '已归档' };
 const ROLE_DIRECTION_LABELS = { wetland_frog: '荷叶青蛙', starry_observer: '星空观察者', workshop_maker: '工坊学徒', dream_cloud: '云朵梦境生物' };
 
 function setRoleResult(kind, title, details) {
@@ -1266,8 +1266,16 @@ function renderRolePulls(pulls = []) {
   `).join('') : '<span class="console-hint">还没有达到跨来源门槛的方向。继续生活，证据会慢慢聚合。</span>';
 }
 
-function roleActionButtons(proposal) {
+function roleActionButtons(proposal, wishesEnabled = false) {
   const id = escapeHtml(proposal.proposal_id);
+  if (proposal.origin === 'lived_wish') {
+    if (proposal.status !== 'proposed') return '';
+    const disabled = proposal.current_gate?.eligible === true ? '' : ' disabled';
+    return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="try"${disabled}>准备实际试做</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">以后再说</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">这次不尝试</button></div>`;
+  }
+  if (wishesEnabled && !proposal.trial?.started_at && ['proposed', 'deferred', 'trying'].includes(proposal.status)) {
+    return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">以后再说</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">这次不尝试</button><button class="quiet-button role-action" type="button" data-role-action="archive" data-role-id="${id}">归档历史记录</button></div>`;
+  }
   if (proposal.status === 'proposed' || proposal.status === 'deferred') {
     return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="try">试一段</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">稍后</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">不要</button></div>`;
   }
@@ -1287,10 +1295,19 @@ function renderRoleProposals(proposals = []) {
   if (!target) return;
   $('#role-proposals-status').textContent = state.roleProposals.length ? `${state.roleProposals.length} 条记录` : '暂无记录';
   target.innerHTML = state.roleProposals.length ? [...state.roleProposals].reverse().map((proposal) => {
+    if (proposal.origin === 'lived_wish') {
+      const axis = proposal.axis === 'form' ? '形态兴趣' : '职业愿望';
+      const barriers = [...(proposal.current_gate?.barriers || []), ...(['deferred', 'rejected', 'withdrawn'].includes(proposal.status) ? proposal.proposal_gate?.barriers || [] : [])];
+      const cooldown = proposal.cooldown_until ? interactionDate(proposal.cooldown_until) : '';
+      const next = proposal.status === 'prepared' ? '已经记录试做意向。实际试做尚未开始，等下一阶段接上行动与结果。' : ['deferred', 'rejected'].includes(proposal.status) ? `${cooldown ? `${cooldown} 后再考虑；` : '先留一段时间；'}还需要新的实际经历，再决定要不要重新提出。` : proposal.status === 'withdrawn' ? '这个想法已收回，实际经历仍会保留。' : proposal.next_step || '先准备一次实际试做，再看结果。';
+      const roots = [...new Set(proposal.wish_basis?.root_outcome_ids || [])];
+      return `<article class="role-item proposal lived-wish ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${axis} · 从生活经历提出</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.authored_reason || '')}</p>${barriers.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${barriers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}<p>${escapeHtml(next)}</p><small>形态兴趣与职业愿望可以组合；目前没有变身，也没有认定职业资格。</small>${roots.length ? `<details><summary>这些日子给了什么依据</summary><p>同一件实际结果，多个记录视角不会叠加。</p><small>${escapeHtml(roots.join(' · '))}</small></details>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
+    }
     const trial = proposal.trial;
     const trialSummary = trial ? `试行 ${trial.turns_observed}/${trial.max_turns} · 正 ${trial.positive_feedback} / 负 ${trial.negative_feedback} · ${trial.status}` : '尚未开始试行';
     const overlay = trial?.status === 'active' ? { wetland_frog: '亲水、轻快、把事变成一个小动作', starry_observer: '观察细节、保留不确定性', workshop_maker: '拆解、验证、先试一块', dream_cloud: '轻盈联想、提出奇怪但低风险的选择' }[proposal.direction_id] : null;
-    return `<article class="role-item proposal ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${escapeHtml(proposal.direction_id)}</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.life || '')}</p><small>${escapeHtml(trialSummary)}</small>${overlay ? `<small class="role-overlay">当前表达覆盖：${escapeHtml(overlay)}</small>` : ''}${proposal.evidence_ids?.length ? `<small>提案证据：${escapeHtml(proposal.evidence_ids.join(', '))}</small>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
+    const historicalDraft = state.roleWishesEnabled && !proposal.trial?.started_at && ['proposed', 'deferred', 'trying'].includes(proposal.status);
+    return `<article class="role-item proposal ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">早期输入线索 · 聊天表达试行</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.life || '')}</p><small>${historicalDraft ? '历史方向记录；新尝试需要实际生活依据。' : escapeHtml(trialSummary)}</small>${overlay ? `<small class="role-overlay">当前表达覆盖：${escapeHtml(overlay)}</small>` : ''}${proposal.evidence_ids?.length ? `<small>提案证据：${escapeHtml(proposal.evidence_ids.join(', '))}</small>` : ''}<div class="role-action-slot">${roleActionButtons(proposal, state.roleWishesEnabled)}</div></article>`;
   }).join('') : '<span class="console-hint">提出方向后，它会出现在这里。接受不会自动换壳。</span>';
 }
 
@@ -1298,7 +1315,9 @@ async function refreshRoleLab() {
   const results = await Promise.allSettled([
     getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`),
     getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`),
+    getJson(`/api/roles/evolution?character_id=${encodeURIComponent(CHARACTER_ID)}`),
   ]);
+  if (results[2].status === 'fulfilled') state.roleWishesEnabled = (results[2].value.wishes || results[2].value.development?.role_wishes)?.enabled === true;
   if (results[0].status === 'fulfilled') renderRolePulls(results[0].value.pulls || []);
   else { $('#role-pulls-status').textContent = '接口不可用'; $('#role-pulls').innerHTML = '<span class="console-hint">角色方向接口尚未启动。</span>'; }
   if (results[1].status === 'fulfilled') renderRoleProposals(results[1].value.proposals || []);
@@ -1421,16 +1440,20 @@ async function handleRoleAction(actionTarget) {
   try {
     const action = actionTarget.dataset.roleAction;
     const proposalId = actionTarget.dataset.roleId;
+    const selectedProposal = state.roleProposals.find(proposal => proposal.proposal_id === proposalId);
+    const livedWish = selectedProposal?.origin === 'lived_wish';
+    if (livedWish && action !== 'choose') throw new Error('这个愿望需要实际试做，聊天试行尚未连接。');
+    if (state.roleWishesEnabled && selectedProposal && !livedWish && !selectedProposal.trial?.started_at && (action === 'start' || (action === 'choose' && actionTarget.dataset.choice === 'try'))) throw new Error('历史方向记录；新尝试需要实际生活依据。');
     let result;
     if (action === 'propose') {
       result = await postJson('/api/roles/proposals', { character_id: CHARACTER_ID, direction_id: actionTarget.dataset.directionId });
       setRoleResult('ok', '方向提案已创建', `${result.proposal.label} · 仍需明确选择是否试行`);
     } else if (action === 'choose') {
       result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/choose`, { choice: actionTarget.dataset.choice });
-      if (actionTarget.dataset.choice === 'try') {
+      if (actionTarget.dataset.choice === 'try' && !livedWish) {
         result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
       }
-      setRoleResult('ok', '选择已记录', `当前阶段：${ROLE_STATUS_LABELS[result.proposal?.status] || result.proposal?.status || '已更新'}`);
+      setRoleResult('ok', '选择已记录', livedWish ? (actionTarget.dataset.choice === 'try' ? '试做意向已记下。实际试做尚未开始，形态与身份保持当前。' : '这个想法先放下，冷却后仍需新的实际经历再考虑。') : `当前阶段：${ROLE_STATUS_LABELS[result.proposal?.status] || result.proposal?.status || '已更新'}`);
     } else if (action === 'start') {
       result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
       setRoleResult('ok', '试行已开始', `观察窗口 ${result.proposal.trial.max_turns} 回合`);
@@ -1456,8 +1479,9 @@ async function handleRoleAction(actionTarget) {
 
 async function refreshDashboard({ allowEncounterAutoOpen = true } = {}) {
   setServicePill('pending', '检查服务…');
-  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson('/api/world/map'), getJson('/api/life/world'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast'), getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`)]);
-  const [health, runtimeContext, world, worldMap, worldLife, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast, rolePulls, roleProposals] = results;
+  const results = await Promise.allSettled([getJson('/health'), getJson('/api/context'), getJson('/api/world'), getJson('/api/world/map'), getJson('/api/life/world'), getJson(`/api/state/${encodeURIComponent(CHARACTER_ID)}`), getJson('/api/voice/health'), getJson('/api/events?limit=12'), getJson('/api/evidence?limit=8'), getJson('/api/world/schema'), getJson('/api/world/mutations?limit=20'), getJson('/api/research/scenarios'), getJson('/api/research/probes'), getJson('/api/research/probe-observations?limit=50'), getJson('/api/connectors/weather/forecast'), getJson(`/api/roles/pulls?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/proposals?character_id=${encodeURIComponent(CHARACTER_ID)}`), getJson(`/api/roles/evolution?character_id=${encodeURIComponent(CHARACTER_ID)}`)]);
+  const [health, runtimeContext, world, worldMap, worldLife, shortState, voice, events, evidence, schema, mutations, scenarios, probes, probeObservations, weatherForecast, rolePulls, roleProposals, roleEvolution] = results;
+  if (roleEvolution.status === 'fulfilled') state.roleWishesEnabled = (roleEvolution.value.wishes || roleEvolution.value.development?.role_wishes)?.enabled === true;
   if (health.status === 'fulfilled') setServicePill('ok', `在线 · ${health.value.version || 'Node'}`); else setServicePill('bad', '服务不可达');
   if (rolePulls.status === 'fulfilled') renderRolePulls(rolePulls.value.pulls || []);
   if (roleProposals.status === 'fulfilled') renderRoleProposals(roleProposals.value.proposals || []);

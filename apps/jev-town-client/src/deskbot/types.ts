@@ -359,6 +359,44 @@ export interface DeskBotRoleDirection {
   cues: string[];
 }
 
+export type DeskBotRoleWishAxis = 'form' | 'vocation';
+export type DeskBotRoleWishChoice = 'try' | 'later' | 'reject';
+export interface DeskBotRoleWishReadiness {
+  eligible:boolean;
+  barriers:{id:string;label:string;scope:'evidence'|'circumstance'}[];
+  checks:{id:string;label:string;passed:boolean;actual:unknown;required:unknown}[];
+}
+export interface DeskBotRoleWishBasis {
+  scope:string;root_outcome_ids:string[];active_roots:string[];active_days:string[];active_contexts:string[];
+  threshold_root_ids:string[];practice_success_roots:string[];practice_days:string[];invited_practice_roots:string[];
+  obligation_roots:string[];condition_failure_roots:string[];performance_failure_roots:string[];unknown_failure_roots:string[];
+  counts:Record<string,number>;historical_import_included?:boolean;
+}
+export interface DeskBotRoleWishDirection {
+  direction_id:string;label:string;axis:DeskBotRoleWishAxis;
+  readiness:DeskBotRoleWishReadiness;basis:DeskBotRoleWishBasis;
+  authored_reason:string;next_step:string;fingerprint:string;
+}
+export interface DeskBotRoleWishes {
+  schema:'deskbot.role-wishes.v1';enabled:boolean;character_id:string;at:string;evidence_revision:number;
+  window:{days:number;from:string;until:string;time_zone:string};fingerprint:string;directions:DeskBotRoleWishDirection[];
+}
+export interface DeskBotRoleProposal {
+  proposal_id:string;character_id?:string;direction_id:string;label?:string;life?:string;status:string;
+  origin?:string;axis?:DeskBotRoleWishAxis;authored_reason?:string;next_step?:string;
+  wish_basis?:DeskBotRoleWishBasis;current_gate?:DeskBotRoleWishReadiness;
+  proposal_gate?:{eligible?:boolean;barriers?:{id:string;label:string;scope?:string}[]};
+  cooldown_until?:string|null;created_at?:string;updated_at?:string;reason?:string;
+  evidence_ids?:string[];trial?:{status:string;started_at?:string;turns_observed:number;max_turns:number;positive_feedback:number;negative_feedback:number}|null;
+}
+export interface DeskBotRoleEvolution {
+  schema:string;wishes?:DeskBotRoleWishes|null;
+  development?:{role_wishes?:DeskBotRoleWishes|null;directions?:DeskBotRoleWishDirection[]};
+}
+export interface DeskBotRoleWishSnapshot {
+  evolution:DeskBotRoleEvolution;proposals:DeskBotRoleProposal[];
+}
+
 export interface DeskBotExperience {
   experience_id: string;
   kind: string;

@@ -33,12 +33,71 @@ const ROLE_TRIAL_OVERLAYS = Object.freeze({
   }),
 });
 
+const LIVE_WISH_STATUSES = new Set(['proposed', 'prepared']);
+const WISH_ANNOUNCE_MS = 24 * 3600000;
+const WISH_LATER_MS = 72 * 3600000;
+const WISH_REJECT_MS = 7 * 24 * 3600000;
+const timestamp = value => Date.parse(value ?? '') || 0;
+const rootIds = direction => [...new Set(direction?.basis?.root_outcome_ids ?? [])];
+
+/** Pure scheduling policy over the original proposal history and canonical basis. */
+export function roleWishProposalGate(history, direction, { characterId = null, at = new Date(), excludeProposalId = null } = {}) {
+  const records = (history ?? []).filter(item => item.origin === 'lived_wish' && (!characterId || item.character_id === characterId));
+  const currentMs = timestamp(at instanceof Date ? at.toISOString() : at);
+  const barriers = [...(direction?.readiness?.barriers ?? [])].map(item => structuredClone(item));
+  const sameDirection = records.filter(item => item.direction_id === direction?.direction_id && item.proposal_id !== excludeProposalId)
+    .sort((left, right) => timestamp(right.decided_at ?? right.proposed_at) - timestamp(left.decided_at ?? left.proposed_at));
+  const last = sameDirection[0] ?? null;
+  const axisConflict = records.find(item => item.proposal_id !== excludeProposalId && item.axis === direction?.axis && LIVE_WISH_STATUSES.has(item.status));
+  if (axisConflict) barriers.push({ id: 'axis_occupied', label: '这个方向轴已有等待回应或准备实践的愿望', scope: 'policy', proposal_id: axisConflict.proposal_id });
+  const lastAnnouncement = records.filter(item => item.proposal_id !== excludeProposalId).reduce((latest, item) => Math.max(latest, timestamp(item.proposed_at)), 0);
+  const announceUntil = lastAnnouncement ? lastAnnouncement + WISH_ANNOUNCE_MS : 0;
+  if (announceUntil > currentMs) barriers.push({ id: 'announcement_cooldown', label: '刚表达过一份愿望，先继续生活', scope: 'policy' });
+  const needsNewRoot = last && ['later', 'reject'].includes(last.user_choice);
+  const ownerCooldown = needsNewRoot ? timestamp(last.cooldown_until) : 0;
+  if (ownerCooldown > currentMs) barriers.push({ id: 'owner_choice_cooldown', label: last.user_choice === 'reject' ? '尊重这次拒绝，暂不重提' : '尊重稍后再说，暂不重提', scope: 'policy' });
+  const previousRoots = new Set(last?.reconsider_after_roots ?? last?.wish_basis?.root_outcome_ids ?? []);
+  const datedRoots = direction?.basis?.root_outcomes ?? [];
+  const newRoots = rootIds(direction).filter(id => !previousRoots.has(id) && datedRoots.some(root => root.root_outcome_id === id && timestamp(root.at) > timestamp(last?.decided_at)));
+  if (needsNewRoot && !newRoots.length) barriers.push({ id: 'new_actual_outcome_required', label: '回应后还没有新的实际经历，不重复劝说', scope: 'policy' });
+  return {
+    eligible: direction?.readiness?.eligible === true && barriers.length === 0,
+    barriers,
+    cooldown_until: Math.max(announceUntil, ownerCooldown) > currentMs ? new Date(Math.max(announceUntil, ownerCooldown)).toISOString() : null,
+    axis_conflict_id: axisConflict?.proposal_id ?? null,
+    last_proposal_id: last?.proposal_id ?? null,
+    needs_new_actual_root: Boolean(needsNewRoot),
+    new_actual_root_ids: newRoots.slice(-32),
+  };
+}
+
 function proposalIdFor(pull, now) {
   const stamp = String(new Date(now).getTime());
   return `proposal-${pull.direction_id}-${stamp}`;
 }
 
-export function createRoleProposal(pull, { proposalId = null, characterId = null, now = new Date(), cooldownMs = 24 * 3600000 } = {}) {
+export function createRoleProposal(pull, { proposalId = null, characterId = null, now = new Date(), cooldownMs = 24 * 3600000, livedWish = null } = {}) {
+  if (livedWish) {
+    if (livedWish.readiness?.eligible !== true) return null;
+    if (!['form', 'vocation'].includes(livedWish.axis)) throw new TypeError('lived wish needs an authored direction axis');
+    const stamp = new Date(now).toISOString();
+    return {
+      schema: 'deskbot.role-direction-proposal.v0.2', origin: 'lived_wish',
+      proposal_id: proposalId ?? `role-wish:${characterId}:${livedWish.direction_id}:${livedWish.fingerprint?.slice(0, 16) ?? new Date(now).getTime()}`,
+      character_id: characterId, direction_id: livedWish.direction_id, label: livedWish.label,
+      axis: livedWish.axis, life: livedWish.label, fantasy_pull: null, score: null,
+      evidence_ids: rootIds(livedWish), sources: ['canonical_life_outcomes'],
+      evidence_fingerprint: livedWish.fingerprint, evidence_revision: 1,
+      wish_basis: structuredClone(livedWish.basis), wish_fingerprint: livedWish.fingerprint,
+      authored_reason: livedWish.authored_reason, next_step: livedWish.next_step,
+      current_gate: structuredClone(livedWish.readiness), current_gate_fingerprint: livedWish.fingerprint,
+      current_root_outcome_ids: rootIds(livedWish),
+      proposed_at: stamp, cooldown_until: new Date(new Date(now).getTime() + WISH_ANNOUNCE_MS).toISOString(),
+      status: 'proposed', user_choices: ['try', 'later', 'reject'],
+      prompt_hint: livedWish.authored_reason,
+      practical_trial_connected: false, changes_identity: false, changes_appearance: false,
+    };
+  }
   if (!pull || pull.status !== 'candidate') return null;
   if (typeof pull.direction_id !== 'string' || pull.direction_id.trim() === '') throw new TypeError('pull.direction_id is required');
   const resolvedProposalId = proposalId ?? proposalIdFor(pull, now);
@@ -85,6 +144,12 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
   const decisions = new Map((persistence?.list('role.proposal-decisions') ?? []).map((item) => [item.decision_id, item]));
   const clone = (value) => structuredClone(value);
   function propose(pull, options = {}) {
+    if (options.livedWish) {
+      const existing = options.proposalId ? proposals.get(options.proposalId) : null;
+      if (existing) return clone(existing);
+      const gate = wishGate(options.livedWish, { characterId: options.characterId, at: options.now ?? now() });
+      if (!gate.eligible) throw new RoleProposalError(409, 'role_wish_not_ready', gate.barriers.map(item => item.label).join('；') || '愿望的生活前提尚未满足');
+    }
     let proposal = createRoleProposal(pull, { ...options, now: options.now ?? now() });
     if (!proposal) return null;
     const explicitId = options.proposalId !== undefined && options.proposalId !== null;
@@ -106,6 +171,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
   function refreshEvidence(proposalId, pull, { now: refreshedAt = now() } = {}) {
     const proposal = proposals.get(proposalId);
     if (!proposal || !pull || typeof pull !== 'object') return null;
+    if (proposal.origin === 'lived_wish') return clone(proposal);
     const evidenceIds = Array.isArray(pull.evidence_ids) ? [...new Set(pull.evidence_ids)] : proposal.evidence_ids ?? [];
     const sources = Array.isArray(pull.sources) ? [...new Set(pull.sources)] : proposal.sources ?? [];
     const nextFingerprint = JSON.stringify({ evidenceIds: [...evidenceIds].sort(), sources: [...sources].sort(), score: pull.score ?? null, fantasyPull: pull.fantasy_pull ?? null });
@@ -182,6 +248,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     if (!CHOICES.has(choice)) throw new TypeError('choice must be try, later, or reject');
     const proposal = proposals.get(proposalId);
     if (!proposal) return null;
+    if (proposal.origin === 'lived_wish') return chooseWish(proposal, choice, { reason });
     if (!['proposed', 'deferred'].includes(proposal.status)) {
       throw new RoleProposalError(409, 'role_proposal_not_selectable', `proposal ${proposalId} is ${proposal.status}`);
     }
@@ -216,6 +283,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
   }
   function startTrial(proposalId, { windowTurns = 5 } = {}) {
     const p = proposals.get(proposalId); if (!p) return null;
+    if (p.origin === 'lived_wish') throw new RoleProposalError(409, 'practical_trial_not_connected', '这份愿望只准备下一阶段的实际活动；对话轮次不能代替实践，也不会改变形象。');
     if (p.status !== 'trying') throw new RoleProposalError(409, 'role_trial_not_startable', 'only trying proposals can start trial');
     if (p.trial?.status === 'active') return clone(p);
     if (p.trial?.status === 'completed') throw new RoleProposalError(409, 'role_trial_window_complete', 'trial window is complete; choose a completion decision');
@@ -232,6 +300,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
   }
   function recordTrialObservation(proposalId, { eventId, signal = 'neutral', evidenceId = null } = {}) {
     const p = proposals.get(proposalId); if (!p) return null;
+    if (p.origin === 'lived_wish') throw new RoleProposalError(409, 'practical_trial_not_connected', '愿望尚未接入实际试做，聊天反馈不能落成实践结果。');
     if (p.status !== 'trying' || p.trial?.status !== 'active') throw new RoleProposalError(409, 'role_trial_not_active', 'trial is not active');
     if (typeof eventId !== 'string' || eventId.trim() === '') throw new TypeError('eventId is required');
     if (!SIGNALS.has(signal)) throw new TypeError('signal must be positive, negative, or neutral');
@@ -243,7 +312,9 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const updated = { ...p, trial: tr }; proposals.set(proposalId, updated); persistence?.put('role.proposals', proposalId, updated); return clone(updated);
   }
   function completeTrial(proposalId, { decision = 'deferred', reason = null } = {}) {
-    const p = proposals.get(proposalId); if (!p?.trial) return null;
+    const p = proposals.get(proposalId); if (!p) return null;
+    if (p.origin === 'lived_wish') throw new RoleProposalError(409, 'practical_trial_not_connected', '这份愿望没有实际试做结果，不能确认成为角色或改变形象。');
+    if (!p.trial) return null;
     if (!['accepted','rejected','deferred'].includes(decision)) throw new TypeError('invalid trial decision');
     if (!['active', 'completed'].includes(p.trial.status)) throw new RoleProposalError(409, 'role_trial_already_closed', 'trial is already closed');
     const at = now().toISOString();
@@ -253,6 +324,13 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
   }
   function archive(proposalId, { reason = null } = {}) {
     const p = proposals.get(proposalId); if (!p) return null;
+    if (p.origin === 'lived_wish') {
+      if (p.status === 'withdrawn') return clone(p);
+      const at = now().toISOString();
+      const updated = { ...p, status: 'withdrawn', withdrawn_at: at, withdrawal_reason: reason,
+        stage_history: [...(p.stage_history ?? []), { from: p.status, to: 'withdrawn', at, reason, source: 'owner_archive' }] };
+      proposals.set(proposalId, updated); persistence?.put('role.proposals', proposalId, updated); return clone(updated);
+    }
     if (p.status === 'archived') return clone(p);
     const at = now().toISOString();
     const updated = { ...p, previous_status: p.status, status: 'archived', archived_at: at, archive_reason: reason, stage_history: [...(p.stage_history ?? []), { from: p.status, to: 'archived', at, reason }] };
@@ -270,7 +348,61 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     return [...decisions.values()].filter((item) => !proposalId || item.proposal_id === proposalId).slice(-bounded).map(clone);
   }
-  return { propose, refreshEvidence, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
+  function wishGate(direction, { characterId = null, at = now(), excludeProposalId = null } = {}) {
+    return roleWishProposalGate([...proposals.values()], direction, { characterId, at, excludeProposalId });
+  }
+  function nextWishId(characterId, directionId) {
+    const base = `role-wish:${characterId}:${directionId}`;
+    if (!proposals.has(base)) return base;
+    let revision = 2;
+    while (proposals.has(`${base}-r${revision}`)) revision += 1;
+    return `${base}-r${revision}`;
+  }
+  function refreshWish(proposalId, direction, { at = now() } = {}) {
+    const proposal = proposals.get(proposalId);
+    if (!proposal || proposal.origin !== 'lived_wish' || !direction) return null;
+    let status = proposal.status;
+    let reason = null;
+    if (!proposal.user_choice && ['proposed', 'deferred'].includes(status)) {
+      if (!direction.readiness?.eligible) {
+        const evidenceMissing = direction.readiness?.barriers?.some(item => item.scope === 'evidence');
+        status = evidenceMissing ? 'withdrawn' : 'deferred';
+        reason = evidenceMissing ? 'actual_basis_no_longer_ready' : 'circumstances_temporarily_blocked';
+      } else if (status === 'deferred') {
+        const axisConflict = [...proposals.values()].some(item => item.proposal_id !== proposalId && item.character_id === proposal.character_id && item.axis === proposal.axis && LIVE_WISH_STATUSES.has(item.status));
+        if (!axisConflict) { status = 'proposed'; reason = 'circumstances_available_again'; }
+      }
+    }
+    if (proposal.current_gate_fingerprint === direction.fingerprint && proposal.status === status) return clone(proposal);
+    const stamp = new Date(at).toISOString();
+    const updated = { ...proposal, status, current_gate: clone(direction.readiness), current_gate_fingerprint: direction.fingerprint, current_root_outcome_ids: rootIds(direction), gate_updated_at: stamp,
+      ...(status !== proposal.status ? { stage_history: [...(proposal.stage_history ?? []), { from: proposal.status, to: status, at: stamp, reason, source: 'lived_rules' }], ...(status === 'withdrawn' ? { withdrawn_at: stamp, withdrawal_reason: reason } : {}) } : {}) };
+    proposals.set(proposalId, updated); persistence?.put('role.proposals', proposalId, updated); return clone(updated);
+  }
+  function chooseWish(proposal, choice, { reason = null } = {}) {
+    const decisionId = `${proposal.proposal_id}:${choice}`;
+    const existingDecision = decisions.get(decisionId);
+    if (proposal.user_choice === choice && existingDecision) return clone({ proposal, decision: existingDecision });
+    if (!['proposed', 'deferred'].includes(proposal.status)) throw new RoleProposalError(409, 'role_proposal_not_selectable', `proposal ${proposal.proposal_id} is ${proposal.status}`);
+    if (proposal.user_choice && proposal.user_choice !== choice) throw new RoleProposalError(409, 'role_wish_choice_recorded', '这次回应已经保存；后续愿望需要新的实际经历。');
+    if (choice === 'try' && proposal.current_gate?.eligible !== true) throw new RoleProposalError(409, 'role_wish_not_ready', '当前生活条件尚未满足，可以稍后再说。');
+    if (choice === 'try' && [...proposals.values()].some(item => item.proposal_id !== proposal.proposal_id
+      && item.origin === 'lived_wish' && item.character_id === proposal.character_id && item.axis === proposal.axis && LIVE_WISH_STATUSES.has(item.status))) {
+      throw new RoleProposalError(409, 'role_wish_axis_conflict', '这个方向轴已有另一份等待回应或准备实践的愿望，先处理已有安排。');
+    }
+    const decision = existingDecision ?? { schema: 'deskbot.role-proposal-decision.v0.2', decision_id: decisionId, proposal_id: proposal.proposal_id, choice, reason, decided_at: now().toISOString(), origin: 'lived_wish' };
+    const status = choice === 'try' ? 'prepared' : choice === 'later' ? 'deferred' : 'rejected';
+    const cooldownMs = choice === 'later' ? WISH_LATER_MS : choice === 'reject' ? WISH_REJECT_MS : WISH_ANNOUNCE_MS;
+    const updated = { ...proposal, status, user_choice: choice, decided_at: decision.decided_at,
+      cooldown_until: new Date(timestamp(decision.decided_at) + cooldownMs).toISOString(),
+      reconsider_after_roots: [...(proposal.current_root_outcome_ids ?? proposal.wish_basis.root_outcome_ids ?? [])],
+      stage_history: [...(proposal.stage_history ?? []), { from: proposal.status, to: status, at: decision.decided_at, reason, source: 'owner_choice' }] };
+    const persist = () => { if (!existingDecision) persistence?.put('role.proposal-decisions', decisionId, decision); persistence?.put('role.proposals', proposal.proposal_id, updated); };
+    if (typeof persistence?.transaction === 'function') persistence.transaction(persist); else persist();
+    if (!existingDecision) decisions.set(decisionId, decision); proposals.set(proposal.proposal_id, updated);
+    return clone({ proposal: updated, decision });
+  }
+  return { propose, refreshEvidence, refreshWish, wishGate, nextWishId, choose, startTrial, recordTrialObservation, completeTrial, archive, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
 }
 
 export { ROLE_TRIAL_OVERLAYS };

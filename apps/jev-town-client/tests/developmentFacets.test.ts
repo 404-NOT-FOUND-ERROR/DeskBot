@@ -22,14 +22,14 @@ describe('three distinct development facets display shared factual roots',()=>{
     const value=development(),before=JSON.stringify(value),topic=value.facets!.actors[0]!.topics[0]!;
     topic.capability.success_roots.push('task:water-once');topic.interest.invited_roots.push('task:water-once');
     const staged=JSON.stringify(value),html=render(value);
-    for(const text of ['喜欢','做得到','怎样看自己','回应邀请做过，还不能说明自己喜欢','实际完成过浇水','先试过了','1 件实际经历','主人促成的真实实践同样保留','角色愿望尚未建立','生活规则对这些经历的暂时归纳'])expect(html).toContain(text);
+    for(const text of ['喜欢','做得到','怎样看自己','回应邀请做过，还不能说明自己喜欢','实际完成过浇水','先试过了','1 件实际经历','主人促成的真实实践同样保留','这些经历为角色愿望提供依据','生活规则对这些经历的暂时归纳'])expect(html).toContain(text);
     expect(html).not.toContain('技能等级');expect(html).not.toContain('XP');expect(html).not.toContain('奖励');expect(JSON.stringify(value)).toBe(staged);expect(staged).not.toBe(before);
   });
   it('keeps contact visible without making practice, interest or capability mature',()=>{
     const value=development(),topic=value.facets!.actors[0]!.topics[0]!;
     value.actors[0]!.practice=0;value.recent=[];topic.interest.invited_roots=[];topic.capability.success_roots=[];topic.capability.root_outcome_ids=[];topic.capability.activities=[];topic.self_assessment.root_outcome_ids=[];
     topic.interest.summary='只是接触过，兴趣仍待观察。';topic.capability.summary='尚无实际练习的结果。';topic.self_assessment.summary='还没有做过，先不判断。';topic.contact.count=12;
-    const html=render(value);for(const text of ['接触过 12 条相关消息','接触本身不算实践','0 件实际经历','只是接触过','尚无实际练习','还没有做过','角色愿望尚未建立'])expect(html).toContain(text);
+    const html=render(value);for(const text of ['接触过 12 条相关消息','接触本身不算实践','0 件实际经历','只是接触过','尚无实际练习','还没有做过','这些经历为角色愿望提供依据'])expect(html).toContain(text);
     expect(html).not.toContain('兴趣已成熟');expect(html).not.toContain('实际完成过浇水');
   });
   it('shows environmental constraints separately from performance difficulties',()=>{

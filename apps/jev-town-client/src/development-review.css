@@ -41,3 +41,10 @@
 @media (max-width:1000px) { .development-review--facets .development-review__columns { grid-template-columns:1fr; }.development-review--facets .life-development__facet-basis dl { grid-template-columns:1fr 1fr; } }
 @media (max-width:600px) { .development-review--facets .life-development__topics { grid-template-columns:1fr; } }
 @media (max-width:760px) { .development-review{padding:24px 16px}.development-review header{display:block}.development-review__badge{display:inline-block;margin-top:8px}.development-review h1{font-size:26px}.development-review__chain,.development-review__columns{grid-template-columns:1fr} }
+.development-review--wishes .development-review__columns { grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr); }
+.development-review--wishes .life-wishes { margin-top:0; }
+.development-review--wishes .life-wish,.development-review--wishes .life-wish-direction { margin:14px 0; padding:18px; }
+.development-review--wishes .life-wish__barriers { padding:12px 14px; }
+.development-review--wishes .life-wish__basis code { display:inline; }
+.development-review--wishes .life-wishes__intro { margin-bottom:18px; }
+@media(max-width:760px) { .development-review--wishes .development-review__columns { grid-template-columns:1fr; } }

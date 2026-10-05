@@ -285,3 +285,23 @@
   .life-sidebar__foot { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .life-sidebar button { transition: none; } }
+.life-wishes__intro { color:#7c8e7d; line-height:1.8; }
+.life-wish,.life-wish-direction { border:1px solid #dce6d6; border-radius:13px; padding:14px; margin:12px 0; background:#f8faf0; }
+.life-wish { background:linear-gradient(145deg,#fcfcf3,#edf5e9); }
+.life-wish h3 { margin:11px 0 8px; color:#4b715d; font-size:15px; }
+.life-wish__axis { color:#8b9674; font-size:10px; letter-spacing:.03em; }
+.life-wish__reason { padding-left:10px; border-left:2px solid #b4cdb4; color:#5e7865!important; line-height:1.9; }
+.life-wish__next { font-size:11px; padding:9px 10px; background:#edf2e4; border-radius:8px; line-height:1.8; }
+.life-wish__identity { display:block; margin-top:12px; color:#94a18b!important; }
+.life-wish .life-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.life-wish .life-actions button { flex:1 1 auto; min-height:34px; font-size:11px; }
+.life-wish__barriers { margin:12px 0; padding:10px 12px; border-radius:9px; background:#f5f0e2; }
+.life-wish__barriers > small { color:#8d8262; }
+.life-wish__barriers ul { margin:6px 0 0; padding-left:15px; color:#8c886a; font-size:11px; line-height:1.8; }
+.life-wish__basis,.life-wishes__directions,.life-wishes__past { margin-top:13px; }
+.life-wish__basis summary,.life-wishes__directions > summary,.life-wishes__past > summary { color:#7c9479; cursor:pointer; font-size:11px; }
+.life-wish__basis ul { list-style:none; padding:0; margin:9px 0; display:grid; gap:8px; }
+.life-wish__basis li { display:grid; gap:3px; font-size:11px; border-top:1px solid #e0e7d8; padding-top:7px; }
+.life-wish__basis code { font:10px/1.6 monospace; color:#96a087; overflow-wrap:anywhere; }
+.life-wish--deferred,.life-wish--rejected,.life-wish--withdrawn { background:#f5f5ee; }
+.life-wish-direction.is-eligible { border-color:#b5cdb1; }

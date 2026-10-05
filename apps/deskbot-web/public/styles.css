@@ -517,3 +517,8 @@ body { overflow-x:hidden; background:#0b2430; }
 .map-living-actions > div { display:grid; gap:4px; }
 .map-living-actions small { font-size:.75rem; opacity:.8; }
 .map-self-life{border:1px solid #bcc9ad;background:#f1f1df;border-radius:10px;padding:10px;margin:12px 0}
+.role-item.lived-wish { background:linear-gradient(145deg,#fcfcf3,#edf5e9); }
+.role-wish-barriers { margin:12px 0; padding:10px 12px; border-radius:9px; background:#f5f0e2; }
+.role-wish-barriers ul { margin:6px 0; padding-left:16px; color:#8b8064; font-size:12px; line-height:1.8; }
+.role-item.lived-wish details { margin-top:12px; font-size:11px; overflow-wrap:anywhere; }
+.role-item.lived-wish summary { cursor:pointer; color:#718770; }

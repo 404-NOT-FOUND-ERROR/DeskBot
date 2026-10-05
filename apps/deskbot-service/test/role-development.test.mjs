@@ -172,10 +172,34 @@ test('legacy keyword proposals and dialogue trial lifecycle stay unchanged when 
   assert.equal(candidate.development_context.counts.failed, 1);
   assert.equal(candidate.development_context.lifecycle_changed, false);
   assert.deepEqual(roles.get(proposal.proposal_id), beforeProposal);
-  assert.equal(evolution.sync().run_id, beforeRun);
+  const liveRun = evolution.sync();
+  assert.notEqual(liveRun.run_id, beforeRun, 'installed facets switch to the shared-life wish gate instead of re-running keyword evolution');
+  assert.deepEqual(liveRun.created, []);
   assert.equal(evolution.sync().duplicate, true);
   assert.equal(snapshot.development.legacy_context.trial_turns_are_practice, false);
   const chat = { event_id: 'trial-chat', type: 'conversation.input', layer: 'dialogue', character_id: 'shaping-001', occurred_at: AT, payload: { role: 'user', text: '现在怎样？' } };
   assert.equal(evolution.observeEvent(chat).trials[0].turns_observed, 1);
   assert.equal(evolution.observeEvent(chat).trials[0].turns_observed, 1);
+});
+
+test('wish prerequisites and axes are attached to direction context without changing appearance', () => {
+  const state = world(); state.tasks.push(task('one')); syncDevelopmentEvidence(state, AT);
+  const before = structuredClone(state), read = roleDevelopmentReadModel(state);
+  assert.equal(read.role_wishes.schema, 'deskbot.role-wishes.v1');
+  assert.equal(direction(read, 'wetland_frog').axis, 'form');
+  assert.equal(direction(read, 'chef').axis, 'vocation');
+  assert.equal(direction(read, 'workshop_maker').axis, 'vocation');
+  assert.ok(read.directions.every(item => item.readiness.eligible === false && item.unlocked === false));
+  assert.ok(direction(read, 'wetland_frog').readiness.barriers.some(item => item.id === 'active_days'));
+  assert.equal(direction(read, 'wetland_frog').wish_stability.direction_prerequisites_ready, false);
+  assert.deepEqual(state, before);
+});
+
+test('an earlier direction read excludes future actual practice as well as future wish prerequisites', () => {
+  const state = world(); state.tasks.push(task('old'), task('later', { finished_at: '2026-10-06T04:00:00Z', completion: { due_at: '2026-10-06T04:00:00Z' } }));
+  syncDevelopmentEvidence(state, '2026-10-06T04:00:00Z');
+  const before = structuredClone(state), read = roleDevelopmentReadModel(state, { at: AT });
+  assert.equal(direction(read, 'wetland_frog').evidence_count, 1);
+  assert.deepEqual(direction(read, 'wetland_frog').root_outcome_ids, ['task:old']);
+  assert.deepEqual(state, before);
 });
