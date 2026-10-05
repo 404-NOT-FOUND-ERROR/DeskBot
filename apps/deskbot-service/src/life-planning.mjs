@@ -27,14 +27,21 @@ function materialPlanner(world, actorId) {
     if(missing<=0)return;
     if(resource==='water') {
       // Gather at the real source; do not drain the nursery's shared reserve.
-      while(carried(projected,actorId,'water')<count)append('collect-water',depth+1);
+      const pump=projected.living.objects['floating-frame']?.project_assets?.small_water_pump;
+      const pumpReady=projected.resident_projects?.projects?.['small-water-pump']?.status==='completed' && pump?.condition>=.4;
+      while(carried(projected,actorId,'water')<count)append(pumpReady?'pump-water':'collect-water',depth+1);
     } else if(resource==='seeds') {
       while(carried(projected,actorId,'seeds')<count)append('save-seeds',depth+1);
     } else if(resource==='frame_kit') {
       while(carried(projected,actorId,'frame_kit')<count)append('craft-frame-kit',depth+1);
     } else if(resource==='moss') {
       transfer('seedling-rack','moss',Math.min(missing,Math.floor(stock(projected,'seedling-rack','moss'))));
-      if(carried(projected,actorId,'moss')<count)append('harvest-bed',depth+1);
+      if(carried(projected,actorId,'moss')<count) {
+        const bed=projected.living.objects['garden-bed'];
+        const floatBed=projected.living.objects['floating-frame']?.project_assets?.floating_seedbed;
+        const floatingReady=projected.resident_projects?.projects?.['floating-seedbed']?.status==='completed' && floatBed?.quantity>0 && floatBed.growth>=.85;
+        append(bed?.quantity>0&&bed.growth>=.85?'harvest-bed':floatingReady?'harvest-float-bed':'harvest-bed',depth+1);
+      }
     } else transfer('parts-drawers',resource,missing);
     if(carried(projected,actorId,resource)<count)throw planError('这次收获还不足以完成安排，留出补给的时间。');
   }
@@ -44,7 +51,8 @@ function materialPlanner(world, actorId) {
     const missing=Math.ceil(count-stock(projected,id,resource));
     if(missing<=0)return;
     if(resource==='rations') {
-      while(carried(projected,actorId,'rations')<missing)append('cook-moss',depth+1);
+      const soupReady=projected.resident_projects?.projects?.['leaf-signature-soup']?.status==='completed';
+      while(carried(projected,actorId,'rations')<missing)append(soupReady?'cook-leaf-soup':'cook-moss',depth+1);
     } else if(resource==='water'||resource==='seeds')carry(resource,missing,depth);
     else throw planError('这里的材料不足，先等补给或换件事做。');
     transfer(id,resource,missing,'store');
@@ -59,7 +67,7 @@ function materialPlanner(world, actorId) {
     }
     go(object(projected,recipe.target)?.location_id);
     const prepared=prepareLivingActivity(projected,id,actorId,at);
-    const result=completeLivingActivity(projected,{...prepared,actor_id:actorId,task_id:'projection-only'},at);
+    const result=completeLivingActivity(projected,{...prepared,actor_id:actorId,task_id:'projection-only',project_projection:true},at);
     if(!result.success)throw planError(result.reason);
     steps.push({kind:'activity',activity_id:id});
   }

@@ -98,10 +98,17 @@ test('valid weather changes outdoor choice while rainfall resource physics remai
 });
 test('new installation receives cached current weather once without replaying its environmental mutation',async t=>{
   const h=fixture(t);h.save(w=>{delete w.refraction;});const event={event_id:'cached-weather',type:'world.mutation',source:'weather-connector',character_id:'shaping-001',occurred_at:h.now().toISOString(),observed_at:h.now().toISOString(),payload:{action:'update_weather',snapshot:{location:'上海',condition:'小雨',wind_mps:4,provider:'sample',observed_at:h.now().toISOString()}}};h.world.ingest(normalizeEvent(event,{now:h.now}));const before=h.world.get();
+  const expectedLiving=structuredClone(before.living);
+  assert.equal(Object.hasOwn(expectedLiving.objects['shared-table'].stock,'trial_soup'),false);
+  expectedLiving.objects['shared-table'].stock.trial_soup=0;
+  const assertNoReplay=w=>{
+    assert.deepEqual(w.living,expectedLiving,'installation only adds an empty trial-soup slot; all stocks, environmental cursors and resource history remain unchanged');
+    assert.deepEqual(w.weather,before.weather);
+  };
   const connector={status:()=>({enabled:true,configured:true,provider:'sample',ttl_ms:1800000}),refresh:async()=>({event,cached:true,connector:{provider:'sample'}})};
   const previousRuntime=createInputRuntime({now:h.now,persistence:h.persistence});previousRuntime.registerSource({sourceId:'weather',displayName:'天气',kind:'external_provider',enabled:true,ttlMs:1800000,refresh:connector.refresh,ingest:()=>{}});await previousRuntime.tick({force:true});
   const server=createDeskBotServer({persistentWorld:h.world,persistence:h.persistence,now:h.now,timeMode:'realtime',residentLifeEnabled:true,autonomousLifeEnabled:true,weatherConnector:connector});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));await server.inputRuntime.tick();
-  let w=h.world.get();assert.equal(w.refraction.records.length,1);assert.equal(w.refraction.records[0].category,'weather');assert.equal(w.refraction.records[0].origin_id,'cached-weather');assert.equal(w.refraction.records[0].status,'observed');assert.deepEqual(w.living.objects,before.living.objects);await server.inputRuntime.tick({force:true});w=h.world.get();assert.equal(w.refraction.records.length,1);assert.deepEqual(w.living.objects,before.living.objects);
+  let w=h.world.get();assert.equal(w.refraction.records.length,1);assert.equal(w.refraction.records[0].category,'weather');assert.equal(w.refraction.records[0].origin_id,'cached-weather');assert.equal(w.refraction.records[0].status,'observed');assertNoReplay(w);await server.inputRuntime.tick({force:true});w=h.world.get();assert.equal(w.refraction.records.length,1);assertNoReplay(w);
 });
 test('device awareness validates sensor payloads; direction is not identity, and a shell is not a new person',t=>{
   const h=fixture(t),identity=structuredClone(h.world.get().protagonist);const adapter={attestedKind:'device',sourceLabel:'测试设备'};

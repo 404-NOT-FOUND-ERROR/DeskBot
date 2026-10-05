@@ -250,6 +250,19 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
       if (resting) { limbs.armLeft.rotation.z = -.14; limbs.armRight.rotation.z = .14; }
       else if (kind === "eat") { limbs.armRight.rotation.x = -.8 - beat * .10; limbs.armLeft.rotation.x = -.25; }
       else if (kind === "social") { limbs.armLeft.rotation.z = -.3; limbs.armRight.rotation.x = -.55 + beat * .20; }
+      else if (activityId === 'soup-record-ratio' && kind === 'craft') {
+        limbs.armLeft.rotation.x = -.56; limbs.armRight.rotation.x = -.68 + beat * .035; limbs.armRight.rotation.y = -.28;
+      }
+      else if (['pump-assemble','pump-install','repair-pump'].includes(activityId??'') && kind === 'craft') {
+        limbs.armLeft.rotation.x = -.73 + beat * .055; limbs.armRight.rotation.x = -.78 - beat * .045;
+        limbs.armLeft.rotation.y = .22; limbs.armRight.rotation.y = -.22;
+      }
+      else if (['pump-trial','pump-water'].includes(activityId??'') && kind === 'care') {
+        limbs.armLeft.rotation.x = -.38; limbs.armRight.rotation.x = -.52 + beat * .09; limbs.armRight.rotation.z = .12;
+      }
+      else if ((activityId?.startsWith('seedbed-') || ['harvest-float-bed','sow-float-bed'].includes(activityId??'')) && kind === 'care') {
+        limbs.armLeft.rotation.x = -.67; limbs.armRight.rotation.x = -.52 + beat * .1; limbs.armLeft.rotation.z = -.1;
+      }
       else if (activityId === 'collect-water' && kind === 'care') {
         limbs.armLeft.rotation.x = -.55; limbs.armLeft.rotation.z = -.15;
         limbs.armRight.rotation.x = -.36 + beat * .10; limbs.armRight.rotation.y = -.18;

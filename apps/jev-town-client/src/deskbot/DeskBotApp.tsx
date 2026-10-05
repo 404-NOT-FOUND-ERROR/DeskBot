@@ -13,6 +13,8 @@ import "./deskbot.css";
 import { LifeSidebar } from "./LifeSidebar.tsx";
 import {projectSceneActivities} from './activityProjection.ts';
 import {activeActorTask,taskDisplayTitle,taskTimeLabel,worldGlance} from './lifeGlance.ts';
+import {ResidentProject,residentProjectFor} from './ResidentProject.tsx';
+import {ProjectFacilityState} from './ProjectFacilityState.tsx';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -291,6 +293,7 @@ export function DeskBotApp() {
     : null;
   const selectedNpcIsPresent = Boolean(selectedNpc && encounterIds.has(selectedNpc.npc_id));
   const selectedNpcTask=activeActorTask(map,selectedNpc?.npc_id);
+  const selectedProject=residentProjectFor(map,selectedNpc?.npc_id);
   const candidates = map && selectedNpc ? buildNpcCandidates(map, selectedNpc) : [];
   const selectedPlace = map?.locations.find((location) => location.location_id === selectedPlaceId) ?? null;
   const selectedRouteSteps = selectedRoute?.route.steps ?? [];
@@ -552,7 +555,7 @@ export function DeskBotApp() {
               <button className="deskbot-mode__place-close" type="button" aria-label="关闭地点信息" onClick={() => { setSelectedPlaceId(null); setSelectedRoute(null); }}>×</button>
               <span className="deskbot-mode__eyebrow">{selectedPlace.current ? "喵呜现在就在这里" : selectedRoute?.route.blocked ? "路线暂时受阻" : selectedRoute?.route.found ? (selectedRouteIsTransfer ? `需要中转 · ${selectedRouteSteps.length} 段` : "直达 · 相邻地点") : routeBusy ? "正在规划路线…" : "暂无可行路线"}</span>
               <h2>{selectedPlace.name}</h2>
-              {selectedPlace.areas?.some(area=>area.objects?.some(object=>object.state)) ? <div className="deskbot-mode__living-summary" aria-label="当前环境与设施">{selectedPlace.areas.flatMap(area=>area.objects??[]).filter(object=>object.state).map(object=><p key={object.object_id}><strong>{object.name}</strong><span>{object.status_text}</span></p>)}</div> : null}
+              {selectedPlace.areas?.some(area=>area.objects?.some(object=>object.state)) ? <div className="deskbot-mode__living-summary" aria-label="当前环境与设施">{selectedPlace.areas.flatMap(area=>area.objects??[]).filter(object=>object.state).map(object=><div key={object.object_id}><p><strong>{object.name}</strong><span>{object.status_text}</span></p><ProjectFacilityState state={object.state} names={map?.living?.resource_names} compact/></div>)}</div> : null}
               <p>{selectedPlace.description || "这里还没有留下描述。"}</p>
               <small>{map?.regions?.find(region => region.region_id === selectedPlace.region_id)?.name}</small>
               <div className="deskbot-mode__area-list" aria-label="地点内部区域">
@@ -560,6 +563,7 @@ export function DeskBotApp() {
                   <summary>{area.name}<span>{area.access === "resident" ? "来访需同意" : "公共区域"}</span></summary>
                   <p>{area.description}</p>
                   {area.objects?.map(object => <div key={object.object_id}><strong>{object.name}</strong><p>{object.status_text??object.description}</p>
+                    <ProjectFacilityState state={object.state} names={map?.living?.resource_names}/>
                     {object.state?.stock?<div className="deskbot-mode__stock" aria-label={`${object.name}库存`}>{Object.entries(object.state.stock).map(([resource,count])=><div key={resource}><span>{map?.living?.resource_names[resource]??resource} {Math.floor(count)} 份</span>
                       {selectedPlace.current?<><button disabled={busy||Boolean(currentTask)||count<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'take')}>取 1 份</button><button disabled={busy||Boolean(currentTask)||(map?.living?.inventory.stock[resource]??0)<1} onClick={()=>void runLivingAction(null,object.object_id,resource,'store')}>存 1 份</button></>:null}</div>)}</div>:null}
                     {map?.living?.resource_renewal?.source_object_id===object.object_id?<p className="deskbot-mode__supply-note">{map.living.resource_renewal.description}</p>:null}
@@ -636,7 +640,7 @@ export function DeskBotApp() {
                 <button className="life-place-link" onClick={()=>handlePlaceClick(selectedNpc.location_id)}>{map?.locations.find(l=>l.location_id===selectedNpc.location_id)?.name} ↗</button>
                 <p>{selectedNpc.bio}</p>
                 {selectedNpc.desires?<p>惦记：{selectedNpc.desires[0]}</p>:null}
-                {selectedNpc.project?<small>长一点的愿望：{selectedNpc.project.goal} · 还在慢慢尝试</small>:null}
+                {selectedProject&&map?<ResidentProject project={selectedProject} map={map} onPlace={handlePlaceClick}/>:selectedNpc.project?<small>长一点的愿望：{selectedNpc.project.goal}</small>:null}
                 {selectedNpc.relationship ? (
                   <div className="deskbot-mode__relationship" aria-label="与这位居民的关系记录">
                     <span>熟悉 {selectedNpc.relationship.familiarity}</span>

@@ -9,6 +9,7 @@ import { advanceSocialLife, reservedSocialActors } from './social-life.mjs';
 import { influenceLifeChoices, recordInputDecision, settleRefraction } from './input-refraction.mjs';
 import { influenceRememberedChoices } from './lived-memory.mjs';
 import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote } from './life-choice.mjs';
+import { projectCandidates, settleResidentProjects, updateProjectScheduling } from './resident-projects.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -58,7 +59,19 @@ function candidates(world, state, at) {
   }
   if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
   if(world.resident_life && carried(world,id,'rations')>0)add('store-meals','把做好的饭留到长桌','有人晚点回来也能吃上一份。',60,()=>depositSteps(world,id,'shared-table','rations'));
-  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<4 && (carried(world,id,'moss')>=2||stock(world,'seedling-rack','moss')>=2||bed.growth>=.85))activity('cook','cook-moss','苗圃的收获可以做成饭，给晚归的人也留一份。',65);
+  const floatBed=objects['floating-frame']?.project_assets?.floating_seedbed;
+  const floatingHarvest=world.resident_projects?.projects?.['floating-seedbed']?.status==='completed' && floatBed?.quantity>0 && floatBed.growth>=.85;
+  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<4 && (carried(world,id,'moss')>=2||stock(world,'seedling-rack','moss')>=2||bed.growth>=.85||floatingHarvest)) {
+    const soupReady=world.resident_projects?.projects?.['leaf-signature-soup']?.status==='completed';
+    activity('cook',soupReady?'cook-leaf-soup':'cook-moss',soupReady?'把验收过的叶芽汤再做一锅，给晚归的人留一份。':'苗圃的收获可以做成饭，给晚归的人也留一份。',65);
+  }
+  for(const project of projectCandidates(world,id,at)) {
+    if(!project.available) result.push(project);
+    else add(project.goal,project.title,project.reason,project.score,()=>activitySteps(world,id,project.activity_id));
+    const choice=result.find(c=>c.goal===project.goal);
+    if(choice)Object.assign(choice,{project_id:project.project_id,project_stage_id:project.project_stage_id,activity_id:project.activity_id});
+  }
+  updateProjectScheduling(world,id,at,result.filter(c=>c.project_id));
   const index=hash(`${id}:${localWorldDate(at,world.clock.time_zone).date}:${Math.floor(minute/180)}`)%profile.places.length;
   for(const destination of world.memory ? profile.places : [profile.places[index]]) {
   add(`interest:${destination}`,world.memory?`${world.locations.find(l=>l.location_id===destination)?.name??destination} · ${profile.quiet}`:profile.quiet,'留点时间做自己感兴趣的事。',30,()=>{
@@ -104,6 +117,7 @@ function executeStep(world,state,at,eventId) {
 export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budget=8}={}) {
   if(world.clock?.mode!=='real_time' || world.living?.recovery.pending || at<world.clock.synced_at || world.tasks.some(t=>t.status==='running'&&t.due_at<=at))return {accepted:false,reason:'life_waiting_for_recovery'};
   installAutonomy(world,at);syncLifeNeeds(world,at);
+  settleResidentProjects(world,at);
   settleRefraction(world,at);
   if(world.social)advanceSocialLife(world,at,{eventId,reservedActors});
   const socialReserved=reservedSocialActors(world);
@@ -135,6 +149,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.sequence++;
       state.plan={plan_id:`life-plan:${state.actor_id}:${state.sequence}`,goal:choice.goal,title:choice.title,reason:choice.reason,steps:choice.steps,index:0,status:'planned',task_id:null,created_at:at};
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
+      if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
       feedback(world,state,at,'decided',`想${choice.title}：${choice.reason}`,{plan_id:state.plan.plan_id});
     }

@@ -24,6 +24,7 @@ import { createEnvironmentEffects } from "./environmentEffects.ts";
 import { activityProgressAt, type SceneLifeActivity } from "../deskbot/activityProjection.ts";
 import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
 import { sceneWorkAnchor, sceneWorkTarget } from './sceneWorkplace.ts';
+import {isProjectActivity,projectActivityView} from './projectScene.ts';
 
 export interface TownScene3DProps {
   sceneLocations?: readonly DeskBotLocation[];
@@ -700,7 +701,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
           figure.body.rotation.x = lean;
         }
         figure.updateCarry?.(admittedTravel?.carriedStock, Boolean(admittedTravel));
-        figure.updateLife?.(t, activity?.status === "paused" ? "idle" : activity?.kind ?? "idle", walking, reducedMotion,night,activity?.activityId);
+        const projectPose=projectActivityView(activity),projectTask=isProjectActivity(activity?.activityId);
+        figure.updateLife?.(t, activity?.status === "paused" || projectTask&&!projectPose ? "idle" : projectPose?.pose??activity?.kind??"idle", walking, reducedMotion,night,projectTask&&!projectPose?undefined:activity?.activityId);
         if(sceneLocationsRef.current) {
           const glyph = activity?.status === "paused" ? "Ⅱ" : activity?.kind === "travel" ? "↗" : activity?.kind === "rest" ? "☾" : activity?.kind === "craft" ? "✦" : activity?.kind === "care" ? "♧" : activity?.kind === "eat" ? "◡" : activity ? "⋯" : "";
           entry.badgeEl.textContent = glyph;

@@ -403,3 +403,8 @@
   .deskbot-mode *, .deskbot-mode *::before, .deskbot-mode *::after { scroll-behavior: auto; transition: none; }
 }
 .deskbot-mode__supply-note { font-size: 11px; line-height: 1.7; color: #71847d; padding-left: 9px; border-left: 2px solid #abc8bc; }
+.life-facility-projects { display: grid; gap: 7px; margin: 8px 0; padding: 8px 9px; border-radius: 8px; background: #edf3e8; }
+.life-facility-projects p { display: grid; gap: 4px; margin: 0 !important; overflow-wrap: anywhere; }
+.life-facility-projects strong { font-size: 11px; color: #5d7b66; }.life-facility-projects span,.life-facility-projects small { font-size: 10px; color: #85917b; margin: 0; }
+.life-facility-projects--compact { margin: 5px 0 0; padding: 5px 0 0 7px; border-left: 2px solid #aec8b1; border-radius: 0; background: transparent; }
+.life-facility-projects--compact strong { color: #49644f; }.life-facility-projects--compact span { color: #526a58; }

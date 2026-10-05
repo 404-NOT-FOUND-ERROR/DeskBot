@@ -61,7 +61,9 @@ export function residentResponse(world, npc, intent, idea) {
   const r=residentDesign(npc.npc_id); if(!r)return null;
   const task=world.tasks.find(t=>t.actor_id===npc.npc_id&&['running','paused'].includes(t.status));
   const brief=RESIDENT_PROFILES[npc.npc_id].quiet;
-  if(intent==='observe')return `${npc.display_name}：我${task?`正在${task.title}`:`在${brief}`}。${r.desires[0]}，还得慢慢做。`;
+  const project=Object.values(world.resident_projects?.projects??{}).find(p=>p.owner_id===npc.npc_id);
+  const progress=project?`${project.goal}${project.status==='completed'?'已经验收好了':'还在慢慢做'}。${project.last_outcome?.text??'还没有完成过实际阶段。'}`:`${r.desires[0]}，还得慢慢做。`;
+  if(intent==='observe')return `${npc.display_name}：我${task?`正在${task.title}`:`在${brief}`}。${progress}`;
   if(intent==='invite'||intent==='help')return `${npc.display_name}：${task?`我这会儿还在${task.title}，等忙完再看。`:'可以先看看咱们手头的事。'}要做成约定，得先说清地点、材料和时间。`;
   if(intent==='suggest')return `${npc.display_name}：${idea?`“${idea.slice(0,80)}”我听到了。`:''}${r.speech.example}先当作一个想法，还没实际开始。`;
   if(intent==='greet')return `${npc.display_name}：来了？${task?`我手上还有${task.title}，先不走开。`:r.speech.example}`;

@@ -1,5 +1,6 @@
 // Server-owned rules for the first continuing nursery/workshop/kitchen loop.
 // Quantities describe this fictional world, not measurements of real Shanghai.
+import { PROJECT_ACTIVITIES, projectActivityReason, projectActivityBinding, projectActivityVisible, applyProjectActivityEffect, advanceProjectAssets } from './resident-projects.mjs';
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
 export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
 export const SPRING_UNITS_PER_HOUR = .75;
@@ -10,7 +11,7 @@ export class LivingResourceError extends Error {
   constructor(code, message, statusCode = 409) { super(message); this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, status) => { throw new LivingResourceError(code, message, status); };
-export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '苔芽餐' });
+export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '苔芽餐', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤' });
 const INITIAL = {
   'floating-frame': { kind: 'waterside', water_level: .46, condition: .67, stock: { raw_water: 12 }, capacity: 24 },
   'garden-bed': { kind: 'plant_bed', moisture: .58, health: .88, growth: .25, quantity: 10 },
@@ -39,6 +40,7 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
   { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
   { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
+  ...PROJECT_ACTIVITIES,
 ]);
 function definition(world, objectId) {
   const object = world.map_catalog?.objects?.find(o => o.object_id === objectId);
@@ -144,6 +146,7 @@ function step(world, start, end, daylight) {
   }
   const rack = l.objects['seedling-rack'];
   if (rack?.stock) rack.stock.water = clamp(rack.stock.water + rain * hours * 8, 0, rack.capacity - heldCount(world, 'seedling-rack', 'water'));
+  advanceProjectAssets(world, start, end, { daylight, rain, evaporation });
   for (const id of ['floating-frame', 'seedling-rack', 'repair-bench', 'market-canopy', 'trial-stove']) {
     const item = l.objects[id]; if (!item) continue;
     const exposed = ['floating-frame', 'market-canopy'].includes(id);
@@ -183,7 +186,7 @@ export function advanceLivingResources(world, at, { force = false, maxMinutes = 
   for (const key of Object.keys(after)) if (after[key] && before[key] !== after[key]) note(world, l.simulated_until, after[key], { kind: 'environment', rule_version: LIVING_RULE_VERSION });
   return { accepted: true, from: new Date(start).toISOString(), until: l.simulated_until, recovered: end - start > 5 * MINUTE, pending: stop < end, weather_event_id: l.weather_window?.event_id ?? null };
 }
-function eligibility(world, recipe, actorId, { completion = false, taskId = null } = {}) {
+function eligibility(world, recipe, actorId, { completion = false, taskId = null, task = null, at = world.clock?.synced_at } = {}) {
   if (!world.living || world.clock?.mode !== 'real_time') return '生活资源规则尚未启用。';
   const actor = person(world, actorId), target = definition(world, recipe.target), state = world.living.objects[recipe.target];
   if (!target || !state) return '这个设施还没有安装。';
@@ -191,6 +194,8 @@ function eligibility(world, recipe, actorId, { completion = false, taskId = null
   if (!canUse(world, target, actorId)) return '需要住户同意。';
   if ((world.tasks ?? []).some(t => ['running', 'paused'].includes(t.status) && t.task_id !== taskId && (t.actor_id === actorId || t.target_object_id === recipe.target))) return '有人正在使用这个设施，或还有未完成的活动。';
   if (!completion && world.living.recovery.pending) return '世界正在补算此前经过的时间。';
+  const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task });
+  if (projectReason) return projectReason;
   const bed = world.living.objects['garden-bed'];
   if (recipe.activity_id === 'harvest-bed' && (!bed || bed.quantity === 0 || bed.growth < .85 || bed.health < .35)) return '苔芽还未成熟，或苗况不适合收获。';
   if (recipe.activity_id === 'sow-bed' && bed?.quantity > 0 && bed.health > .08) return '苗床还有活苗，先照料或收获。';
@@ -215,14 +220,15 @@ function eligibility(world, recipe, actorId, { completion = false, taskId = null
 export function prepareLivingActivity(world, activityId, actorId, at) {
   const recipe = ACTIVITIES.find(a => a.activity_id === activityId);
   if (!recipe) fail('activity_unknown', '没有这项生活活动。', 400);
-  const reason = eligibility(world, recipe, actorId);
+  const reason = eligibility(world, recipe, actorId, { at });
   if (reason) fail('activity_unavailable', reason);
+  const projectBinding = projectActivityBinding(world, recipe);
   const reserved = recipe.inputs.map(input => ({ ...input, container: input.container === 'bag' ? `bag:${actorId}` : input.container }));
   for (const input of recipe.inputs) container(world, input.container, actorId).stock[input.resource] -= input.count;
   world.living.revision += 1;
   note(world, at, `${person(world, actorId).display_name ?? '居民'}开始${recipe.title}。`, { kind: 'activity_started', activity_id: activityId, actor_id: actorId });
   return { activity_id: activityId, target_object_id: recipe.target, title: recipe.title, kind: recipe.kind, duration_seconds: recipe.seconds,
-    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved } };
+    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved }, ...projectBinding };
 }
 export function releaseLivingReservation(world, task, at) {
   if (task.reservation?.status !== 'held') return;
@@ -237,7 +243,7 @@ export function releaseLivingReservation(world, task, at) {
 export function completeLivingActivity(world, task, at) {
   const recipe = ACTIVITIES.find(a => a.activity_id === task.activity_id);
   if (!recipe || task.completion_effect !== LIVING_RULE_VERSION || task.reservation?.status !== 'held') fail('activity_rules_changed', '这项活动的规则或材料预留不一致。');
-  const reason = eligibility(world, recipe, task.actor_id, { completion: true, taskId: task.task_id });
+  const reason = eligibility(world, recipe, task.actor_id, { completion: true, taskId: task.task_id, task, at });
   if (reason) return { success: false, reason };
   const target = world.living.objects[recipe.target], before = copy(target), bed = world.living.objects['garden-bed'];
   const changes = [];
@@ -256,6 +262,8 @@ export function completeLivingActivity(world, task, at) {
     }
     case 'repair-frame': case 'repair-bench': case 'repair-rack': case 'repair-stove': case 'stitch-canopy': target.condition = clamp(target.condition + .35); break;
   }
+  const projectResult = applyProjectActivityEffect(world, recipe, task, at);
+  if (projectResult) changes.push(...projectResult.stock_changes);
   if (recipe.output) {
     const storage = container(world, recipe.output.container, task.actor_id);
     storage.stock[recipe.output.resource] = (storage.stock[recipe.output.resource] ?? 0) + recipe.output.count;
@@ -264,7 +272,7 @@ export function completeLivingActivity(world, task, at) {
   target.updated_at = at; task.reservation.status = 'consumed'; world.living.revision += 1;
   const text = recipe.activity_id === 'harvest-bed' ? `收获了 ${changes[0].count} 份鲜苔芽，苗床等待下一次播种。` : recipe.activity_id === 'share-meal' ? '在长桌吃完一份苔芽餐。' : `${recipe.title}完成了。`;
   note(world, at, text, { kind: 'activity_completed', task_id: task.task_id, actor_id: task.actor_id });
-  return { success: true, text, before, after: copy(target), stock_changes: changes };
+  return { success: true, text, before, after: copy(target), stock_changes: changes, ...(projectResult ? { project_result: projectResult } : {}) };
 }
 function heldCount(world, storageId, resource) {
   return (world.tasks ?? []).filter(t => t.reservation?.status === 'held').flatMap(t => t.reservation.inputs).filter(input => input.container === storageId && input.resource === resource).reduce((sum, input) => sum + input.count, 0);
@@ -307,11 +315,12 @@ export function livingReadModel(world, actorId = world.protagonist.character_id)
     revision: world.living.revision, recovery: copy(world.living.recovery), resource_names: RESOURCES,
     resource_renewal: copy(world.living.resource_renewal ?? null),
     inventory: copy(world.living.inventories[actorId] ?? { stock: {}, capacity: 24 }), recent_changes: copy(world.living.recent_changes.slice(-8)),
-    activities: ACTIVITIES.map(recipe => {
+    activities: ACTIVITIES.filter(recipe => projectActivityVisible(world, recipe, actorId)).map(recipe => {
       const reason = eligibility(world, recipe, actorId);
       return { activity_id: recipe.activity_id, title: recipe.title, kind: recipe.kind, target_object_id: recipe.target,
         location_id: definition(world, recipe.target)?.location_id ?? null, duration_seconds: recipe.seconds,
         inputs: recipe.inputs.map(input => ({ resource: input.resource, name: RESOURCES[input.resource], count: input.count, from: input.container === 'bag' ? '随身袋' : definition(world, input.container)?.name ?? input.container })),
+        ...(recipe.project_id ? { project_id: recipe.project_id, project_stage_id: recipe.project_stage } : {}),
         ...(recipe.output ? { output: { resource: recipe.output.resource, name: RESOURCES[recipe.output.resource], count: recipe.output.count, to: recipe.output.container === 'bag' ? '随身袋' : definition(world, recipe.output.container)?.name ?? recipe.output.container } } : {}),
         available: !reason, unavailable_reason: reason };
     }) };

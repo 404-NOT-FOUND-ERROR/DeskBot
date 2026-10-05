@@ -5,6 +5,7 @@ import type { DeskBotLocation, DeskBotObjectState } from "../deskbot/types.ts";
 import { sceneOperationAt, type SceneLightChannel } from './sceneLife.ts';
 import { addShapingDetails, createSceneLifeEffects, createSoftLightTexture, type SceneLifeContext } from './sceneLifeEffects.ts';
 import { createResourceSupplyEffects } from './resourceSupplyEffects.ts';
+import {createProjectScene} from './projectScene.ts';
 
 const C = { wood:0x997052, dark:0x5e5142, cream:0xe8dfc3, teal:0x508e86, soil:0x765b40, leaf:0x7eab59, water:0x6eabb2, red:0xb6513c };
 const solidMaterial = () => new THREE.MeshLambertMaterial({ vertexColors:true });
@@ -54,6 +55,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
   const objects=new Map<string,THREE.Group>(), water:THREE.Mesh[]=[], lamps:THREE.Mesh[]=[], trees:THREE.Group[]=[], flags:THREE.Group[]=[];
   const lifeEffects:{locationId:string;effect:ReturnType<typeof createSceneLifeEffects>}[]=[];
   const supplyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResourceSupplyEffects>>}[]=[];
+  const projectEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createProjectScene>>}[]=[];
   const cloth:THREE.Group[]=[];
   const glowTexture=createSoftLightTexture();
   const stockSlots=new Map<string,THREE.Group[]>();
@@ -164,7 +166,11 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
         fixture("floating-frame",(_b,g)=>{g.position.set(-1,.6,0);
           for(let i=0;i<4;i++){const plank=new THREE.Group();plank.name=`frame-plank:${i}`;g.add(plank);const p=new Model(plank);
             if(i<2)p.box(.3,.22,3,i===0?-2:2,0,0,C.wood);else p.box(4.3,.22,.3,0,0,i===2?-1.5:1.5,C.wood);p.finish("frame-wood");}
-          g.userData.workstations={'collect-water':{standing:[6.1,0,.6],facing:[5.2,1.8,-.75]}};
+          const seedbedStation={standing:[2.4,0,1.5],facing:[-1,1.1,0]},pumpStation={standing:[5.4,0,7.0],facing:[5.4,1.3,5.6]};
+          g.userData.workstations={'collect-water':{standing:[6.1,0,.6],facing:[5.2,1.8,-.75]},
+            ...Object.fromEntries(['seedbed-survey','seedbed-plant','seedbed-inspect','seedbed-accept','seedbed-care','harvest-float-bed','sow-float-bed'].map(id=>[id,seedbedStation])),
+            ...Object.fromEntries(['pump-install','pump-trial','pump-accept','pump-water','repair-pump'].map(id=>[id,pumpStation]))};
+          g.userData.workstations['seedbed-survey']={standing:[4.5,0,1.5],facing:[-1,1.1,0]};
         });
         // Bank-mounted spring intake and gravity filter do not float with the decorative frame.
         m.box(3,.15,.62,5.2,.52,-5.2,C.dark);
@@ -209,12 +215,14 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       }
       case "courtyard": {
         cottage(m,0,-3,0xb8734e,7);m.box(.7,3,.7,2,3.5,-3,C.wood);
-        fixture("trial-stove",(b)=>{b.box(2.4,1.2,1.8,-4,.3,3,0xb6865c);b.cylinder(.6,.15,-4,1.5,3,C.dark);b.box(.6,1.4,.6,-4,1.5,2.3,C.dark);});
-        fixture("shared-table",(b)=>table(b,2,4,5));lamp(group,6,6);break;
+        fixture("trial-stove",(b,g)=>{b.box(2.4,1.2,1.8,-4,.3,3,0xb6865c);b.cylinder(.6,.15,-4,1.5,3,C.dark);b.box(.6,1.4,.6,-4,1.5,2.3,C.dark);
+          g.userData.workstations=Object.fromEntries(['soup-record-ratio','soup-cook-trial','soup-confirm-recipe','cook-leaf-soup'].map(id=>[id,{standing:[-4,0,5],facing:[-4,2,3]}]));});
+        fixture("shared-table",(b,g)=>{table(b,2,4,5);g.userData.workstations=Object.fromEntries(['soup-serve-trial','soup-taste-trial'].map(id=>[id,{standing:[.7,0,5.55],facing:[.7,2,4]}]));});lamp(group,6,6);break;
       }
       case "workshop": {
         cottage(m,0,-3,C.teal,8);m.box(3,2.7,.2,0,.3,-.35,C.dark);
-        fixture("repair-bench",(b)=>{table(b,-2,4,4);b.box(3.7,1.8,.15,-2,1.5,2.9,C.teal);for(let i=0;i<5;i++)b.box(.15,.8,.1,-3.3+i*.65,2,3,0xe3ddc9);});
+        fixture("repair-bench",(b,g)=>{table(b,-2,4,4);b.box(3.7,1.8,.15,-2,1.5,2.9,C.teal);for(let i=0;i<5;i++)b.box(.15,.8,.1,-3.3+i*.65,2,3,0xe3ddc9);
+          g.userData.workstations=Object.fromEntries(['pump-survey','pump-assemble'].map(id=>[id,{standing:[-2.1,0,5.65],facing:[-2.1,2.2,4]}]));});
         fixture("parts-drawers",(b)=>{b.box(2.4,2.5,1.1,4,.3,3,C.wood);for(let i=0;i<3;i++)for(let j=0;j<3;j++){b.box(.72,.72,.08,3.2+j*.8,.42+i*.8,3.6,0xbcb492);b.box(.2,.08,.12,3.2+j*.8,.72+i*.8,3.68,C.dark);}});lamp(group,6,6);break;
       }
       case "home": {
@@ -231,6 +239,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     addShapingDetails(group,m,binding.model);
     lifeEffects.push({locationId:place.location_id,effect:createSceneLifeEffects(group,binding.model,glowTexture)});
     const supply=createResourceSupplyEffects(group,binding.model);if(supply)supplyEffects.push({locationId:place.location_id,effect:supply});
+    const projects=createProjectScene(group,binding.model);if(projects)projectEffects.push({locationId:place.location_id,effect:projects});
     if(['workshop','market','nursery'].includes(binding.model)) {
       const sign=new THREE.Mesh(new THREE.PlaneGeometry(binding.model==='market'?1.3:2,.18),new THREE.MeshBasicMaterial({color:0xf3d79c,transparent:true,opacity:0,depthWrite:false}));
       sign.name='closing-store-light';sign.position.set(binding.model==='market'?-3.4:0,binding.model==='market'?2.5:3.2,binding.model==='market'?1.25:-.2);
@@ -307,5 +316,6 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     const floating=objects.get("floating-frame");if(floating)floating.rotation.z=(1-(floating.userData.condition??1))*.06+(reducedMotion ? 0 : Math.sin(time*1.1)*.015);
     for(const {locationId,effect} of lifeEffects)effect.update(time,night,wind,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
     for(const {locationId,effect} of supplyEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
+    for(const {locationId,effect} of projectEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
   }};
 }

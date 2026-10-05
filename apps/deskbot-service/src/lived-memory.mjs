@@ -16,6 +16,9 @@ export function installLivedMemory(w, at, { plannerEnabled = false } = {}) {
   return {accepted:true,version:MEMORY_VERSION,imported_records:w.memory.episodes.length};
 }
 export function goalTopic(goal='') {
+  if(/floating-seedbed|seedbed-|float-bed/.test(goal))return 'care';
+  if(/small-water-pump|pump-/.test(goal))return 'repair';
+  if(/leaf-signature-soup|soup-/.test(goal))return 'cook';
   if(/water|drain|tend|harvest|sow|seed/.test(goal))return 'care';
   if(/repair|stitch/.test(goal))return 'repair';
   if(/tray|craft/.test(goal))return 'craft';
@@ -68,6 +71,20 @@ export function syncLivedMemory(w,at) {
       model_safe:['autonomous_life','social_life'].includes(task.origin),
       model_text:`镇内${task.kind==='travel'?'旅行':ACTIVITIES.find(a=>a.activity_id===task.activity_id)?.title??(task.life_action==='rest'?'休息':'观察活动')}：${task.status==='completed'?'完成':task.status==='failed'?'未完成':'取消'}。`,
       independent_evidence:task.status!=='cancelled'&&task.kind!=='travel'&&task.life_action!=='rest'&&Boolean(topic)&&!(task.life_source_ids?.length)});
+  }
+  // A durable project milestone survives the short task-retention window. It is
+  // a result of canonical tasks, not a second independent personality reward.
+  for(const project of Object.values(w.resident_projects?.projects??{})) {
+    for(const record of project.history??[]) {
+      if(!record.at||record.at>at||!record.task_id||!['completed','failed','cancelled'].includes(record.outcome))continue;
+      const taskEvidence=(project.evidence??[]).find(e=>e.task_id===record.task_id);
+      const actorId=record.actor_id??taskEvidence?.actor_id??project.owner_id;
+      remember(w,{origin_id:`project:${project.project_id}:${record.task_id}:${record.outcome}`,kind:'world_fact',actor_ids:[actorId],at:record.at,
+        text:record.text??`${project.name}：${record.outcome==='completed'?'实际阶段完成':'这次尝试没有完成'}。`,
+        topic:goalTopic(project.project_id),location_id:record.location_id??null,outcome:record.outcome,
+        source:{kind:'resident_project',project_id:project.project_id,task_id:record.task_id,stage_id:record.stage_id??null},
+        model_safe:true,model_text:record.text??`${project.name}的实际阶段：${record.outcome}。`,independent_evidence:false});
+    }
   }
   for(const c of w.social?.commitments??[]) {
     if(!['completed','failed','withdrawn','declined'].includes(c.status)||!c.finished_at||c.finished_at>at)continue;

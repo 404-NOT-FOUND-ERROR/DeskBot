@@ -31,7 +31,7 @@ describe('Shaping Field local lighting and lived task effects', () => {
     expect(sceneOperationAt('homes', 1350, 1, [], 0).window).not.toBe(sceneOperationAt('homes', 1350, 1, [], 3).window);
   });
   it('an overnight committed task retains its workspace and room without reopening the shop sign', () => {
-    const working = sceneOperationAt('workshop', 60, 1, [task({ locationId: 'repair-bay-workshop', activityId: 'repair-bench' })]);
+    const working = sceneOperationAt('workshop', 60, 1, [task({ locationId: 'spare-parts-house', activityId: 'repair-bench' })]);
     expect(working.active).toBe(true); expect(working.work).toBe(1); expect(working.window).toBeGreaterThan(.9); expect(working.sign).toBe(0);
     expect(sceneOperationAt('workshop', 60, 1, [task({ status: 'paused' })]).work).toBe(0);
     expect(sceneOperationAt('workshop', 60, 1, [task({ kind: 'travel' })]).active).toBe(false);

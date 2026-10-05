@@ -2,6 +2,7 @@ import { worldHopAccess, findWorldPath } from './world-map-content.mjs';
 import { DEFAULT_CHARACTER_ID, canonicalCharacterId, canonicalLocationId } from './world-definition.mjs';
 import { prepareLivingActivity, completeLivingActivity, releaseLivingReservation } from './living-resources.mjs';
 import { syncLifeNeeds, finishLifeTask } from './life-state.mjs';
+import { settleProjectTask } from './resident-projects.mjs';
 
 export class RealTimeWorldError extends Error {
   constructor(statusCode, code, message) {
@@ -165,7 +166,9 @@ export function startActivityTask(world, payload, { eventId, at }) {
     title: authored?.title ?? text(payload.title, 'title'), status: 'running', revision: 0, cause_event_id: eventId,
     location_id: person.location_id, started_at: timestamp, updated_at: timestamp,
     due_at: new Date(Date.parse(timestamp) + seconds * 1000).toISOString(), duration_ms: seconds * 1000, remaining_ms: seconds * 1000,
-    completion_effect: authored?.completion_effect ?? 'record_activity_only', ...(authored ? { activity_id: authored.activity_id, target_object_id: authored.target_object_id, reservation: authored.reservation } : {}),
+    completion_effect: authored?.completion_effect ?? 'record_activity_only', ...(authored ? { activity_id: authored.activity_id, target_object_id: authored.target_object_id, reservation: authored.reservation,
+      ...(authored.project_id ? { project_id: authored.project_id, project_stage_id: authored.project_stage_id, project_attempt: authored.project_attempt, project_version: authored.project_version,
+        ...(authored.project_batch_id ? { project_batch_id: authored.project_batch_id } : {}) } : {}) } : {}),
     finished_at: null, failure_reason: null, completion: null, history: [],
   };
   recordTask(world, task);
@@ -202,6 +205,7 @@ export function controlWorldTask(world, payload, at) {
   task.history.push({ operation, at: timestamp });
   task.history = task.history.slice(-100);
   if (task.kind === 'travel') reflectTravel(world, task);
+  if (task.status === 'cancelled') settleProjectTask(world, task, timestamp);
   retainTasks(world);
   return { task_id: task.task_id, task: structuredClone(task) };
 }
@@ -261,6 +265,7 @@ export function advanceWorldTask(world, payload, at) {
   task.revision += 1;
   task.history = task.history.slice(-100);
   if (task.kind === 'travel') reflectTravel(world, task);
+  if (task.status !== 'running') settleProjectTask(world, task, timestamp);
   retainTasks(world);
   return { task_id: task.task_id, task: structuredClone(task), arrival_text: task.kind === 'travel' && task.status === 'completed' ? person.travel_state.arrival_text : null };
 }

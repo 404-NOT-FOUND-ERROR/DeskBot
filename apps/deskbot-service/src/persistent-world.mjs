@@ -4,6 +4,7 @@ import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuth
 import { getWorldEnvironment } from './world-environment.mjs';
 import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
 import { installResidentLife } from './resident-life.mjs';
+import { installResidentProjects, projectReadModel } from './resident-projects.mjs';
 import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
 import { LivingResourceError, installLivingResources, installResourceRenewal, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
@@ -586,6 +587,10 @@ function migrateWorldToCurrentSetting(world, now) {
     changed = true; next.world_revision += 1;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-resource-renewal-v1',applied_at:timestamp,scope:'additive_spring_source',preserved_existing_tasks:true,preserved_existing_stocks:true}];
   }
+  if (installResidentProjects(next, timestamp)) {
+    changed = true; next.world_revision += 1;
+    next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-resident-projects-v1',applied_at:timestamp,scope:'additive_resident_projects',preserved_existing_tasks:true,preserved_existing_stocks:true,past_events_created:0}];
+  }
 
   const initialField = createInitialShapingField(
     typeof next.shaping_field?.shaping_time === 'string' ? next.shaping_field.shaping_time : timestamp,
@@ -1126,7 +1131,8 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
     case 'install_input_refraction':
       details=installRefraction(next,at);break;
     case 'install_resident_life':
-      details=installResidentLife(next,at);break;
+      details=installResidentLife(next,at);
+      installResidentProjects(next,at);break;
     case 'respond_social_invitation':
       details=respondSocialInvitation(next,at,payload.invitation_id,payload.operation);break;
     case 'install_lived_memory':
@@ -1854,6 +1860,7 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
     social: socialReadModel(world),
     refraction: refractionReadModel(world),
     resident_life: clone(world.resident_life ?? null),
+    projects: projectReadModel(world),
     tasks: clone(world.tasks ?? []),
     protagonist: {
       character_id: characterId,

@@ -28,8 +28,11 @@ test('installation preserves three identities, actual tasks and history; restart
   const h=fixture(t);h.mutate('legacy-task',{action:'start_activity',task_id:'already-working',actor_id:'pathfinder-001',kind:'care',title:'检查旧路标',duration_seconds:3600});
   h.save(s=>{s.npcs[0].relationship={trust:7,familiarity:11,encounters:4};s.life.recent_experiences=[{experience_id:'old-experience',summary:'以前实际发生的事'}];});
   const before=h.world.get();h.install();const after=h.world.get();
+  const expectedLiving=structuredClone(before.living);
+  assert.equal(Object.hasOwn(expectedLiving.objects['shared-table'].stock,'trial_soup'),false);
+  expectedLiving.objects['shared-table'].stock.trial_soup=0;
   assert.equal(after.npcs.length,12);assert.equal(Object.keys(after.autonomy.actors).length,13);assert.equal(after.npcs[0].display_name,'阿砾');
-  assert.deepEqual(after.npcs[0].relationship,before.npcs[0].relationship);assert.equal(after.npcs[0].location_id,before.npcs[0].location_id);assert.deepEqual(after.tasks,before.tasks);assert.deepEqual(after.living,before.living);assert.deepEqual(after.life,before.life);
+  assert.deepEqual(after.npcs[0].relationship,before.npcs[0].relationship);assert.equal(after.npcs[0].location_id,before.npcs[0].location_id);assert.deepEqual(after.tasks,before.tasks);assert.deepEqual(after.living,expectedLiving,'the only living-state addition is trial_soup:0; prior inventory, cursor and history remain exact');assert.deepEqual(after.life,before.life);
   assert.equal(after.social.relationships&&Object.keys(after.social.relationships).length,0);h.restart();h.install();assert.deepEqual(h.world.get(),after);
   getWorldMap(after);socialReadModel(after);assert.deepEqual(h.world.get(),after);
 });
@@ -65,7 +68,21 @@ test('explicit join while own autonomous scheduling is paused waits for presence
   h.mutate('join',{action:'respond_social_invitation',invitation_id:c.id,operation:'join'});h.run(30);const s=h.world.get();assert.equal(s.social.commitments.find(x=>x.id===c.id).status,'completed');assert.equal(s.living.objects['shared-table'].stock.rations,1);assert.equal(s.autonomy.actors[own].paused,true);
 });
 test('thirteen actors share rotating budget; no resident is starved and installed profiles stay distinct',t=>{
-  const h=fixture(t);h.install();h.save(s=>{s.social.next_offer_at='2099-01-01T00:00:00Z';});h.tick();h.run(2);const s=h.world.get();assert.equal(s.npcs.length,12);assert.ok(Object.values(s.autonomy.actors).every(a=>a.plan));assert.equal(new Set(s.npcs.map(n=>n.color)).size,12);assert.ok(s.npcs.every(n=>n.project.status==='authored_goal'));
+  const h=fixture(t);h.install();const installed=h.world.get();h.save(s=>{s.social.next_offer_at='2099-01-01T00:00:00Z';});h.tick();h.run(2);const s=h.world.get();assert.equal(s.npcs.length,12);assert.ok(Object.values(s.autonomy.actors).every(a=>a.plan));assert.equal(new Set(s.npcs.map(n=>n.color)).size,12);
+  const activeProjects={'floating-seedbed':grower,'small-water-pump':mender,'leaf-signature-soup':cook};
+  assert.deepEqual(Object.keys(s.resident_projects.projects).sort(),Object.keys(activeProjects).sort());
+  assert.equal(s.npcs.filter(n=>n.project.status==='active').length,3);
+  assert.equal(s.npcs.filter(n=>n.project.status==='authored_goal').length,9);
+  for(const npc of s.npcs){
+    const original=installed.npcs.find(n=>n.npc_id===npc.npc_id);
+    const {status,progress,...authored}=npc.project,{status:oldStatus,progress:oldProgress,...originalAuthored}=original.project;
+    assert.deepEqual(authored,originalAuthored,'runtime progress must preserve every authored goal, step, consequence and supporting resident');
+    if(Object.hasOwn(activeProjects,npc.project.project_id)){
+      assert.equal(activeProjects[npc.project.project_id],npc.npc_id);assert.equal(status,'active');
+      const runtime=s.resident_projects.projects[npc.project.project_id];
+      assert.equal(runtime.owner_id,npc.npc_id);assert.equal(progress.stage_id,runtime.stage_id);assert.equal(progress.attempt,runtime.attempt);
+    }else{assert.equal(status,'authored_goal');assert.equal(progress,undefined);}
+  }
 });
 test('a participant leaving after eating cannot turn a partial dinner into a kept joint promise',t=>{
   const h=fixture(t);h.install();h.scope([own,cook]);h.save(s=>{s.protagonist.location_id='warm-pot-courtyard';s.living.objects['floating-frame'].condition=.99;s.living.objects['seedling-rack'].stock.trays=2;});h.tick();

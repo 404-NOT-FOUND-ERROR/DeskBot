@@ -110,4 +110,13 @@ describe("light-condensed town inhabitants", () => {
     expect(figure.limbs.armRight.rotation.x).toBe(0); expect(figure.limbs.armLeft.rotation.y).toBe(0);
     disposeObject(figure.group);
   });
+  it('renders deliberate project assembly and recording gestures while keeping taste a real eating pose',()=>{
+    const figure=createCitizenFigure(0,1,'spare-mender-001');
+    figure.updateLife!(5,'craft',false,true,0,'pump-assemble');expect(figure.limbs.armLeft.rotation.x).toBe(-.73);expect(figure.limbs.armRight.rotation.y).toBe(-.22);
+    figure.updateLife!(5,'craft',false,true,0,'soup-record-ratio');expect(figure.limbs.armRight.rotation.x).toBe(-.68);
+    figure.updateLife!(5,'eat',false,true,0,'soup-taste-trial');expect(figure.limbs.armRight.rotation.x).toBe(-.8);
+    for(const activity of ['harvest-float-bed','sow-float-bed']){figure.updateLife!(5,'care',false,true,0,activity);expect(figure.limbs.armLeft.rotation.x).toBe(-.67);expect(figure.limbs.armLeft.rotation.z).toBe(-.1);}
+    figure.updateLife!(5,'idle',false,true,0,'pump-assemble');expect(figure.limbs.armRight.rotation.x).toBe(0);expect(figure.limbs.armRight.rotation.y).toBe(0);
+    disposeObject(figure.group);
+  });
 });

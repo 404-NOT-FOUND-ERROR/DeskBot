@@ -33,6 +33,13 @@ export interface DeskBotObjectState {
   object_id: string; kind: string; updated_at: string;
   water_level?: number; moisture?: number; health?: number; growth?: number; quantity?: number; dead_quantity?:number; condition?: number;
   stock?: Record<string,number>; capacity?: number;
+  project_assets?: {
+    floating_seedbed?: { project_id:string; status:'prototype'|'growing'|'ready'|'empty'|'dead'; installed_at:string; accepted_at?:string|null; quantity:number; health:number; moisture:number; growth:number; last_cared_at?:string|null; last_inspected_at?:string|null };
+    small_water_pump?: { project_id:string; status:'assembled'|'moved'|'installed_trial'|'ready'|'broken'; assembled_at?:string; carrier_id?:string; installed_at?:string; accepted_at?:string|null; condition?:number; last_used_at?:string|null; use_count?:number };
+  };
+  project_drafts?:Record<string,{project_id:string;recorded_at:string;inputs:{resource:string;count:number}[];yield_count:number}>;
+  recipe_book?:Record<string,{project_id:string;name:string;accepted_at:string;inputs:{resource:string;count:number}[];yield_count:number;feedback?:unknown[]}>;
+  project_batches?:Record<string,{batch_id:string;status:'carried'|'served'|'awaiting_taste'|'tasted'|'expired';prepared_at:string;served_at?:string|null;expires_at:string;feedback?:unknown[];remaining_portions:number}>;
 }
 export interface DeskBotLivingActivity {
   activity_id: string; title: string; kind: "care"|"craft"; target_object_id: string; location_id: string;
@@ -98,7 +105,22 @@ export interface DeskBotNpc {
   desires?:string[];
   flaws?:string[];
   home_location_id?:string;
-  project?:{goal:string;status:string};
+  project?:{goal:string;status:string;progress?:Pick<DeskBotResidentProject,'stage_id'|'attempt'|'ready_at'|'completed_at'|'last_outcome'>|null};
+}
+
+export interface DeskBotProjectOutcome {
+  at:string; text:string; success:boolean; kind:'stage_completed'|'setback'|'cancelled'|'maintenance'|'project_completed';
+  task_id:string;activity_id:string;actor_id:string;stage_id:string;attempt:number;reason?:string;
+}
+export interface DeskBotResidentProject {
+  project_id:string;actor_id?:string;owner_id:string;name:string;goal:string;status:'active'|'setback'|'completed';attempt:number;
+  stage_id:string;stage_title:string;stage_started_at:string;target_object_id:string|null;location_id:string|null;
+  ready_at:string|null;blocked_reason:string|null;last_outcome:DeskBotProjectOutcome|null;
+  evidence:{at:string;task_id:string;activity_id:string;actor_id:string;stage_id:string;attempt:number;text:string;details?:Record<string,unknown>}[];
+  history:DeskBotProjectOutcome[];completed_at:string|null;retry_count:number;
+}
+export interface DeskBotResidentProjects {
+  schema:string;version:string;installed_at:string;revision:number;projects:DeskBotResidentProject[];
 }
 
 export interface DeskBotSocialCommitment {
@@ -132,6 +154,7 @@ export interface DeskBotWorldMap {
   living?: DeskBotLiving|null;
   autonomy?: DeskBotAutonomy|null;
   memory?:DeskBotLivedMemory|null;
+  projects?:DeskBotResidentProjects|null;
   social?:DeskBotSocial|null;
   refraction?:DeskBotRefraction|null;
   resident_life?:{version:string;installed_at:string;count:number}|null;
