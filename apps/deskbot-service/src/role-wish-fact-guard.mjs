@@ -1,6 +1,7 @@
 import { ROLE_WISH_DIRECTIONS } from './role-wishes.mjs';
 import { ACTIVITIES } from './living-resources.mjs';
 import { practicalTrialReadModel } from './role-practical-trials.mjs';
+import { roleStageReadModel, roleStagesReadModel } from './role-stages.mjs';
 
 const AUTHOR = new Map(ROLE_WISH_DIRECTIONS.map(direction => [direction.direction_id, direction]));
 const RECIPE_TITLES = new Map(ACTIVITIES.map(recipe => [recipe.activity_id, recipe.title]));
@@ -11,7 +12,7 @@ const MENTIONS = Object.freeze({
   dream_cloud: /云朵梦境生物|梦境生物/u,
   chef: /厨师|主厨/u,
 });
-const STATUSES = new Set(['proposed', 'prepared', 'deferred', 'rejected', 'withdrawn']);
+const STATUSES = new Set(['proposed', 'prepared', 'deferred', 'rejected', 'withdrawn', 'accepted']);
 const HELP_OR_IMAGINATION = /帮我|替我|教我|菜谱|食谱|怎么做|如何做|画(?:个|一)|写(?:个|一)|编(?:个|一)|故事|童话|角色扮演|假如|如果|假设|想象|脑补|扮演/u;
 const REPORTED = /(?:他|她|他们|朋友|别人|有人|老板|主人).{0,10}(?:说|问|觉得|认为|告诉)|(?:他|她|别人|朋友)的(?:愿望|角色|形态)/u;
 const OTHER_SUBJECT = /^(?:那|这)?(?:他|她|它|他们|别人|朋友|老板|小岚|阿砾).{0,30}(?:想|成为|变|愿望|角色|形态)|你.{0,10}(?:觉得|认为|说).{0,12}(?:他|她|它|别人|朋友).{0,14}(?:想|变|成为)/u;
@@ -96,6 +97,14 @@ function stateForPractice(trial) {
   };
   return `${practice}${states[trial.status]}这些记录还没有改变我的形象或身份。`;
 }
+function stateForStage(stage) {
+  const retained = `跨日完成的 ${stage.primary_root_ids.length} 项主要练习和已经发生的经历都保留。`;
+  if (!stage.current) return `我以前采用过${stage.label}方向，${stage.status === 'rolled_back' ? '现在已回退这一方向' : '这一方向现在已由同轴的新阶段替代'}。${retained}另一方向按当前记录继续，不能把这份历史说成现在的造型。`;
+  const choice = stage.axis === 'form'
+    ? `我在聚形域里的虚拟造型已经采用${stage.label}方向，仍是同一个我，眼睛、胸前光核和光粒保留。`
+    : `我已经采用${stage.label}的生活方向，日常会多考虑对应的备料、${stage.direction_id === 'chef' ? '做饭' : '制作和修缮'}活动；具体安排仍要看需要、材料和原任务结果。`;
+  return `${choice}${retained}这是原愿望、实际试做和一起确认后的选择，成功记录不能证明喜欢、作品质量或现实职业资格。桌边实体外壳、声音和硬件能力还没有因此改变。`;
+}
 
 /**
  * Canonical rendering only for explicit questions about a saved wish or trial.
@@ -114,16 +123,37 @@ export function guardRoleWishFacts({ userText, text, worldSnapshot, roleWishes, 
   if (!SELF.test(query) && !(reasonQuestion && /(?:想|愿望|角色|形态)/u.test(query))) return unchanged('not_a_self_wish_inquiry');
   if (!actorId || !worldSnapshot?.memory?.development) return unchanged('wish_world_facts_unavailable');
   const named = Object.entries(MENTIONS).filter(([, pattern]) => pattern.test(query)).map(([id]) => id);
+  if (named.length === 2 && statusQuestion && !reasonQuestion && worldSnapshot.role_stages?.schema === 'deskbot.role-stages.v1'
+    && new Set(named.map(id => AUTHOR.get(id)?.axis)).size === 2) {
+    const stages = roleStagesReadModel(worldSnapshot, { actorId });
+    const confirmed = named.every(id => stages.history.some(stage => stage.direction_id === id
+      && (Array.isArray(roleWishes) ? roleWishes : []).some(wish => wish.proposal_id === stage.proposal_id && wish.character_id === actorId && wish.origin === 'lived_wish' && wish.wish_basis?.root_outcome_ids?.length)));
+    if (confirmed) {
+      const form = stages.current.form?.label ?? '原来的造型', vocation = stages.current.vocation?.label ?? '原来的生活方向';
+      return { text: `我现在的虚拟形态是${form}，生活职业是${vocation}，两个方向分别保留自己的状态，仍是同一个我。已回退的方向不算当前采用，实际做过的事和材料消耗保留。采用是原愿望、跨日实践与一起确认后的选择；它不证明喜欢或现实职业资格，也没有改变桌边实体外壳、声音和硬件能力。`,
+        applied: true, reason: 'canonical_role_stage_combination_status', direction: null };
+    }
+  }
   if (named.length > 1) return unchanged('ambiguous_wish_directions');
   if (!named.length && /变成|成为|想当|当一个|想试试|想试着当/u.test(query)) return unchanged('unknown_or_unnamed_wish_direction');
   if (!named.length && !(statusQuestion && /愿望|角色|形态|试用|试做|变身|变形/u.test(query))
     && !(responseQuestion && /愿望|催|答应/u.test(query))
     && !(reasonQuestion && /这(?:个|份)愿望/u.test(query))) return unchanged('unknown_or_unnamed_wish_direction');
   const saved = savedWishes(roleWishes, actorId);
-  const wish = named.length ? saved.find(item => item.direction_id === named[0]) : saved.length === 1 ? saved[0] : null;
+  const current = named.length ? Object.values(roleStagesReadModel(worldSnapshot, { actorId }).current)
+    .find(stage => stage?.direction_id === named[0]) : null;
+  const currentWish = current && (Array.isArray(roleWishes) ? roleWishes : []).find(item => item.proposal_id === current.proposal_id
+    && item.character_id === actorId && item.origin === 'lived_wish' && item.axis === current.axis && item.direction_id === current.direction_id);
+  const wish = currentWish ?? (named.length ? saved.find(item => item.direction_id === named[0]) : saved.length === 1 ? saved[0] : null);
   if (!wish) return unchanged(named.length ? 'saved_wish_unavailable' : 'ambiguous_or_missing_saved_wish');
   const direction = wish.direction_id;
   if (!wish.wish_basis || !Array.isArray(wish.wish_basis.root_outcome_ids)) return unchanged('saved_wish_basis_unavailable', direction);
+  const stage = roleStageReadModel(worldSnapshot, { proposalId: wish.proposal_id, actorId });
+  if (stage && stage.actor_id === actorId && stage.direction_id === direction && stage.axis === wish.axis) {
+    const explanation = reasonQuestion ? reasonFor(wish, worldSnapshot) : null;
+    if (reasonQuestion && !explanation) return unchanged('saved_wish_reason_basis_unavailable', direction);
+    return { text: `${explanation ?? ''}${stateForStage(stage)}`, applied: true, reason: 'canonical_role_stage_status', direction };
+  }
   const practical = practicalTrialReadModel(worldSnapshot, { proposalId: wish.proposal_id, actorId });
   if (practical?.schema === 'deskbot.practical-role-trial.v1'
     && practical.actor_id === actorId && practical.direction_id === direction && practical.axis === wish.axis

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { CitizenFigure } from "./buildScene.ts";
 import { FOCUS_COLOR } from "./palette.ts";
+import {SHAPING_ANCHORS,shapingAppearanceLayers,type ShapingAppearance} from './shapingAppearance.ts';
 
 /** Authored first forms, keyed by identity. Appearance never implies a new memory or evolution. */
 export const SHAPING_FORMS = {
@@ -151,23 +152,53 @@ function addIdentity(p: FigureParts, f: Form): void {
  * Common recognition anchors: pear shell, seed eyes, a suspended chest pearl,
  * stubby feet and light grains settling towards the same body. No licensed character silhouettes.
  */
-export function createShapingFigure(style: string, seed: number): CitizenFigure {
-  const form = SHAPING_FORMS[style as keyof typeof SHAPING_FORMS] ?? SHAPING_FORMS["shaping-001"];
+export function createShapingFigure(style: string, seed: number, appearance?:ShapingAppearance|null): CitizenFigure {
+  const authored = SHAPING_FORMS[style as keyof typeof SHAPING_FORMS] ?? SHAPING_FORMS["shaping-001"];
   const own = style === "shaping-001";
+  const layers=own?shapingAppearanceLayers(appearance):{form:'base',vocation:'none'};
+  const frog=layers.form==='leaf-frog';
+  const form={...authored,...(frog?{accent:0x83aa78,light:0xb8f3ce}:{})};
   const group = new THREE.Group(); group.name = `shaping-being:${style}`;
   group.userData.shaping_form = form.feature;
+  if(own){group.userData.role_form=layers.form;group.userData.role_vocation=layers.vocation;group.userData.identity_anchors=[...SHAPING_ANCHORS];group.userData.physical_shell_changed=false;}
   group.userData.visual_only = true;
   const body = new THREE.Group(); body.name = "shaping-body"; group.add(body);
   body.scale.setScalar(SCALE);
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
   const parts = new FigureParts();
-  parts.add(ball, form.shell, 0, Y0 + .88, -.015, .43, .56, .35);
-  parts.add(ball, form.shell, 0, Y0 + 1.68, .015, own ? .55 : .50, .47, .44);
+  parts.add(ball, form.shell, 0, Y0 + .88, -.015, frog?.49:.43, frog?.52:.56, .35);
+  parts.add(ball, form.shell, 0, Y0 + 1.68, .015, frog?.62:own ? .55 : .50, .47, .44);
   // A small lower lip and cheeks give the face a readable front without painted textures.
   parts.add(ball, 0xf5eddc, 0, Y0 + 1.50, .33, .22, .11, .12);
   for (const side of [-1, 1]) parts.add(ball, form.accent, side * .29, Y0 + 1.59, .372, .066, .027, .019);
-  addIdentity(parts, form);
+  addIdentity(parts, authored);
   const upper = parts.mesh(material, "condensed-shell") as CitizenFigure["upper"]; body.add(upper);
+  if(own){
+    if(frog){
+      const roleParts=new FigureParts();
+      for(const side of [-1,1])roleParts.add(ball,0x83aa78,side*.42,Y0+2.03,.10,.22,.18,.19);
+      for(const side of [-1,1])roleParts.add(ball,0x83aa78,side*.35,Y0+1.20,.10,.31,.065,.29,0,side*.25);
+      roleParts.add(ball,0xa4c992,0,Y0+1.10,-.22,.46,.07,.24);
+      body.add(roleParts.mesh(material,'leaf-collar-and-frog-brow'));
+    }
+    if(layers.vocation==='chef'){
+      const roleParts=new FigureParts(),ivory=0xf5efdf;
+      roleParts.add(cylinder,ivory,0,Y0+2.24,0,.35,.15,.29);
+      for(const x of [-.20,0,.20])roleParts.add(ball,ivory,x,Y0+2.42,0,.21,.18,.20);
+      roleParts.add(box,ivory,0,Y0+.82,.348,.50,.55,.055);
+      roleParts.add(box,0xbd936d,0,Y0+.64,.39,.22,.14,.02);
+      roleParts.add(torus,0xe4bd70,0,Y0+1.0,.40,.14,.14,.12);
+      body.add(roleParts.mesh(material,'chef-hat-and-apron'));
+    }else if(layers.vocation==='workshop-maker'){
+      const roleParts=new FigureParts();
+      roleParts.add(box,0x9d7e60,0,Y0+.82,.352,.49,.56,.065);
+      roleParts.add(box,0x566f73,-.16,Y0+.74,.395,.21,.18,.022);
+      roleParts.add(box,0xe7ccb0,.14,Y0+.72,.405,.045,.28,.024,0,-.15);
+      roleParts.add(torus,0xe4bd70,0,Y0+1.0,.405,.14,.14,.12);
+      roleParts.add(box,0x6c8b88,.42,Y0+.78,-.18,.16,.30,.16);
+      body.add(roleParts.mesh(material,'maker-apron-and-tool-badge'));
+    }
+  }
 
   function limb(kind: "arm" | "leg", side: -1 | 1): THREE.Object3D {
     const pivot = new THREE.Group(); pivot.name = `${kind}:${side < 0 ? "left" : "right"}`;
@@ -232,7 +263,7 @@ export function createShapingFigure(style: string, seed: number): CitizenFigure 
   for (const side of [-1, 1]) eyeParts.add(ball, EYE_COLOR, side * .15, 0, 0, .047, .070, .027, 0, side * -.12);
   face.add(eyeParts.mesh(new THREE.MeshBasicMaterial({ vertexColors: true }), "eye-shapes")); body.add(face);
   const glowParts = new FigureParts();
-  glowParts.add(ball, form.light, 0, Y0 + 1.0, .355, .11, .12, .065);
+  glowParts.add(ball, form.light, 0, Y0 + 1.0, layers.vocation==='none'?.355:.423, .11, .12, .065);
   for (const side of [-1, 1]) glowParts.add(ball, form.light, side * .12, Y0 + 1.35, .33, .025, .030, .025);
   if (form.feature === "lamp-fruit") glowParts.add(ball, form.light, -.02, Y0 + 2.32, 0, .13, .17, .12);
   const glowMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .8 });

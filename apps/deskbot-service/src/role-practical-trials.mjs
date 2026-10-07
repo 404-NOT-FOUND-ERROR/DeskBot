@@ -94,6 +94,7 @@ export function controlPracticalTrial(world, { trialId, operation, at, eventId, 
   requireTime(world, at);
   const trial = world.practical_role_trials?.trials?.[trialId];
   if (!trial) fail('practical_trial_not_found', '没有这份实际试做记录。', 404);
+  if (trial.accepted_stage_id) fail('practical_trial_stage_bound', '这份试做已绑定采用的角色阶段，旧结果不能再调整、退出或重新使用；请在角色阶段上回退。');
   const action = operation === 'withdraw' ? 'exit' : operation;
   if (!['pause', 'resume', 'adjust', 'exit'].includes(action)) fail('practical_trial_operation_invalid', '可以暂停、恢复、调整或退出试做。', 400);
   if (trial.status === 'exited') {
@@ -253,7 +254,7 @@ export function settlePracticalTrials(world, at) {
     const before = JSON.stringify({ status: trial.status, outcomes: trial.outcomes, blockers: trial.blockers, review_reason: trial.review_reason, pause_origin: trial.pause_origin });
     trial.outcomes = resultsFor(world, trial, at);
     const current = activeWorldTask(world, trial.actor_id);
-    if (trial.status !== 'exited') {
+    if (trial.status !== 'exited' && !trial.accepted_stage_id) {
       // Repair a retained generic task pause. Keeping a paused task reserved
       // would freeze hunger/rest and contradict the trial's pause semantics.
       if (current?.role_trial?.trial_id === trial.trial_id && current.status === 'paused') {
@@ -287,13 +288,14 @@ function publicTrial(world, trial, at) {
   return { schema: PRACTICAL_ROLE_TRIAL_ITEM_SCHEMA, trial_id: trial.trial_id, proposal_id: trial.proposal_id, actor_id: trial.actor_id,
     direction_id: trial.direction_id, axis: trial.axis, status, variant_id: trial.variant_id, variant_label: variantFor(trial)?.label ?? trial.variant_id,
     variant_choices: DEFINITIONS[trial.direction_id].map(({ id, label }) => ({ id, label })),
-    allowed_actions: status === 'exited' ? [] : status === 'paused' ? ['resume', 'adjust', 'exit'] : status === 'review' ? ['adjust', 'exit'] : ['pause', 'exit'],
+    allowed_actions: trial.accepted_stage_id || status === 'exited' ? [] : status === 'paused' ? ['resume', 'adjust', 'exit'] : status === 'review' ? ['adjust', 'exit'] : ['pause', 'exit'],
+    accepted_stage_id: trial.accepted_stage_id ?? null, accepted_at: trial.accepted_at ?? null,
     started_at: trial.started_at, updated_at: trial.updated_at, ended_at: trial.ended_at, exited_at: trial.exited_at, exit_event_id: trial.exit_event_id,
     active_task: owned ? { task_id: owned.task_id, title: owned.title, activity_id: owned.activity_id ?? null, status: owned.status,
       due_at: owned.due_at, remaining_ms: owned.remaining_ms, step_role: owned.role_trial.step_role } : null,
     current_step: step ? { kind: step.kind, activity_id: step.activity_id ?? null, location_id: step.location_id ?? null, step_role: step.role_trial_primary ? 'primary' : 'support' } : null,
     outcomes: outcomes.slice(-32), progress: progressFor(trial, outcomes), review, blockers,
-    next_step: status === 'review' ? '结合这次实际结果回顾，决定继续生活、调整方式或退出；此处不会改变形象。'
+    next_step: trial.accepted_stage_id ? '这份试做已绑定角色阶段，保留实际成果；后续回退在角色阶段上处理。' : status === 'review' ? '结合这次实际结果回顾，决定继续生活、调整方式或退出；此处不会改变形象。'
       : status === 'exited' ? '本次试做已经结束，保留实际经历与资源后果。' : status === 'paused' ? '普通生活继续；恢复后重新核对实际条件。'
         : status === 'blocked' ? blockers[0]?.label ?? '先继续眼前的生活，再看条件。' : owned ? '等待实际任务到期，再核验材料、地点与环境。' : '留有余力时，自行安排下一次真实活动。',
     frozen_wish_root_ids: [...trial.frozen_wish_root_ids], history: structuredClone(trial.history), fingerprint: digest({ status, variant: trial.variant_id, outcomes, blockers, active_task: owned?.task_id ?? null }) };

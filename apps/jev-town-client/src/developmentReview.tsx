@@ -12,6 +12,8 @@ import {RoleWishes,RoleWishDirection,roleWishView} from './deskbot/RoleWishes.ts
 import './styles.css';
 import './deskbot/life-sidebar.css';
 import './development-review.css';
+import {readRoleStagesReview,type RoleStagesReviewFixture} from './roleStagesReview.ts';
+import {RoleStagesReviewPanel} from './RoleStagesReviewPanel.tsx';
 
 interface Review {
   simulated:true;phase:string;now:string;task_id:string|null;decision_policy:string;live_world_untouched:true;restart_verified:boolean;
@@ -23,6 +25,16 @@ const fixtureUrl=new URLSearchParams(location.search).get('developmentReviewUrl'
 const facetMode=new URLSearchParams(location.search).get('sample')==='facets';
 const wishMode=new URLSearchParams(location.search).get('sample')==='wishes';
 const trialMode=new URLSearchParams(location.search).get('sample')==='trials';
+const stageMode=new URLSearchParams(location.search).get('sample')==='stages';
+function StagesReview() {
+  const [fixture,setFixture]=useState<RoleStagesReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
+  async function load(){setError('');try{const response=await fetch('/role-stages-review.json');if(!response.ok)throw Error();const value=readRoleStagesReview(await response.json());if(!value)throw Error();setFixture(value);setSelected(value.samples[0]!.id);}catch{setError('角色阶段验收样本暂时不可用，重新载入后再试。');}}
+  useEffect(()=>{void load();},[]);
+  const sample=fixture?.samples.find(value=>value.id===selected)??fixture?.samples[0];
+  return <main className="development-review development-review--wishes development-review--stages"><header><div><span className="development-review__eyebrow">聚形域 · 发展管线 06</span><h1>仍是喵呜，成为下一种自己</h1><p>真实做过，再预览、采用，也允许带着经历回到原来的形态。</p></div><span className="development-review__badge">实际任务与可回退阶段样本</span></header>
+    <nav aria-label="角色阶段与形象组合样本">{fixture?.samples.map(value=><button key={value.id} aria-pressed={sample?.id===value.id} onClick={()=>setSelected(value.id)}>{value.label}</button>)}</nav>
+    {error?<p role="alert" className="development-review__error">{error}<button onClick={()=>void load()}>重试</button></p>:null}{sample?<RoleStagesReviewPanel sample={sample}/>:!error?<p className="development-review__note">正在载入角色阶段样本……</p>:null}</main>;
+}
 function PracticalTrialsReview() {
   const [fixture,setFixture]=useState<RolePracticalTrialsReviewFixture|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
   async function load() {
@@ -151,4 +163,4 @@ function DevelopmentReview() {
 }
 const root=import.meta.hot?.data.developmentReviewRoot??createRoot(document.getElementById('root')!);
 if(import.meta.hot)import.meta.hot.data.developmentReviewRoot=root;
-root.render(trialMode?<PracticalTrialsReview/>:wishMode?<WishesReview/>:facetMode?<FacetsReview/>:<DevelopmentReview/>);
+root.render(stageMode?<StagesReview/>:trialMode?<PracticalTrialsReview/>:wishMode?<WishesReview/>:facetMode?<FacetsReview/>:<DevelopmentReview/>);

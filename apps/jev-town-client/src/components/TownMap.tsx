@@ -9,6 +9,7 @@ import type { TownScene3DHandle } from "../three/TownScene3D.tsx";
 import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
 import type { DeskBotEnvironment, DeskBotLocation } from "../deskbot/types.ts";
 import type { SceneLifeActivity } from "../deskbot/activityProjection.ts";
+import type {ShapingAppearance} from '../three/shapingAppearance.ts';
 import "./shaping-map.css";
 import { isWebglAvailable } from "../three/webgl.ts";
 import { CitizenSprite } from "./CitizenSprite.tsx";
@@ -20,6 +21,7 @@ export interface TownMapProps {
   focusLocationId?: string | null;
   focusRequest?: number;
   citizens?: readonly Citizen[];
+  shapingAppearances?:ReadonlyMap<number,ShapingAppearance>;
   labels?: readonly LabelSpec[];
   positions: Map<number, Point>;
   durations: Map<number, number>;
@@ -48,7 +50,7 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
+export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
@@ -78,6 +80,7 @@ export function TownMap({ citizens = CITIZENS, labels, sceneLocations, environme
             <TownScene3D
               ref={sceneRef}
               citizens={citizens}
+              shapingAppearances={shapingAppearances}
               labels={labels}
               sceneLocations={sceneLocations}
               environment={environment}

@@ -1270,14 +1270,17 @@ function renderRolePulls(pulls = []) {
 function roleActionButtons(proposal, wishesEnabled = false) {
   const id = escapeHtml(proposal.proposal_id);
   if (proposal.origin === 'lived_wish') {
+    if(proposal.role_stage){const stage=proposal.role_stage;return stage.current&&stage.allowed_actions?.includes('rollback')?`<button class="quiet-button role-action" type="button" data-role-action="stage" data-role-operation="rollback" data-role-id="${id}" data-stage-id="${escapeHtml(stage.stage_id)}">回退这个${stage.axis==='form'?'虚拟形态':'职业方向'}</button>`:'';}
     if (proposal.practical_trial) {
       const trial = proposal.practical_trial;
-      const allowed = trial.allowed_actions || [];
+      const allowed = trial.accepted_stage_id ? [] : trial.allowed_actions || [];
       const button = (operation, label) => `<button class="quiet-button role-action" type="button" data-role-action="practical" data-role-operation="${operation}" data-role-id="${id}">${label}</button>`;
       const adjust = allowed.includes('adjust') ? `<label class="role-practical-variant">接下来采用的实际做法<select data-role-practical-variant>${(trial.variant_choices || []).map(value => `<option value="${escapeHtml(value.id)}"${value.id === trial.variant_id ? ' selected' : ''}>${escapeHtml(value.label)}</option>`).join('')}</select></label>${button('adjust', trial.status === 'review' ? '按这个做法继续试做' : '调整试做安排')}` : '';
-      return `<div class="role-actions">${allowed.includes('pause') ? button('pause', '先暂停试做') : ''}${allowed.includes('resume') ? button('resume', '继续实际试做') : ''}${allowed.includes('exit') ? button('exit', '退出这次试做') : ''}</div>${adjust}`;
+      const preview=proposal.role_stage_preview&&proposal.status==='prepared'&&!trial.accepted_stage_id?state.roleStagePreviews?.[proposal.proposal_id]:null;
+      const stages=proposal.role_stage_preview&&proposal.status==='prepared'&&!trial.accepted_stage_id?`<button class="quiet-button role-action" type="button" data-role-action="stage" data-role-operation="preview" data-role-id="${id}">查看阶段预览</button>${preview?.eligible?`<button class="quiet-button role-action" type="button" data-role-action="stage" data-role-operation="accept" data-role-id="${id}">采用这个${preview.axis==='form'?'虚拟形态':'生活方向'}</button>`:''}`:'';
+      return `<div class="role-actions">${allowed.includes('pause') ? button('pause', '先暂停试做') : ''}${allowed.includes('resume') ? button('resume', '继续实际试做') : ''}${allowed.includes('exit') ? button('exit', '退出这次试做') : ''}${stages}</div>${adjust}`;
     }
-    if (proposal.status === 'prepared' && proposal.practical_trial_available) return `<button class="quiet-button role-action" type="button" data-role-action="practical" data-role-operation="start" data-role-id="${id}">开始实际试做</button>`;
+    if (proposal.status === 'prepared' && proposal.practical_trial_available) return `<button class="quiet-button role-action" type="button" data-role-action="practical" data-role-operation="start" data-role-id="${id}">开始实际试做</button>${proposal.role_stage_preview?`<button class="quiet-button role-action" type="button" data-role-action="stage" data-role-operation="preview" data-role-id="${id}">查看阶段预览</button>`:''}`;
     if (proposal.status !== 'proposed') return '';
     const disabled = proposal.current_gate?.eligible === true ? '' : ' disabled';
     return `<div class="role-actions"><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="try"${disabled}>准备实际试做</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="later">以后再说</button><button class="quiet-button role-action" type="button" data-role-action="choose" data-role-id="${id}" data-choice="reject">这次不尝试</button></div>`;
@@ -1298,6 +1301,14 @@ function roleActionButtons(proposal, wishesEnabled = false) {
   return '';
 }
 
+function renderRoleStage(proposal) {
+  const stage=proposal.role_stage,preview=state.roleStagePreviews?.[proposal.proposal_id];
+  if(stage)return `<section class="role-stage"><strong>${escapeHtml(stage.label)} · ${stage.current?'当前阶段':stage.status==='rolled_back'?'已经回退':'历史阶段'}</strong><p>${escapeHtml(stage.life_changes?.summary||'继续原来的生活。')}</p><small>采用于 ${escapeHtml(interactionDate(stage.accepted_at))} · ${escapeHtml(stage.stage_id)}</small><p>仍是同一个体。形态与职业分轴记录，实际经历和关系继续留下；现实外壳保持当前。</p></section>`;
+  if(!preview)return '';
+  const label=value=>[value?.form?.label||'初生形态',value?.vocation?.label].filter(Boolean).join(' · ');
+  return `<section class="role-stage preview"><strong>独立预览 · 不改变当前形象</strong><p>此刻：${escapeHtml(label(preview.appearance_before))}<br>若采用：${escapeHtml(label(preview.appearance_preview))}</p><p>${escapeHtml(preview.options?.[0]?.summary||'这个方向尚无可采用的形象。')}</p><p>${escapeHtml(preview.life_changes?.summary||'')}</p>${preview.barriers?.length?`<ul>${preview.barriers.map(value=>`<li>${escapeHtml(value.label)}</li>`).join('')}</ul>`:''}<small>已有 ${escapeHtml(preview.basis.primary_root_ids.length)} 件核验主要实践，跨 ${escapeHtml(preview.basis.primary_days.length)} 个上海日期。成功不认定喜欢、作品质量或职业资格；配件不赠送物品。采用后可回退当前这一轴。</small></section>`;
+}
+
 function renderRoleProposals(proposals = []) {
   state.roleProposals = Array.isArray(proposals) ? proposals : [];
   const target = $('#role-proposals');
@@ -1310,7 +1321,7 @@ function renderRoleProposals(proposals = []) {
       const cooldown = proposal.cooldown_until ? interactionDate(proposal.cooldown_until) : '';
       const next = proposal.practical_trial ? '' : proposal.status === 'prepared' ? `已经记录试做意向。实际试做尚未开始。${proposal.practical_trial_available ? '可以进入实际生活任务；已有安排和身体需要优先。' : '等实际行动与结果连接后再开始。'}` : ['deferred', 'rejected'].includes(proposal.status) ? `${cooldown ? `${cooldown} 后再考虑；` : '先留一段时间；'}还需要新的实际经历，再决定要不要重新提出。` : proposal.status === 'withdrawn' ? '这个想法已收回，实际经历仍会保留。' : proposal.next_step || '先准备一次实际试做，再看结果。';
       const roots = [...new Set(proposal.wish_basis?.root_outcome_ids || [])];
-      return `<article class="role-item proposal lived-wish ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${axis} · 从生活经历提出</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.authored_reason || '')}</p>${barriers.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${barriers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}${next ? `<p>${escapeHtml(next)}</p>` : ''}${renderPracticalTrial(proposal.practical_trial)}<small>形态兴趣与职业愿望可以组合；目前没有变身，也没有认定职业资格。</small>${roots.length ? `<details><summary>这些日子给了什么依据</summary><p>同一件实际结果，多个记录视角不会叠加。</p><small>${escapeHtml(roots.join(' · '))}</small></details>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
+      return `<article class="role-item proposal lived-wish ${escapeHtml(proposal.status)}"><div class="role-item-heading"><div><span class="role-direction-id">${axis} · 从生活经历提出</span><strong>${escapeHtml(proposal.label || ROLE_DIRECTION_LABELS[proposal.direction_id] || proposal.direction_id)}</strong></div><b>${escapeHtml(ROLE_STATUS_LABELS[proposal.status] || proposal.status)}</b></div><p>${escapeHtml(proposal.authored_reason || '')}</p>${barriers.length ? `<div class="role-wish-barriers"><small>眼下还差这些</small><ul>${barriers.map(value => `<li>${escapeHtml(value.label)}</li>`).join('')}</ul></div>` : ''}${next ? `<p>${escapeHtml(next)}</p>` : ''}${proposal.role_stage?'':renderPracticalTrial(proposal.practical_trial)}${renderRoleStage(proposal)}<small>${proposal.role_stage?'虚拟阶段已保存；现实外壳保持当前，也没有认定职业资格。':'形态兴趣与职业愿望可以组合；目前没有变身，也没有认定职业资格。'}</small>${roots.length ? `<details><summary>这些日子给了什么依据</summary><p>同一件实际结果，多个记录视角不会叠加。</p><small>${escapeHtml(roots.join(' · '))}</small></details>` : ''}<div class="role-action-slot">${roleActionButtons(proposal)}</div></article>`;
     }
     const trial = proposal.trial;
     const trialSummary = trial ? `试行 ${trial.turns_observed}/${trial.max_turns} · 正 ${trial.positive_feedback} / 负 ${trial.negative_feedback} · ${trial.status}` : '尚未开始试行';
@@ -1451,7 +1462,7 @@ async function handleRoleAction(actionTarget) {
     const proposalId = actionTarget.dataset.roleId;
     const selectedProposal = state.roleProposals.find(proposal => proposal.proposal_id === proposalId);
     const livedWish = selectedProposal?.origin === 'lived_wish';
-    if (livedWish && !['choose', 'practical'].includes(action)) throw new Error('这个愿望需要实际试做，不能用聊天试行代替。');
+    if (livedWish && !['choose', 'practical','stage'].includes(action)) throw new Error('这个愿望需要实际试做，不能用聊天试行代替。');
     if (state.roleWishesEnabled && selectedProposal && !livedWish && !selectedProposal.trial?.started_at && (action === 'start' || (action === 'choose' && actionTarget.dataset.choice === 'try'))) throw new Error('历史方向记录；新尝试需要实际生活依据。');
     let result;
     if (action === 'propose') {
@@ -1475,6 +1486,24 @@ async function handleRoleAction(actionTarget) {
       result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/practical-trial/${operation}`, { event_id: state.rolePracticalRetry.event_id, ...(variant ? { variant } : {}) });
       state.rolePracticalRetry = null;
       setRoleResult('ok', '实际试做已更新', result.practical_trial.next_step);
+    } else if(action==='stage'){
+      const operation=actionTarget.dataset.roleOperation;
+      if(!livedWish||!['preview','accept','rollback'].includes(operation))throw new Error('角色阶段操作不在当前可用范围。');
+      if(operation==='preview'){
+        result=await getJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/stage/preview`);
+        if(result.preview?.schema!=='deskbot.role-stage-preview.v1'||result.preview.proposal_id!==proposalId)throw new Error('预览与当前愿望不一致。');
+        state.roleStagePreviews??={};state.roleStagePreviews[proposalId]=result.preview;
+        setRoleResult('ok','阶段预览已读取','预览没有改变小镇里的形象，请查看生活选项和实际依据后决定。');
+      }else{
+        const preview=state.roleStagePreviews?.[proposalId],stage=selectedProposal.role_stage;
+        if(operation==='accept'&&!preview?.eligible)throw new Error('先重新查看满足实际门槛的独立预览。');
+        if(operation==='rollback'&&(!stage?.current||!stage.allowed_actions.includes('rollback')||actionTarget.dataset.stageId!==stage.stage_id))throw new Error('只能回退这一轴的当前阶段。');
+        const binding=operation==='accept'?preview.preview_fingerprint:stage.stage_id,fingerprint=JSON.stringify([proposalId,operation,binding]);
+        if(state.roleStageRetry?.fingerprint!==fingerprint)state.roleStageRetry={fingerprint,event_id:`role-stage-${crypto.randomUUID()}`};
+        result=await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/stage/${operation}`,{event_id:state.roleStageRetry.event_id,...(operation==='accept'?{preview_fingerprint:binding}:{stage_id:binding})});
+        state.roleStageRetry=null;if(state.roleStagePreviews)delete state.roleStagePreviews[proposalId];
+        setRoleResult('ok',operation==='accept'?'虚拟阶段已采用':'当前这一轴已经回退','实际经历与关系继续保留，现实外壳和身体能力保持当前。');
+      }
     } else if (action === 'start') {
       result = await postJson(`/api/roles/proposals/${encodeURIComponent(proposalId)}/trial/start`, { window_turns: 5 });
       setRoleResult('ok', '试行已开始', `观察窗口 ${result.proposal.trial.max_turns} 回合`);

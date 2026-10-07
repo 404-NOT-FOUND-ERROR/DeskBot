@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
+import {afterEach,describe,expect,it,vi} from "vitest";
 import { CITIZEN_COUNT } from "../shared/citizens.ts";
 import { createApp } from "../server/app.ts";
 import { loadJevConfig, readVisitorKey } from "../server/jevClient.ts";
 
 const VISITOR_KEY = "sk-visitor-secret-value-1234";
+const realFetch=globalThis.fetch;
+afterEach(()=>vi.unstubAllGlobals());
+function stubJev() {
+  // The routes are real local HTTP. Only the remote provider is simulated;
+  // credential and quota checks must not depend on an external service.
+  const upstream=vi.fn(async(_request:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({model:'jev-offline-test',answers:{},provider_debug:{echo:VISITOR_KEY}}),{status:200}));
+  vi.stubGlobal('fetch',upstream);return upstream;
+}
 
 function body(round: number) {
   return {
@@ -16,7 +24,7 @@ function body(round: number) {
 }
 
 async function withServer<T>(app: ReturnType<typeof createApp>, run: (baseUrl: string) => Promise<T>) {
-  const server = app.listen(0);
+  const server = app.listen(0,'127.0.0.1');
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -28,7 +36,7 @@ async function withServer<T>(app: ReturnType<typeof createApp>, run: (baseUrl: s
 }
 
 async function post(baseUrl: string, round: number, key?: string) {
-  return fetch(`${baseUrl}/api/broadcast`, {
+  return realFetch(`${baseUrl}/api/broadcast`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -65,29 +73,39 @@ describe("bring-your-own-key", () => {
   });
 
   it("never echoes the visitor key back to the client", async () => {
+    const upstream=stubJev();
     await withServer(createApp({ jevConfig: null, rateLimit: null }), async (baseUrl) => {
       const res = await post(baseUrl, 1, VISITOR_KEY);
       const text = await res.text();
       expect(text).not.toContain(VISITOR_KEY);
       expect(res.headers.get("x-typesafe-key")).toBeNull();
     });
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect((upstream.mock.calls[0]![1]!.headers as Record<string,string>).Authorization).toBe(`Bearer ${VISITOR_KEY}`);
   });
 
   it("does not spend the deployment's rate limit on a visitor's own key", async () => {
     // The limit exists to protect the server key; a visitor paying for their own
     // rounds should not be throttled by it.
+    const upstream=stubJev();
     await withServer(
-      createApp({ jevConfig: null, rateLimit: { limit: 1, windowMs: 60_000 } }),
+      createApp({ jevConfig: {apiKey:'deployment-test-key',baseUrl:'https://provider.example.invalid',model:'jev-test',timeoutMs:50}, rateLimit: { limit: 1, windowMs: 60_000 } }),
       async (baseUrl) => {
         for (let round = 1; round <= 4; round += 1) {
           const res = await post(baseUrl, round, VISITOR_KEY);
           expect(res.status).toBe(200);
+          await res.arrayBuffer();
         }
+        expect(upstream).toHaveBeenCalledTimes(4);
+        for(const call of upstream.mock.calls)expect((call[1]!.headers as Record<string,string>).Authorization).toBe(`Bearer ${VISITOR_KEY}`);
+        expect((await post(baseUrl,5)).status).toBe(200);
+        expect((await post(baseUrl,6)).status).toBe(429);
       },
     );
   });
 
   it("still throttles callers relying on the deployment's key", async () => {
+    stubJev();
     const jevConfig = {
       apiKey: "server-key",
       baseUrl: "https://api.example.invalid",

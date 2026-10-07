@@ -28,7 +28,8 @@ export function readRoleWishesReview(value:unknown):RoleWishesReviewFixture|null
     }
     for(const proposal of sample.proposals) {
       if(!proposal||typeof proposal.proposal_id!=='string'||typeof proposal.direction_id!=='string'||typeof proposal.status!=='string')return null;
-      if(proposal.origin==='lived_wish'&&(!['form','vocation'].includes(proposal.axis??'')||!['proposed','prepared','deferred','rejected','withdrawn'].includes(proposal.status)))return null;
+      if(proposal.origin==='lived_wish'&&(!['form','vocation'].includes(proposal.axis??'')||!['proposed','prepared','accepted','deferred','rejected','withdrawn'].includes(proposal.status)))return null;
+      if(proposal.origin==='lived_wish'&&proposal.status==='accepted'&&(!proposal.role_stage||proposal.role_stage.status!=='accepted'||proposal.role_stage.proposal_id!==proposal.proposal_id||proposal.role_stage.axis!==proposal.axis||proposal.role_stage.direction_id!==proposal.direction_id))return null;
     }
   }
   return fixture;

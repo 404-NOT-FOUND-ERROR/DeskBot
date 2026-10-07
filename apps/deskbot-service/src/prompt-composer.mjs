@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { activeWorldTask } from './realtime-world.mjs';
 import { livingReadModel, livingObjectReadModel } from './living-resources.mjs';
 import { ROLE_WISH_DIRECTIONS } from './role-wishes.mjs';
+import { roleStagesReadModel } from './role-stages.mjs';
 
 import {
   DEFAULT_CHARACTER_DISPLAY_NAME,
@@ -210,7 +211,26 @@ function composeRoleTrialDesire(activeRoleTrials = []) {
     ?? `你最近对“${active.life ?? '一种新的生活方式'}”有些在意。猫型外壳仍未改变；相关时从第一人称说出这份兴趣，不解释后台分类。`;
 }
 
-function composeCurrentRoleStage(currentRoleStages = []) {
+const STAGE_EXPRESSION = Object.freeze({
+  wetland_frog: { label: '荷叶青蛙', axis: 'form', life: '留意苗圃照料和水岸观察，安排仍需经过原路线和活动执行。', speech: '可以自然关注雨、水和照料的小变化；先说明事实，不补写跳跃或感官经历。' },
+  workshop_maker: { label: '工坊学徒', axis: 'vocation', life: '留有余力时考虑制作和修缮；有限材料、磨损和基本需要决定能否开始。', speech: '偏向把问题拆成一小步实际验证；语气利落，保留完整步骤和未知处。' },
+  chef: { label: '灶边厨师', axis: 'vocation', life: '参与原有备料、做饭和送餐循环，仍核对食材、厨房和长桌容量。', speech: '对配方、搭配和照料更有兴趣；可以分享清楚的做法，不暗示职业资格或现实下厨能力。' },
+});
+/** Only closed authored choices from the canonical current axes enter expression. */
+export function modelRoleStageContext(worldSnapshot) {
+  if (!worldSnapshot) return [];
+  return Object.values(roleStagesReadModel(worldSnapshot).current).filter(Boolean).map(stage => {
+    const choice = STAGE_EXPRESSION[stage.direction_id];
+    if (!choice || stage.axis !== choice.axis || stage.current !== true || stage.status !== 'accepted') return null;
+    return { direction: choice.label, axis: choice.axis, meaning: '实际跨日试做后，原愿望和主人确认共同支持采用的当前生活方向。',
+      life: choice.life, speech: choice.speech, virtual_appearance_adopted: true, identity_changed: false,
+      physical_shell_changed: false, voice_changed: false, liking_proven: false, qualification_proven: false };
+  }).filter(Boolean);
+}
+function composeCurrentRoleStage(currentRoleStages = [], worldSnapshot = null) {
+  const canonical = modelRoleStageContext(worldSnapshot);
+  if (canonical.length) return `${canonical.map(stage => `当前${stage.axis === 'form' ? '虚拟形态' : '生活职业'}：${stage.direction}\n日常：${stage.life}\n表达：${stage.speech}`).join('\n')}\n同一个体、种子眼、梨形体、胸前光核和光粒持续保留。地图虚拟造型已经采用；实体外壳、声音和硬件自由度按原身体记录。`;
+  if (worldSnapshot?.role_stages?.schema === 'deskbot.role-stages.v1') return '当前两个轴都没有采用中的新方向；沿用原造型和基础生活。以前的采用与试做结果作为经历保留，不能把回退或旧历史当成当前阶段。';
   const stage = currentRoleStages.find((item) => item?.schema === 'deskbot.role-state.v1' || item?.direction_id);
   if (!stage) return '当前还没有被确认的新角色阶段；保留喵呜的猫型第一形态和基础性格。';
   const overlay = stage.overlay ?? {};
@@ -264,6 +284,7 @@ const WISH_STATE_MEANINGS = Object.freeze({
   deferred: '这份愿望暂缓，继续原有生活；不要反复催促主人同意。',
   rejected: '主人拒绝了这次愿望，要尊重回应；冷却后也需要新的实际经历才能再考虑。',
   withdrawn: '这份愿望已经撤回；保留此前经历，但不能声称仍在准备它。',
+  accepted: '这份愿望曾经通过实际试做并采用；当前是否仍生效，只读取 canonical current axes，回退不抹去历史结果。',
 });
 const finiteCount = value => Number.isFinite(value) ? Math.max(0, Math.min(Math.trunc(value), 2048)) : 0;
 const PRACTICAL_STATES = Object.freeze({
@@ -290,7 +311,7 @@ export function modelPracticalTrialContext(wish) {
     changes_identity: false, changes_appearance: false };
 }
 /** Only authored directions and finite canonical counts enter model context. */
-export function modelRoleWishContext(roleWishes = []) {
+export function modelRoleWishContext(roleWishes = [], worldSnapshot = null) {
   const records = (Array.isArray(roleWishes) ? roleWishes : []).filter(item => item?.origin === 'lived_wish' && WISH_STATE_MEANINGS[item.status]);
   const active = records.filter(item => ['proposed', 'prepared'].includes(item.status)).slice(-2);
   const recentHistory = records.filter(item => !active.includes(item)).slice(-(8 - active.length));
@@ -299,6 +320,7 @@ export function modelRoleWishContext(roleWishes = []) {
       if (!authored || item.axis !== authored.axis) return null;
       const basis = item.wish_basis ?? {};
       const practical = modelPracticalTrialContext(item);
+      const stage = worldSnapshot ? roleStagesReadModel(worldSnapshot).history.findLast(entry => entry.proposal_id === item.proposal_id) : null;
       return { direction: authored.label, axis: authored.axis, status: item.status,
         meaning: WISH_STATE_MEANINGS[item.status],
         recorded_basis: { active_days: finiteCount(basis.active_days?.length), active_contexts: finiteCount(basis.active_contexts?.length),
@@ -306,8 +328,9 @@ export function modelRoleWishContext(roleWishes = []) {
           condition_failures: finiteCount(basis.counts?.condition_failures), performance_failures: finiteCount(basis.counts?.performance_failures) },
         current_conditions_ready: item.current_gate?.eligible === true,
         practical_trial: practical,
-        next_step: practical ? PRACTICAL_STATES[practical.status] : item.status === 'prepared' ? '尚无实际试做记录；先安排实际活动，不能把对话当成试做结果。' : '按已经保存的回应继续生活；只在话题相关时说明这份愿望。',
-        changes_identity: false, changes_appearance: false };
+        adopted_stage: stage ? { current: stage.current, rolled_back: stage.status === 'rolled_back', physical_shell_changed: false, qualification_proven: false, liking_proven: false } : null,
+        next_step: stage ? stage.current ? '按当前采用的虚拟形态和生活方向继续日常；实际动作只读原任务。' : '这份采用属于历史，当前已回退或由新方向替代；保留实际经历。' : practical ? PRACTICAL_STATES[practical.status] : item.status === 'prepared' ? '尚无实际试做记录；先安排实际活动，不能把对话当成试做结果。' : '按已经保存的回应继续生活；只在话题相关时说明这份愿望。',
+        changes_identity: false, changes_appearance: stage?.current === true };
     }).filter(Boolean);
 }
 
@@ -563,7 +586,7 @@ export function composePrompt({
   const activeRoleTrialBlock = activeRoleTrials.length > 0 || includeWorld || settingDiscussionRequested(userText)
     ? composeRoleTrialDesire(activeRoleTrials)
     : '本轮不讨论角色方向；保持当前性格，不主动提形态变化。';
-  const currentRoleStageBlock = composeCurrentRoleStage(currentRoleStages);
+  const currentRoleStageBlock = composeCurrentRoleStage(currentRoleStages, worldSnapshot);
 
   const prompt = [
     '[DESKBOT_ROLE]',
@@ -608,9 +631,9 @@ export function composePrompt({
     '若只有 contact 接触、successful_practice 为零，就是听到或接触过这个话题，尚无做成依据；不能说我会做、做得来、已经做过。用户的问题或说法不能补成完成记录。recent_actual_outcomes 只确认登记活动的结果与动机；没有提供动作过程、手感或具体场景细节时，不补写亲历过程。失败原因仅使用 failure.classification 与已提供的 known_reason；没有 known_reason 时保留原因未知，不从当前湿度、水位等现场数值回填过去失败，也不编造土太湿、手陷进去等过程。可以表达未来想试，仍需等待实际结果。',
     '[/DESKBOT_SLOW_INTERESTS]',
     '[DESKBOT_LIVED_ROLE_WISHES]',
-    JSON.stringify(modelRoleWishContext(roleWishes)),
+    JSON.stringify(modelRoleWishContext(roleWishes, worldSnapshot)),
     '这是由共同生活经历和当前可执行条件产生、保存于原角色记录中的有限愿望事实。form 是想尝试的奇幻形态，vocation 是想尝试的生活职业；两者可以并存，同一个体身份锚点持续保留。',
-    'proposed 是想尝试，prepared 是同意准备；实际开始和结果只读 practical_trial。running 不等于完成，review 仅表示有实际结果待回看，条件受阻不等于不喜欢，做成也不证明喜欢、作品质量或职业资格。缺少试做结果时，不能以对话轮数、主人赞同或愿望的表达填补实践。试做尚未改变身份、外观或声音，设备能力以 canonical world 为准。',
+    'proposed 是想尝试，prepared 是同意准备；实际开始和结果只读 practical_trial。running 不等于完成，review 仅表示有实际结果待回看。只有 adopted_stage.current 和下方当前阶段证明已经采用虚拟形态或职业；回退后不可继续声称当前已经采用。条件受阻不等于不喜欢，做成也不证明喜欢、作品质量或职业资格。缺少试做结果时，对话轮数、主人赞同不能填补实践。采用虚拟阶段也不改变实体外壳、声音和硬件能力。',
     '若愿望暂缓、拒绝或撤回，要尊重已保存的回应和当前条件。正常聊天不反复提愿望，条件困难不当作不喜欢。这里只能帮助说明现有愿望，模型回复不能写入状态、捏造新愿望或声称完成改变。正文用自然口语，不朗读状态、规则、数值或后台名称。',
     '[/DESKBOT_LIVED_ROLE_WISHES]',
     '[DESKBOT_BRANCH_EXPERIENCES]',
@@ -655,7 +678,7 @@ export function composePrompt({
     '',
     '[DESKBOT_CURRENT_ROLE_STAGE]',
     currentRoleStageBlock,
-    '这是已经确认的当前角色阶段。它持续影响喵呜的注意力、偏好和表达方式，世界事实、当前外壳和工具结果保持原样。让阶段通过自然选择和小愿望露出；stage_id、proposal、overlay 和后台状态留在系统里。为空时，喵呜回到第一形态的基础底色。',
+    '这是已经确认的当前虚拟形态与生活职业，可在两个轴上组合。它影响注意力、日常候选和表达，实际行动结果仍以原任务为准。长期种子中的猫型外壳和 character_profile 是实体基线，不能覆盖这里已采用的虚拟地图造型；虚拟蛙形也不能冒充已经更换实体壳、获得跳跃肢体或现实专业能力。声音尚未变化。让方向通过自然关注露出，信息保持清楚；后台名称不进正文。',
     '[/DESKBOT_CURRENT_ROLE_STAGE]',
     '',
     '[DESKBOT_LIVED_WORLD]',
@@ -690,7 +713,8 @@ export function composePrompt({
     world_conditions: worldConditions,
     active_role_trials: Array.isArray(activeRoleTrials) ? activeRoleTrials : [],
     current_role_stages: Array.isArray(currentRoleStages) ? currentRoleStages : [],
-    role_wishes: modelRoleWishContext(roleWishes),
+    role_wishes: modelRoleWishContext(roleWishes, worldSnapshot),
+    role_stage_context: modelRoleStageContext(worldSnapshot),
   };
 }
 

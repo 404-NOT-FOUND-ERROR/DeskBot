@@ -31,7 +31,23 @@ const ROLE_TRIAL_OVERLAYS = Object.freeze({
     preferences: '留意梦、云、幻想、童话、漂浮和新的组合方式。',
     boundary: '想象只作为表达或候选方案；事实、承诺和风险必须明确区分。',
   }),
+  chef: Object.freeze({
+    direction_id: 'chef', label: '苔芽厨师',
+    presence: '从实际食材与步骤开始，留心饭桌上的需要；可以主动提议做一道已有配方。',
+    speech: '可以说一个具体食材或操作细节，回答仍先说清楚事实。',
+    preferences: '留意食材、烹饪步骤、共餐和已经做过的配方。',
+    boundary: '这是聚形域里的生活角色选择；没有验证现实厨师资格、作品质量或喜欢程度。',
+  }),
 });
+
+export function roleDirectionOverlay(directionId, { label = directionId, life = '' } = {}) {
+  return structuredClone(ROLE_TRIAL_OVERLAYS[directionId] ?? {
+    direction_id: directionId, label,
+    presence: '保持当前角色底色，只在日常表达中留下这个方向的兴趣。',
+    speech: '先完成任务，再让当前生活兴趣自然露出。', preferences: life,
+    boundary: '角色阶段只改变表达与生活选择，不证明世界之外的事实。',
+  });
+}
 
 const LIVE_WISH_STATUSES = new Set(['proposed', 'prepared']);
 const WISH_ANNOUNCE_MS = 24 * 3600000;
@@ -41,24 +57,25 @@ const timestamp = value => Date.parse(value ?? '') || 0;
 const rootIds = direction => [...new Set(direction?.basis?.root_outcome_ids ?? [])];
 
 /** Pure scheduling policy over the original proposal history and canonical basis. */
-export function roleWishProposalGate(history, direction, { characterId = null, at = new Date(), excludeProposalId = null } = {}) {
+export function roleWishProposalGate(history, direction, { characterId = null, at = new Date(), excludeProposalId = null, currentDirectionIds = [] } = {}) {
   const records = (history ?? []).filter(item => item.origin === 'lived_wish' && (!characterId || item.character_id === characterId));
   const currentMs = timestamp(at instanceof Date ? at.toISOString() : at);
   const barriers = [...(direction?.readiness?.barriers ?? [])].map(item => structuredClone(item));
   const sameDirection = records.filter(item => item.direction_id === direction?.direction_id && item.proposal_id !== excludeProposalId)
-    .sort((left, right) => timestamp(right.practical_trial_exited_at ?? right.decided_at ?? right.proposed_at) - timestamp(left.practical_trial_exited_at ?? left.decided_at ?? left.proposed_at));
+    .sort((left, right) => timestamp(right.role_stage_rolled_back_at ?? right.practical_trial_exited_at ?? right.decided_at ?? right.proposed_at) - timestamp(left.role_stage_rolled_back_at ?? left.practical_trial_exited_at ?? left.decided_at ?? left.proposed_at));
   const last = sameDirection[0] ?? null;
   const axisConflict = records.find(item => item.proposal_id !== excludeProposalId && item.axis === direction?.axis && LIVE_WISH_STATUSES.has(item.status));
   if (axisConflict) barriers.push({ id: 'axis_occupied', label: '这个方向轴已有等待回应或准备实践的愿望', scope: 'policy', proposal_id: axisConflict.proposal_id });
+  if (currentDirectionIds.includes(direction?.direction_id)) barriers.push({ id: 'direction_already_current', label: '这个方向已经是当前生活阶段，继续实际生活，不重复提出相同愿望', scope: 'policy' });
   const lastAnnouncement = records.filter(item => item.proposal_id !== excludeProposalId).reduce((latest, item) => Math.max(latest, timestamp(item.proposed_at)), 0);
   const announceUntil = lastAnnouncement ? lastAnnouncement + WISH_ANNOUNCE_MS : 0;
   if (announceUntil > currentMs) barriers.push({ id: 'announcement_cooldown', label: '刚表达过一份愿望，先继续生活', scope: 'policy' });
-  const needsNewRoot = last && (['later', 'reject'].includes(last.user_choice) || Boolean(last.practical_trial_exited_at));
+  const needsNewRoot = last && (['later', 'reject'].includes(last.user_choice) || Boolean(last.practical_trial_exited_at) || Boolean(last.role_stage_rolled_back_at));
   const ownerCooldown = needsNewRoot ? timestamp(last.cooldown_until) : 0;
-  if (ownerCooldown > currentMs) barriers.push({ id: 'owner_choice_cooldown', label: last.practical_trial_exited_at ? '尊重这次退出，先继续生活' : last.user_choice === 'reject' ? '尊重这次拒绝，暂不重提' : '尊重稍后再说，暂不重提', scope: 'policy' });
+  if (ownerCooldown > currentMs) barriers.push({ id: 'owner_choice_cooldown', label: last.role_stage_rolled_back_at ? '尊重这次回退，先继续生活' : last.practical_trial_exited_at ? '尊重这次退出，先继续生活' : last.user_choice === 'reject' ? '尊重这次拒绝，暂不重提' : '尊重稍后再说，暂不重提', scope: 'policy' });
   const previousRoots = new Set(last?.reconsider_after_roots ?? last?.wish_basis?.root_outcome_ids ?? []);
   const datedRoots = direction?.basis?.root_outcomes ?? [];
-  const reconsiderAt = last?.practical_trial_exited_at ?? last?.decided_at;
+  const reconsiderAt = last?.role_stage_rolled_back_at ?? last?.practical_trial_exited_at ?? last?.decided_at;
   const newRoots = rootIds(direction).filter(id => !previousRoots.has(id) && datedRoots.some(root => root.root_outcome_id === id && timestamp(root.at) > timestamp(reconsiderAt)));
   if (needsNewRoot && !newRoots.length) barriers.push({ id: 'new_actual_outcome_required', label: '回应后还没有新的实际经历，不重复劝说', scope: 'policy' });
   return {
@@ -219,7 +236,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 1, 1), 10);
     const accepted = [...proposals.values()]
       .filter((item) => !characterId || item.character_id === characterId)
-      .filter((item) => item.status === 'accepted')
+      .filter((item) => item.status === 'accepted' && item.origin !== 'lived_wish')
       .sort((a, b) => String(a.decided_at ?? a.proposed_at).localeCompare(String(b.decided_at ?? b.proposed_at)));
     return accepted.slice(-bounded).map((item) => {
       const overlay = ROLE_TRIAL_OVERLAYS[item.direction_id] ?? {
@@ -349,8 +366,8 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     const bounded = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     return [...decisions.values()].filter((item) => !proposalId || item.proposal_id === proposalId).slice(-bounded).map(clone);
   }
-  function wishGate(direction, { characterId = null, at = now(), excludeProposalId = null } = {}) {
-    return roleWishProposalGate([...proposals.values()], direction, { characterId, at, excludeProposalId });
+  function wishGate(direction, { characterId = null, at = now(), excludeProposalId = null, currentDirectionIds = [] } = {}) {
+    return roleWishProposalGate([...proposals.values()], direction, { characterId, at, excludeProposalId, currentDirectionIds });
   }
   function nextWishId(characterId, directionId) {
     const base = `role-wish:${characterId}:${directionId}`;
@@ -402,6 +419,57 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     decisions.set(decisionId, decision); proposals.set(proposalId, updated);
     return clone(updated);
   }
+  // The world owns the current axes and appearance. These records are only
+  // the existing owner's decision history, repaired after a durable world
+  // commit so a stopped process cannot invent a second accepted role state.
+  function reconcileCanonicalStage(proposalId, stage, { reason = null, rollbackReason = null, rootOutcomeIds = [] } = {}) {
+    const proposal = proposals.get(proposalId);
+    if (!proposal) return null;
+    if (proposal.origin !== 'lived_wish' || stage?.schema !== 'deskbot.role-stage.v1'
+      || stage.proposal_id !== proposalId || stage.actor_id !== proposal.character_id
+      || stage.direction_id !== proposal.direction_id || stage.axis !== proposal.axis
+      || !['accepted', 'rolled_back'].includes(stage.status) || !Number.isFinite(Date.parse(stage.accepted_at))) {
+      throw new RoleProposalError(409, 'role_stage_proposal_conflict', '当前世界阶段与原愿望不一致，不能改写原有记录。');
+    }
+    const acceptedEvent = stage.accept_event_id ?? stage.accepted_event_id;
+    if (typeof acceptedEvent !== 'string' || !acceptedEvent) throw new RoleProposalError(409, 'role_stage_decision_missing', '世界阶段需要保留原接受操作。');
+    let updated = clone(proposal);
+    const newDecisions = [];
+    const addDecision = (eventId, choice, stamp, ownerReason, from, to, source) => {
+      const decisionId = `${proposalId}:role-stage:${choice}:${eventId}`;
+      const existing = decisions.get(decisionId);
+      if (!existing) newDecisions.push({ schema: 'deskbot.role-proposal-decision.v0.2', decision_id: decisionId,
+        proposal_id: proposalId, choice, reason: ownerReason, decided_at: stamp, origin: 'lived_wish', event_id: eventId, stage_id: stage.stage_id });
+      updated.stage_history = [...(updated.stage_history ?? []), { from, to, at: stamp,
+        reason: existing?.reason ?? ownerReason, source, event_id: eventId, stage_id: stage.stage_id }];
+    };
+    if (updated.role_stage_accept_event_id !== acceptedEvent) {
+      addDecision(acceptedEvent, 'accept_role_stage', stage.accepted_at, reason, updated.status, 'accepted', 'owner_role_stage_accept');
+      updated = { ...updated, status: 'accepted', role_stage_id: stage.stage_id,
+        role_stage_accepted_at: stage.accepted_at, role_stage_accept_event_id: acceptedEvent };
+    }
+    if (stage.status === 'rolled_back') {
+      const rollbackEvent = stage.rollback_event_id ?? stage.rolled_back_event_id;
+      if (typeof rollbackEvent !== 'string' || !rollbackEvent || !Number.isFinite(Date.parse(stage.rolled_back_at))) {
+        throw new RoleProposalError(409, 'role_stage_decision_missing', '世界阶段需要保留原回退操作。');
+      }
+      if (updated.role_stage_rollback_event_id !== rollbackEvent) {
+        addDecision(rollbackEvent, 'rollback_role_stage', stage.rolled_back_at, rollbackReason, updated.status, 'withdrawn', 'owner_role_stage_rollback');
+        updated = { ...updated, status: 'withdrawn', withdrawn_at: stage.rolled_back_at,
+          withdrawal_reason: rollbackReason ?? 'owner_rolled_back_role_stage',
+          role_stage_rolled_back_at: stage.rolled_back_at, role_stage_rollback_event_id: rollbackEvent,
+          cooldown_until: new Date(timestamp(stage.rolled_back_at) + WISH_LATER_MS).toISOString(),
+          reconsider_after_roots: [...new Set([...rootOutcomeIds, ...(proposal.wish_basis?.root_outcome_ids ?? [])])].slice(-64) };
+      }
+    }
+    if (JSON.stringify(updated) === JSON.stringify(proposal)) return clone(proposal);
+    const persist = () => { for (const decision of newDecisions) persistence?.put('role.proposal-decisions', decision.decision_id, decision);
+      persistence?.put('role.proposals', proposalId, updated); };
+    if (typeof persistence?.transaction === 'function') persistence.transaction(persist); else persist();
+    for (const decision of newDecisions) decisions.set(decision.decision_id, decision);
+    proposals.set(proposalId, updated);
+    return clone(updated);
+  }
   function chooseWish(proposal, choice, { reason = null } = {}) {
     const decisionId = `${proposal.proposal_id}:${choice}`;
     const existingDecision = decisions.get(decisionId);
@@ -425,7 +493,7 @@ export function createRoleProposalStore({ persistence = null, now = () => new Da
     if (!existingDecision) decisions.set(decisionId, decision); proposals.set(proposal.proposal_id, updated);
     return clone({ proposal: updated, decision });
   }
-  return { propose, refreshEvidence, refreshWish, wishGate, nextWishId, choose, startTrial, recordTrialObservation, completeTrial, archive, exitPracticalWish, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
+  return { propose, refreshEvidence, refreshWish, wishGate, nextWishId, choose, startTrial, recordTrialObservation, completeTrial, archive, exitPracticalWish, reconcileCanonicalStage, activeTrials, currentStages, get: (id) => clone(proposals.get(id) ?? null), list, decisions: listDecisions };
 }
 
 export { ROLE_TRIAL_OVERLAYS };

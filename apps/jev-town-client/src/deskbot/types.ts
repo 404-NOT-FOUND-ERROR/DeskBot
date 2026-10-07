@@ -1,3 +1,4 @@
+import type {ShapingAppearance} from '../three/shapingAppearance.ts';
 export interface DeskBotLocation {
   location_id: string;
   settlement_id?: string;
@@ -204,7 +205,7 @@ export interface DeskBotWorldMap {
   areas?: DeskBotArea[];
   objects?: DeskBotObject[];
   paths?: { passage_id: string | null; from_location_id: string; to_location_id: string; open: boolean; blocked_reason: string | null }[];
-  protagonist: { character_id: string; location_id: string; travel_state?: { status: string; task_id?: string; arrival_text?: string | null } };
+  protagonist: { character_id: string; location_id: string; appearance?:{schema?:string;role_stage?:ShapingAppearance};travel_state?: { status: string; task_id?: string; arrival_text?: string | null } };
   world_setting?: {
     setting_id: string;
     version: string;
@@ -374,6 +375,7 @@ export interface DeskBotPracticalRoleTrial {
   progress:{successful_primary:number;condition_failures:number;performance_failures:number;unknown_failures:number;cancelled:number;primary_days:string[];root_outcome_ids:string[];support_roots:string[];started_attempts:number};
   review:{ready:boolean;reason:null|'repeated_actual_success'|'execution_difficulties';basis:'canonical_unique_task_results';summary:string;quality_proven:false;qualification_proven:false;preference_proven:false;changes_appearance:false};
   blockers:{code:string;label:string;classification:string|null}[];next_step:string;frozen_wish_root_ids:string[];
+  accepted_stage_id?:string|null;
 }
 export interface DeskBotPracticalTrialActionResponse {
   schema:'deskbot.practical-role-trial-action-response.v1';accepted:boolean;duplicate:boolean;
@@ -406,14 +408,44 @@ export interface DeskBotRoleProposal {
   proposal_gate?:{eligible?:boolean;barriers?:{id:string;label:string;scope?:string}[]};
   cooldown_until?:string|null;created_at?:string;updated_at?:string;reason?:string;
   practical_trial_available?:boolean;practical_trial_connected?:boolean;practical_trial?:DeskBotPracticalRoleTrial|null;
+  role_stage?:DeskBotRoleStage|null;role_stage_preview?:DeskBotRoleStagePreview|null;
   evidence_ids?:string[];trial?:{status:string;started_at?:string;turns_observed:number;max_turns:number;positive_feedback:number;negative_feedback:number}|null;
 }
 export interface DeskBotRoleEvolution {
   schema:string;wishes?:DeskBotRoleWishes|null;
+  role_stages?:DeskBotRoleStages|null;
   development?:{role_wishes?:DeskBotRoleWishes|null;directions?:DeskBotRoleWishDirection[]};
 }
 export interface DeskBotRoleWishSnapshot {
   evolution:DeskBotRoleEvolution;proposals:DeskBotRoleProposal[];
+}
+export interface DeskBotRoleStageLifeChanges {
+  basis:'rule_based_choice';summary:string;added_interests:string[];added_places:string[];actual_activity:string;
+  resource_grants:false;task_preemption:false;preference_proven:false;qualification_proven:false;
+}
+export interface DeskBotRoleStage {
+  schema:'deskbot.role-stage.v1';stage_id:string;proposal_id:string;trial_id:string;actor_id:string;direction_id:string;axis:DeskBotRoleWishAxis;label:string;
+  status:'accepted'|'rolled_back';current:boolean;allowed_actions:'rollback'[];accepted_at:string;rolled_back_at:string|null;predecessor_stage_id:string|null;
+  primary_root_ids:string[];primary_days:string[];frozen_wish_root_ids:string[];life_changes:DeskBotRoleStageLifeChanges;
+  qualification_proven:false;preference_proven:false;physical_shell_changed:false;
+}
+export interface DeskBotRoleStages {
+  schema:'deskbot.role-stages.v1';available:boolean;enabled:boolean;actor_id:string;revision:number;
+  current:{form:DeskBotRoleStage|null;vocation:DeskBotRoleStage|null};history:DeskBotRoleStage[];appearance:ShapingAppearance;
+  identity_changed:false;physical_shell_changed:false;
+}
+export interface DeskBotRoleStagePreview {
+  schema:'deskbot.role-stage-preview.v1';proposal_id:string;actor_id:string;direction_id:string;axis:DeskBotRoleWishAxis;
+  eligible:boolean;barriers:{id:string;label:string}[];preview_fingerprint:string;current:DeskBotRoleStages['current'];stage:DeskBotRoleStage|null;
+  appearance_before:ShapingAppearance;appearance_preview:ShapingAppearance;
+  options:{direction_id:string;axis:DeskBotRoleWishAxis;label:string;summary:string;appearance:ShapingAppearance}[];
+  life_changes:DeskBotRoleStageLifeChanges|null;
+  basis:{kind:'canonical_unique_task_results';trial_id:string|null;variant_id:string|null;primary_root_ids:string[];primary_days:string[];frozen_wish_root_ids:string[]};
+  reversible:true;changes_identity:false;physical_shell_changed:false;qualification_proven:false;preference_proven:false;
+}
+export type DeskBotRoleStageOperation='accept'|'rollback';
+export interface DeskBotRoleStageActionResponse {
+  schema:string;accepted:boolean;duplicate:boolean;proposal:DeskBotRoleProposal;role_stage:DeskBotRoleStage;role_stages:DeskBotRoleStages;
 }
 
 export interface DeskBotExperience {

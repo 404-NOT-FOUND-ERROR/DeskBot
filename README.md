@@ -1,5 +1,7 @@
 # DeskBot / 聚形域软件端
 
+**角色发展第 6 阶段（2026-10-07）：** 实际跨日试做后的原愿望与主人确认，共同支持采用虚拟形态或生活职业。荷叶青蛙、工坊学徒和灶边厨师使用有限造型与生活选项；两个轴可以组合，预览只读，确认核对当前结果，回退保留另一轴与已发生的经历。正式地图读取同一外观版本，表达区分虚拟造型和实体外壳。见 [阶段验收](research/milestones/role-development-stage6.md) 与 [角色阶段规则](research/world/role-stages-v1.md)，九种隔离样本为 `/development-review.html?sample=stages`。
+
 **角色发展第 5 阶段（2026-10-06）：** 准备愿望接入原自主生活候选与真实任务，核验路线、材料、需要和跨日结果；可暂停、调整、继续与退出。界面显示主要练习、准备步骤和受阻原因，结果不自动等于喜欢、资格或变身。九种隔离 SQLite 样本验证控制与重载，正式世界继续按现实时间运行。见 [阶段验收](research/milestones/role-development-stage5.md) 与 [实际试做规则](research/world/role-practical-trials-v1.md)，验收页面为 `/development-review.html?sample=trials`。
 
 **角色发展第 4 阶段（2026-10-06）：** 持续兴趣、具体配方实践与当前生活条件连接原角色提案，形态与职业分轴；支持准备、暂缓、拒绝、撤回和有冷却的新经历重提。主人支持不会开始聊天试用或改变外观。八种 SQLite 隔离样本和七日普通循环分别验证生命周期与未满足前提的情况。见 [阶段验收](research/milestones/role-development-stage4.md) 与 [愿望规则](research/world/role-wishes-v1.md)，验收页面为 `/development-review.html?sample=wishes`。
@@ -42,7 +44,7 @@
 - 第一至第六步已完成基本世界合同、现实 1:1 时钟、分层地图、实际设施、天气表现与有限资源。十三名角色共用规则生活循环；邀请、协作、交换、赴约与关系后果使用真实事务记录。见 [第六步验收](research/milestones/companion-world-step6.md) 与 [社会生活规则](research/world/social-life-v1.md)。
 - 第七步已接入现实输入折射：上海天气、对话和有限生活建议影响下一次空闲选择，保留出处、暂缓理由与实际任务引用。本地已启用 DeepSeek Flash 对话、NASA Science 新闻与上海区域空气质量。其他 agent 等待真实来源，设备联调仍属第九步。见 [第七步验收](research/milestones/companion-world-step7.md)、[输入折射规则](research/world/input-refraction-v1.md) 与 [外界来源配置](research/milestones/external-input-configuration.md)。独立专项为 `/life-review.html?sample=inputs`。
 - 第八步已接入三种长期记忆、关系沉淀、可逆兴趣积累与 DeepSeek 空闲目标选择。需要、任务、路线、材料和实际结果仍由世界核验；模型解释是意图，不是已经完成的经历。私人对话记忆留在本地，自动选择只引用有限镇内记录与公开消息。见 [第八步验收](research/milestones/companion-world-step8.md)；独立七日回放为 `/life-review.html?sample=memory`，不能代替正式世界真实经过七天。
-- 首批造型与场景效果由客户端创作。有限方向的主动愿望和实际生活试做已接入；阶段接受、形态生成、声音演化与换壳流程继续按 [v0.5 当前路线图](research/development-roadmap-v0.5.md) 推进。
+- 首批造型与场景效果由客户端创作。有限方向的主动愿望、实际生活试做与可逆阶段采用已接入。当前形态和职业配件是作者定义的闭集 3D 造型；开放生成、真实声音与实机换壳继续按 [v0.5 当前路线图](research/development-roadmap-v0.5.md) 推进。
 
 ![十三位光粒居民的首批造型：独立陈列预览，不代表正式聚会](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 

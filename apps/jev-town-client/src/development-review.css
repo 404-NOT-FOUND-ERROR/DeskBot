@@ -48,3 +48,8 @@
 .development-review--wishes .life-wish__basis code { display:inline; }
 .development-review--wishes .life-wishes__intro { margin-bottom:18px; }
 @media(max-width:760px) { .development-review--wishes .development-review__columns { grid-template-columns:1fr; } }
+.development-review--stages .development-review__columns { grid-template-columns:minmax(310px,410px) minmax(360px,1fr); }
+.development-review--stages .development-review__appearance { padding:25px 32px; }
+.development-review--stages .development-review__appearance .life-stage-preview__figure { max-width:460px; margin:20px auto; }
+.development-review--stages .development-review__appearance .life-stage-figure__canvas { min-height:270px; }
+@media(max-width:850px){.development-review--stages .development-review__columns{grid-template-columns:1fr}.development-review--stages .development-review__appearance{padding:22px}.development-review--stages .development-review__appearance .life-stage-preview__figure{max-width:330px}}

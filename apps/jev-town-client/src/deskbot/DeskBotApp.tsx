@@ -18,6 +18,9 @@ import {ProjectFacilityState} from './ProjectFacilityState.tsx';
 import {BodyStatus} from './BodyStatus.tsx';
 import type {DeskBotBodyPerception} from './bodyTypes.ts';
 import './body-status.css';
+import {fetchRoleStagePreview,createRoleStageController} from './bridge.ts';
+import type {DeskBotRoleStageOperation} from './types.ts';
+import type {ShapingAppearance} from '../three/shapingAppearance.ts';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -55,6 +58,7 @@ function position(x: number, y: number): Point {
 export function DeskBotApp() {
   const baseUrl = useMemo(deskbotBaseUrl, []);
   const practicalTrialControl=useMemo(()=>createPracticalTrialController(baseUrl),[baseUrl]);
+  const stageControl=useMemo(()=>createRoleStageController(baseUrl),[baseUrl]);
   const [npcSelectionRequest,setNpcSelectionRequest]=useState(0);
   const suggestionRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const socialRetry=useRef<{fingerprint:string;id:string}|null>(null);
@@ -91,6 +95,7 @@ export function DeskBotApp() {
   const taskTitle = currentTask ? taskDisplayTitle(map,currentTask) : undefined;
   const glance=worldGlance(map);
   const sceneActivities=useMemo(()=>projectSceneActivities(map),[map]);
+  const shapingAppearances=useMemo(()=>{const values=new Map<number,ShapingAppearance>(),appearance=map?.protagonist.appearance?.role_stage;if(map&&appearance)values.set(numericId(map.protagonist.character_id,500000),appearance);return values;},[map?.protagonist.appearance?.role_stage,map?.protagonist.character_id]);
 
   useEffect(() => {
     const previous = observedTask.current;
@@ -154,13 +159,14 @@ export function DeskBotApp() {
   async function respondInvitation(id:string,operation:'join'|'decline'|'withdraw'){const fingerprint=id+':'+operation;if(socialRetry.current?.fingerprint!==fingerprint)socialRetry.current={fingerprint,id:newWorldEventId('social')};setBusy(true);try{await respondSocialInvitation(id,operation,socialRetry.current.id,baseUrl);socialRetry.current=null;await refresh();setMessage(operation==='join'?'愿意参加，手头的事忙完再赴约。':operation==='decline'?'已经告诉对方这次不参加。':'已经告诉对方退出，实际做过的事会保存。');}catch(error){setMessage(error instanceof Error?error.message:'约定更新失败');}finally{setBusy(false);}}
   async function chooseWish(id:string,choice:DeskBotRoleWishChoice){setBusy(true);try{await respondRoleWish(id,choice,baseUrl);await refresh();setMessage(choice==='try'?'试做意向已记下。实际试做还没有开始，形态与身份保持当前。':choice==='later'?'这个想法先放一放，等有新的实际经历再考虑。':'已经记下这次不尝试，先继续过自己的日子。');}catch(error){setMessage(error instanceof Error?error.message:'愿望回应未保存');}finally{setBusy(false);}}
   async function changePracticalTrial(id:string,operation:DeskBotPracticalTrialOperation,variant?:string){setBusy(true);try{const result=await practicalTrialControl(id,operation,variant);await refresh();setMessage(result.practical_trial.next_step);}catch(error){setMessage(error instanceof Error?error.message:'实际试做未更新');}finally{setBusy(false);}}
+  async function changeRoleStage(id:string,operation:DeskBotRoleStageOperation,binding:string){setBusy(true);try{const result=await stageControl(id,operation,binding);await refresh();setMessage(operation==='accept'?`已采用${result.role_stage.label}方向，新的生活选项与虚拟形象已保存。`:'已经回退这一轴的虚拟阶段，实际经历与关系仍会保留。');}catch(error){await refresh();setMessage(error instanceof Error?error.message:'角色阶段未更新');}finally{setBusy(false);}}
 
   const refresh = useCallback(async () => {
     try {
       const snapshot = await fetchDeskBotWorld(baseUrl);
       applyMap(snapshot.map);
       applyLife(snapshot.life);
-      try {setRoleWishes(await fetchRoleWishes(snapshot.map.protagonist.character_id,baseUrl));} catch {setRoleWishes(null);}
+      try {const next=await fetchRoleWishes(snapshot.map.protagonist.character_id,baseUrl);setRoleWishes(current=>(current?.evolution.role_stages?.revision??0)>(next.evolution.role_stages?.revision??0)?current:next);} catch {setRoleWishes(null);}
       setMessage("小镇的近况已更新。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "无法读取 DeskBot 世界");
@@ -535,6 +541,7 @@ export function DeskBotApp() {
         <section className="deskbot-mode__stage">
           <TownMap
             citizens={citizens}
+            shapingAppearances={shapingAppearances}
             labels={labels}
             sceneLocations={map?.locations}
             environment={map?.environment}
@@ -648,7 +655,7 @@ export function DeskBotApp() {
           </form>
         </section>
 
-        <LifeSidebar roleWishes={roleWishes} onRoleWish={(id,choice)=>void chooseWish(id,choice)} onPracticalTrial={(id,operation,variant)=>void changePracticalTrial(id,operation,variant)} onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
+        <LifeSidebar roleWishes={roleWishes} onRoleWish={(id,choice)=>void chooseWish(id,choice)} onPracticalTrial={(id,operation,variant)=>void changePracticalTrial(id,operation,variant)} onStagePreview={id=>fetchRoleStagePreview(id,baseUrl)} onStageControl={(id,operation,binding)=>void changeRoleStage(id,operation,binding)} onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
             <p className="deskbot-mode__task-time">{taskTimeLabel(currentTask)}</p>
             {travelling ? <small>正从{map?.locations.find(place => place.current)?.name??'上一处地点'}出发，尚未抵达。</small> : null}
             {currentTask.role_trial?<small className="deskbot-mode__task-note">这是实际试做中的活动。请到下方试做卡暂停或退出，材料会归还，日常生活继续。</small>:<div className="deskbot-mode__task-controls"><button type="button" disabled={busy} onClick={() => { void (async () => { setBusy(true); try { await controlWorldTask(currentTask.task_id, currentTask.status === "paused" ? "resume" : "pause", baseUrl); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败"); } finally { setBusy(false); } })(); }}>{currentTask.status === "paused" ? "继续" : "暂停"}</button>

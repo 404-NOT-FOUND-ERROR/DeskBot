@@ -12,6 +12,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { DeskBotLocation } from "../deskbot/types.ts";
 import { buildCompanionScenery, type CompanionScenery } from "./companionScenery.ts";
 import { createShapingFigure } from "./shapingFigures.ts";
+import type {ShapingAppearance} from './shapingAppearance.ts';
 import { sceneOperationAt } from './sceneLife.ts';
 import { createSoftLightTexture } from './sceneLifeEffects.ts';
 import { mapToWorld } from "@shared/world.ts";
@@ -909,8 +910,8 @@ function place(x: number, y: number, z: number, sx: number, sy: number, sz: numb
  * that does not move independently is baked into one smooth-shaded mesh, so a
  * crowd of fifty stays at five draw calls each.
  */
-export function createCitizenFigure(paletteIndex: number, seed: number, residentStyle?:string): CitizenFigure {
-  if (residentStyle) return createShapingFigure(residentStyle, seed);
+export function createCitizenFigure(paletteIndex: number, seed: number, residentStyle?:string, appearance?:ShapingAppearance|null): CitizenFigure {
+  if (residentStyle) return createShapingFigure(residentStyle, seed,appearance);
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);

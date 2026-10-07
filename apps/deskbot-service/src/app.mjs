@@ -37,6 +37,7 @@ import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import { createRoleEvolution } from './role-evolution.mjs';
 import { practicalTrialReadModel } from './role-practical-trials.mjs';
+import { roleStageReadModel } from './role-stages.mjs';
 import { createWorldCandidateStore, WorldCandidateError } from './world-candidates.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
@@ -229,7 +230,7 @@ export function createDeskBotServer({
     listMutations: options => persistentWorld.listMutations(options),
     npcGoals,
     persistence,
-    roleStages: (characterId) => roles.currentStages({ characterId }),
+    roleStages: (characterId) => roleEvolution.currentStages({ characterId }),
     llm,
     enabled: worldLifeEnabled,
   });
@@ -257,7 +258,7 @@ export function createDeskBotServer({
     ttsFormat,
     audioArtifacts,
     activeRoleTrials: (characterId) => roles.activeTrials({ characterId }),
-    currentRoleStages: (characterId) => roles.currentStages({ characterId }),
+    currentRoleStages: (characterId) => roleEvolution.currentStages({ characterId }),
     currentRoleWishes: (characterId) => roleEvolution.wishProposals({ characterId }),
     relationshipMemories: (characterId, query) => sharedLife.retrieve(characterId, query),
     branchExperiences: (query, worldSnapshot) => sharedLife.retrieveExperiences(query, worldSnapshot),
@@ -345,8 +346,10 @@ export function createDeskBotServer({
 
   function ingestNonChatEvent(eventInput, adapter = {}) {
     const trialAction = ['start_role_practical_trial', 'control_role_practical_trial'].includes(eventInput.payload?.action);
+    const stageAction = ['accept_role_stage', 'rollback_role_stage'].includes(eventInput.payload?.action);
     if (eventInput.type === 'world.mutation' && (['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)
-      || (trialAction && adapter.rolePracticalInternal === true && !inputStore.get(eventInput.event_id)))) {
+      || (trialAction && adapter.rolePracticalInternal === true && !inputStore.get(eventInput.event_id))
+      || (stageAction && adapter.roleStageInternal === true && !inputStore.get(eventInput.event_id)))) {
       persistentWorld.syncWallClock?.();
       const recovery = persistentWorld.syncTasks?.();
       if (recovery?.pending_due || recovery?.environment_pending) throw new PersistentWorldError(409, 'world_catching_up', '世界正在补算之前的事务，请稍后再试。');
@@ -1259,7 +1262,7 @@ export function createDeskBotServer({
         ...snapshot,
         proposals: roleEvolution.wishProposals({ characterId, limit: url.searchParams.get('limit') ?? 50 }),
         active_trials: roles.activeTrials({ characterId, limit: url.searchParams.get('limit') ?? 20 }),
-        current_stages: roles.currentStages({ characterId, limit: 10 }),
+        current_stages: roleEvolution.currentStages({ characterId, limit: 10 }),
         ...(url.pathname === '/api/role-evolution/status'
           ? { schema: 'deskbot.role-evolution-status.v0.1', snapshot_schema: snapshot.schema }
           : {}),
@@ -1346,6 +1349,57 @@ export function createDeskBotServer({
       return;
     }
 
+    const roleStagePreviewMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/stage\/preview$/);
+    if (request.method === 'GET' && roleStagePreviewMatch) {
+      const proposalId = decodeURIComponent(roleStagePreviewMatch[1]), preview = roleEvolution.stagePreview(proposalId);
+      if (!preview) sendJson(response, 404, { error: 'role_proposal_not_found', message: '没有这份角色愿望。' });
+      else sendJson(response, 200, { schema: 'deskbot.role-stage-preview-response.v1', preview,
+        proposal: roleEvolution.wishProposal(proposalId) });
+      return;
+    }
+
+    const roleStageActionMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/stage\/(accept|rollback)$/);
+    if (request.method === 'POST' && roleStageActionMatch) {
+      const proposalId = decodeURIComponent(roleStageActionMatch[1]), operation = roleStageActionMatch[2];
+      readJson(request, 16 * 1024, { allowEmpty: false }).then(body => {
+        const allowedKeys = operation === 'accept' ? ['event_id', 'reason', 'preview_fingerprint'] : ['event_id', 'reason', 'stage_id'];
+        if (Object.keys(body).some(key => !allowedKeys.includes(key))) throw new InputError(400, 'invalid_role_stage_request', '阶段操作只接受已登记的预览或当前阶段编号，不能提交形象、技能、经历或结果。');
+        const proposal = roles.get(proposalId);
+        if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
+        if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'role_stage_requires_lived_wish', '新的生活阶段需要已经保存的生活愿望和实际试做，旧聊天反馈不能替代。');
+        const world = persistentWorld.get(), stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+        const previewFingerprint = operation === 'accept' ? requiredRoleText(body.preview_fingerprint, 'preview_fingerprint') : null;
+        const stageId = operation === 'rollback' ? requiredRoleText(body.stage_id, 'stage_id') : null;
+        const eventId = optionalRoleText(body.event_id, 'event_id') ?? `role-stage:${operation}:${operation === 'accept' ? proposalId : stageId}`;
+        const savedEvent = inputStore.get(eventId);
+        const sameReplay = savedEvent?.source === 'role-stage-engine' && savedEvent.type === 'world.mutation'
+          && (operation === 'accept' ? savedEvent.payload?.action === 'accept_role_stage' && savedEvent.payload?.proposal_id === proposalId
+            : savedEvent.payload?.action === 'rollback_role_stage' && savedEvent.payload?.stage_id === stageId);
+        if (operation === 'accept' && !sameReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
+          throw new RoleProposalError(409, 'role_stage_requires_prepared_wish', '采用生活阶段需要原先已支持的准备愿望与实际结果。');
+        }
+        if (operation === 'rollback' && (!stage || stage.stage_id !== stageId || !sameReplay && (stage.status !== 'accepted' || stage.current !== true))) {
+          throw new RoleProposalError(409, 'role_stage_not_current', '只有当前轴上采用的这份阶段可以回退，请重新读取阶段卡。');
+        }
+        const reason = optionalRoleText(body.reason, 'reason');
+        const payload = operation === 'accept' ? { action: 'accept_role_stage', proposal_id: proposalId,
+          actor_id: proposal.character_id, direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
+          preview_fingerprint: previewFingerprint, ...(reason ? { reason } : {}) }
+          : { action: 'rollback_role_stage', stage_id: stageId, ...(reason ? { reason } : {}) };
+        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-stage-engine',
+          source_kind: 'world_engine', character_id: world.protagonist.character_id,
+          occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { roleStageInternal: true });
+        roleEvolution.reconcileRoleStage(proposalId);
+        return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
+          proposal: roleEvolution.wishProposal(proposalId), role_stage: roleStageReadModel(persistentWorld.get(), { proposalId,
+            actorId: proposal.character_id, at: now().toISOString() }), role_stages: roleEvolution.snapshot({ characterId: proposal.character_id }).role_stages,
+          world_mutation: result.worldMutation };
+      }).then(result => sendJson(response, result.duplicate ? 200 : 202, {
+        schema: 'deskbot.role-stage-action-response.v1', accepted: true, ...result,
+      })).catch(error => sendRoleError(response, error));
+      return;
+    }
+
     const practicalActionMatch = url.pathname.match(/^\/api\/roles\/proposals\/([^/]+)\/practical-trial\/(start|pause|resume|adjust|exit)$/);
     if (request.method === 'POST' && practicalActionMatch) {
       const proposalId = decodeURIComponent(practicalActionMatch[1]), operation = practicalActionMatch[2];
@@ -1356,11 +1410,15 @@ export function createDeskBotServer({
         if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
         if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'practical_trial_requires_lived_wish', '旧草稿不能启动实际角色试做，需要从实际生活中产生新的愿望。');
         const world = persistentWorld.get();
+        const stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
         const trial = practicalTrialReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
         const eventId = optionalRoleText(body.event_id, 'event_id') ?? (operation === 'start' ? `role-practical:start:${proposalId}` : `role-practical:${operation}:${randomUUID()}`);
         const savedEvent = inputStore.get(eventId);
         const sameStartReplay = operation === 'start' && trial && savedEvent?.source === 'role-practical-trial-engine'
           && savedEvent.payload?.action === 'start_role_practical_trial' && savedEvent.payload?.proposal_id === proposalId;
+        const sameControlReplay = savedEvent?.source === 'role-practical-trial-engine' && savedEvent.payload?.action === 'control_role_practical_trial'
+          && savedEvent.payload?.trial_id === trial?.trial_id && savedEvent.payload?.operation === operation;
+        if (stage && !sameStartReplay && !sameControlReplay) throw new RoleProposalError(409, 'role_trial_closed_by_stage', '这段试做已经成为阶段依据，结果保留；调整生活阶段请使用当前阶段的回退操作。');
         if (operation === 'start' && !sameStartReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
           throw new RoleProposalError(409, 'practical_trial_requires_prepared_wish', '先回应这份已经具备生活依据的愿望，再安排实际试做。');
         }
@@ -1399,7 +1457,7 @@ export function createDeskBotServer({
             return roleEvolution.startTrial(proposalId, { windowTurns });
           }
           if (action === 'trial/observations') return roles.recordTrialObservation(proposalId, { eventId: requiredRoleText(body.event_id ?? body.eventId, 'event_id'), signal: body.signal ?? 'neutral', evidenceId: optionalRoleText(body.evidence_id ?? body.evidenceId, 'evidence_id') });
-          if (action === 'trial/complete') return roles.completeTrial(proposalId, { decision: body.decision ?? 'deferred', reason });
+          if (action === 'trial/complete') return roleEvolution.completeTrial(proposalId, { decision: body.decision ?? 'deferred', reason });
           return roleEvolution.archive(proposalId, { reason });
         })
         .then((result) => {

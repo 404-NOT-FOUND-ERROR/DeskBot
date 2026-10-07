@@ -25,6 +25,7 @@ import { activityProgressAt, type SceneLifeActivity } from "../deskbot/activityP
 import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
 import { sceneWorkAnchor, sceneWorkTarget } from './sceneWorkplace.ts';
 import {isProjectActivity,projectActivityView} from './projectScene.ts';
+import {shapingAppearanceKey,type ShapingAppearance} from './shapingAppearance.ts';
 
 export interface TownScene3DProps {
   sceneLocations?: readonly DeskBotLocation[];
@@ -33,6 +34,7 @@ export interface TownScene3DProps {
   focusLocationId?: string | null;
   focusRequest?: number;
   citizens: readonly Citizen[];
+  shapingAppearances?:ReadonlyMap<number,ShapingAppearance>;
   labels?: readonly LabelSpec[];
   positions: Map<number, Point>;
   durations: Map<number, number>;
@@ -202,13 +204,13 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
+  { citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
   // World revisions replace object identities frequently. Scene construction is
   // keyed by the actual actors/places instead, so a map refresh cannot reset a
   // citizen halfway through an authoritative travel segment.
-  const citizenKey = citizens.map((citizen) => `${citizen.id}:${citizen.palette}:${citizen.residentStyle??""}`).join(",");
+  const citizenKey = citizens.map((citizen) => `${citizen.id}:${citizen.palette}:${citizen.residentStyle??""}:${shapingAppearanceKey(shapingAppearances?.get(citizen.id))}`).join(",");
   const labelKey = labels.map((label) => `${label.id}:${label.label}:${label.x}:${label.z}:${label.height}`).join("|");
   const sceneryKey=JSON.stringify(sceneLocations?.map(place=>[place.location_id,place.presentation,place.areas?.map(a=>a.objects?.map(o=>o.object_id))]));
   const sceneLocationsRef=useRef(sceneLocations);sceneLocationsRef.current=sceneLocations;
@@ -338,7 +340,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const entries = new Map<number, CitizenEntry>();
     const now0 = performance.now();
     for (const citizen of citizens) {
-      const figure = createCitizenFigure(citizen.palette, citizen.id,citizen.residentStyle);
+      const figure = createCitizenFigure(citizen.palette, citizen.id,citizen.residentStyle,shapingAppearances?.get(citizen.id));
       const start = initialPositionsRef.current.get(citizen.id) ?? { x: MAP_W / 2, y: MAP_H / 2 };
       const world = mapToWorld(start.x, start.y);
       figure.group.position.set(world.x, 0, world.z);

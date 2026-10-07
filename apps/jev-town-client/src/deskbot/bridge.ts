@@ -15,6 +15,9 @@ import type {
   DeskBotRoleWishSnapshot,
   DeskBotPracticalTrialOperation,
   DeskBotPracticalTrialActionResponse,
+  DeskBotRoleStagePreview,
+  DeskBotRoleStageOperation,
+  DeskBotRoleStageActionResponse,
 } from "./types.ts";
 
 function cleanBaseUrl(value: string): string {
@@ -358,6 +361,21 @@ export function createPracticalTrialController(baseUrl:string,newEventId=()=>`ro
     const result=await controlPracticalTrial(proposalId,operation,eventId,variant,baseUrl);
     pending.delete(key);
     return result;
+  };
+}
+
+export async function fetchRoleStagePreview(proposalId:string,baseUrl=deskbotBaseUrl()):Promise<DeskBotRoleStagePreview> {
+  const result=await getJson<{preview:DeskBotRoleStagePreview}>(baseUrl,`/api/roles/proposals/${encodeURIComponent(proposalId)}/stage/preview`);
+  if(result.preview?.schema!=='deskbot.role-stage-preview.v1'||result.preview.proposal_id!==proposalId)throw new Error('形象预览与当前愿望不一致，请重新查看。');
+  return result.preview;
+}
+export function createRoleStageController(baseUrl:string,newEventId=()=>`role-stage-${crypto.randomUUID()}`) {
+  const pending=new Map<string,string>();
+  return async(proposalId:string,operation:DeskBotRoleStageOperation,binding:string):Promise<DeskBotRoleStageActionResponse>=>{
+    const key=JSON.stringify([proposalId,operation,binding]),eventId=pending.get(key)??newEventId();pending.set(key,eventId);
+    const result=await postJson<DeskBotRoleStageActionResponse>(baseUrl,`/api/roles/proposals/${encodeURIComponent(proposalId)}/stage/${operation}`,
+      {event_id:eventId,...(operation==='accept'?{preview_fingerprint:binding}:{stage_id:binding})},'角色阶段暂时没有更新。');
+    pending.delete(key);return result;
   };
 }
 

@@ -5,7 +5,8 @@ import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 import { roleDevelopmentReadModel, candidateDevelopmentContext } from './role-development.mjs';
 import { roleWishReadModel } from './role-wishes.mjs';
 import { practicalTrialReadModel, practicalTrialsReadModel } from './role-practical-trials.mjs';
-import { RoleProposalError } from './role-proposals.mjs';
+import { RoleProposalError, roleDirectionOverlay } from './role-proposals.mjs';
+import { roleStagePreview, roleStageReadModel, roleStagesReadModel } from './role-stages.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
 const EVIDENCE_NAMESPACE = 'role.evidence';
@@ -502,10 +503,30 @@ export function createRoleEvolution({
   }
 
   function wishView({ characterId = activeCharacter, at = now() } = {}) {
-    const model = roleWishReadModel(typeof worldSnapshot === 'function' ? worldSnapshot() : null, { actorId: characterKey(characterId), at: new Date(at).toISOString() });
+    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const model = roleWishReadModel(world, { actorId: characterKey(characterId), at: new Date(at).toISOString() });
+    const currentDirectionIds = canonicalCurrentDirectionIds(world, model.character_id, at);
     return { ...model, directions: model.directions.map(direction => ({ ...direction,
-      proposal_gate: roles.wishGate(direction, { characterId: model.character_id, at }),
+      proposal_gate: roles.wishGate(direction, { characterId: model.character_id, at, currentDirectionIds }),
     })) };
+  }
+
+  function canonicalCurrentDirectionIds(world, actorId, at = now()) {
+    const model = roleStagesReadModel(world, { actorId, at: new Date(at).toISOString() });
+    return Object.values(model.current ?? {}).filter(Boolean).map(stage => stage.direction_id);
+  }
+
+  function currentStages({ characterId = activeCharacter, limit = 10 } = {}) {
+    const actorId = characterKey(characterId, activeCharacter), world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const model = roleStagesReadModel(world, { actorId, at: now().toISOString() });
+    const current = Object.values(model.current ?? {}).filter(Boolean).map(stage => ({ ...clone(stage),
+      schema: 'deskbot.role-state.v1', origin: 'canonical_role_stage', character_id: stage.actor_id,
+      life: stage.label, stage_history: clone(stage.history ?? []),
+      overlay: roleDirectionOverlay(stage.direction_id, { label: stage.label, life: stage.label }),
+    }));
+    const legacy = roles.currentStages?.({ characterId: actorId, limit: 10 }) ?? [];
+    const selected = world?.role_stages?.schema === 'deskbot.role-stages.v1' ? current : [...current, ...legacy];
+    return selected.slice(0, Math.min(Math.max(Number(limit) || 10, 1), 10));
   }
 
   function wishProposals({ characterId = activeCharacter, status = null, limit = 50 } = {}) {
@@ -537,7 +558,30 @@ export function createRoleEvolution({
     const available = proposal.status === 'prepared' && proposal.user_choice === 'try' && registered
       && Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time'
       && ['wetland_frog', 'workshop_maker', 'chef'].includes(proposal.direction_id) && !trial;
-    return { ...proposal, practical_trial: trial, practical_trial_connected: Boolean(trial), practical_trial_available: Boolean(available) };
+    const roleStage = roleStageReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
+    const preview = roleStagePreview(world, { proposal, at: now().toISOString() });
+    return { ...proposal, practical_trial: trial, practical_trial_connected: Boolean(trial), practical_trial_available: Boolean(available),
+      role_stage: roleStage, role_stage_preview: preview };
+  }
+
+  function stagePreview(proposalId) {
+    const proposal = roles.get(proposalId);
+    if (!proposal) return null;
+    return roleStagePreview(typeof worldSnapshot === 'function' ? worldSnapshot() : null, { proposal, at: now().toISOString() });
+  }
+
+  function reconcileRoleStage(proposalId, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null) {
+    const proposal = roles.get(proposalId);
+    if (!proposal || proposal.origin !== 'lived_wish') return proposal;
+    const stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+    if (!stage) return proposal;
+    const rolledBackAt = stage.status === 'rolled_back' ? stage.rolled_back_at : null;
+    const direction = rolledBackAt ? roleWishReadModel(world, { actorId: proposal.character_id, at: rolledBackAt }).directions.find(item => item.direction_id === proposal.direction_id) : null;
+    return roles.reconcileCanonicalStage(proposalId, stage, {
+      reason: stage.accept_event_id ? inputStore.get?.(stage.accept_event_id)?.payload?.reason ?? null : null,
+      rollbackReason: stage.rollback_event_id ? inputStore.get?.(stage.rollback_event_id)?.payload?.reason ?? null : null,
+      rootOutcomeIds: direction?.basis?.root_outcome_ids ?? [],
+    });
   }
 
   function reconcilePracticalExit(proposalId, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null) {
@@ -557,6 +601,12 @@ export function createRoleEvolution({
   function archive(proposalId, options = {}) {
     const proposal = roles.get(proposalId);
     const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const stage = proposal?.origin === 'lived_wish' ? roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() }) : null;
+    if (stage?.status === 'accepted') throw new RoleProposalError(409, 'role_stage_requires_rollback', '这份愿望已经采用为生活阶段，请先在阶段卡上回退；实际经历与材料后果会保留。');
+    if (stage?.status === 'rolled_back') {
+      reconcileRoleStage(proposalId, world);
+      return roles.archive(proposalId, options);
+    }
     const trial = proposal?.origin === 'lived_wish' ? practicalTrialReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() }) : null;
     if (trial && trial.status !== 'exited') throw new RoleProposalError(409, 'practical_trial_requires_exit', '请先退出这份实际试做，再归档愿望，实际任务和经历会保留。');
     if (trial?.status === 'exited') reconcilePracticalExit(proposalId, world);
@@ -574,6 +624,7 @@ export function createRoleEvolution({
       if (existing.origin !== 'lived_wish' || existing.character_id !== resolvedId || existing.direction_id !== directionId || !['proposed', 'prepared'].includes(existing.status)) throw new RoleProposalError(409, 'role_wish_proposal_conflict', '这个提案编号已经属于另一份记录，不能覆盖或重开');
       return { duplicate: true, proposal: existing };
     }
+    if (!direction?.proposal_gate?.eligible) throw new RoleProposalError(409, 'role_wish_not_ready', direction?.proposal_gate?.barriers?.map(item => item.label).join('；') || '这个方向暂不重提');
     const proposal = roles.propose(null, { characterId: resolvedId, proposalId: proposalId ?? nextWishId(resolvedId, directionId), now: at, livedWish: direction });
     return { duplicate: false, proposal };
   }
@@ -586,6 +637,9 @@ export function createRoleEvolution({
     }
     const model = wishView({ characterId: proposal.character_id });
     const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
+    if (choice === 'try' && proposal.user_choice !== 'try' && direction?.proposal_gate?.barriers?.some(item => item.id === 'direction_already_current')) {
+      throw new RoleProposalError(409, 'role_wish_direction_current', '这个方向已经是当前生活阶段，先继续实际生活。');
+    }
     if (direction) roles.refreshWish(proposalId, direction, { at: now() });
     return roles.choose(proposalId, choice, { reason });
   }
@@ -602,6 +656,11 @@ export function createRoleEvolution({
     return roles.startTrial(proposalId, options);
   }
 
+  function completeTrial(proposalId, options = {}) {
+    assertLegacyTrialCanStart(roles.get(proposalId));
+    return roles.completeTrial(proposalId, options);
+  }
+
   function nextWishId(characterId, directionId) {
     if (typeof roles.nextWishId === 'function') return roles.nextWishId(characterId, directionId);
     const base = `role-wish:${characterId}:${directionId}`;
@@ -616,6 +675,7 @@ export function createRoleEvolution({
     const model = roleWishReadModel(world, { actorId: characterId, at: at.toISOString() });
     const created = [];
     for (const proposal of roles.list({ characterId, limit: 200 })) {
+      if (proposal.origin === 'lived_wish') reconcileRoleStage(proposal.proposal_id, world);
       if (proposal.origin === 'lived_wish' && !proposal.practical_trial_exited_at
         && practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: characterId, at: at.toISOString() })?.status === 'exited') {
         reconcilePracticalExit(proposal.proposal_id, world);
@@ -628,7 +688,7 @@ export function createRoleEvolution({
         if (direction) roles.refreshWish(proposal.proposal_id, direction, { at });
       }
       for (const direction of model.directions) {
-        const gate = roles.wishGate(direction, { characterId, at });
+        const gate = roles.wishGate(direction, { characterId, at, currentDirectionIds: canonicalCurrentDirectionIds(world, characterId, at) });
         if (!gate.eligible) continue;
         const proposal = roles.propose(null, { characterId, proposalId: nextWishId(characterId, direction.direction_id), now: at, livedWish: direction });
         if (proposal) created.push(proposal);
@@ -638,7 +698,7 @@ export function createRoleEvolution({
       }
     }
     const materialized = model.directions.map(direction => {
-      const gate = roles.wishGate(direction, { characterId, at });
+      const gate = roles.wishGate(direction, { characterId, at, currentDirectionIds: canonicalCurrentDirectionIds(world, characterId, at) });
       const proposal = roles.list({ characterId, limit: 200 }).reverse().find(item => item.origin === 'lived_wish' && item.direction_id === direction.direction_id);
       const current = { ...direction, proposal_gate: gate, proposal_id: proposal?.proposal_id ?? null, proposal_status: proposal?.status ?? null };
       const stateFingerprint = fingerprint({ direction: direction.fingerprint, gate: { eligible: gate.eligible,
@@ -743,6 +803,7 @@ export function createRoleEvolution({
       wishes,
       practical_trials: { ...practicalTrialsReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: now().toISOString() }),
         available: Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time' },
+      role_stages: roleStagesReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: now().toISOString() }),
       evidence: evidenceList,
       pulls: pullList,
       candidates: candidateList,
@@ -766,8 +827,12 @@ export function createRoleEvolution({
     proposeWish,
     chooseWish,
     startTrial,
+    completeTrial,
     archive,
     reconcilePracticalExit,
+    reconcileRoleStage,
+    stagePreview,
+    currentStages,
     constants: {
       activeCharacter,
       evidenceNamespace: EVIDENCE_NAMESPACE,
