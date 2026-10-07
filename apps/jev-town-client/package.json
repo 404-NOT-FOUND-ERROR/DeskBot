@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "DeskBot world client based on Jev Town's 3D scene and interaction baseline.",
+  "description": "DeskBot Shaping Field: a persistent 3D companion world with thirteen residents, lived wishes, practical trials and reversible form/vocation stages. Based on Jev Town's scene and interaction baseline.",
   "engines": {
     "node": ">=20"
   },

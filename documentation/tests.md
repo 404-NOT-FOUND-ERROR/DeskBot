@@ -1,93 +1,89 @@
-# 测试覆盖图
+# 当前验证与实验
 
-本文件区分“仓库当前已经检查”与“建议但尚未完成”的证据。自动回归不是真实 DeepSeek、QWeather 或 ESP-VoCat 验收的替代品。
+**当前功能基线：v0.5 · 角色发展第 6 阶段，2026-10-07。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
-## Existing coverage
+## 最近完成的检查
 
-2026-10-04 第三步：服务回归 322 项、客户端回归 136 项通过；TypeScript 和 Vite 构建通过，Web JavaScript 语法检查通过。`world-map-content.test.mjs` 新增 19 项，覆盖非法目录、断开地理连接、迁移与保留任务、通路版本与幂等、到期封路、剩余路线重规划、合法扩建与重启、NPC 通路合法性和公开写入边界。`mapCatalog.test.ts` 新增 2 项，覆盖目录中的十个展示锚点与全部通路端点。
+| 范围 | 已完成结果 | 能说明什么 |
+| --- | --- | --- |
+| DeskBot 服务完整回归 | 649 项通过 | 世界、存档、资源、生活、来源、记忆、角色发展、设备与接口规则的回归基线 |
+| 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
+| 3D 客户端 | 39 套、259 项通过 | 读模型、控制、样本、场景和组合几何；不替代浏览器像素检查 |
+| 前端类型与生产构建 | 均通过 | 类型一致性和可构建性 |
+| SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
+| DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-本地 SQLite 一致性备份完整性为 `ok`；迁移副本保留主角、NPC、任务、时钟、互动计数和近期经历。浏览器验证 2D/3D 十地点、内部区域及物件展开；这些检查不证明后续苗况、库存、完整经济或长期文化已经实现。一次完整回归因系统临时分配到 Node fetch 禁用端口而失败，原有用例原样重跑后 322 项通过；没有为绕过它改变产品规则。详细证据见 [第三步验收](../research/milestones/companion-world-step3.md)。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)。本次文档整理不把已有回归快照写成重新运行结果。
 
-| 用例 | 规则/预期 | 证据 | 状态 |
-|---|---|---|---|
-| NPC Persona Agent | Persona 字段、Markdown 作者卡、Scene/关系提示词、HTTP 真实调用、fallback、重复请求幂等 | `npc-personas.test.mjs`、`world-life.test.mjs` | existing: local fake LLM |
-| 雾灯镇内容合同 | settlement、地点归属、Lore key、NevaMind NPC 字段、日程与世界事件模板和 canonical world 对齐 | `morrowmere-content.test.mjs`、`persistent-world*.test.mjs` | existing |
-| 内容包编译与第一天回放 | 只读校验作者包、故事目录来源、预览无副作用、五步 canonical 计划 | `content-packages.test.mjs`、`story-packages.test.mjs` | existing |
-| 路线投影与旅行动画 | 统一地点锚点、完整路线折线、中转点、端点、道路拐点和分段动画时长；版本漂移清除预览；未知地点使用坐标 fallback，不改变服务端事实 | `canonicalGeometry.test.ts`、`routeVisual.test.ts`、`deskbotBridge.test.ts` | existing: 26 targeted client cases |
-| 研究模拟墙钟 | 首次锚定、分钟余数、单次追赶上限、marker 中断恢复、SQLite 重启和 replay 幂等 | `persistent-world-clock.test.mjs` | existing: 5 cases；独立 simulation |
-| 生产实时钟与任务 | 北京时间午夜、停机校正、回拨保护、禁止快进、SQLite 恢复、任务控制、多段路线、封路核验、事务回滚、NPC 等待、HTTP 幂等与当地日期成长门槛、研究决策隔离 | `realtime-world.test.mjs` | implemented: 14 cases |
-| 真实旅行客户端 | 把最终目标交给服务端；出发不动画抵达、不立即执行后续路段；持续任务控制 | `realtimeTravel.test.ts` | implemented: 2 cases |
-| 输入与聊天幂等 | 相同 event/correlation 不重复回合；冲突返回错误 | `apps/deskbot-service/test/input.test.mjs`、`persistence-restart.test.mjs` | existing |
-| 喵呜提示词 | seed/profile/反应节拍/边界字段进入 prompt | `chat-orchestrator.test.mjs`、`persistent-world.test.mjs` | existing |
-| 角色试行表达覆盖 | 活动方向进入 prompt；用户回合 neutral 观察；同角色单活动试行 | `chat-orchestrator.test.mjs`、`role-proposals.test.mjs`、`role-proposals-http.test.mjs` | existing |
-| 旧世界迁移 | `ember-001`/旧名迁移到 canonical ID/喵呜且保留历史 | `persistent-world-migration.test.mjs` | existing |
-| 多源隔离 | 世界线、天气、用户偏好和设备事件按 route 分类，不自动播报 | `interaction-policy.test.mjs`、`multisource-prompt.test.mjs` | existing |
-| 天气缓存 | TTL、force、观测时间单调、v7/v1 字段和错误不泄密 | `weather-connector.test.mjs`、`context-sources.test.mjs` | existing |
-| P4-1 输入运行层 | 来源注册、TTL 到期判断、SQLite 状态恢复、失败退避、持久化失败隔离、canonical ingest callback 不被调度异常打断 | `input-runtime.test.mjs`、`weather-persistence.test.mjs` | implemented: 5 cases |
-| P4 角色方向 evidence polarity | `support/conflict/neutral` 分别加分/扣分/只审计；缺省 polarity 兼容为 support；仅 dialogue/user_profile 有 cue 邻接中文显式否定识别；支持证据单独计数与跨源门槛 | `fantasy-pull.test.mjs` | implemented: targeted polarity cases |
-| P4 角色演化闭环 | 独立来源聚合、日期提案门槛（生产为事件当地日期，研究为 UTC 观察日期）、候选/提案幂等物化、显式试行、仅用户聊天消耗试行回合、accepted 阶段提示词/表达/世界投影、SQLite 重启恢复、单句变形不越权 | `role-evolution.test.mjs`、`p4-acceptance.test.mjs`、`role-proposals-http.test.mjs`、`chat-orchestrator.test.mjs`、`world-life.test.mjs` | implemented |
-| P4 外部事件到世界候选 | observation 来源/evidence/provenance 保留、白名单动作、preview 无副作用、revision 冲突需重预览、显式 accept/dismiss、过期/幂等/重启恢复 | `world-candidates.test.mjs`、`world-candidates-http.test.mjs`、`p4-acceptance.test.mjs` | implemented: backend/API; no visual candidate panel or automatic news provider |
-| LLM 错误 | 不回显 provider body/secret；缺配置拒绝启动 | `llm.test.mjs` | existing |
-| 设备 outbox/ACK | 白名单命令、重复 ACK、冲突 ACK 和失败可解释 | `output-router*.test.mjs`、`device-*.test.mjs` | existing |
-| WebSocket/音频协议 | hello、能力协商、序列、hash、重连和播放边界 | `websocket-bridge.test.mjs`、`app-websocket.test.mjs`、`protocol-regression.test.mjs` | existing |
-| 研究场景 | 固定场景隔离、可回放、无虚构 L1b 距离 | `research-scenarios.test.mjs`、`research-sessions.test.mjs` | existing |
-| voice sidecar contract | ASR/TTS/cancel、超时、格式和错误 envelope | `voice-sidecar/tests/*`、`voice-sidecar-client.test.mjs` | existing |
-| 世界线结果到 Scene 分支 | outcome/status 选择 authored branch；相同 cause 不重复 | `world-life.test.mjs` | implemented: targeted |
-| NPC 多步目标 | 每 tick 一步；waiting/missed/failed 可重启恢复 | `npc-goals.test.mjs` | implemented: targeted |
-| 支线经历检索 | 相关 query 返回 source/evidence；不进入 confirmed memory | `shared-life.test.mjs` | implemented: targeted |
-| 共享生活连续性 | 承诺需显式确认并可重启恢复；关系趋势要求两条 mutation 证据；日报预览无副作用、空日不造事实、物化后可回读 | `shared-life-reports.test.mjs` | implemented |
-| CI | Node service test workflow | `.github/workflows/service-test.yml` | existing/configured |
+## 当前自动覆盖
 
-此前 Node 服务回归快照依次为 `145/145`、`180/180`、`186/186`、`194/194`、`216/216`、`223/223` 和 `244/244`。`244/244` 是 2026-09-30 P4 polarity / 世界候选增量之前的完整回归快照。当前 P4 工作区全量 Node service 回归为 `266/266`；Jev Town 客户端最近已知快照为 `16 files / 132 tests`，TypeScript 检查与生产构建通过；路线投影定向用例为 26 个。Python sidecar 本轮回归为 `16/16`（未把 provider 网络调用算作自动通过）。
+以下文件位于 `apps/deskbot-service/test/` 和 `apps/jev-town-client/tests/`。
 
-2026-09-30 P4 验证：role evidence polarity 与跨 UTC 事件日期提案门槛的定向测试 `13/13` 通过；完整 Node service 回归 `266/266` 通过，覆盖角色演化、proposal decision 原子提交、world candidate preview/accept、幂等和 SQLite 重启恢复。
+| 能力 | 主要覆盖 | 代表测试 |
+| --- | --- | --- |
+| 现实钟与持续任务 | 上海日期、停机校正、回拨保护、禁止生产快进、到期结算、重启和真实旅行 | `realtime-world.test.mjs`、`realtimeTravel.test.ts` |
+| 地图与环境 | 十地点目录、区域/物件、合法扩建、封路、重规划、天气与环境更新 | `world-map-content.test.mjs`、`world-environment.test.mjs`、`mapCatalog.test.ts`、`routeVisual.test.ts` |
+| 可感知场景 | 工作姿态、资源/项目读模型、风雨与昼夜、家庭和工作灯光、光粒居民造型 | `activityProjection.test.ts`、`sceneWorkplace.test.ts`、`domesticLights.test.ts`、`shapingFigures.test.ts` |
+| 自主生活与供给 | 有限候选、需要优先、真实任务、库存预留、生态恢复、错开生产、帮助与食物交接 | `autonomous-life.test.mjs`、`living-resources.test.mjs`、`life-supply-cycle.test.mjs`、`supply-coordination.test.mjs`、`supply-help.test.mjs` |
+| 居民与关系 | Persona、有限目标、邀约、约定、共同生活与三个长期项目 | `npc-personas.test.mjs`、`social-life.test.mjs`、`resident-projects-domain.test.mjs`、`shared-life-reports.test.mjs` |
+| 多源折射 | 来源权限、TTL、过期、失败退避、消息去重与重启、有限新闻和区域空气 | `input-refraction.test.mjs`、`input-runtime.test.mjs`、`external-connectors.test.mjs`、`inputInfluences.test.ts` |
+| 共同记忆与发展维度 | 事实/消息/理解分层、同根去重、建议与实际结果区分、主动/受邀实践、条件困难 | `lived-memory.test.mjs`、`development-causality.test.mjs`、`development-facets.test.mjs`、`development-facets-integration.test.mjs` |
+| 有依据的愿望 | 前提、冻结依据、冷却、主人回应、旧关键词/聊天旁路限制、事实校准 | `role-wishes.test.mjs`、`role-wish-lifecycle.test.mjs`、`role-wishes-http.test.mjs`、`role-wish-chat-guard.test.mjs` |
+| 实际试做 | 原任务准入、当前方式及回顾窗口的主要成功、两上海日、缺料与失败区分、暂停/调整/退出、预留释放与重载 | `role-practical-trials.test.mjs`、`role-practical-trials-http.test.mjs`、`rolePracticalTrials.test.ts` |
+| 阶段采用与回退 | 只读预览、指纹过期、双轴组合、封存试做、当前阶段回退、重试与恢复、实际生活候选 | `role-stages.test.mjs`、`role-stages-http.test.mjs`、`roleStages.test.ts`、`roleStageFigures.test.ts` |
+| 表达一致性 | 当前双轴、历史不冒充当前、单方向与组合问答、屏幕/mock TTS/outbox 共用答语 | `role-stage-expression.test.mjs`、`role-wish-fact-guard.test.mjs`、`role-practical-expression.test.mjs` |
+| 身体与输出协议 | 登记能力、可信感知、未知壳、坐标、受限 yaw、ACK、失败、过期和重启 | `body-perception-domain.test.mjs`、`body-perception-http.test.mjs`、`body-device-config.test.mjs`、`websocket-bridge.test.mjs` |
+| 网络与配置 | provider 错误不泄露上游正文/密钥、天气缓存、配置重载、音频工件与 sidecar 合同 | `llm-http-error.test.mjs`、`weather-persistence.test.mjs`、`voice-sidecar-client.test.mjs`、`audio-artifacts.test.mjs` |
 
-2026-09-11 运行态检查：`4311/health` 与 `4322/health` 均通过；服务实际加载 `openai-compatible-v0.1`。本次 PowerShell 对 `api.deepseek.com:443` 的直接连接被 Windows socket 权限策略拒绝，真实聊天因此返回 `502 llm_transport_error`；这不是 DeepSeek HTTP 错误。未加载 QWeather 环境文件时，天气状态明确为 `open-meteo / disabled`，不能把历史天气快照记为当前连接成功。
+历史研究回放、旧角色方向与世界候选也保留兼容测试。它们不能替代现版本的实际生活愿望与试做门槛。
 
-2026-09-16 运行态修订：沙箱外 DeepSeek 直连最小请求返回 HTTP 200；最新服务真实聊天返回 HTTP 202。角色样本验证了融合式功能话语、猫式开场、低风险代选、情绪承接、世界生活细节和“机会/悬念未观测前不得当作事实”的规则。当前服务 PID 由启动时动态分配，验收时以 `/health` 和当次请求为准；天气仍明确为 `open-meteo / disabled`。
+## 复现检查
 
-2026-09-21 Persona Agent 修订：首轮 NPC 草稿若不满足 60-180 个中文字符、1-2 个短段落及“直接回应 + 具体物件/动作 + 人物判断 + 小选择”，或触发设定说明、客服套话、抽象词堆叠，会最多进行一次窄范围改写；若改写仍不合格，则丢弃两次模型草稿并使用 authored persona fallback。测试分别锁定合格首稿只调用一次模型、重复 interaction 不二次调用、坏稿触发二稿以及二稿失败回退。地图读模型继续验证 `toy_zone/prop_icon/material/signature_props`，Web 静态检查覆盖五种摆件 class 与移动 NPC 抽屉样式。
+从仓库根目录运行，使用 Node.js 24 或更新版本。先在 `apps/jev-town-client` 安装前端依赖。
 
-2026-09-18 当前运行复核：按 `scripts/start-local.ps1 -StartWeb` 以现有 DeepSeek/QWeather 配置重启后，`4311/health`、`4322/health` 和页面静态资源均返回 200；真实 `/api/chat` 使用 `openai-compatible-v0.1` 返回带具体桌面物件和小选择的喵呜样本；QWeather 当前观测刷新 `accepted=true,cached=false`，分钟/小时/每日预报分别返回 24/24/7 条；NPC Persona Agent 实际返回带路标、歪耳朵杯子、变色小路标和小动作选择的潮痕巡路员台词。voice-sidecar 仍未运行，浏览器视觉点击验收仍需可用浏览器或人工完成。
+```powershell
+npm.cmd --prefix apps/deskbot-service test
+npm.cmd --prefix apps/jev-town-client test
+npm.cmd --prefix apps/jev-town-client run typecheck
+npm.cmd --prefix apps/jev-town-client run build
+```
 
-## Proposed tests
+单独重现第 6 阶段的完整隔离样本：
 
-| 用例 | 类型 | 通过条件 | 状态 |
-|---|---|---|---|
-| 十类喵呜真实 DeepSeek 样本 | guarded live + manual review | utility/character/grounding/presence/variety 五项全 1 | partial: representative samples pass; full matrix open |
-| 正式 QWeather v7/v1 刷新 | guarded live integration | 真实观测/预报、TTL、失败旧快照均可解释 | partial: current QWeather live smoke passed; v1/长期失败恢复仍 open |
-| 认证和局域网暴露 | automated integration + security review | 未认证请求拒绝，Origin/速率/设备密钥有效 | proposed |
-| CosyVoice/真实 ASR | guarded live + hardware | 20 回合一次且仅一次、延迟和播放失败可回放 | proposed |
-| ESP-VoCat 真机 | hardware integration | hello、speak、expression、ACK、断线恢复 | proposed |
-| 纵向角色变化 | manual longitudinal study | P2-P4 evidence/revision/阶段档案可完整回放 | proposed |
-| 世界候选处置流程 | automated integration + manual review | 隔离数据库中完成 observation -> candidate -> preview -> accept/dismiss；预览无 mutation，accept 产生单次可回查 ledger 写入 | proposed |
-| 跨日门槛的日期语义 | automated regression + design review | 明确使用 UTC observation date 还是 canonical world logical day；边界、时区、重放结果固定且可回归 | proposed |
+```powershell
+node scripts/review-role-stages.mjs
+```
 
-## Gaps
+启动正式客户端后，可在 `/development-review.html?sample=stages` 查看样本。脚本重新走第 4 阶段的实际路线和配方前置经历，再进入独立 SQLite。样本只有一个活动个体，十二位居民暂停，初始有限库存、次日需要与苗床条件是明确的受控条件。两种方向各产生两个上海日的主要成功，共四项主要结果与十二个新共同结果，没有直接插入完成成果。
 
-- **高风险：** 当前无认证/授权/速率限制测试；禁止把 `0.0.0.0` 当作生产配置。
-- **高风险：** QWeather 已有本轮真实观测和 24/24/7 预报 smoke，但长期失败恢复与 v1 兼容仍未形成稳定证据；真实语音出站仍未运行。DeepSeek 角色样本已在本轮重启后再次验证。
-- **高风险：** 固件 agent 尚未提供真实设备 ACK、播放和断线证据。
-- **中风险：** `expression_intent` 尚未驱动真实屏幕/TTS 三端一致性。
-- **中风险：** P2-P4 角色方向 API、有限试行、accepted `role-state.v1` 和临时表达覆盖已实现；跨天稳定主动性、真实阶段演化和外壳映射尚未实现。
-- **中风险：** 世界候选只有后端 API，尚无候选观测/处置面板或自动新闻 provider；UTC 日期门槛与虚拟世界 `logical_time` 尚未统一。
+九种样本是 `prepared`、`first-result`、`ready-preview`、`adopted-form`、`adopted-combination`、`ordinary-life`、`restart`、`rollback-form`、`rollback-vocation`。实验不导入正式世界，也不强制正式角色产生愿望或采用形态。
 
-## Merge gate
+其他隔离入口：
 
-合并到 `main` 至少要求：Node CI 通过、无密钥/SQLite/音频/临时输出、接口变化附迁移说明；角色表达变化还需附真实模型人工记录，硬件协议变化需通知固件 agent。
-# 2026-09-16 shared-life verification
+```powershell
+node scripts/review-body-perception.mjs --smoke
+node scripts/review-body-perception.mjs
+```
 
-NPC editor follow-up: 157/157 passing, including frontend request mapping, priority order, empty input and maximum-alternative validation. JS syntax check passed; `/npc-goal-editor.js` returned HTTP 200 and proxied goal API returned successfully. Browser permission review timed out, so rendered desktop/mobile layout and actual browser clicks remain unverified. No live NPC goal was installed by verification.
+身体样本通过模拟设备真实经过 WebSocket、命令下发与延迟 ACK，界面为 `/body-review.html`。模拟回执不证明真实感知、屏幕、底座或中文播放已接通。
 
-NPC deployment verification follow-up: the running backend now exposes `/api/life/npc-goals` directly and through port 4322, both returning an empty goals array. Page HTTP 200; real DeepSeek chat returned successfully; QWeather refresh returned accepted=true, cached=false, condition=阴, temperature_c=27. No NPC goal was installed by this smoke test. This supersedes the earlier deployment-blocked status, but is not a browser visual test or live NPC goal lifecycle test.
+部署复核先读取 `/health`、`/api/model/status`、`/api/input-runtime`、`/api/life/body` 与 `/api/roles/evolution`。HTTP 成功、旧天气快照或配置存在，都不能单独证明本次模型/来源连通或实体动作成功。
 
-NPC finite-goal follow-up: 156/156 passed. Tests cover waiting for canonical evidence, persisted pause/resume, single execution across reload, reservation/cancellation, failed-goal blocking, and replay of a persisted immutable decision after interrupted delivery. Tests do not validate an open-ended planner, LLM-generated goals, or longitudinal NPC experience. Goal creation remains opt-in through API.
+## 实验效果的解释
 
-Plan admission follow-up: 153/153 tests pass. Covers read-only domain preview, sequential NPC dependency, exclusive resource conflict and cancellation release, malformed steps and missing fields, plus runtime failure blocking. Future plans may still fail after manual world edits; installation validation is not a guarantee against later state changes.
+第 1–6 阶段已验证同一共同结果可以进入生活、兴趣/能力、愿望、试做与阶段，而不是各自维护一套经验值。采用会改变有限日常选项和同一 3D/表达投影；回退不删除经历。受控跨日样本验证了这些规则可执行。
 
-Memory follow-up: 151/151 passing. Added old-note retrieval beyond 20 records, cross-character ID protection, SQLite-persisted deletion boundary, and HTTP chat checks proving previous user text and assistant paraphrases are excluded after correction/deletion. This validates prompt inputs, not guaranteed model behavior or deletion from historical audit records.
+此前供给阶段完成十四日加速规则实验，发展维度阶段完成三日隔离实验；它们证明有限规则在指定条件下运作，不等于正式世界自然经过这些天。早期普通循环实验也有未达到多情境稳定兴趣、未形成愿望的结果。不能只展示成功样本就宣称人格或愿望已自然涌现。
 
-Follow-up: 149/149 tests passed after Web authoring and cancellation support. Added cross-source candidate threshold and cancellation/reload coverage. Frontend `node --check` passed. Deployed backend with existing local credentials; proxied memory/plan GETs returned successfully, page HTML contains the panel, real DeepSeek chat succeeded, and QWeather refresh returned accepted=true with a new observation. Browser visual/click validation remains blocked by `unsupported Codex auth method: apikey`. No sample plan or test memory was installed in the live database.
+第 6 阶段尚未完成实际浏览器像素与新截图验收，本机自动化初始化失败。现有 2026-10-05 场景图片应按独立美术预览阅读。有限真实模型状态摘要没有发送完整存档、个人记忆或真实对话，也不能证明长期表达质量。
 
-`npm.cmd --prefix apps/deskbot-service test`: 148 passed, 0 failed.
-New `shared-life.test.mjs` checks SQLite restart persistence, explicit memory confirmation, revision, character isolation, physical note deletion, prompt inclusion, real HTTP memory-to-chat wiring, scheduled NPC-to-ledger wiring, cross-day clock simulation, bounded catch-up, duplicate prevention, and failure blocking. Test databases are isolated temporary files. These checks do not establish long-term user experience quality, real model memory recall quality, or deployed availability on port 4311. The running user service was not restarted in this change.
+## 后续验收
+
+| 工作 | 需要形成的证据 |
+| --- | --- |
+| 第 7 阶段真实声音 | 中文 ASR/TTS 连通、同一答语、人工试听、延迟、一次回合与播放失败恢复 |
+| 第 8 阶段真实身体 | 小智固件适配后的触摸、触屏、双麦方向、地磁、屏幕和受限单轴动作；回执与实测分别记录 |
+| 第 9 阶段长期观察 | 正式 1:1 时间连续 7–14 天的供给、关系、兴趣、愿望、反复行为和模型开销；据实际结果拓展地图、职业和居民 |
+| 当前视觉与表达体验 | 正式浏览器的昼夜、风雨、工作灯、阶段预览/组合/回退；连续真实对话中来源与状态可读、信息完整 |
+
+阶段顺序与后续计划见 [v0.5 路线](../research/development-roadmap-v0.5.md)，历史细节见 [第 2 阶段供给](../research/milestones/community-supply-stage2.md)、[第 3 阶段维度](../research/milestones/role-development-stage3.md)、[第 4 阶段愿望](../research/milestones/role-development-stage4.md)、[第 5 阶段试做](../research/milestones/role-development-stage5.md) 与 [第 6 阶段采用](../research/milestones/role-development-stage6.md)。

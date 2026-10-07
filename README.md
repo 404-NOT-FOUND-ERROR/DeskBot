@@ -1,118 +1,72 @@
-# DeskBot / 聚形域软件端
+# DeskBot · 聚形域
 
-**角色发展第 6 阶段（2026-10-07）：** 实际跨日试做后的原愿望与主人确认，共同支持采用虚拟形态或生活职业。荷叶青蛙、工坊学徒和灶边厨师使用有限造型与生活选项；两个轴可以组合，预览只读，确认核对当前结果，回退保留另一轴与已发生的经历。正式地图读取同一外观版本，表达区分虚拟造型和实体外壳。见 [阶段验收](research/milestones/role-development-stage6.md) 与 [角色阶段规则](research/world/role-stages-v1.md)，九种隔离样本为 `/development-review.html?sample=stages`。
+**让同一个桌边个体拥有持续的生活。**
 
-**角色发展第 5 阶段（2026-10-06）：** 准备愿望接入原自主生活候选与真实任务，核验路线、材料、需要和跨日结果；可暂停、调整、继续与退出。界面显示主要练习、准备步骤和受阻原因，结果不自动等于喜欢、资格或变身。九种隔离 SQLite 样本验证控制与重载，正式世界继续按现实时间运行。见 [阶段验收](research/milestones/role-development-stage5.md) 与 [实际试做规则](research/world/role-practical-trials-v1.md)，验收页面为 `/development-review.html?sample=trials`。
+DeskBot 是面向 ESP 喵伴本体与旋转底座的桌宠软件实验。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系；你可以参与它的生活，生活也会留下后果。
 
-**角色发展第 4 阶段（2026-10-06）：** 持续兴趣、具体配方实践与当前生活条件连接原角色提案，形态与职业分轴；支持准备、暂缓、拒绝、撤回和有冷却的新经历重提。主人支持不会开始聊天试用或改变外观。八种 SQLite 隔离样本和七日普通循环分别验证生命周期与未满足前提的情况。见 [阶段验收](research/milestones/role-development-stage4.md) 与 [愿望规则](research/world/role-wishes-v1.md)，验收页面为 `/development-review.html?sample=wishes`。
+**当前产品基线：v0.5 · 角色发展第六阶段（2026-10-07）。** 已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
 
-当前产品目标：让同一个桌边个体在伴生奇幻世界持续生活；多源输入和主人互动影响其选择，实际实践逐渐形成兴趣与角色愿望，再通过可逆试用改变生活角色、外观和表达。形态与职业可以组合，保留识别锚点，成功、喜欢、能力和想成为各有含义。后续开发按 [v0.5 九阶段管线](research/development-roadmap-v0.5.md) 推进。
+## 现在可以体验什么
 
-**角色发展第 3 阶段（2026-10-06）：** 同一批经历分别呈现接触、主动继续、受邀实践、具体配方能力和规则自评，连接正常生活候选、有限模型摘要和原侧栏。旧兴趣分保留为历史记录，条件失败不扣成能力不足；主人促成的真实实践也可作为能力依据。三日 SQLite 隔离实验与重载已验证，尚未建立主动角色愿望。见 [验收与实验边界](research/milestones/role-development-stage3.md) 和 [分维度规则](research/world/development-facets-v1.md)，独立页面为 `/development-review.html?sample=facets`。
+| 能力 | 当前表现 |
+| --- | --- |
+| 持续生活 | 喵呜与十二位居民共用现实 1:1 时钟，按需要和可行条件选择生活。出行、工作、吃饭、休息和约定都有耗时与持久状态，关闭网页不暂停服务中的世界。 |
+| 有后果的世界 | 五个地区、十个地点，含内部区域、设施与通路。取水、净滤、育苗、收获、制种、制作、炖餐和搬运使用有限资源；库存、预留、失败与恢复都有记录。 |
+| 社会生活 | 居民可以相遇、邀请、搭手、交换、赴约、分享食物。苔团的浮圃、扣扣的小泵和锅粒的叶芽汤通过实际任务推进；其他居民仍有待进一步实现的私人项目。 |
+| 现实折射 | 天气、新闻、区域空气质量和主人互动保留来源、时效与影响依据，进入有限生活选择。本机已配置上海天气；其他 agent 有输入边界，尚未接入真实外部 agent 服务。 |
+| 可感知的奇幻场景 | 低多边形小镇中的光粒居民、实际任务动作、苗床与水位细节、风雨和连续昼夜。窗灯与店招在深夜渐息，公共照明与正在工作的设施分别处理。 |
+| 记忆与发展 | 世界事实、听闻和个人理解分别保存。兴趣接触、主动继续、受邀实践、需要、具体配方能力和规则自评读取同一批真实结果，重试与重启不重复增加经历。 |
+| 愿望与实际试做 | 满足生活前提后提出有依据的形态或职业愿望。主人可以支持、暂缓或拒绝；支持后仍需真实路线、材料、耗时与跨日实践，不能凭一句对话完成变身。 |
+| 可逆角色阶段 | 荷叶青蛙、工坊学徒、灶边厨师为当前有限方向。形态与职业分轴组合；实际试做符合条件后先预览，再明确采用。生活候选、表达、地图和 3D 共用当前版本；回退保留另一轴、经历与既成后果。 |
+| 交流与身体软件 | DeepSeek 对话与有限闲时目标选择；同一核对后的答语进入屏幕、模拟 TTS 和设备文字队列。触摸、触屏、声源方向、换壳与受限单轴转头已有软件协议和隔离模拟。 |
 
-**角色发展第 1 阶段（2026-10-05）：** 实际任务、居民项目、约定与记忆已共享结果根；原角色方向能读取相同实践，主人促成的真实行动也可追溯。重复视图、重复输入和重启不叠加次数。生活侧栏展示前因、行动和结果，`/development-review.html` 提供五种隔离样本。能力分维度已在第 3 阶段接入，主动愿望和实际试用留待后续阶段。见 [验收图与实验效果](research/milestones/role-development-stage1.md) 和 [共同证据规则](research/world/development-evidence-v1.md)。
+例如，照料湿地和苗圃的经历可能支持「想试着成为荷叶青蛙」的愿望；灶边做饭的经历可能支持「想成为灶边厨师」。当前阶段需要原愿望、当前试做方案在两个上海日留下的主要成功，以及主人明确确认。成功、喜欢、有能力、想成为分别判断，采用也不会赠送材料或技能。
 
-**角色发展第 2 阶段（2026-10-05）：** 十三人的生活供给增加有限光果来源、实际采集和炖餐，整锅饭进入长桌，采收与厨房错开安排，送饭约定需实际吃完才兑现。地图显示枝上果实、搬运篮、饭碗和正在工作的锅气，侧栏区分可取、携带与预留。原苗床、浮圃、项目和共同经历继续使用；没有补发旧存档食物。见 [供给验收与实验边界](research/milestones/community-supply-stage2.md)，独立规则回放为 `/life-review.html?sample=supply`。
+这些选择由程序设计的生活规则与前置条件约束。DeepSeek 可以参与对话，并从服务提供的有限候选中选择闲时目标；路线、资源、任务结算、身份与世界事实由服务核验。当前能力不能等同于完全自发的人格演化。
 
-这是《聚形域》桌宠实验装置的软件工作区。当前目标不是做一个通用聊天产品，而是跑通并记录以下可审计链路：
+## 场景与形象
 
-```text
-多源输入
-  -> Node 持续世界与角色状态
-  -> DeepSeek 对话与有限目标选择
-  -> 文字 / 表情 / TTS 表达意图
-  -> Web 与 ESP-VoCat 客户端
-```
+聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-## 目录
+![十三位光粒居民的首批造型，独立陈列预览](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 
-- `apps/deskbot-service`：唯一在线状态源、SQLite 持久化、世界逻辑、LLM 编排、天气连接器和设备桥。
-- `apps/deskbot-web`：研究与体验界面，只读取和调用服务端 API，不保存第二份世界状态。
-- `apps/jev-town-client`：基于 CeciliaW888/jev-town 的 3D 世界体验客户端；读取世界地图、场景与实际任务，表现聚形域的光粒居民和持续生活，并调用服务端核验的生活互动。
-- `voice-sidecar`：无状态 ASR/TTS 边界；当前基线不代表真实中文模型性能。
-- `research`：研究协议、实验设计与接口说明。
-- `tmp`：源码审阅副本、下载和临时产物，不进入 Git。
+![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-角色当前阶段名为“喵呜”。“聚形域”是它的持续世界背景，不是每句话都必须使用的修辞。用户输入可以影响角色方向，但不能用一句话直接改写角色、外壳或世界事实。
+图片为 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光；不是第六阶段的新截图，也不代表正式世界中发生了十三人聚会。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
-## 当前执行基线
+## 当前完成范围
 
-- **第九步身体软件回合（2026-10-05）**：触摸、触屏、声源方向和校准换壳进入持久身体状态；表情与受限单轴转头经过同一输出队列，发送、设备报告、失败、过期和模拟回执分别显示。正式页面显示简短身体状态，独立 `/body-review.html` 可运行八种隔离 WebSocket 场景。当前小智固件尚未适配，本轮未刷机；开环设备报告不冒充实测角度。见 [身体协议](research/protocol/body-perception-v1.md)、[验收图与边界](research/milestones/companion-world-body-perception.md) 和 [小智固件结构及后续适配](research/hardware/body-bridge-audit-v0.1.md)。
-- **居民长期职业项目（2026-10-05）**：苔团的浮圃、扣扣的小泵和锅粒的叶芽汤开始通过真实任务持续推进。备料、制作、携带、不同居民的实际检查或试吃，以及 6/12 小时观察门槛都有持久记录；缺料、暂停、取消和失败保留既成阶段。验收成果能继续生长收获、缩短取水时间或按配方复做，地图和居民详情显示同一份状态。见 [项目规则与边界](research/world/resident-projects-v1.md) 和 [验收记录](research/milestones/companion-world-resident-projects.md)。其余九名居民的私人项目仍是作者愿望。
-- **持续生活补给循环（2026-10-05）**：水岸泉眼有有限原水与缓慢补充；角色可以实际出行、汲水净滤、携带并补给厨房/苗圃。收获的一部分能制种并存回育苗架，收获和餐食可进入共用库存。新增活动仍使用真实耗时、预留材料、失败退款与重启恢复。见 [补给循环验收](research/milestones/companion-world-supply-cycle.md)；这不是完整经济，也不保证当前单块苗床足够供养全部居民。
-- **聚形域视觉更新（2026-10-05）**：保留低多边形小镇，新增喵呜与十二位居民的光粒首批造型、任务驱动动作、设施细节、连续昼夜与渐息灯火；生活侧栏整理为清楚的当前活动、居民近况、约定与记忆。见 [图文说明与预览边界](documentation/shaping-field-visual-life.md)，独立美术预览为 `/scene-review.html`。
-- 第一至第六步已完成基本世界合同、现实 1:1 时钟、分层地图、实际设施、天气表现与有限资源。十三名角色共用规则生活循环；邀请、协作、交换、赴约与关系后果使用真实事务记录。见 [第六步验收](research/milestones/companion-world-step6.md) 与 [社会生活规则](research/world/social-life-v1.md)。
-- 第七步已接入现实输入折射：上海天气、对话和有限生活建议影响下一次空闲选择，保留出处、暂缓理由与实际任务引用。本地已启用 DeepSeek Flash 对话、NASA Science 新闻与上海区域空气质量。其他 agent 等待真实来源，设备联调仍属第九步。见 [第七步验收](research/milestones/companion-world-step7.md)、[输入折射规则](research/world/input-refraction-v1.md) 与 [外界来源配置](research/milestones/external-input-configuration.md)。独立专项为 `/life-review.html?sample=inputs`。
-- 第八步已接入三种长期记忆、关系沉淀、可逆兴趣积累与 DeepSeek 空闲目标选择。需要、任务、路线、材料和实际结果仍由世界核验；模型解释是意图，不是已经完成的经历。私人对话记忆留在本地，自动选择只引用有限镇内记录与公开消息。见 [第八步验收](research/milestones/companion-world-step8.md)；独立七日回放为 `/life-review.html?sample=memory`，不能代替正式世界真实经过七天。
-- 首批造型与场景效果由客户端创作。有限方向的主动愿望、实际生活试做与可逆阶段采用已接入。当前形态和职业配件是作者定义的闭集 3D 造型；开放生成、真实声音与实机换壳继续按 [v0.5 当前路线图](research/development-roadmap-v0.5.md) 推进。
+当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-![十三位光粒居民的首批造型：独立陈列预览，不代表正式聚会](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。后端完整 649 项回归及最终 37 项专项复核通过；前端 39 套、259 项测试、类型检查与生产构建通过。三个公开虚构状态摘要完成真实 DeepSeek 调用验证。样本与有限对话验证不代替正式世界连续 7–14 天的自然生活观察；第六阶段尚未完成新的浏览器截图验收。详见 [本阶段验收与实验边界](research/milestones/role-development-stage6.md)。
 
-![午夜小镇：普通窗灯与店招渐息，公共路灯保留，独立时间预览](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
+下一阶段是 **真实中文声音接入与人工试听**，随后进行真实身体联调、长期观察及内容扩展。完整安排见 [v0.5 开发路线](research/development-roadmap-v0.5.md)。
 
-这两张图来自只读美术预览。实际生活界面、傍晚苗圃、夜间工作的照明例外及全部截图说明见 [聚形域：让持续生活看得见](documentation/shaping-field-visual-life.md)。预览中的时间、天气和编排动作不写入正式世界。
+## 本地运行
 
-- 工程架构与交接索引：[`documentation/architecture.md`](documentation/architecture.md)
-- 伴生世界居民重设计：[`research/npcs/resident-life-design-v1.md`](research/npcs/resident-life-design-v1.md)
-- 地图内容目录：[`world-content/companion-world/map.v1.json`](world-content/companion-world/map.v1.json)；2D 与 3D 都读取 `GET /api/world/map`，内部区域与物件可展开查看。
-- 角色与世界决策记录：[`research/聚形域-角色与世界决策记录_2026-09-09.md`](research/聚形域-角色与世界决策记录_2026-09-09.md)
-- 喵呜角色验收：[`research/miaowu-expression-acceptance-v0.1.md`](research/miaowu-expression-acceptance-v0.1.md)
-- 喵呜角色表演：[`research/miaowu-roleplay-bible-v0.1.md`](research/miaowu-roleplay-bible-v0.1.md)
-- 喵呜 Soul 人格基线：[`research/soul/miaowu-soul-v0.1.md`](research/soul/miaowu-soul-v0.1.md)
-- GitHub P1 里程碑：[`research/milestones/software-baseline-p1.md`](research/milestones/software-baseline-p1.md)
-- P2 奇幻吸引里程碑：[`research/milestones/p2-fantasy-pull-v0.1.md`](research/milestones/p2-fantasy-pull-v0.1.md)
-- 服务与固件接口：[`research/protocol/interaction-contract-v0.1.md`](research/protocol/interaction-contract-v0.1.md)
-
-`research/development-roadmap-v0.1.md` 至 `research/development-roadmap-v0.3.md` 是历史计划及实现记录，不再作为当前排期依据。第一至第八步的资料继续保留。角色提示词或状态结构变更只有在自动测试和真实模型人工验收都通过后，才算完成。
-
-## 首次配置
-
-需要 Node.js 24 或更高版本；只有运行 voice-sidecar 测试或启动 sidecar 时才需要 Python 3.10+。
-
-从公开仓库 clone 后，在仓库根目录创建本机配置副本：
+需要 Node.js 24+。首次下载后，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
-```
-
-只在 `config\llm_config.json` 填写自己的 DeepSeek key。真实配置文件已被 Git 忽略，不能提交。
-
-需要和风天气时再创建：
-
-```powershell
-Copy-Item config\weather.env.example config\weather.env
-notepad config\weather.env
-```
-
-将 `DESKBOT_WEATHER_URL` 的 `YOUR_API_HOST` 换成和风控制台提供的 API Host，并把 token 填入本机文件。天气文件只允许 `DESKBOT_WEATHER_*` 变量，启动时通过 `-WeatherEnvFile` 显式加载。配置字段、优先级和 v7/v1 选择见 [`config/README.md`](config/README.md) 与 [`documentation/variables.md`](documentation/variables.md)。
-
-启动前不需要设置 `setx`，也不要把 key 放进网页、事件 JSON、命令行 URL 或日志。`scripts/start-local.ps1` 优先读取仓库内 `config\llm_config.json`；仅为兼容当前工作站，才回退到 `DeskBotClaude\foundry-bench\llm_config.json`。公开 clone 不应依赖这个旧路径。
-
-## 本地运行
-
-从仓库根目录启动服务、研究页面与 3D 世界客户端：
-
-```powershell
+Push-Location apps\jev-town-client
+npm.cmd install
+Pop-Location
 .\scripts\start-local.ps1 -StartWeb -StartWorld
 ```
 
-生活世界：<http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311>。研究界面：<http://127.0.0.1:4322/>。Jev Town 接入来源、授权范围和发布清单见 [接入说明](documentation/jev-town-adoption.md)。
+在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-脚本优先读取本地 `config\llm_config.json`，默认加载已有的 `config\weather.local.env`；新闻和区域空气质量连接器默认开启。上海 Open-Meteo 天气是当前工作站配置，公开 clone 需自行配置城市。配置方法见 [本地配置](config/README.md)。可显式指定天气文件：
+| 入口 | 用途 |
+| --- | --- |
+| [3D 生活世界](http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311) | 日常生活、居民、场景、交流与角色发展 |
+| [研究界面](http://127.0.0.1:4322/) | 状态、来源、任务、记忆与控制查看 |
+| [角色阶段验收](http://127.0.0.1:5173/development-review.html?sample=stages) | 九种隔离样本；不写入正式世界 |
+| [生活规则回放](http://127.0.0.1:5173/life-review.html) | 生活、供给、现实输入、记忆与协作专项 |
+| [场景预览](http://127.0.0.1:5173/scene-review.html) | 只读昼夜、天气与居民美术预览 |
+| [身体软件验收](http://127.0.0.1:5173/body-review.html) | 需独立 `4313` 样本服务的隔离设备模拟；不代表真实硬件完成适配 |
 
-```powershell
-.\scripts\start-local.ps1 -StartWeb -StartWorld -WeatherEnvFile (Resolve-Path config\weather.env)
-```
-
-启动脚本检查 `4311/4322/5173` 端口与健康状态；已有端口占用会直接失败。`GET /health` 仅证明服务就绪，天气与模型是否接通需查看相应连接器状态。数据库中的旧观测不能代替当前有效天气。若聊天返回 `llm_transport_error`，先检查本机网络、TLS 和代理配置。
-
-独立预览与规则回放：
-
-- `/scene-review.html`：昼夜、风雨、居民近景和动作编排；只读，不写入正式世界。
-- `/life-review.html`：三日生活与协作、延期专项。
-- `/life-review.html?sample=inputs`：现实输入折射专项。
-- `/life-review.html?sample=memory`：七日记忆与兴趣积累专项，使用标注的测试模型。
+身体验收还需从仓库根目录运行 `node scripts/review-body-perception.mjs`；它使用独立实例，不能用正式设备或正式世界代替模拟样本。
 
 停止本次本地服务：
 
@@ -120,45 +74,28 @@ notepad config\weather.env
 .\scripts\stop-local.ps1
 ```
 
-## 测试与公开打包
+启动脚本检查 `4311/4322/5173` 端口，拒绝把占用端口当成新服务。模型、天气与设备是否连通，应查看各自状态；`/health` 就绪不等于所有外部能力已接通。原 Jev Town 模式仍保留，DeskBot 体验使用上表中的 `mode=deskbot` 链接。
 
-在提交或打包前，从仓库根目录执行：
+## 工程与资料
 
-```powershell
-Set-Location apps\deskbot-service
-npm.cmd test
-Set-Location ..\..\voice-sidecar
-python -m unittest discover -s tests -v
-Set-Location ..
-git diff --check
-git check-ignore -v config\llm_config.json config\weather.env apps\deskbot-service\data\deskbot.sqlite
-```
+| 路径 | 内容 |
+| --- | --- |
+| [deskbot-service](apps/deskbot-service/README.md) | Node.js + SQLite 唯一世界状态源、规则执行、模型编排与设备桥 |
+| [deskbot-web](apps/deskbot-web/README.md) | 服务驱动的研究与体验界面 |
+| `apps/jev-town-client` | React + Three.js 3D 客户端与独立验收页面 |
+| [voice-sidecar](voice-sidecar/README.md) | 无状态 ASR/TTS 接口基线，真实语音待接入 |
+| [当前设计与实现](documentation/design-implementation-map.md) | 已完成能力、实现对应和剩余工作 |
+| [架构](documentation/architecture.md) · [流程](documentation/flows.md) | 状态边界、生活与角色发展链路 |
+| [验证](documentation/tests.md) · [自动运行](documentation/automation.md) | 验证方法、连接器与服务运行 |
+| [居民设计](research/npcs/resident-life-design-v1.md) · [地图目录](world-content/companion-world/map.v1.json) | 生活角色与地图内容 |
+| [阶段规则](research/world/role-stages-v1.md) · [身体协议](research/protocol/body-perception-v1.md) | 角色采用、回退与后续硬件适配 |
 
-生成公开源码包（不包含 `.git`、`tmp`、依赖、SQLite/WAL、日志、音频、模型、真实配置和 `dist`）：
+`research/milestones` 保存各次交付的验收与实验记录；v0.1–v0.4 路线图为历史资料，当前排期以 v0.5 为准。
 
-```powershell
-.\scripts\package-source.ps1
-```
+开发检查可分别在 `apps/deskbot-service` 执行 `npm.cmd test`，在 `apps/jev-town-client` 执行 `npm.cmd test`、`npm.cmd run typecheck` 与 `npm.cmd run build`。语音接口检查需要 Python 3.10+，在 `voice-sidecar` 执行 `python -m unittest discover -s tests -v`。角色效果还需要真实模型与实际体验验收。
 
-默认输出到 `dist\DeskBot-source-<UTC 时间>.zip`。可用 `-OutputDirectory` 和 `-ArchiveName` 指定位置/文件名；脚本在压缩前会再次按路径规则过滤敏感和运行时文件，并输出包含文件数量和 SHA-256 的 manifest。`dist/` 本身被 Git 忽略，源码包需通过 GitHub Release 或其他制品渠道单独发布。
+公开仓库只保存源码、规则、配置模板和验收资料。本地密钥、数据库、音频、缓存及运行日志不提交。`scripts/package-source.ps1` 可生成排除这些文件的源码包。
 
-## GitHub 交付边界
+## 3D 来源
 
-仓库公开基线只包含可审阅源码、接口合同、研究文档、配置模板、测试和启动脚本。真实 key、SQLite、音频/模型缓存、下载的第三方源码、固件产物和本机日志不属于公开包。CI 会在涉及服务、sidecar、配置模板、文档或脚本时运行对应回归；当前 workflow 不调用 DeepSeek、QWeather 或真实硬件。
-
-## 提交门槛
-
-每次服务端修改至少执行：
-
-```powershell
-Set-Location 'C:\Users\Administrator\Desktop\Jeremy\DeskBot\apps\deskbot-service'
-npm.cmd test
-```
-
-涉及用户体验时，还要在真实 DeepSeek 下检查任务、事实、陪伴、玩笑与边界场景。自动测试只能证明合同没有破坏，不能替代角色效果验收。
-
-## GitHub 使用边界
-
-建议把本工作区作为软件仓库根目录。提交 `apps`、`voice-sidecar`、`research` 和必要的非敏感接口文档；不提交 SQLite、音频、模型缓存、密钥、本地配置、下载副本或生成式硬件产物。固件由独立 agent 维护，双方只通过版本化接口合同对齐。
-
-仓库启用分支保护后，合并条件至少包括 `DeskBot service tests` 通过、无密钥变更、接口变更附迁移说明，以及用户可见行为附人工验收记录。
+3D 客户端以 [CeciliaW888/jev-town](https://github.com/CeciliaW888/jev-town) 的场景与交互基线为起点，并接入 DeskBot 持续世界、生活规则及聚形域居民造型。来源与授权记录见 [接入说明](documentation/jev-town-adoption.md) 和 [授权记录](apps/jev-town-client/AUTHORIZATION.md)；依赖项与上游归属继续保留。

@@ -1,83 +1,51 @@
-# 设计定义与实现对照
+# 聚形域：现版本能力与设计对照
 
-## 2026 年 10 月伴生世界主线
+**当前功能基线：v0.5 · 角色发展第 1–6 阶段，2026-10-07。** v0.5 是开发路线编号；各软件包保留自身版本号。完整路线见 [开发管线](../research/development-roadmap-v0.5.md)。
 
-当前执行路线为 [v0.4](../research/development-roadmap-v0.4.md)。前三步已实现规则合同、现实同步时钟与持续任务、十个地点及区域与对象目录、可变通路和共同路线判断。物件尚无资源和设施状态，十二名居民尚未部署，自主试行仍待后续开发。输入分类辅助函数不授予世界写权限。以下 v0.7 表格继续记录此前实现能力，旧的 P4.1 排期由新路线接替；第三步当前边界见 [验收记录](../research/milestones/companion-world-step3.md)。
+DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活在伴生于现实的奇幻空间“聚形域”，现实输入影响它的处境与选择，实际行动留下资源、关系和记忆后果。兴趣逐渐发展；重要形态变化则经由有前提的角色愿望、真实试做和明确采用发生。
 
-**版本：** v0.7
-**更新日期：** 2026-09-30
+当前软件已把世界、生活、记忆、角色发展与可逆 3D 形象接在同一份存档上。声音与实体身体仍是后续交付。
 
-这份文件把《聚形域》的体验设计定义和软件当前实现放在同一张可审计的对照表中。设计定义是产品与论文讨论的约束；实现状态只根据仓库源码、测试和当前运行检查填写，不能把计划或旧日志当成已完成能力。
+## 当前能力
 
-## 核心定义
+| 体验与设计要求 | 已实现能力 | 实现位置与实际边界 |
+| --- | --- | --- |
+| 不在线时，它仍在过日子 | 上海现实 1:1 时钟、持续旅行和活动、停机校正、SQLite 恢复 | `realtime-world.mjs`、`persistent-world.mjs`；任务按真实截止时间结算，研究加速回放使用独立存档 |
+| 有具体地方和可以改变的处境 | 十个地点、区域与物件目录、合法扩建、通路阻断和重规划 | `world-map-content.mjs`；地图可扩展，规则与路线仍由服务端决定 |
+| 场景能看出天气、时间和正在发生的生活 | Low-poly 小镇、昼夜与风雨、苗床和水岸状态、工作动作、傍晚至午夜的逐步熄灯 | `three/sceneEnvironment.ts`、`sceneLife.ts`、`sceneWorkplace.ts`；工作照明与居民状态连接，3D 读取世界而不反向制造成果 |
+| 主角和居民有自己的安排 | 喵呜与十二名居民共十三个生活角色，有限需要、兴趣、关系、日程与合法行动候选 | `autonomous-life.mjs`、`life-choice.mjs`、`npc-personas.mjs`；程序生成可执行选项，模型参与有界选择，仍保留规则回退 |
+| 做事有代价和后果 | 苗床、浮圃、取水、采集、搬运、制作、烹饪、库存与设施；多人错开供给，邻居可分享实际存在的食物 | `living-resources.mjs`、`life-planning.mjs`；材料预留、时间和容量必须满足，不发放无限物资 |
+| 关系是一起经历过的事 | 邀约、约定、交易、帮助、共同结果，以及苔团浮圃、扣扣小泵、锅粒叶芽汤三个居民项目 | `social-life.mjs`、`resident-projects.mjs`、`shared-life.mjs`；已有后果持续保存，尚未实现完整城市经济和自治政治 |
+| 现实折射进伴生世界 | 天气、NASA Science 消息、区域空气、主人互动与身体输入按来源、时效和作用权限进入 | `input-refraction.mjs`、`external-connectors.mjs`、`input-runtime.mjs`；外部消息保留出处，新闻不是亲历，也不能直接创建资源或身份 |
+| 记忆区分“发生过”和“听说过” | 世界事实、他人消息、个人理解分层；任务、项目、关系与发展维度共用结果根 | `lived-memory.mjs`、`development-evidence.mjs`；同一结果不重复计算，模型回复不循环变成外部证据 |
+| 兴趣、能力和愿望不是一个总分 | 分开记录接触、自主继续、受邀实践、具体表现、条件困难、需要与规则自评 | `development-facets.mjs`；主人建议能促成实践，建议本身不能证明能力或稳定兴趣 |
+| 它有理由提出想成为谁 | 当前生活满足兴趣、准备、处境、冷却等前提后，保存形态或职业愿望及冻结依据 | `role-wishes.mjs`、`role-evolution.mjs`；单句“变成青蛙”不会直接改形态，旧关键词草稿不能替代新生活愿望 |
+| 先试着生活，再决定采用 | 原愿望进入实际试做，复用自主生活、路线、配方、耗时、材料和结果；支持暂停、调整、退出 | `role-practical-trials.mjs`；成功、喜欢与资格分开，准备旅行和聊天回合不算主要成功 |
+| 外观跟随选择，并能看见和回退 | 荷叶青蛙、工坊学徒、灶边厨师；形态与职业双轴组合，纯预览、明确采用、版本历史和按轴回退 | `role-stages.mjs`、`tests/roleStageFigures.test.ts`；两上海日的两项实际主要成功是采用前提之一，回退保留材料、任务、记忆和关系 |
+| 始终能认出是同一个个体 | 虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒；当前双轴同时进入生活、表达和正式地图 | `world.role_stages` 是唯一当前阶段权威；有限作者制作造型，尚无开放图像、几何或外壳生成 |
+| 说话有特色，信息也清楚 | DeepSeek Flash 对话、来源与生活上下文、有限闲时选择；明确发展状态提问经事实校准后统一供屏幕、mock TTS 和设备文字使用 | `prompt-composer.mjs`、`chat-orchestrator.mjs`、`role-wish-fact-guard.mjs`；模型不能直接写世界，有限状态校准不能保证所有对话都可靠 |
+| 现实身体能力如实表达 | 头部触摸、触屏、双麦方向与磁识别的软件合同，受限单轴转头意图、outbox 与 ACK、失败和过期记录 | `body-perception.mjs`、[固件审计](../research/hardware/body-bridge-audit-v0.1.md)；实机仍是未适配的小智固件，软件模拟不证明物理执行 |
 
-| 设计定义 | 当前软件落点 | 状态与边界 |
-|---|---|---|
-| 聚形域是持续世界背景与演化机制，不是每句话都故弄玄虚 | `world-definition.mjs`、world context、角色提示词 | 已实现基础框架；实际表达仍由 LLM 生成，需用真实 DeepSeek 做人工验收 |
-| 当前第一角色叫“喵呜”，猫型潮玩外壳只是阶段形态，不是永久身份 | canonical `protagonist`、`miaowu-expression-seed-v4`、角色 Soul/roleplay bible | 已写入角色/世界决策文档；accepted role-state 阶段档案可持久化并投影到普通表达；自动换壳仍未实现 |
-| 雾灯镇是聚形域中的具体小镇，地图与内容包提供第一版生活舞台 | `DEFAULT_SETTLEMENT`、`GET /api/world/map`、`src/content-packages.mjs`、`world-content/settlements/morrowmere/` | 已实现 canonical settlement、地点归属、只读内容编译和「雾灯镇第一天」有限回放；内容包不是第二事实源，NPC 仍保持 NevaMind 式结构；更丰富的世界自动生活仍需继续扩展 |
-| 喵呜是会主动选择奇幻生活方式的潮玩生命体 | `research/soul/miaowu-soul-v0.1.md`、`character-seed.mjs`、`fantasy-pull.mjs`、`role-evolution.mjs`、`role-proposals.mjs`、`prompt-composer.mjs`、`shared-life-reports.mjs` | 已实现规则化方向聚合、持久 evidence/pull/候选/运行记录、跨 UTC 日期提案门槛、显式试行与阶段档案，以及表达/Scene 倾向投影；真实跨日主动性、长期人格体感和外壳变化仍未实现 |
-| 功能信息必须内生于角色的日常嘴皮子，不能先中性回答再追加人设 | `prompt-composer.mjs`、`miaowu-expression-seed-v4`、角色圣经 v0.2 | 已实现融合式话语编译与禁止后台汇报规则；真实 DeepSeek 仍需人工验证连续体感 |
-| 持续世界要以“今日影响 / 眼前机会 / 未解钩子”进入生活，而非只存标题摘要 | world-line canonical event、interaction policy、Web 世界线编辑器、`DESKBOT_LIVED_WORLD` | 已实现可选字段、持久化、展示、编辑和 prompt 生活切片；现存旧事件需人工追加这些字段后才有强体感 |
-| 多源输入影响喵呜的方向选择，不能由单句命令或其回复直接改人格/外壳 | `evidence-ledger.mjs`、`fantasy-pull.v0.4`、`role-evolution.mjs`、`role-proposals.mjs` | 已过滤 assistant、语音、传输、服务和设备输出；方向证据支持/冲突/中性分型，只有支持证据计入至少 3 条、2 个来源和 UTC 事件日门槛，净分按支持减冲突；中文显式否定识别仅用于 dialogue/user_profile。日期桶不使用 canonical `logical_time`；真实长期演化仍需纵向人工验收 |
-| 外界 observation 不应直接改写虚拟世界，合法后果必须可预览、可追溯、受控提交 | `world-candidates.mjs`、`previewWorldMutations()`、`persistentWorld.ingest()`、`/api/world/candidates` | 后端世界候选桥已实现：来源 observation 只能导出有限 mutation 白名单；preview 不改 canonical world，accept 检查 revision 并走统一 ingest/ledger。当前无候选可视化面板，也没有自动新闻 Provider |
-| 世界环境由世界规则和明确 mutation 改变，不由 LLM 正文直接写入 | persistent world、mutation ledger、world matches、world candidate bridge | 已实现 canonical world 和只追加 ledger；候选入场后仍需显式接受；复杂世界线事件和新的自动外部 provider 仍是后续能力 |
-| NPC 能在有限生活中自主挑选下一步，但不能越过世界规则 | `npc-agent-loop.mjs`、`npc-goals.mjs`、`GET /api/life/npc-agents` | 已实现 NevaMind 风格候选/选择/执行分层；每 NPC 每逻辑槽一次、只允许相邻 hop、决策可持久化/回放；accepted 角色阶段已进入 world-life 的 `role_context` 和 Scene 选择上下文；开放式目标生成、跨天成长仍未实现 |
-| 时间、天气、外部事件、用户偏好、关系事件和设备状态是不同来源 | `/api/context`、`/api/input-runtime`、`input-runtime.mjs`、weather connector、event/evidence stores | 来源分层与输入运行层已实现；天气实时/小实时/小时/每日缓存可恢复，四类天气来源独立调度；来源运行有持久化结果 event ID 与规范化错误。外部事件可经标准 API 进入候选层，但尚无自动新闻抓取 Provider |
-| 外部天气应缓存慢更新，用户明确要求“最新/实时”时才强制刷新 | weather connector TTL、`input-runtime.mjs`、`/api/connectors/weather/refresh`、聊天天气意图 | 已实现当前天气及短临/小时/每日预报缓存、SQLite 重启恢复和后台到期检查；显式最新请求仍强制刷新；实际 provider 是否可用取决于服务端 token/Host |
-| 文字、屏幕和未来 TTS 必须共享同一个表达意图 | `expression-intent.mjs`、`expression_intent` / output plan、device outbox 合同 | 已有版本化意图及 text/screen/TTS consumer 字段；真实 TTS、屏幕和固件 ACK 闭环尚未验收 |
-| 固件只负责采集、播放和显示，不持有世界、人格或 API key | `interaction-contract-v0.1`、WebSocket bridge、outbox | 合同和桥接已实现；真实固件由独立 agent 维护，不能据此宣称真机闭环 |
+表中的文件名指向 `apps/deskbot-service/src/` 或 `apps/jev-town-client/src/`；测试文件位于客户端 `tests/`。结构关系见 [架构](architecture.md)，执行过程见 [关键流程](flows.md)。
 
-## 当前可验证状态
+## 角色改变如何连接持续生活
 
-### 2026-09-29 P3/P3.1 基线（历史测试快照）
+一个湿地照料方向先要有实际经历。接触话题、主人邀请、亲自做过和后来主动继续，会分别进入同一结果体系的不同维度。有了持续兴趣与准备依据，喵呜才提出“想试着成为荷叶青蛙”的愿望；主人支持后，真正进入照料和水岸实践。
 
-- DeskBot service 回归为 `244/244`；新增的内容包、跨日 `world-life.replay()`、NPC Agent Loop、NPC 有限目标、共同经历、记忆/承诺/日报、角色演化闭环和重启幂等均在隔离 SQLite 测试中通过。P4 验收覆盖跨来源候选到提案、显式试行到 accepted、普通对话与 Scene 上下文投影，以及 SQLite 重启恢复。Agent 决策与 goal 的绑定、重启对账、稳定探索脉冲和日志清理也有回归覆盖。
-- Jev Town 客户端 `16 files / 132 tests` 通过，`npm run typecheck` 与生产 `npm run build` 通过。客户端路线定向测试覆盖 26 个用例。
-- 路线视觉代码级闭环已完成：`canonicalGeometry.ts` 为当前聚形域地点提供稳定道路锚点，`routeVisual.ts` 根据服务端路径构造完整折线、分段动画、中转点和目的地标记；地点标签、喵呜/NPC 位置、路线折线、分段动画和到达提示共用同一投影。服务端仍拥有邻接、成本、阻断和 mutation 权威；未知地点保留安全的坐标 fallback，不会改变世界事实。路线版本漂移或失效时客户端会清除预览。
-- 当前仍需人工验收桌面/移动端的路线观感与缩放，以及路线中转点、完整折线、到达提示和版本失效清除；记忆更正后的后续回调、承诺做到/错过/取消、日报预览/物化差异和关系趋势 evidence 的可读性也待人工验收。自动测试不等于证明长期生命感。
+当前试做方式在当前回顾窗口内、两个上海日期完成至少两项主要成功，且回顾为 `repeated_actual_success`、原愿望仍匹配并已获得支持时，才开放纯预览。明确采用后，同一阶段增加日常的苗圃与水岸候选，并在正式 3D 与表达中出现。它仍要吃饭、休息、遵守已有约定，不能因为角色称号而绕过材料或自动获得技能。
 
-### 2026-09-30 P4 角色与世界候选实现
+职业走同一条路径。荷叶青蛙与灶边厨师可以共存；回退蛙形只恢复形态轴，灶边职业继续。已经消耗的食材、一起做过的饭和关系结果都保留。这是程序设计的、有依据的选择机制；目前尚不能据此宣称模型自然产生稳定喜好或职业资格。
 
-- 角色方向路径：结构化动态方向可与内置方向一起聚合；证据、pull、candidate 与 run 均带规则版本并持久化。角色候选表示潜在生活方向，不是世界事实；提案不自动开始试行，试行不自动 accepted。
-- 提案的“跨日”门槛在当前代码中按来源事件 `occurred_at` / `observed_at` 转成 UTC 日期统计，不代表基于 canonical 世界时钟的两日生活。这一边界已如实记录，后续可统一世界日定义。
-- 世界候选路径：符合类型的 observation 可产生受限候选，保留来源、evidence、provenance、动作指纹与预览；revision 改变后再次 preview 会更新验收基线。显式 accept 才会经 `persistentWorld.ingest()` 写世界。
-- 当前 P4 自动验证代码覆盖方向 evidence polarity、显式用户否定与外部事实不做否定猜测、支持证据门槛、两日 UTC 事件日期门槛、过滤非用户证据、API 别名、世界候选无副作用预览、刷新 revision、陈旧 revision 拒绝、过期/撤销、接受幂等和重启恢复；见 [`tests.md`](tests.md) 及 [`p4-role-evolution-world-candidates.md`](p4-role-evolution-world-candidates.md)。本段不声明当前服务进程、真实新闻源或浏览器界面已验收。
-- 人工待验收：真实 DeepSeek 下连续多日方向体感与试行完成体验；使用隔离/测试数据库走通 observation -> world candidate -> preview -> accept/dismiss -> mutation/evidence 回查；观察世界变化是否自然且不把外部输入生硬播报。当前无候选可视化面板、无自动新闻抓取 Provider。
-- 下一道门是 P4.1：为角色候选与世界候选准备清楚的观测/处置界面或可复现验收入口，统一 UTC 发生日与 canonical logical day 的策略，并完成纵向人工样本；之后再进入 P5 的真实屏幕/TTS 消费，P6 固件闭环与 P7 可装配外壳。
+## 验证与当前边界
 
-## 2026-09-18 NPC 与桌面潮玩叙事增量
+- 后端完整回归 649 项通过，最终表达、重试与实际生活接入的补充专项复核 37 项通过；前端 39 套、259 项测试、类型检查和生产构建通过。
+- 第 6 阶段九种隔离 SQLite 样本复用实际路线与配方，展示准备、一次结果、预览、采用、组合、普通生活、重启与两次回退。样本使用明确的受控初始条件，没有导入正式存档。
+- DeepSeek Flash 对三种公开虚构有限状态摘要完成真实调用，范围是未采用、已采用与部分回退；不是完整连续聊天或真实 TTS 验收。
+- 当前阶段的浏览器自动化初始化失败，尚未完成新阶段的像素和截图验收。仓库现有 2026-10-05 美术截图是此前独立场景预览，不能充当第 6 阶段的正式运行截图。
+- 尚待真实中文 ASR/TTS、ESP 喵伴与旋转底座适配、实体外壳映射，以及 7–14 天自然连续生活观察。地图、职业、居民和世界规则将根据这些观察继续扩展。
 
-- `npc-personas.mjs` 与 `research/npcs/*.md` 建立了“作者 Markdown -> 运行时 Persona 投影”的人物构造边界；首发 NPC 的欲望、爱憎、恐惧、口癖和触发点不再只存在于固定回复函数里。
-- NPC HTTP 互动已接入 `llm.complete()`，提示词包含当前 Scene、地点、关系和最近共同经历；模型只返回台词，世界事实仍由 `npc_interaction` mutation 写入。重复互动直接重放，不二次调用模型。
-- NPC Agent 有明确 fallback，因此 fake/offline 环境仍可运行，但真实 DeepSeek 人物质量仍需人工长对话验收。
-- 首发地点与 Scene 已改写为桌边潮玩生活语言；客户端地图节点增加“小世界/摆件区域”语义与地点图标。此增量改善视觉和叙事方向，但还不是完整美术重制。
-- 地图读模型现在稳定暴露 `toy_zone`、`prop_icon`、`material`、`signature_props`，回归测试会锁定这些字段，避免客户端退回只有抽象地点名的状态。
-- 视觉 token v0.2 已同步到研究文档和游玩层样式：木桌/软垫/彩胶材质、深青灰正文、紫/珊瑚强调色、明确字号层级和 `4/8/12/18/24px` 间距；研究台与游玩层继续分离。
+详情见 [测试与实验](tests.md)、[第 6 阶段验收](../research/milestones/role-development-stage6.md) 与 [阶段规则](../research/world/role-stages-v1.md)。
 
-- Node 服务默认绑定 `127.0.0.1:4311`，Web 默认绑定 `127.0.0.1:4322`。
-- 直接执行 `npm.cmd start` 时，若没有 `DESKBOT_LLM_*`，LLM 会合法地退回 `fake-llm-v0.1`；这不是 DeepSeek 失败响应。
-- DeepSeek 可从 `DESKBOT_LLM_CONFIG` 指向的本地 JSON 读取；API key 不得进入源码、网页、日志或 Git。
-- QWeather 只有在 `DESKBOT_WEATHER_ENABLED=true`、经纬度、有效 Host 和 `DESKBOT_WEATHER_TOKEN` 同时存在时才算 configured。SQLite 中的旧快照只是历史数据，不等于本次实时连接成功。
-- Web 是服务代理和展示层；它不保存第二份世界状态，也不能替服务端补充缺失的密钥。
-- `voice-sidecar` 当前是可插拔边界/基线，不等于真实 ASR/TTS 已经运行；表达意图字段已能提供给未来 TTS/屏幕消费者，但未形成真实音频和固件动作证据。
+## 历史材料
 
-## 认知规则
-
-1. 设计目标、计划路线和代码实现必须分别标注；“有接口”不等于“已接通”。
-2. 运行状态以本次 `/health`、`/api/context`、连接器状态和真实请求为准；旧日志只作为历史证据。
-3. provider、模型、天气 Host/token、数据库和进程属于部署状态，不写进角色世界或用户可见回复。
-4. 任何角色演化都必须有证据、规则版本、方向候选和可回放记录；LLM 正文没有 canonical world 写权限。
-5. 普通对话不暴露候选、分数、模式、阶段、试行或 overlay；研究 UI 可以读取完整审计数据。
-
-## 2026-09-15 表达修订
-
-- 修复 `conversation.reply` 反向强化角色方向的证据污染。
-- 世界线事件新增 `daily_consequence`、`opportunity`、`unresolved_hook`，Web 可分别编辑和回看。
-- prompt 分出后台审计数据与近端表演层；活动方向压成唯一第一人称生活倾向，不再把多张候选卡送给模型。
-- 新验收核心是“功能是否长在角色语言里”“世界是否以具体生活而非状态摘要出现”，以及“疲惫或脆弱时是否先陪住对方，而不是变成任务管理器”。猫叫不设机械次数配额；世界询问禁止用“没有记录/不能编”的审计口吻抢走叙事。
-- 2026-09-28 人格校准：新增可执行的陪伴契约与按场景检索示例；疲惫时允许一两句后停住，安排任务只给可挪动草案，变形先共同试用新生活再轻放外壳边界。DeepSeek 采样温度默认 0.55，可用 `DESKBOT_LLM_TEMPERATURE` 调整；这只改善表达变化，不代表长期关系或角色演化已验收。
-
-## 本轮故障记录
-
-2026-09-11 检查时 4311/4322 均无监听进程，当前 PowerShell、用户和机器环境均没有 `DESKBOT_*` 变量。因此直接启动会使用 Fake LLM、默认 Open-Meteo 且天气 disabled。DeepSeek 本地配置文件仍存在；QWeather token 未在当前环境中发现，不能宣称天气已连接。统一启动脚本见 [`scripts/start-local.ps1`](../scripts/start-local.ps1)。
+[v0.4 路线](../research/development-roadmap-v0.4.md)、[P4 角色方向与世界候选](p4-role-evolution-world-candidates.md) 和各阶段验收记录保留历史实现与实验背景。旧的聊天试行、UTC 事件日期门槛和三居民基线不再作为当前角色发展方式。

@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#edf0df" />
-    <title>聚形域 · DeskBot</title>
+    <title>DeskBot · 聚形域研究与体验</title>
+    <meta name="description" content="DeskBot v0.5 第六阶段：查看持续生活、现实输入、任务与记忆，以及角色愿望、实际试做和可逆虚拟阶段。" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -43,7 +44,7 @@
 
           <section class="card forecast-card game-panel floating-panel wide-panel" data-game-panel="weather" hidden><button class="panel-close" type="button" aria-label="关闭">×</button><div class="card-heading"><div><p class="eyebrow">桌外天气</p><h2>天气预报</h2></div><span id="forecast-status" class="mini-pill muted">尚未读取</span></div><p class="forecast-note">短临、小时和每日预报慢慢更新；你明确问“最新”时，喵呜才会再去看一眼。</p><div class="forecast-grid"><section class="forecast-column"><div class="forecast-column-heading"><strong>眼前一小时</strong><span id="forecast-minutely-status">未请求</span></div><div id="forecast-minutely" class="forecast-list"><span>等待短临数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>接下来几小时</strong><span id="forecast-hourly-status">未请求</span></div><div id="forecast-hourly" class="forecast-list"><span>等待小时数据</span></div></section><section class="forecast-column"><div class="forecast-column-heading"><strong>未来几天</strong><span id="forecast-daily-status">未请求</span></div><div id="forecast-daily" class="forecast-list"><span>等待每日数据</span></div></section></div></section>
 
-          <section class="card appearance-card game-panel floating-panel" data-game-panel="appearance" hidden><button class="panel-close" type="button" aria-label="关闭">×</button><div class="card-heading"><div><p class="eyebrow">它现在选择怎样出现</p><h2>这一身壳衣</h2></div><span id="appearance-state" class="mini-pill ok">第一形态</span></div><div class="appearance-row"><div class="character-portrait" aria-hidden="true"><div class="portrait-ears"><i></i><i></i></div><div class="portrait-head"><div class="portrait-screen"><i></i><i></i></div></div><div class="portrait-body"><span class="portrait-lobe lobe-a"></span><span class="portrait-lobe lobe-b"></span><span class="portrait-lobe lobe-c"></span><span class="portrait-lobe lobe-d"></span><b class="portrait-button"></b></div></div><div class="appearance-copy"><strong id="appearance-silhouette">读取中…</strong><p id="appearance-anchor">—</p><small id="appearance-generation">下一身壳衣得等喵呜自己真正想穿</small></div></div></section>
+          <section class="card appearance-card game-panel floating-panel" data-game-panel="appearance" hidden><button class="panel-close" type="button" aria-label="关闭">×</button><div class="card-heading"><div><p class="eyebrow">现实桌边的识别锚点</p><h2>实体外壳</h2></div><span id="appearance-state" class="mini-pill ok">第一形态</span></div><div class="appearance-row"><div class="character-portrait" aria-hidden="true"><div class="portrait-ears"><i></i><i></i></div><div class="portrait-head"><div class="portrait-screen"><i></i><i></i></div></div><div class="portrait-body"><span class="portrait-lobe lobe-a"></span><span class="portrait-lobe lobe-b"></span><span class="portrait-lobe lobe-c"></span><span class="portrait-lobe lobe-d"></span><b class="portrait-button"></b></div></div><div class="appearance-copy"><strong id="appearance-silhouette">读取中…</strong><p id="appearance-anchor">—</p><small id="appearance-generation">虚拟角色阶段单独记录，实体外壳需实机识别与校准</small></div></div></section>
 
           <section class="card voice-card game-panel floating-panel" data-game-panel="voice" hidden><button class="panel-close" type="button" aria-label="关闭">×</button><div class="card-heading"><div><p class="eyebrow">喵呜的声音</p><h2>声音计划</h2></div><span id="voice-pill" class="mini-pill muted">未配置</span></div><div class="voice-row"><div class="voice-icon">◒</div><div><strong id="voice-profile">shaping-neutral</strong><p id="voice-description">声音还在等一副合适的耳朵。</p></div></div><div class="voice-plan"><span>当前说话气质</span><strong id="voice-style">balanced</strong><span class="plan-note">声音设备准备中</span></div><div class="research-only voice-raw" id="voice-raw">语音连接细节等待读取…</div></section>
 
@@ -56,7 +57,7 @@
 
         <form id="chat-form" class="composer game-composer"><label class="sr-only" for="message-input">输入消息</label><span class="composer-avatar" aria-hidden="true">喵</span><textarea id="message-input" rows="1" maxlength="2000" placeholder="想对喵呜说什么，或者想让它做什么？" required></textarea><button id="send-button" class="send-button" type="submit" aria-label="发送"><span>发送</span><span class="send-arrow">↗</span></button></form>
 
-        <nav class="game-dock" aria-label="世界面板"><button class="active" type="button" data-panel-target="story"><span>▤</span>故事</button><button type="button" data-panel-target="map"><span>⌖</span>摆件</button><button type="button" data-panel-target="npc"><span>♟</span>邻居</button><button type="button" data-panel-target="state"><span>◉</span>脾气</button><button type="button" data-panel-target="world"><span>✦</span>异闻</button><button type="button" data-panel-target="memory"><span>▥</span>旅记</button><button type="button" data-panel-target="weather"><span>☁</span>天气</button><button type="button" data-panel-target="appearance"><span>◇</span>壳衣</button><button type="button" data-panel-target="context"><span>◎</span>桌外</button></nav>
+        <nav class="game-dock" aria-label="世界面板"><button class="active" type="button" data-panel-target="story"><span>▤</span>故事</button><button type="button" data-panel-target="map"><span>⌖</span>摆件</button><button type="button" data-panel-target="npc"><span>♟</span>邻居</button><button type="button" data-panel-target="state"><span>◉</span>脾气</button><button type="button" data-panel-target="world"><span>✦</span>异闻</button><button type="button" data-panel-target="memory"><span>▥</span>旅记</button><button type="button" data-panel-target="weather"><span>☁</span>天气</button><button type="button" data-panel-target="appearance"><span>◇</span>实体</button><button type="button" data-panel-target="context"><span>◎</span>桌外</button></nav>
       </section>
 
       <section id="worldline-lab" class="research-only worldline-lab card">
@@ -272,7 +273,7 @@
         </details>
         <p id="life-status" role="status"></p>
       </section>
-      <footer class="research-only footer-note"><span>聚形域 · 世界体验 v0.3</span><span>Node 状态源 · 相关性场景切片 · 语音层待接入</span></footer>
+      <footer class="research-only footer-note"><span>DeskBot v0.5 · 角色发展第六阶段</span><span>持续生活 · 实际试做 · 可逆角色阶段</span></footer>
     </main>
     <script type="module" src="/app.js"></script>
   </body>

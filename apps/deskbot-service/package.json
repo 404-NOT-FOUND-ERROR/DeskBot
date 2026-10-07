@@ -2,6 +2,7 @@
   "name": "deskbot-service",
   "version": "0.1.0",
   "private": true,
+  "description": "DeskBot persistent companion world: SQLite life rules, graded inputs, memory, practical trials, reversible role stages and bounded model orchestration.",
   "type": "module",
   "engines": {
     "node": ">=24"

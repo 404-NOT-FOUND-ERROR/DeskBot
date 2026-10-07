@@ -1,129 +1,95 @@
-# DeskBot Jev Town world client
+# DeskBot 3D 生活客户端 · 聚形域
 
-This directory is the DeskBot world client derived from [CeciliaW888/jev-town](https://github.com/CeciliaW888/jev-town). DeskBot integration mode is the maintained product path; the original town-crier simulation remains as upstream reference code. DeskBot service owns canonical world state, validation and persistence. See [AUTHORIZATION.md](AUTHORIZATION.md) and the repository-level [adoption record](../../documentation/jev-town-adoption.md).
+当前基线为 **v0.5 角色发展第 6 阶段（2026-10-07）**。本客户端把 DeskBot 的持续世界表现为低多边形小镇：喵呜与十二位光粒居民按现实时间生活，实际任务、设施、资源、约定和角色成长共同呈现在同一地图上。
 
-Start DeskBot mode with `npm run dev:deskbot` and open:
+客户端基于 [CeciliaW888/jev-town](https://github.com/CeciliaW888/jev-town) 的场景与交互基线制作。DeskBot 的维护入口是 `?mode=deskbot`；原 Town Crier 模式保留作上游参考。来源、授权及继承范围见 [AUTHORIZATION.md](AUTHORIZATION.md) 和 [接入记录](../../documentation/jev-town-adoption.md)。
 
-```text
-http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311
+## 当前能力
+
+- **持续生活看得见。** 喵呜与十二位居民共十三个生活角色，当前位置、旅行进度、正在进行的活动及预计结束时间读取真实服务状态，动作跟随任务。
+- **地图与设施有实际后果。** 苗圃、厨房、水岸、育苗架和零件设施显示苗况、水位、有限库存、锅气与工作状态。采收、携带、烹饪、交接、照料和项目阶段都由服务核验。
+- **现实环境折射。** 上海时间、天气与风雨影响昼夜、环境和生活选择；傍晚及夜间灯火随时段与运作状态渐变。NASA Science 消息和区域空气参考保留来源，不冒充角色亲历。
+- **居民有关系和事务。** 喵呜、居民、约定、记录四个视图展示独立生活、共同经历、项目、邀请、合作与延期；同地互动经过服务端生成并保存，远处居民可查看档案。
+- **角色选择接到实际生活。** 接触、主动继续、受邀实践、具体配方能力及规则自评分开呈现。有依据愿望进入实际试做，可暂停、调整、继续或退出；跨日主要成果达标后才提供采用预览。
+- **形态与职业可以组合。** 荷叶青蛙、工坊学徒和灶边厨师采用有限制作的 3D 造型，保留种子眼、梨形体、胸前光核与光粒。预览不修改当前角色，确认后地图读取正式版本；形态或职业可分别回退，另一轴与实际经历保留。
+
+`deskbot-service` 是唯一世界事实源。浏览器不自行结算资源、任务完成、关系或角色阶段，动画、候选和模型台词也不能直接修改存档。具体规则见 [当前架构](../../documentation/architecture.md)、[第 6 阶段验收](../../research/milestones/role-development-stage6.md) 与 [角色阶段规则](../../research/world/role-stages-v1.md)。
+
+## 运行 DeskBot
+
+整个项目需要 **Node.js 24+**。从仓库根目录准备 [本地配置](../../config/README.md)，安装客户端依赖，再启动三个本地服务：
+
+```powershell
+Set-Location apps\jev-town-client
+npm.cmd ci
+Set-Location ..\..
+.\scripts\start-local.ps1 -StartWeb -StartWorld
 ```
 
-## Upstream project description
+生活世界：<http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311>。
 
-You are the Town Crier of a small 3D town. Write one broadcast and all 50 citizens decide, in parallel, whether to **investigate**, **join**, **flee**, **warn**, or **ignore** it.
+研究与通用对话：<http://127.0.0.1:4322/>。世界服务为 `127.0.0.1:4311`。启动脚本加载服务端 DeepSeek 与可选天气配置，新闻及区域空气连接器默认开启；公开 clone 需自行填写模型密钥、城市等配置，不包含本机真实配置。密钥不得放在客户端代码或浏览器 URL 中。
 
-Play it at <https://jev-town.vercel.app>.
+从仓库根目录停止本次服务：
 
-The hosted demo runs on the built-in simulation so that it costs nothing to share.
-A deployment ignores its own `TYPESAFE_API_KEY` unless `JEV_ALLOW_SERVER_KEY=true` is set, so a public URL never spends the owner's quota on anonymous visitors.
-To see real Jev decisions, add your own key in the app or run it locally - both are described below.
-
-The game uses one batched Jev `choice` request per round. Every citizen has a distinct role and personality, so the same announcement can split the town in surprising ways. Your directive changes each round. Balance trust and unrest while building a streak.
-
-## Run it
-
-Requires Node.js 20 or newer.
-
-```bash
-npm install
-TYPESAFE_API_KEY="$(<~/.config/typesafe/api_key)" npm run dev
+```powershell
+.\scripts\stop-local.ps1
 ```
 
-Open <http://localhost:5173>.
+只开发前端时，先保持 DeskBot 服务运行，再在本目录执行：
 
-The key is read only by the local Express backend on port `8787`; it is never sent to the browser. If the key is missing or Jev is unavailable, the game remains playable with a clearly labelled deterministic simulation fallback.
-
-## Bring your own key
-
-The game needs a Jev API key to produce real decisions.
-There are two ways to supply one, and neither exposes a key to anyone else.
-
-**Run it locally.** Clone the repo and pass your key to the local server, as shown above.
-The key stays in your shell environment, is read only by the Express backend, and is never sent to the browser.
-This is the right option if you would rather not paste a key into a website.
-
-**Add a key in the hosted app.** When the deployment carries no key of its own, the app offers an "Add key" box.
-The key is held in `sessionStorage` for that tab only, is sent to this app's own API, and is forwarded once to Jev.
-It is never stored on the server, never written to a log, and never returned in a response - `tests/byok.test.ts` asserts the last of those.
-Closing the tab discards it.
-
-Get a key at <https://typesafe.ai>.
-
-Rounds played on a visitor's own key are not counted against the deployment's rate limit, because that limit exists to protect the deployment's key rather than the visitor's.
-
-## Play
-
-1. Read the round directive and its two hidden-in-plain-sight scoring goals.
-2. Write a town-wide broadcast, or choose a prompt chip.
-3. Watch all 50 citizens walk the streets of a 3D town according to their typed Jev decision.
-4. Use the result chart and citizen confidence indicators to tune your next broadcast.
-5. Keep trust above zero and unrest below 100 for six rounds.
-
-## Verification
-
-```bash
-npm test
-npm run build
+```powershell
+npm.cmd run dev:deskbot
 ```
 
-The test suite covers scoring, reducer state, fallback determinism, request validation, response mapping, API-key isolation, rate limiting, street routing, and the exact five-action Jev schema.
+继续打开带 `mode=deskbot` 和 `deskbotUrl` 的生活入口。裸 `/` 仍是原 Town Crier 模式；本客户端的上游 Express 服务 `8787` 不负责 DeskBot 世界状态，运行 DeskBot 入口不需要 Jev API key。
 
-## Live site
+## 独立样例与验收入口
 
-<https://jev-town.vercel.app> runs the real thing: every round is a live Jev call.
+以下页面使用只读预览、隔离规则样本或独立身体软件回合，不写入正式存档，不代表正式个体已经经历了样本中的全部生活：
 
-The Vercel deployment serves the same Express API as a serverless function, so `TYPESAFE_API_KEY` stays on the server and is never bundled into the browser build.
-`npm run build:vercel` (see `scripts/build-vercel.mjs`) emits the deployment through Vercel's Build Output API: the Vite client as static files, plus one bundled Node function at `api/[...path]`.
-Two constraints make that the right shape rather than a zero-config `api/` directory.
-Vercel detects zero-config functions from the cloned source before the build command runs, so a generated function is never picked up.
-It also compiles each function file on its own, which leaves this project's explicit `.ts` import specifiers in the emitted JavaScript, where Node cannot resolve them.
+| 地址 | 内容 |
+| --- | --- |
+| `/development-review.html?sample=stages` | 当前第 6 阶段：试做、纯预览、采用、形态与职业组合、重启、分轴回退 |
+| `/development-review.html?sample=trials` | 第 5 阶段实际试做、暂停、调整、受阻与跨日成果 |
+| `/development-review.html?sample=wishes` | 第 4 阶段愿望前提、支持、暂缓、拒绝和重提 |
+| `/development-review.html?sample=facets` | 接触、主动继续、实际配方与条件困难的分维度依据 |
+| `/development-review.html` | 共同经历与发展结果根，需独立 `4314` 样本服务 |
+| `/scene-review.html` | 居民近景、动作、昼夜、风雨与场景美术预览 |
+| `/life-review.html` | 持续生活、设施、协作与约定规则回放 |
+| `/life-review.html?sample=supply` | 有限光果来源、烹饪、送餐与多人供给 |
+| `/life-review.html?sample=inputs` | 现实输入折射与来源记录 |
+| `/life-review.html?sample=memory` | 长期记忆与有限模型选择，使用标注的测试模型 |
+| `/body-review.html` | 独立 `4313` 身体软件回合；正式状态仅可读取，模拟回执不代表实机验证 |
 
-Pushes to `main` deploy automatically, because the Vercel project is connected to this GitHub repository.
-Note that `vercel git connect` cannot parse an SSH host alias such as `git@github-cecilia:...`; point `origin` at the plain `https://github.com/...` URL while connecting if you ever need to redo it.
+当前阶段样本通过仓库根目录的 `node scripts/review-role-stages.mjs` 重新生成；生成器使用隔离 SQLite、受控条件与实际任务执行器，不导入正式世界。持续现实观察与受控回放的结论分别记录。
 
-Deploying from a fresh clone, or by hand:
+第 1 阶段及身体页面还需分别运行 `node scripts/review-development-evidence.mjs`、`node scripts/review-body-perception.mjs` 的独立样本服务；两个脚本均从仓库根目录启动。第 3–6 阶段页面直接读取随客户端保存的静态样本。
 
-```bash
-vercel login
-vercel link
-vercel env add TYPESAFE_API_KEY production < ~/.config/typesafe/api_key
-vercel --prod
+## 前端开发与验证
+
+在本目录运行：
+
+```powershell
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run build:deskbot
 ```
 
-Because the hosted site spends the site owner's Jev quota, `/api/broadcast` is rate limited to 60 broadcasts per IP per hour.
-Set `BROADCAST_RATE_LIMIT` to another number to change that, or to `0` to switch it off.
-The limit is counted in memory per serverless instance, so treat it as a brake on casual abuse rather than a hard guarantee.
+`build:deskbot` 生成 Vite 客户端页面；`typecheck` 单独核验类型。`npm.cmd run build` 同时构建继承的上游 Express 服务，仍供兼容与完整回归使用。`build:vercel`、上游部署与访客 key 流程是历史 Town Crier 路径，不是当前 DeskBot 公网部署方案。
 
-## Public demo
+主要目录：
 
-The GitHub Pages build runs the deterministic simulation, because a static site cannot keep an API key secret.
-It is labelled **Simulation** in the interface.
-Use the Vercel site above, or run the project locally with `TYPESAFE_API_KEY`, to play with real Jev decisions.
+- `src/deskbot/`：服务读模型、生活侧栏、角色发展、阶段控制与 DeskBot 接入。
+- `src/three/`：小镇、光粒造型、设施状态、任务动作与环境表现。
+- `public/` 与各 `*-review.html`：无凭据的独立验收数据和页面入口。
+- `tests/`：DeskBot reader、状态边界、组件、阶段组合与上游兼容测试。
+- `server/`、`shared/` 和原 `src/App.tsx`：继承的 Town Crier 路径，当前世界事实不由其管理。
 
-## Architecture and decisions
+## 当前边界与来源
 
-[ARCHITECTURE.md](ARCHITECTURE.md) explains the stack, the decisions behind the game (why one batched Jev call, why the key never reaches the browser, why the citizens are stylised rather than realistic), and the terminology those decisions use.
+采用阶段改变的是虚拟外观和有限生活倾向，不代表换了实体外壳、增加自由度、获得现实职业资格或测得主观喜欢。当前形象是作者定义的闭集几何与配件；开放造型生成尚未交付。
 
-## Architecture
+正式中文 ASR/TTS 尚未启用，小智固件尚未适配 DeskBot 身体协议。当前阶段的组件、几何与构建已验证，浏览器自动化初始化失败，尚未完成第 6 阶段截图验收。自然愿望形成、长期人物体验和连续 7–14 天现实生活仍需后续观察。开发进度见 [v0.5 路线图](../../research/development-roadmap-v0.5.md)。
 
-- `src/`: React/Vite game UI; `src/three/` renders the town in Three.js (merged low-poly scenery, walking citizens, orbit/pan/zoom camera)
-- `server/`: Express API, Jev adapter, validation, rate limiting, and fallback simulation
-- `server/vercel.ts`: Vercel serverless entry point, bundled into `api/` at build time
-- `shared/`: citizens, action schema, scoring, street-grid town layout and routing, and wire protocol
-- `tests/`: Vitest suite
-
-## DeskBot world-client integration
-
-The `?mode=deskbot` entry keeps this project's visual baseline while reading the DeskBot canonical map and life Scene. It does not import the original 50 citizens into DeskBot, and it does not own a second world state.
-
-Start a DeskBot service with a disposable database, then open for example:
-
-```text
-http://localhost:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4411
-```
-
-NPC actions are shown as proposals first. Confirmation re-reads the world revision, current NPC location, and adjacency before posting a normal `npc_action` to DeskBot `/api/event`; DeskBot remains the final validator and persistent ledger owner.
-
-The DeskBot project owner reports direct confirmation from this project's developer that the source and bundled assets may be modified and redistributed for the DeskBot derivative. See [AUTHORIZATION.md](AUTHORIZATION.md) for the recorded scope and release checklist; preserve the developer's written confirmation with the derivative release.
-
-One server request sends 50 typed `choice` questions to Jev. The response is validated and mapped back to the matching citizen. Invalid or missing answers are filled locally so a partial model response cannot break the round.
+保留原作者与依赖归属，授权记录不自动改变第三方依赖许可证。原完整 README 已原样保存在 [UPSTREAM-README.md](UPSTREAM-README.md)，其中外部网站、上游 API key 和自动部署断言仅供历史参考；本项目当前能力、入口和配置以本文及 [主仓库介绍](../../README.md) 为准。[ARCHITECTURE.md](ARCHITECTURE.md) 继续保留上游设计资料，DeskBot 当前架构见 [主仓库架构说明](../../documentation/architecture.md)。
