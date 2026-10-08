@@ -21,7 +21,7 @@ function snapshot():DeskBotRoleWishSnapshot {
 }
 const proposal=(status='proposed'):DeskBotRoleProposal=>({proposal_id:'wish-frog',direction_id:'wetland_frog',label:'荷叶青蛙',axis:'form',origin:'lived_wish',status,authored_reason:direction().authored_reason,wish_basis:direction().basis,current_gate:direction().readiness,next_step:direction().next_step});
 function fixture():RoleWishesReviewFixture {const value=snapshot();return {schema:'deskbot.role-wishes-review.v1',simulated:true,live_world_untouched:true,samples:[{id:'ready',label:'准备实际试做',now:at,summary:'受控时钟与真实任务结果带来的方向。',memory:memory(),evolution:value.evolution,proposals:[proposal('prepared')]}]};}
-const researchSource=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8');
+const researchSource=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8').replace(/\r\n/g,'\n');
 function researchFunction(name:string,context:Record<string,unknown>) {
   const start=researchSource.indexOf(`function ${name}(`);
   const from=researchSource.slice(start-6,start)==='async '?start-6:start;

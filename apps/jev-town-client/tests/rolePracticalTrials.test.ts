@@ -19,7 +19,7 @@ function trial():DeskBotPracticalRoleTrial {
     progress:{successful_primary:0,condition_failures:0,performance_failures:0,unknown_failures:0,cancelled:0,primary_days:[],root_outcome_ids:[],support_roots:[],started_attempts:1},review:{ready:false,reason:null,basis:'canonical_unique_task_results',summary:'实际动手之后再回看。',quality_proven:false,qualification_proven:false,preference_proven:false,changes_appearance:false},blockers:[],next_step:'先照看这格苗床，做完后核验结果。',frozen_wish_root_ids:p.wish_basis!.root_outcome_ids};
 }
 const render=(value:DeskBotPracticalRoleTrial,readOnly=false)=>renderToStaticMarkup(createElement(PracticalRoleTrial,{trial:value,readOnly,onControl:()=>{}}));
-const researchSource=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8');
+const researchSource=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8').replace(/\r\n/g,'\n');
 function researchFunction(name:string,context:Record<string,unknown>) {
   const start=researchSource.indexOf(`function ${name}(`),from=researchSource.slice(start-6,start)==='async '?start-6:start,end=researchSource.indexOf('\n}\n',start)+3;
   return runInNewContext(`${researchSource.slice(from,end)};${name}`,context);

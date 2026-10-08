@@ -12,7 +12,7 @@ import type {RoleStagesReviewFixture} from '../src/roleStagesReview.ts';
 
 const fixture=JSON.parse(readFileSync(new URL('../public/role-stages-review.json',import.meta.url),'utf8')) as RoleStagesReviewFixture;
 const sample=(id:string)=>structuredClone(fixture.samples.find(value=>value.id===id)!);
-const source=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8');
+const source=readFileSync(new URL('../../deskbot-web/public/app.js',import.meta.url),'utf8').replace(/\r\n/g,'\n');
 function researchFunction(name:string,context:Record<string,unknown>){const start=source.indexOf(`function ${name}(`),from=source.slice(start-6,start)==='async '?start-6:start,end=source.indexOf('\n}\n',start)+3;return runInNewContext(`${source.slice(from,end)};${name}`,context);}
 afterEach(()=>vi.unstubAllGlobals());
 describe('actual life becomes a reviewed, reversible virtual stage',()=>{
