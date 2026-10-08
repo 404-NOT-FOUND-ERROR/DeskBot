@@ -11,6 +11,7 @@ import {
   publicNpcProfile,
 } from './npc-personas.mjs';
 import { roleExperienceContext } from './role-experience-packages.mjs';
+import { roleExperiencePerformance } from './role-experience-performance.mjs';
 
 const SLOT_MS = 30 * 60 * 1000;
 import { residentResponse } from './resident-life.mjs';
@@ -516,6 +517,7 @@ export function createWorldLife({
         current_stage: stages[0] ?? null,
         stages,
         experience: roleExperienceContext(stages.map((stage) => stage.direction_id)),
+        performance: roleExperiencePerformance(stages.map((stage) => stage.direction_id)),
       },
       encounters: activeWorldTask(world)?.kind === 'travel' ? [] : (world.npcs ?? []).filter((npc) => npc.location_id === currentLocationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map(profileFor),
       available_interactions: INTERACTION_INTENTS,

@@ -30,3 +30,8 @@ The registry currently contains the baseline, 荷叶青蛙, 工坊学徒, 灶边
 星空观察者 and 云朵梦境生物. P1 migrates existing runtime modules to read
 these authored packages; P2-P5 add complete vertical behavior and new content.
 
+`role-experience-performance.v1` is the read-only projection for clients and
+future device adapters. It combines accepted package layers into virtual
+appearance, expression, screen and TTS consumers while always reporting
+`physical_shell_changed: false` until a later hardware gate is passed.
+
