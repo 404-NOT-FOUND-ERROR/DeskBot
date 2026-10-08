@@ -33,6 +33,8 @@ export const ROLE_WISH_DIRECTIONS = Object.freeze([
     reason_theme: '梦境', wish_text: '试试云朵梦境生物的形态' }),
   Object.freeze({ direction_id: 'chef', label: '厨师方向', axis: 'vocation', topics: ['cook'], locations: ['warm-pot-courtyard'],
     practice_topics: ['cook'], practice_activities: COOKING, minimum_practice: 3, reason_theme: '灶边做饭', wish_text: '试着当一个会帮忙做饭的厨师' }),
+  Object.freeze({ direction_id: 'explorer', label: '潮痕探险家', axis: 'vocation', topics: ['explore'], locations: ['tidal-old-road', 'backlit-grove', 'echo-waterside'],
+    practice_topics: ['explore'], minimum_practice: 2, reason_theme: '远方路线', wish_text: '试着当一段时间的潮痕探险家' }),
 ]);
 
 function actor(world, actorId) {
