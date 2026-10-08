@@ -219,7 +219,12 @@ export function roleStageCandidates(world, state, at) {
   const choices = [];
   for (const axis of AXES) {
     const stage = currentStage(world, state.actor_id, axis); if (!stage) continue;
-    const design = definitions[stage.direction_id], goal = `role-stage:${stage.stage_id}:${design.activity}`;
+    const packageValue = getRoleExperiencePackage(stage.direction_id);
+    const baseDesign = definitions[stage.direction_id];
+    const design = packageValue ? { ...baseDesign, interests: packageValue.life.interests, places: packageValue.life.places,
+      activity: packageValue.life.activity || baseDesign.activity, topic: packageValue.life.interests[0] || baseDesign.topic,
+      title: packageValue.life.actions[0] || baseDesign.title, label: packageValue.identity.label } : baseDesign;
+    const goal = `role-stage:${stage.stage_id}:${design.activity}`;
     const objects = world.living.objects, inventory = world.living.inventories?.[state.actor_id]?.stock ?? {};
     const link = { stage_id: stage.stage_id, direction_id: stage.direction_id, axis: stage.axis, basis: 'rule_based_choice' };
     // Real trial products can already be in the bag when the stage is adopted.
@@ -229,7 +234,7 @@ export function roleStageCandidates(world, state, at) {
       if (!(Date.parse(state.cooldowns?.[depositGoal] ?? '') > Date.parse(at))) {
         try { choices.push({ goal: depositGoal, title: '把已做好的托盘送回育苗架', reason: '托盘已经在随身袋里，先送到苗圃，让下一次育苗能真正取用。',
           score: 38, available: true, steps: depositSteps(world, state.actor_id, 'seedling-rack', 'trays'), development_topic: 'craft',
-          discretionary_practice: true, role_stage: link }); }
+          discretionary_practice: true, role_stage: { ...link, package_id: packageValue?.package_id ?? null } }); }
         catch (error) { if (!error.code) throw error; }
       }
       continue;
@@ -252,7 +257,7 @@ export function roleStageCandidates(world, state, at) {
       }
       choices.push({ goal, title: design.title, reason: `采用${design.label}方向后，留有余力时想把对应生活继续做实。`,
         score: 36, available: true, steps, development_topic: design.topic, discretionary_practice: true,
-        role_stage: link });
+        role_stage: { ...link, package_id: packageValue?.package_id ?? null } });
     } catch (error) { if (!error.code) throw error; }
   }
   return choices;

@@ -10,6 +10,7 @@ import {
   npcReplyNeedsGrounding,
   publicNpcProfile,
 } from './npc-personas.mjs';
+import { roleExperienceContext } from './role-experience-packages.mjs';
 
 const SLOT_MS = 30 * 60 * 1000;
 import { residentResponse } from './resident-life.mjs';
@@ -320,6 +321,7 @@ function selectScene(world, now, { roleStages = [] } = {}) {
   const eventKey = world.world_line?.latest_event?.event_id ?? 'quiet-world';
   const weatherKey = world.weather?.snapshot?.condition ?? 'no-weather';
   const roleKey = roleStages.map((stage) => stage.direction_id).sort().join(',') || 'base-role';
+  const roleExperience = roleExperienceContext(roleStages.map((stage) => stage.direction_id));
   const selected = choices[hashNumber(`${locationId}:${world.logical_time?.day}:${slot}:${eventKey}:${weatherKey}:${roleKey}`) % choices.length];
   const startsAt = new Date(slot * SLOT_MS).toISOString();
   const expiresAt = new Date((slot + 1) * SLOT_MS).toISOString();
@@ -357,6 +359,7 @@ function selectScene(world, now, { roleStages = [] } = {}) {
       weather: world.weather?.snapshot?.condition ?? null,
       world_event_id: world.world_line?.latest_event?.event_id ?? null,
       role_stages: roleStages,
+      role_experience: roleExperience,
     },
     continuity: {
       kind: continuityKind,
@@ -512,6 +515,7 @@ export function createWorldLife({
       role_context: {
         current_stage: stages[0] ?? null,
         stages,
+        experience: roleExperienceContext(stages.map((stage) => stage.direction_id)),
       },
       encounters: activeWorldTask(world)?.kind === 'travel' ? [] : (world.npcs ?? []).filter((npc) => npc.location_id === currentLocationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map(profileFor),
       available_interactions: INTERACTION_INTENTS,
