@@ -225,13 +225,14 @@ export function modelRoleStageContext(worldSnapshot) {
     const choice = packageValue ? { label: packageValue.identity.label, axis: packageValue.axis, life: packageValue.life.summary, speech: packageValue.expression.speech } : STAGE_EXPRESSION[stage.direction_id];
     if (!choice || stage.axis !== choice.axis || stage.current !== true || stage.status !== 'accepted') return null;
     return { direction: choice.label, package_id: packageValue?.package_id ?? null, axis: choice.axis, meaning: '实际跨日试做后，原愿望和主人确认共同支持采用的当前生活方向。',
-      life: choice.life, speech: choice.speech, virtual_appearance_adopted: true, identity_changed: false,
+      life: choice.life, speech: choice.speech, catchphrases: packageValue?.expression.catchphrases ?? [], triggers: packageValue?.expression.triggers ?? [],
+      virtual_appearance_adopted: true, identity_changed: false,
       physical_shell_changed: false, voice_changed: false, liking_proven: false, qualification_proven: false };
   }).filter(Boolean);
 }
 function composeCurrentRoleStage(currentRoleStages = [], worldSnapshot = null) {
   const canonical = modelRoleStageContext(worldSnapshot);
-  if (canonical.length) return `${canonical.map(stage => `当前${stage.axis === 'form' ? '虚拟形态' : '生活职业'}：${stage.direction}\n日常：${stage.life}\n表达：${stage.speech}`).join('\n')}\n同一个体、种子眼、梨形体、胸前光核和光粒持续保留。地图虚拟造型已经采用；实体外壳、声音和硬件自由度按原身体记录。`;
+  if (canonical.length) return `${canonical.map(stage => `当前${stage.axis === 'form' ? '虚拟形态' : '生活职业'}：${stage.direction}\n日常：${stage.life}\n表达：${stage.speech}\n可以自然使用的口头习惯：${stage.catchphrases.join('、') || '沿用喵呜底色'}。`).join('\n')}\n同一个体、种子眼、梨形体、胸前光核和光粒持续保留。地图虚拟造型已经采用；实体外壳、声音和硬件自由度按原身体记录。`;
   if (worldSnapshot?.role_stages?.schema === 'deskbot.role-stages.v1') return '当前两个轴都没有采用中的新方向；沿用原造型和基础生活。以前的采用与试做结果作为经历保留，不能把回退或旧历史当成当前阶段。';
   const stage = currentRoleStages.find((item) => item?.schema === 'deskbot.role-state.v1' || item?.direction_id);
   if (!stage) return '当前还没有被确认的新角色阶段；保留喵呜的猫型第一形态和基础性格。';
