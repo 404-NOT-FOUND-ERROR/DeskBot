@@ -4,6 +4,7 @@ import { activeWorldTask } from './realtime-world.mjs';
 import { livingReadModel, livingObjectReadModel } from './living-resources.mjs';
 import { ROLE_WISH_DIRECTIONS } from './role-wishes.mjs';
 import { roleStagesReadModel } from './role-stages.mjs';
+import { getRoleExperiencePackage } from './role-experience-packages.mjs';
 
 import {
   DEFAULT_CHARACTER_DISPLAY_NAME,
@@ -220,9 +221,10 @@ const STAGE_EXPRESSION = Object.freeze({
 export function modelRoleStageContext(worldSnapshot) {
   if (!worldSnapshot) return [];
   return Object.values(roleStagesReadModel(worldSnapshot).current).filter(Boolean).map(stage => {
-    const choice = STAGE_EXPRESSION[stage.direction_id];
+    const packageValue = getRoleExperiencePackage(stage.direction_id);
+    const choice = packageValue ? { label: packageValue.identity.label, axis: packageValue.axis, life: packageValue.life.summary, speech: packageValue.expression.speech } : STAGE_EXPRESSION[stage.direction_id];
     if (!choice || stage.axis !== choice.axis || stage.current !== true || stage.status !== 'accepted') return null;
-    return { direction: choice.label, axis: choice.axis, meaning: '实际跨日试做后，原愿望和主人确认共同支持采用的当前生活方向。',
+    return { direction: choice.label, package_id: packageValue?.package_id ?? null, axis: choice.axis, meaning: '实际跨日试做后，原愿望和主人确认共同支持采用的当前生活方向。',
       life: choice.life, speech: choice.speech, virtual_appearance_adopted: true, identity_changed: false,
       physical_shell_changed: false, voice_changed: false, liking_proven: false, qualification_proven: false };
   }).filter(Boolean);

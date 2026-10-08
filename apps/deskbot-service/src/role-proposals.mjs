@@ -1,3 +1,5 @@
+import { getRoleExperiencePackage } from './role-experience-packages.mjs';
+
 const ROLE_TRIAL_OVERLAYS = Object.freeze({
   wetland_frog: Object.freeze({
     direction_id: 'wetland_frog',
@@ -41,6 +43,19 @@ const ROLE_TRIAL_OVERLAYS = Object.freeze({
 });
 
 export function roleDirectionOverlay(directionId, { label = directionId, life = '' } = {}) {
+  const packageValue = getRoleExperiencePackage(directionId);
+  if (packageValue) {
+    return structuredClone({
+      direction_id: packageValue.direction_id,
+      label: packageValue.identity.label || label,
+      presence: packageValue.expression.presence,
+      speech: packageValue.expression.speech,
+      preferences: packageValue.expression.preferences || life,
+      boundary: packageValue.expression.boundary,
+      package_id: packageValue.package_id,
+      package_version: packageValue.version,
+    });
+  }
   return structuredClone(ROLE_TRIAL_OVERLAYS[directionId] ?? {
     direction_id: directionId, label,
     presence: '保持当前角色底色，只在日常表达中留下这个方向的兴趣。',

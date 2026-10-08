@@ -1,4 +1,5 @@
 const EXPRESSION_INTENT_SCHEMA = 'deskbot.expression-intent.v1';
+import { getRoleExperiencePackage } from './role-experience-packages.mjs';
 
 const PROFILES = Object.freeze({
   neutral: Object.freeze({ mode: 'companion', intensity: 0.35, pace: 'natural', prosody: 'warm_with_variation', tts_profile: 'miaowu-v1', speed: 1, pitch_semitones: 0, energy: 0.45 }),
@@ -94,8 +95,17 @@ export function applyRoleTrialExpressionIntent(value, activeTrials = [], current
     ? currentStages.find((item) => item?.schema === 'deskbot.role-state.v1' || item?.direction_id)
     : null;
   const directionId = trial?.direction_id ?? stage?.direction_id ?? null;
-  const profile = directionId ? ROLE_STAGE_PROFILES[directionId] : null;
-  if (!directionId || !profile) return base;
+  const packageValue = directionId ? getRoleExperiencePackage(directionId) : null;
+  const authoredTts = packageValue?.expression?.tts ?? {};
+  const authoredScreen = packageValue?.expression?.screen ?? {};
+  const profile = directionId ? (ROLE_STAGE_PROFILES[directionId] ?? {
+    mode: 'companion', intensity_floor: 0.5,
+    pace: 'natural', prosody: 'warm_with_variation',
+    screen_motif: authoredScreen.motif ?? 'open_round_eyes', screen_motion: authoredScreen.motion ?? 'blink',
+    speed: authoredTts.speed ?? 1, pitch_semitones: authoredTts.pitch_semitones ?? 0,
+    energy: authoredTts.energy ?? 0.5,
+  }) : null;
+  if (!directionId || !profile || !packageValue) return base;
   const restrained = ['supportive', 'boundary'].includes(base.mode)
     || ['concerned', 'alert', 'tired'].includes(base.expression);
   const roleOverlay = {
@@ -106,8 +116,12 @@ export function applyRoleTrialExpressionIntent(value, activeTrials = [], current
     lifecycle: trial ? 'trial' : 'accepted',
     applied: !restrained,
     reason: restrained ? 'short_state_requires_restrained_expression' : trial ? 'active_role_trial' : 'accepted_role_stage',
+    package_id: getRoleExperiencePackage(directionId)?.package_id ?? null,
+    package_version: getRoleExperiencePackage(directionId)?.version ?? null,
   };
   if (restrained) return { ...base, role_trial: roleOverlay, role_stage: stage ? roleOverlay : undefined };
+  const packageTts = packageValue.expression.tts ?? {};
+  const packageScreen = packageValue.expression.screen ?? {};
   return {
     ...base,
     mode: profile.mode,
@@ -119,8 +133,8 @@ export function applyRoleTrialExpressionIntent(value, activeTrials = [], current
     consumers: {
       ...base.consumers,
       text: { ...base.consumers.text, mode: profile.mode, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
-      screen: { ...base.consumers.screen, intensity: Math.max(base.intensity, profile.intensity_floor), motif: profile.screen_motif, motion: profile.screen_motion, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
-      tts: { ...base.consumers.tts, speed: profile.speed, pitch_semitones: profile.pitch_semitones, energy: profile.energy, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
+      screen: { ...base.consumers.screen, intensity: Math.max(base.intensity, profile.intensity_floor), motif: packageScreen.motif ?? profile.screen_motif, motion: packageScreen.motion ?? profile.screen_motion, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
+      tts: { ...base.consumers.tts, profile_id: packageTts.profile_id ?? base.consumers.tts.profile_id, speed: packageTts.speed ?? profile.speed, pitch_semitones: packageTts.pitch_semitones ?? profile.pitch_semitones, energy: packageTts.energy ?? profile.energy, ...(trial ? { role_trial_direction: directionId } : { role_stage_direction: directionId }) },
     },
   };
 }

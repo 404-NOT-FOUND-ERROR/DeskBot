@@ -3,6 +3,7 @@ import { practicalTrialReadModel } from './role-practical-trials.mjs';
 import { localWorldDate, activeWorldTask } from './realtime-world.mjs';
 import { activitySteps, cookAndStoreSteps, depositSteps } from './life-planning.mjs';
 import { findWorldPath } from './world-map-content.mjs';
+import { getRoleExperiencePackage } from './role-experience-packages.mjs';
 
 export const ROLE_STAGES_SCHEMA = 'deskbot.role-stages.v1';
 export const ROLE_STAGE_SCHEMA = 'deskbot.role-stage.v1';
@@ -51,9 +52,11 @@ function currentStage(world, actorId, axis) {
 }
 function appearancePart(stage, directionId = stage?.direction_id) {
   const design = definitions[directionId]; if (!design) return null;
+  const packageValue = getRoleExperiencePackage(directionId);
   return { direction_id: directionId, stage_id: stage?.stage_id ?? null, label: design.label,
-    ...(design.axis === 'form' ? { figure_form: design.figure_form } : { figure_vocation: design.figure_vocation }),
-    accessories: [...design.accessories], palette: { ...design.palette } };
+    package_id: packageValue?.package_id ?? null, package_version: packageValue?.version ?? null,
+    ...(design.axis === 'form' ? { figure_form: packageValue?.appearance.figure_form || design.figure_form } : { figure_vocation: packageValue?.appearance.figure_vocation || design.figure_vocation }),
+    accessories: [...(packageValue?.appearance.accessories ?? design.accessories)], palette: { ...(packageValue?.appearance.palette ?? {}), ...design.palette } };
 }
 export function roleStageAppearance(world, actorId, replacing = null) {
   const selected = { form: currentStage(world, actorId, 'form'), vocation: currentStage(world, actorId, 'vocation') };
@@ -206,8 +209,8 @@ export function rollbackRoleStage(world, { stageId, at, eventId } = {}) {
 export function roleStageLifeProfile(world, actorId, baseline) {
   const active = AXES.map(axis => currentStage(world, actorId, axis)).filter(Boolean);
   if (!active.length) return baseline;
-  return { ...baseline, interests: unique([...baseline.interests, ...active.flatMap(stage => definitions[stage.direction_id].interests)]),
-    places: unique([...baseline.places, ...active.flatMap(stage => definitions[stage.direction_id].places)]) };
+  return { ...baseline, interests: unique([...baseline.interests, ...active.flatMap(stage => getRoleExperiencePackage(stage.direction_id)?.life.interests ?? definitions[stage.direction_id].interests)]),
+    places: unique([...baseline.places, ...active.flatMap(stage => getRoleExperiencePackage(stage.direction_id)?.life.places ?? definitions[stage.direction_id].places)]) };
 }
 export function roleStageCandidates(world, state, at) {
   const minute = localWorldDate(at, 'Asia/Shanghai')?.minute_of_day;
