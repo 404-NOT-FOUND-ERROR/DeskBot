@@ -75,6 +75,41 @@ test('world mutations require a reviewed candidate and the ledger is readable ov
   assert.deepEqual(ledger.mutations.map((record) => record.action), ['advance_time']);
 });
 
+test('world life feed is readable without mutating canonical state', async () => {
+  const before = await (await fetch(`${baseUrl}/api/world/state`)).json();
+  const first = await (await fetch(`${baseUrl}/api/life/world/feed?limit=20`)).json();
+  assert.equal(first.schema, 'deskbot.world-life-feed-response.v1');
+  const second = await (await fetch(`${baseUrl}/api/life/world/feed?limit=20`)).json();
+  assert.deepEqual(second.entries, first.entries);
+  const after = await (await fetch(`${baseUrl}/api/world/state`)).json();
+  assert.equal(after.world.world_revision, before.world.world_revision);
+  const invalid = await fetch(`${baseUrl}/api/life/world/feed?after_id=missing`);
+  assert.equal(invalid.status, 400);
+  assert.equal((await invalid.json()).error, 'invalid_life_feed_cursor');
+  assert.equal((await fetch(`${baseUrl}/api/life/world/feed?after_sequence=NaN`)).status, 400);
+});
+
+test('world life HTTP feed cursors preserve multiple entries from one mutation', async () => {
+  const local = createDeskBotServer({ now: () => new Date('2026-10-08T02:00:00.000Z'), timeMode: 'realtime', worldLifeEnabled: true, autonomousLifeEnabled: true, websocket: false });
+  await new Promise(resolve => local.listen(0, '127.0.0.1', resolve));
+  try {
+    local.persistentWorld.ingest({ event_id: 'http-feed-multi', type: 'world.mutation', source: 'test', character_id: 'shaping-001', occurred_at: '2026-10-08T02:00:00.000Z', payload: { action: 'advance_autonomous_life' } });
+    const root = `http://127.0.0.1:${local.address().port}`;
+    const before = local.persistentWorld.get();
+    const feed = (await (await fetch(`${root}/api/life/world/feed?kind=life.task.started&limit=20`)).json()).entries;
+    assert.ok(feed.length > 1);
+    const second = await (await fetch(`${root}/api/life/world/feed?kind=life.task.started&limit=1&after_id=${encodeURIComponent(feed[0].id)}`)).json();
+    assert.equal(second.entries.length, 1);
+    assert.equal(second.entries[0].id, feed[1].id);
+    assert.equal(second.cursor.has_more_before, true);
+    assert.equal(second.cursor.has_more_after, feed.length > 2);
+    assert.equal(second.cursor.before_id, feed[1].id);
+    assert.deepEqual(local.persistentWorld.get(), before);
+  } finally {
+    await new Promise(resolve => local.close(resolve));
+  }
+});
+
 test('content catalog and story preview expose the Morrowmere first-day replay without mutating world state', async () => {
   const before = await (await fetch(`${baseUrl}/api/world/state`)).json();
   const contentResponse = await fetch(`${baseUrl}/api/life/content-packages`);

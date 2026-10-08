@@ -4,6 +4,22 @@
 
 DeskBot 让同一个桌边个体“喵呜”在伴生奇幻空间“聚形域”持续生活。Node `deskbot-service` 保存唯一的世界事实、任务、资源、关系、记忆、角色阶段和设备输出记录；浏览器显示这些状态并提交受限请求。模型负责对话和合法候选中的有限选择，实际后果由世界规则核验。
 
+## 持续生活感补强（当前分支）
+
+真实生活任务现在有一条明确的可见投影链：
+
+```text
+canonical task / travel / NPC activity
+  -> task result or still-running state
+  -> lived Scene (read projection)
+  -> canonical life feed
+  -> map/story panel after refresh
+```
+
+`lived-scenes.mjs` 只读取已存在的任务、位置、参与者和结算结果，不执行任务、不发放资源，也不把模型台词当作世界事实。进行中、暂停、完成、失败和取消分别呈现；同一任务跨时间槽继续时沿用同一 Scene，结算后才进入结果 Scene。`persistent-world.mjs` 的 `/api/life/world/feed` 从 canonical mutation ledger 重建最近有意义的 Scene、任务、居民、社会和项目记录，过滤时钟同步与安装噪声；因此刷新或重启不会清空时间线，也不会多写一份事实。客户端只显示人可读的标题和正文，来源序号等审计字段留在服务端。
+
+这一步让“世界确实在过日子”能被看见，但它不是无限故事生成器：地点叙事、NPC可执行行动和分支仍由有限内容包与规则候选组成；停机期间没有真正启动的行动不会被补造。自然长期生活、丰富的自主世界事件与声音/实体输出仍需真实运行观察和后续阶段验收。
+
 ## 运行结构与状态归属
 
 ```text

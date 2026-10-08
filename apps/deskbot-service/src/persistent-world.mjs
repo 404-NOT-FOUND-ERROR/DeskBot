@@ -46,6 +46,7 @@ const WALL_CLOCK_NAMESPACE = 'canonical-world.wall-clock';
 const WALL_CLOCK_SCHEMA = 'deskbot.world-wall-clock.v0.1';
 const WALL_CLOCK_DEFAULT_CATCH_UP_MINUTES = 120;
 const WORLD_RULE_VERSION = 'canonical-world-rules-v0.4';
+const WORLD_LIFE_FEED_SCHEMA = 'deskbot.world-life-feed.v1';
 
 const PRESENTATION_SPACE = 'jev-town-map-v1';
 
@@ -250,6 +251,201 @@ function appendUniqueWorldLineEvent(values, value, limit = MAX_CONTEXT_ITEMS) {
     ? values.filter((item) => item?.event_id !== eventId)
     : values;
   return [...withoutDuplicate, value].slice(-limit);
+}
+
+// The life feed is a read-only projection of the canonical mutation ledger.
+// It deliberately has no independent persistence: a restart or a repeated
+// read reconstructs the same entries from the durable world mutations.
+function lifeFeedItem(mutation, world = null, scenes = null) {
+  const action = mutation?.action ?? null;
+  const details = mutation?.details ?? {};
+  const scene = details.scene ?? null;
+  const logicalBefore = mutation?.logical_time_before ?? null;
+  const logicalAfter = mutation?.logical_time_after ?? null;
+  const source = mutation?.event_source ?? null;
+  const ignored = new Set(['sync_real_time', 'advance_time', 'advance_living_world', 'advance_autonomous_life',
+    'install_input_refraction', 'install_resident_life', 'install_lived_memory', 'install_development_evidence',
+    'install_body_perception', 'claim_life_choice', 'resolve_life_choice', 'control_autonomy']);
+  if (!action || ignored.has(action)) return null;
+  let kind = 'world.event';
+  let title = '世界有了一点变化';
+  let text = '';
+  let actorId = null;
+  let locationId = null;
+  let actorName = null;
+  let sceneId = null;
+  let slotKey = null;
+  if (action === 'set_life_scene') {
+    kind = 'scene.started';
+    sceneId = scene?.scene_id ?? null;
+    slotKey = scene?.slot_key ?? null;
+    locationId = scene?.location_id ?? null;
+    title = scene?.title ?? '新的生活场景开始了';
+    text = scene?.narration ?? scene?.sensory_cue ?? '';
+  } else if (action === 'continue_life_scene') {
+    kind = 'scene.continued';
+    sceneId = details.scene_id ?? null;
+    slotKey = details.slot_key ?? null;
+    const current = scenes?.get?.(sceneId)
+      ?? (world?.life?.current_scene?.scene_id === sceneId ? world.life.current_scene : null);
+    locationId = current?.location_id ?? null;
+    title = current?.title ?? '生活场景继续了';
+    text = current?.narration ?? current?.sensory_cue ?? '';
+  } else if (action === 'npc_action') {
+    kind = 'npc.action';
+    actorId = details.npc_id ?? details.task?.actor_id ?? null;
+    const task = details.task ?? null;
+    actorId = actorId ?? task?.actor_id ?? null;
+    locationId = details.npc?.location_id ?? details.location_id ?? task?.location_id ?? task?.destination_location_id ?? null;
+    title = task?.title ?? (/[\u3400-\u9fff]/.test(details.action_name ?? '') ? details.action_name : '居民继续自己的安排');
+    text = details.npc?.status ?? details.status ?? task?.title ?? '';
+  } else if (action === 'move_protagonist' && !details.task) {
+    kind = 'travel.arrived';
+    actorId = world?.protagonist?.character_id ?? null;
+    locationId = details.to ?? null;
+    title = '走到了新的地方';
+    text = details.arrival_text ?? '已经走到这里了。';
+  } else if (action === 'start_activity' || action === 'move_protagonist') {
+    kind = 'life.task.started';
+    const task = details.task ?? {};
+    actorId = task.actor_id ?? null;
+    locationId = task.location_id ?? task.destination_location_id ?? null;
+    title = task.title ?? '一项生活事务开始了';
+    text = '已经开始了，还在忙着这件事。';
+  } else if (action === 'advance_task') {
+    const task = details.task ?? {};
+    if (!['completed', 'failed', 'cancelled'].includes(task.status)) return null;
+    kind = `life.task.${task.status}`;
+    actorId = task.actor_id ?? null;
+    locationId = task.location_id ?? task.destination_location_id ?? null;
+    title = task.title ?? '生活事务结算了';
+    text = task.status === 'completed'
+      ? (task.completion?.result?.text ?? (task.kind === 'travel' ? '已经走到目的地了。' : '这件事已经做完了。'))
+      : task.status === 'cancelled' ? '这件事停下了，没有继续做。' : '这次没有做成。';
+  } else if (action === 'control_task') {
+    const task = details.task ?? {};
+    if (!task.task_id) return null;
+    kind = `life.task.${task.status ?? 'updated'}`;
+    actorId = task.actor_id ?? null;
+    locationId = task.location_id ?? task.destination_location_id ?? null;
+    title = task.title ?? '生活事务更新了';
+    text = task.status === 'cancelled' ? '这项事务停下了，已经发生的结果仍然保留。' : task.status === 'paused' ? '这项事务暂时停下了。' : '这项事务继续进行了。';
+  } else if (action === 'npc_interaction') {
+    kind = 'social.interaction';
+    actorId = details.npc_id ?? null;
+    locationId = details.interaction?.location_id ?? null;
+    title = details.experience?.summary ?? '喵呜与居民有了一次相遇';
+    text = details.response ?? details.experience?.summary ?? '';
+  } else if (action === 'transfer_resource') {
+    kind = 'life.resource';
+    actorId = details.actor_id ?? null;
+    locationId = details.location_id ?? null;
+    title = '一份生活物资被取放了';
+    text = details.text ?? '这份物资已经交接好了。';
+  } else if (action.includes('role_practical_trial') || action === 'accept_role_stage' || action === 'rollback_role_stage') {
+    kind = action.includes('trial') ? 'role.trial' : 'role.stage';
+    actorId = details.actor_id ?? details.stage?.actor_id ?? null;
+    title = action === 'accept_role_stage' ? '一个新的角色阶段被采用了' : action === 'rollback_role_stage' ? '角色阶段回退了' : '角色试做有了进展';
+    text = details.text ?? details.stage?.label ?? details.trial?.title ?? '';
+  } else if (action === 'apply_world_line_event' || action === 'activate_event' || action === 'resolve_active_event') {
+    kind = 'world.event';
+    const event = details.event ?? details.active_event ?? details.resolved_event ?? {};
+    title = event.title ?? '世界线发生了一件事';
+    text = event.summary ?? event.daily_consequence ?? event.outcome ?? '';
+  } else if (action === 'refract_input') {
+    const record = details.record ?? details;
+    if (!record?.suggestion && !record?.environment && record?.meaning !== 'sourced_report') return null;
+    kind = 'input.refraction';
+    title = record.suggestion ? '一个外界想法抵达了小镇' : '小镇收到了外界观测';
+    text = record.summary ?? record.last_note ?? '';
+  } else if (action === 'respond_social_invitation' || action.startsWith('social_') || action.startsWith('resident_project')) {
+    kind = action.startsWith('resident_project') ? 'resident.project' : 'social.commitment';
+    actorId = details.actor_id ?? details.actor_ids?.[0] ?? null;
+    locationId = details.location_id ?? null;
+    title = details.title ?? details.name ?? (kind === 'resident.project' ? '居民的项目有了进展' : '共同生活有了新的约定');
+    text = details.text ?? '';
+  } else {
+    // Only retain meaningful state changes whose mutation includes a human
+    // readable detail. Installation and scheduler ticks are filtered above.
+    if (typeof details.text !== 'string' && typeof details.summary !== 'string') return null;
+    title = details.title ?? details.summary;
+    text = details.text ?? details.summary;
+  }
+  const person = actorId && world ? (actorId === world.protagonist?.character_id ? world.protagonist : (world.npcs ?? []).find(item => item.npc_id === actorId)) : null;
+  actorName = person?.display_name ?? null;
+  const locationName = world?.locations?.find(item => item.location_id === locationId)?.name ?? null;
+  return {
+    schema: WORLD_LIFE_FEED_SCHEMA,
+    id: `life-feed:${mutation.mutation_id}`,
+    at: action === 'advance_task'
+      ? details.task?.completion?.due_at ?? details.task?.due_at ?? details.task?.finished_at ?? mutation.occurred_at ?? mutation.committed_at ?? null
+      : ['start_activity', 'move_protagonist', 'npc_action'].includes(action)
+        ? details.task?.started_at ?? details.at ?? mutation.occurred_at ?? mutation.committed_at ?? null
+        : details.at ?? mutation.occurred_at ?? mutation.time?.occurred_at ?? mutation.committed_at ?? null,
+    kind,
+    title: String(title ?? '').trim() || '世界有了一点变化',
+    text: String(text ?? '').trim(),
+    location_id: locationId,
+    location_name: locationName,
+    location: locationName ?? locationId,
+    actor_id: actorId,
+    actor_name: actorName,
+    actor: actorName ?? actorId,
+    scene_id: sceneId,
+    slot_key: slotKey,
+    provenance: {
+      mutation_id: mutation.mutation_id,
+      event_id: mutation.event_id,
+      sequence: mutation.sequence,
+      action: mutation.action,
+      source,
+      world_revision: mutation.after_revision ?? null,
+      logical_time_before: clone(logicalBefore),
+      logical_time_after: clone(logicalAfter),
+    },
+  };
+}
+
+function lifeFeedItems(mutation, world, scenes = null) {
+  const items = [];
+  const direct = lifeFeedItem(mutation, world, scenes);
+  if (direct) items.push(direct);
+  const append = (action, details, suffix) => {
+    const projected = lifeFeedItem({ ...mutation, action, details }, world, scenes);
+    if (projected) items.push({ ...projected, id: `${projected.id}:${suffix}` });
+  };
+  // Autonomous/social/project schedulers can start several real tasks in one
+  // canonical commit. Only new task records are projected, never candidates.
+  for (const change of mutation.changes ?? []) {
+    if (change.field_path === '/tasks' && !['start_activity', 'npc_action', 'move_protagonist', 'advance_task', 'control_task'].includes(mutation.action)) {
+      const before = new Map((Array.isArray(change.old_value) ? change.old_value : []).map(task => [task.task_id, task]));
+      for (const task of Array.isArray(change.new_value) ? change.new_value : []) {
+        const old = before.get(task.task_id);
+        if (!old && task.status === 'running') append('start_activity', { task }, `task-start:${task.task_id}`);
+      }
+    }
+    const isSocial = change.field_path === '/social/recent';
+    const isProject = change.field_path.startsWith('/resident_projects/projects/') && change.field_path.endsWith('/history');
+    const isRefraction = change.field_path === '/refraction/records';
+    if (!isSocial && !isProject && !isRefraction) continue;
+    const refractionKey = record => `${record?.id ?? ''}|${record?.status ?? ''}`;
+    const previous = new Set((Array.isArray(change.old_value) ? change.old_value : [])
+      .map(record => isRefraction ? refractionKey(record) : stableStringify(record)));
+    const emitted = new Set();
+    for (const [index, record] of (Array.isArray(change.new_value) ? change.new_value : []).entries()) {
+      const key = isRefraction ? refractionKey(record) : stableStringify(record);
+      if (previous.has(key) || emitted.has(key)) continue;
+      if (isRefraction) {
+        if (!record.attested || !['chosen', 'completed', 'failed', 'cancelled'].includes(record.status)) continue;
+        emitted.add(key);
+        append('refract_input', { ...record, summary: record.last_note ?? record.summary }, `refraction:${record.id}:${record.status}`);
+      } else {
+        emitted.add(key);
+        append(isSocial ? 'social_log' : 'resident_project_log', record, `${isSocial ? 'social' : 'project'}:${index}`);
+      }
+    }
+  }
+  return items;
 }
 
 function createMultisourceState() {
@@ -1466,6 +1662,51 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       .map(clone);
   }
 
+  function listLifeFeed({ worldId = DEFAULT_WORLD_ID, afterSequence = null, beforeSequence = null, afterId = null, beforeId = null, limit = 50, kind = null } = {}) {
+    const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
+    const parsedAfter = afterSequence === null || afterSequence === undefined ? null : Math.max(Number.parseInt(afterSequence, 10) || 0, 0);
+    const parsedBefore = beforeSequence === null || beforeSequence === undefined ? null : Math.max(Number.parseInt(beforeSequence, 10) || 0, 0);
+    const scenes = new Map(storedMutations.filter(mutation => mutation.world_id === worldId && mutation.action === 'set_life_scene')
+      .map(mutation => [mutation.details.scene?.scene_id, mutation.details.scene]).filter(([id]) => id));
+    const projected = storedMutations
+      .filter((mutation) => mutation.world_id === worldId && mutation.applied !== false)
+      .flatMap((mutation) => lifeFeedItems(mutation, worlds.get(worldId), scenes))
+      .map(clone);
+    const cursorIndex = id => {
+      if (id === null || id === undefined) return null;
+      const index = projected.findIndex(item => item.id === id);
+      if (index === -1) throw new PersistentWorldError(400, 'invalid_life_feed_cursor', 'This life feed cursor does not exist');
+      return index;
+    };
+    const afterIndex = cursorIndex(afterId);
+    const beforeIndex = cursorIndex(beforeId);
+    const entries = projected
+      .filter((item, index) => (afterIndex === null || index > afterIndex) && (beforeIndex === null || index < beforeIndex))
+      .filter((item) => parsedAfter === null || item.provenance.sequence > parsedAfter)
+      .filter((item) => parsedBefore === null || item.provenance.sequence < parsedBefore)
+      .filter((item) => !kind || item.kind === kind);
+    const sliceForward = values => {
+      if (values.length <= boundedLimit) return values;
+      const boundary = values[boundedLimit - 1]?.provenance?.sequence;
+      let end = boundedLimit;
+      while (end < values.length && values[end]?.provenance?.sequence === boundary) end += 1;
+      return values.slice(0, end);
+    };
+    const sliceBackward = values => {
+      if (values.length <= boundedLimit) return values;
+      const startAt = values.length - boundedLimit;
+      const boundary = values[startAt]?.provenance?.sequence;
+      let start = startAt;
+      while (start > 0 && values[start - 1]?.provenance?.sequence === boundary) start -= 1;
+      return values.slice(start);
+    };
+    if (beforeIndex !== null) return entries.slice(-boundedLimit);
+    if (afterIndex !== null) return entries.slice(0, boundedLimit);
+    return parsedAfter !== null || parsedBefore !== null || afterIndex !== null || beforeIndex !== null
+      ? (parsedBefore !== null || beforeIndex !== null ? sliceBackward(entries) : sliceForward(entries))
+      : sliceBackward(entries);
+  }
+
   function persistCommit(world, mutation, countedTurn = null) {
     const operation = () => {
       persistence?.put('canonical-world.states', world.world_id, world);
@@ -1831,6 +2072,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     get,
     ingest,
     listMutations,
+    listLifeFeed,
     syncWallClock,
     syncTasks,
   };

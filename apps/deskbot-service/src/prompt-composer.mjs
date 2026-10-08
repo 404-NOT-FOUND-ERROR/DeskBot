@@ -4,7 +4,7 @@ import { activeWorldTask } from './realtime-world.mjs';
 import { livingReadModel, livingObjectReadModel } from './living-resources.mjs';
 import { ROLE_WISH_DIRECTIONS } from './role-wishes.mjs';
 import { roleStagesReadModel } from './role-stages.mjs';
-import { getRoleExperiencePackage } from './role-experience-packages.mjs';
+import { composeRoleExperiencePackages, getRoleExperiencePackage } from './role-experience-packages.mjs';
 
 import {
   DEFAULT_CHARACTER_DISPLAY_NAME,
@@ -245,6 +245,80 @@ function composeCurrentRoleStage(currentRoleStages = [], worldSnapshot = null) {
     `会留意：${overlay.preferences ?? '当前生活中具体、有趣的细节。'}`,
     `边界：${overlay.boundary ?? '只影响表达与愿望，不改变世界事实。'}`,
   ].join('\n');
+}
+
+/**
+ * A role package is a stable expression source, not a line to recite.  Keep
+ * the package-owned presence and speech cues in the base prompt even when the
+ * user is asking an ordinary question.  This is what makes an adopted stage
+ * feel like the same living character between world enquiries, while the
+ * trial package remains explicitly provisional.
+ */
+export function modelRoleExperienceContext({ worldSnapshot = null, currentRoleStages = [], activeRoleTrials = [], roleWishes = [] } = {}) {
+  const canonicalStages = worldSnapshot?.role_stages?.schema === 'deskbot.role-stages.v1'
+    ? Object.values(roleStagesReadModel(worldSnapshot).current).filter(Boolean)
+    : currentRoleStages;
+  const currentDirections = [...new Set((Array.isArray(canonicalStages) ? canonicalStages : [])
+    // Legacy callers may omit status (the role-state contract implies an
+    // accepted stage); when present, only accepted stages are current.
+    .filter(stage => stage?.current !== false && (stage?.status === 'accepted'
+      || (!stage?.status && stage?.schema === 'deskbot.role-state.v1')))
+    .map(stage => stage.direction_id)
+    .filter(Boolean))];
+  const composed = composeRoleExperiencePackages(currentDirections);
+  const practicalTrials = (Array.isArray(roleWishes) ? roleWishes : []).filter(wish => {
+    const practical = modelPracticalTrialContext(wish);
+    return wish.status === 'prepared' && ['running', 'blocked', 'paused', 'review'].includes(practical?.status);
+  });
+  const trials = [...(Array.isArray(activeRoleTrials) ? activeRoleTrials : []).filter(trial => trial?.trial?.status === 'active'), ...practicalTrials]
+    .filter(trial => trial.direction_id)
+    .map(trial => {
+      const packageValue = getRoleExperiencePackage(trial.direction_id);
+      if (!packageValue) return null;
+      return {
+        direction_id: packageValue.direction_id,
+        package_id: packageValue.package_id,
+        label: packageValue.identity.label,
+        premise: packageValue.identity.premise,
+        presence: packageValue.expression.presence,
+        speech: packageValue.expression.speech,
+        catchphrases: [...packageValue.expression.catchphrases],
+        triggers: structuredClone(packageValue.expression.triggers),
+        status: trial.practical_trial?.status ?? 'active_trial',
+      };
+    }).filter(Boolean)
+    .filter((trial, index, values) => values.findIndex(item => item.direction_id === trial.direction_id) === index);
+  return {
+    schema: 'deskbot.role-experience-prompt-view.v1',
+    current: composed.packages.map(packageValue => ({
+      direction_id: packageValue.direction_id,
+      package_id: packageValue.package_id,
+      label: packageValue.identity.label,
+      premise: packageValue.identity.premise,
+      presence: packageValue.expression.presence,
+      speech: packageValue.expression.speech,
+      preferences: packageValue.expression.preferences,
+      catchphrases: [...packageValue.expression.catchphrases],
+      triggers: structuredClone(packageValue.expression.triggers),
+    })),
+    active_trials: trials,
+    rejected: structuredClone(composed.rejected),
+    fallback_used: composed.fallback_used,
+  };
+}
+
+function composeRoleExperienceExpression(context) {
+  const expression = (packageValue, trial = false) => [
+    `${trial ? '正在尝试的生活兴趣' : '持续的生活气质'}：${packageValue.label}`,
+    `在意：${packageValue.premise}`,
+    `气质：${packageValue.presence}`,
+    `措辞：${packageValue.speech}`,
+    packageValue.preferences ? `留意：${packageValue.preferences}` : null,
+    packageValue.catchphrases.length ? `可以自然用的口头习惯：${packageValue.catchphrases.join('、')}` : null,
+    packageValue.triggers.length ? `情境反应：${packageValue.triggers.map(trigger => trigger.response).filter(Boolean).join('；')}` : null,
+  ].filter(Boolean).join('\n');
+  return [...context.current.map(packageValue => expression(packageValue)),
+    ...context.active_trials.map(packageValue => expression(packageValue, true))].join('\n');
 }
 
 function settingDiscussionRequested(userText = '') {
@@ -590,6 +664,7 @@ export function composePrompt({
     ? composeRoleTrialDesire(activeRoleTrials)
     : '本轮不讨论角色方向；保持当前性格，不主动提形态变化。';
   const currentRoleStageBlock = composeCurrentRoleStage(currentRoleStages, worldSnapshot);
+  const roleExperienceBlock = modelRoleExperienceContext({ worldSnapshot, currentRoleStages, activeRoleTrials, roleWishes });
 
   const prompt = [
     '[DESKBOT_ROLE]',
@@ -684,6 +759,11 @@ export function composePrompt({
     '这是已经确认的当前虚拟形态与生活职业，可在两个轴上组合。它影响注意力、日常候选和表达，实际行动结果仍以原任务为准。长期种子中的猫型外壳和 character_profile 是实体基线，不能覆盖这里已采用的虚拟地图造型；虚拟蛙形也不能冒充已经更换实体壳、获得跳跃肢体或现实专业能力。声音尚未变化。让方向通过自然关注露出，信息保持清楚；后台名称不进正文。',
     '[/DESKBOT_CURRENT_ROLE_STAGE]',
     '',
+    '[DESKBOT_ROLE_EXPERIENCE]',
+    composeRoleExperienceExpression(roleExperienceBlock),
+    '角色体验包是喵呜持续生活的表达底色：把 presence、speech 和一个合适的 catchphrase 藏进当前事实与功能信息里，不要逐字段朗读，也不要每轮机械轮播口癖。current 是已经采用的虚拟生活方向（没有采用方向时使用猫型 baseline）；active_trials 是正在试做的兴趣，只能以“我最近想试试”的轻微倾向出现，不能说成已经采用。不同轴可以同时存在，但事实、风险和任务优先。',
+    '[/DESKBOT_ROLE_EXPERIENCE]',
+    '',
     '[DESKBOT_LIVED_WORLD]',
     livedWorldBlock,
     '[/DESKBOT_LIVED_WORLD]',
@@ -718,6 +798,7 @@ export function composePrompt({
     current_role_stages: Array.isArray(currentRoleStages) ? currentRoleStages : [],
     role_wishes: modelRoleWishContext(roleWishes, worldSnapshot),
     role_stage_context: modelRoleStageContext(worldSnapshot),
+    role_experience_context: roleExperienceBlock,
   };
 }
 

@@ -20,7 +20,7 @@ export const stageSaved = persistence => stageSavedNamespaces.map(namespace => [
 // Prior wish prerequisites are explicit recorded-root unit fixtures. New
 // trial successes are timed original recipes admitted by ordinary autonomy;
 // no completed result or acceptance is inserted into this fixture.
-export async function roleStageHttpFixture(t, { seedWorld = null, seedProposals = [], at = seedWorld?.clock?.synced_at ?? WISH_AT } = {}) {
+export async function roleStageHttpFixture(t, { seedWorld = null, seedProposals = [], developmentRecords = null, at = seedWorld?.clock?.synced_at ?? WISH_AT } = {}) {
   mkdirSync(new URL('../../../../tmp/', import.meta.url), { recursive: true });
   const filename = fileURLToPath(new URL(`../../../../tmp/stage-http-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`, import.meta.url));
   let time = Date.parse(at), persistence, world, roles, server, baseUrl;
@@ -32,7 +32,7 @@ export async function roleStageHttpFixture(t, { seedWorld = null, seedProposals 
       const state = seedWorld ? structuredClone(seedWorld) : world.get();
       if (!seedWorld) { installResidentLife(state, WISH_AT);
       installLivedMemory(state, '2026-10-06T00:00:00.000Z', { plannerEnabled: false });
-      state.memory.development.records = readyWishWorld({ chef: true }).memory.development.records;
+      state.memory.development.records = developmentRecords ?? readyWishWorld({ chef: true }).memory.development.records;
       for (const actor of Object.values(state.autonomy.actors)) Object.assign(actor, { paused: true, energy: .8, appetite: .1 });
       state.autonomy.actors[OWNER].paused = false;
       state.protagonist.location_id = 'moss-sprout-garden';

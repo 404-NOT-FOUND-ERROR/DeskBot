@@ -12,6 +12,7 @@ import {
 } from './npc-personas.mjs';
 import { roleExperienceContext } from './role-experience-packages.mjs';
 import { roleExperiencePerformance } from './role-experience-performance.mjs';
+import { selectLivedScene } from './lived-scenes.mjs';
 
 const SLOT_MS = 30 * 60 * 1000;
 import { residentResponse } from './resident-life.mjs';
@@ -298,8 +299,13 @@ function selectCausalScene(world, now, { roleStages = [] } = {}) {
 }
 
 function selectScene(world, now, { roleStages = [] } = {}) {
+  const livedOptions = { roleStages, timeBand: timeBand(world.logical_time?.minute_of_day ?? 0) };
+  const lived = selectLivedScene(world, now, { ...livedOptions, includeQuiet: false });
+  if (lived) return lived;
   const causal = selectCausalScene(world, now, { roleStages });
   if (causal) return causal;
+  const quiet = selectLivedScene(world, now, livedOptions);
+  if (quiet) return quiet;
   const locationId = world.protagonist.location_id;
   const catalog = LIFE_SCENES[locationId] ?? LIFE_SCENES['shaping-field-desk'];
   const band = timeBand(world.logical_time?.minute_of_day ?? 0);

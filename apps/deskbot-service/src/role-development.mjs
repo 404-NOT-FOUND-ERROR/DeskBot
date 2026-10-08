@@ -15,6 +15,7 @@ export const DEVELOPMENT_DIRECTIONS = Object.freeze([
   Object.freeze({ direction_id: 'starry_observer', label: '星空观察者', topics: [], locations: null, availability: 'existing_direction', mapping_note: '尚无明确的观星实践活动，普通观察小镇不作为观星经历。' }),
   Object.freeze({ direction_id: 'dream_cloud', label: '云朵梦境生物', topics: [], locations: null, availability: 'existing_direction', mapping_note: '尚无对应实际试用活动，梦境或漂浮对白不作为实践。' }),
   Object.freeze({ direction_id: 'chef', label: '厨师方向', topics: ['cook'], locations: null, availability: 'future_direction', mapping_note: '只观察做饭实践；主动愿望、角色提案与解锁尚未实现。' }),
+  Object.freeze({ direction_id: 'explorer', label: '潮痕探险家', topics: ['explore'], locations: ['tidal-old-road', 'backlit-grove', 'echo-waterside'], availability: 'existing_direction', mapping_note: '已有路线观察实践与对应试做方式；愿望、采用和表达仍依据各自的实际记录。' }),
 ]);
 
 const unique = values => [...new Set(values.filter(value => typeof value === 'string' && value))].sort();

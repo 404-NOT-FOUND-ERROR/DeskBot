@@ -14,6 +14,10 @@ const DEFINITIONS = Object.freeze({
   chef: [{ id: 'cook', label: '实际做苔芽餐', activities: ['cook-moss'] }, { id: 'stew', label: '实际煮林间光果餐', activities: ['cook-grove-stew'] }],
   explorer: [{ id: 'scout', label: '沿旧路实际观察十步', activities: ['scout-route'] }],
 });
+// Public read-only catalog for lifecycle adapters.  The activity definitions
+// remain the single source of truth for which authored directions can enter a
+// real practical trial.
+export const PRACTICAL_TRIAL_DIRECTIONS = Object.freeze(Object.keys(DEFINITIONS));
 const clean = value => typeof value === 'string' && value.trim() && value.length <= 500 ? value.trim() : null;
 const validAt = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const unique = values => [...new Set(values.filter(Boolean))].sort();

@@ -228,7 +228,7 @@ export function roleStageCandidates(world, state, at) {
     const baseDesign = definitions[stage.direction_id];
     const design = packageValue ? { ...baseDesign, interests: packageValue.life.interests, places: packageValue.life.places,
       activity: packageValue.life.activity || baseDesign.activity, topic: packageValue.life.interests[0] || baseDesign.topic,
-      title: packageValue.life.actions[0] || baseDesign.title, label: packageValue.identity.label } : baseDesign;
+      title: baseDesign.title, label: packageValue.identity.label } : baseDesign;
     const goal = `role-stage:${stage.stage_id}:${design.activity}`;
     const objects = world.living.objects, inventory = world.living.inventories?.[state.actor_id]?.stock ?? {};
     const link = { stage_id: stage.stage_id, direction_id: stage.direction_id, axis: stage.axis, basis: 'rule_based_choice' };

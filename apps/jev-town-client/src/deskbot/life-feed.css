@@ -1,0 +1,10 @@
+.deskbot-mode__life-feed{padding:12px 15px 15px;border-top:1px solid #e6eadc}
+.deskbot-mode__life-feed-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
+.deskbot-mode__life-feed-head strong{font-size:11px;color:#557763}
+.deskbot-mode__life-feed-head small{font-size:9px;color:#93a180}
+.deskbot-mode__life-feed ol{display:grid;gap:11px;margin:0;padding:0;list-style:none}
+.deskbot-mode__life-feed li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px}
+.deskbot-mode__life-feed time{font-size:9px;color:#a1ad98;line-height:1.5}
+.deskbot-mode__life-feed li div{display:grid;gap:3px;border-left:1px solid #dbe4d5;padding-left:9px}
+.deskbot-mode__life-feed li strong{font-size:11px;color:#557763;line-height:1.5;overflow-wrap:anywhere}
+.deskbot-mode__life-feed li span{font-size:10px;color:#82937b;line-height:1.6;overflow-wrap:anywhere}

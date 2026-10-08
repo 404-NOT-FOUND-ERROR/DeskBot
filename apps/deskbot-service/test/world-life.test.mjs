@@ -63,6 +63,94 @@ test('world life seeds bounded NPCs and one replayable scene per wall-clock slot
   assert.equal(world.get().life.current_scene.continuity.kind, 'local_progression');
 });
 
+test('life feed is a read-only canonical mutation projection and survives restart', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deskbot-life-feed-'));
+  const filename = join(directory, 'life-feed.sqlite');
+  try {
+    const persistence = createSqlitePersistence({ filename });
+    const first = fixture('2026-09-17T02:00:00.000Z', persistence);
+    first.life.tick();
+    const firstFeed = first.world.listLifeFeed({ limit: 20 });
+    assert.ok(firstFeed.some((entry) => entry.kind === 'scene.started'));
+    const beforeRead = first.world.get();
+    const repeated = first.world.listLifeFeed({ limit: 20 });
+    assert.deepEqual(repeated, firstFeed);
+    assert.deepEqual(first.world.get(), beforeRead);
+    first.world.ingest(mutation('life-feed-clock-001', { action: 'advance_time', minutes: 30 }));
+    first.advance(30 * 60 * 1000);
+    first.life.tick();
+    const continued = first.world.listLifeFeed({ afterSequence: firstFeed.at(-1).provenance.sequence, limit: 20 });
+    assert.ok(continued.length >= 1);
+    assert.ok(continued.every((entry) => entry.id.startsWith('life-feed:')));
+    const lastSequence = continued.at(-1).provenance.sequence;
+    persistence.close();
+
+    const restoredPersistence = createSqlitePersistence({ filename });
+    const restored = createPersistentWorld({ persistence: restoredPersistence, now: () => new Date('2026-09-17T02:30:00.000Z') });
+    const restoredFeed = restored.listLifeFeed({ limit: 50 });
+    assert.equal(restoredFeed.at(-1).provenance.sequence, lastSequence);
+    assert.deepEqual(restoredFeed, restored.listLifeFeed({ limit: 50 }));
+    restoredPersistence.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('life feed excludes scheduler clock noise and supports recent/cursor pagination', () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('feed-time-noise', { action: 'advance_time', minutes: 30 }));
+  life.tick();
+  const feed = world.listLifeFeed({ limit: 50 });
+  assert.ok(feed.length >= 1);
+  assert.ok(feed.every((entry) => !entry.kind.startsWith('clock.') && entry.provenance));
+  assert.ok(feed.every((entry) => !['advance_time', 'advance_living_world', 'advance_autonomous_life'].includes(entry.provenance.action)));
+  const recent = world.listLifeFeed({ limit: 1 });
+  assert.equal(recent.length, 1);
+  const before = world.listLifeFeed({ beforeSequence: recent[0].provenance.sequence, limit: 10 });
+  assert.ok(before.every((entry) => entry.provenance.sequence < recent[0].provenance.sequence));
+});
+
+test('life feed entry cursors preserve task start and completion facts', () => {
+  let clock = Date.parse('2026-10-08T02:00:00.000Z');
+  const world = createPersistentWorld({ now: () => new Date(clock), timeMode: 'realtime' });
+  world.ingest(mutation('feed-task-start', {
+    action: 'start_activity', task_id: 'feed-task', kind: 'care', title: '照料桌边的小东西', duration_seconds: 60,
+  }, new Date(clock).toISOString()));
+  clock += 61_000;
+  world.syncTasks();
+  const all = world.listLifeFeed({ limit: 20 });
+  const started = all.find(entry => entry.kind === 'life.task.started');
+  const completed = all.find(entry => entry.kind === 'life.task.completed');
+  assert.ok(started && completed);
+  assert.equal(completed.at, '2026-10-08T02:01:00.000Z', 'completion is shown at due time');
+  assert.deepEqual(world.listLifeFeed({ afterId: started.id, limit: 20 }).map(entry => entry.id), [completed.id]);
+  assert.deepEqual(world.listLifeFeed({ beforeId: completed.id, limit: 20 }).map(entry => entry.id), [started.id]);
+  assert.throws(() => world.listLifeFeed({ afterId: 'life-feed:missing', limit: 20 }), { code: 'invalid_life_feed_cursor' });
+});
+
+test('life feed pagination does not lose multiple activities from the same canonical commit', () => {
+  const now = () => new Date('2026-10-08T02:00:00.000Z');
+  const world = createPersistentWorld({ now, timeMode: 'realtime' });
+  createWorldLife({ now, worldSnapshot: () => world.get(), ingest: event => world.ingest(event) }).seedNpcs();
+  world.ingest(mutation('feed-autonomy-cycle', { action: 'advance_autonomous_life' }, now().toISOString()));
+  const feed = world.listLifeFeed({ limit: 20 });
+  assert.ok(feed.length > 1);
+  assert.equal(new Set(feed.map(entry => entry.provenance.sequence)).size, 1);
+  assert.deepEqual(world.listLifeFeed({ limit: 1 }), feed, 'legacy sequence pagination keeps one commit together');
+  const walked = [feed[0]];
+  while (walked.length < feed.length) {
+    const next = world.listLifeFeed({ afterId: walked.at(-1).id, limit: 1 });
+    assert.equal(next.length, 1);
+    walked.push(next[0]);
+  }
+  assert.deepEqual(walked, feed);
+  assert.deepEqual(world.listLifeFeed({ afterId: walked.at(-1).id, limit: 1 }), []);
+  assert.deepEqual(world.listLifeFeed({ beforeId: feed.at(-1).id, limit: 1 }), [feed.at(-2)]);
+  assert.ok(feed.every(entry => entry.kind === 'life.task.started'));
+  assert.deepEqual(world.listLifeFeed({ limit: 20 }), feed);
+});
+
 test('an older story NPC is upgraded without losing its location or status', () => {
   const { world, life } = fixture();
   world.ingest(mutation('legacy-pathfinder', {

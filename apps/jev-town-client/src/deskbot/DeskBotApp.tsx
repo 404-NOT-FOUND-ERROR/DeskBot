@@ -21,6 +21,8 @@ import './body-status.css';
 import {fetchRoleStagePreview,createRoleStageController} from './bridge.ts';
 import type {DeskBotRoleStageOperation} from './types.ts';
 import type {ShapingAppearance} from '../three/shapingAppearance.ts';
+import {buildLifeFeed, fetchPersistentLifeFeed, type DeskBotLifeFeedEvent} from './lifeFeed.ts';
+import './life-feed.css';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -75,6 +77,7 @@ export function DeskBotApp() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [storyLines, setStoryLines] = useState<StoryLine[]>([]);
+  const [storyOpen, setStoryOpen] = useState(true);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [placeFocusRequest,setPlaceFocusRequest]=useState(0);
   const [selectedRoute, setSelectedRoute] = useState<DeskBotWorldRouteResponse | null>(null);
@@ -82,6 +85,7 @@ export function DeskBotApp() {
   const [travelBusy, setTravelBusy] = useState(false);
   const [arrivalText, setArrivalText] = useState<string | null>(null);
   const [travelVisual, setTravelVisual] = useState<DeskBotTravelVisual | null>(null);
+  const [lifeFeed, setLifeFeed] = useState<DeskBotLifeFeedEvent[]>([]);
   const [message, setMessage] = useState("正在连接雾灯镇…");
   const interactionRetry = useRef<{ fingerprint: string; id: string } | null>(null);
   const chatRetry = useRef<{ fingerprint: string; id: string } | null>(null);
@@ -166,6 +170,11 @@ export function DeskBotApp() {
       const snapshot = await fetchDeskBotWorld(baseUrl);
       applyMap(snapshot.map);
       applyLife(snapshot.life);
+      // Prefer a future server-owned feed when available, while keeping this
+      // client compatible with the current service by deriving the timeline
+      // from persisted map/life read models.
+      const feed = await fetchPersistentLifeFeed(baseUrl) ?? buildLifeFeed(snapshot.map, snapshot.life);
+      setLifeFeed(feed);
       try {const next=await fetchRoleWishes(snapshot.map.protagonist.character_id,baseUrl);setRoleWishes(current=>(current?.evolution.role_stages?.revision??0)>(next.evolution.role_stages?.revision??0)?current:next);} catch {setRoleWishes(null);}
       setMessage("小镇的近况已更新。");
     } catch (error) {
@@ -559,7 +568,7 @@ export function DeskBotApp() {
             routePreview={routePreview}
             activities={sceneActivities}
           />
-          <details className="deskbot-mode__story" aria-label="雾灯镇当前故事" open={storyLines.length>0?true:undefined}><summary><span>喵呜 · {map?.locations.find(l=>l.current)?.name??"雾灯镇"}</span><strong>{currentTask?taskTitle:"此刻的日常"}</strong></summary>
+          <details className="deskbot-mode__story" aria-label="雾灯镇当前故事" open={storyOpen} onToggle={event=>setStoryOpen(event.currentTarget.open)}><summary><span>喵呜 · {map?.locations.find(l=>l.current)?.name??"雾灯镇"}</span><strong>{currentTask?taskTitle:"此刻的日常"}</strong></summary>
             <div className="deskbot-mode__story-scene">
               <span>{travelling ? "此刻 · 在路上" : `此刻 · ${map?.locations.find((location) => location.current)?.name ?? "雾灯镇"}`}</span>
               <h2>{currentTask ? taskTitle : life?.current_scene?.title ?? "雾灯镇的日常"}</h2>
@@ -578,6 +587,13 @@ export function DeskBotApp() {
             ) : null}
             {lastInteraction?.experience ? <small className="deskbot-mode__story-note">共同经历已记入：{lastInteraction.experience.summary}</small> : null}
             {lastInteraction?.role_evidence?.direction ? <small className="deskbot-mode__story-note">角色方向线索：{lastInteraction.role_evidence.direction.label} · 观察中，尚未改变身份或外壳</small> : null}
+            {lifeFeed.length ? <section className="deskbot-mode__life-feed" aria-label="小镇最近动静">
+              <div className="deskbot-mode__life-feed-head"><strong>最近动静</strong><small>世界继续往前走</small></div>
+              <ol>{lifeFeed.slice(0, 6).map(event => <li key={event.id}>
+                <time dateTime={event.at}>{new Date(event.at).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'})}</time>
+                <div><strong>{event.title}</strong><span>{event.text}</span></div>
+              </li>)}</ol>
+            </section> : null}
           </details>
 
           {selectedPlace ? (

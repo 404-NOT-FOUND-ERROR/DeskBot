@@ -4,7 +4,7 @@ import { localWorldDate } from './realtime-world.mjs';
 import { isFantasyEvidenceEvent } from './fantasy-pull.mjs';
 import { roleDevelopmentReadModel, candidateDevelopmentContext } from './role-development.mjs';
 import { roleWishReadModel } from './role-wishes.mjs';
-import { practicalTrialReadModel, practicalTrialsReadModel } from './role-practical-trials.mjs';
+import { practicalTrialReadModel, practicalTrialsReadModel, PRACTICAL_TRIAL_DIRECTIONS } from './role-practical-trials.mjs';
 import { RoleProposalError, roleDirectionOverlay } from './role-proposals.mjs';
 import { roleStagePreview, roleStageReadModel, roleStagesReadModel } from './role-stages.mjs';
 
@@ -557,7 +557,7 @@ export function createRoleEvolution({
     const registered = world?.protagonist?.character_id === proposal.character_id || world?.npcs?.some(item => item.npc_id === proposal.character_id);
     const available = proposal.status === 'prepared' && proposal.user_choice === 'try' && registered
       && Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time'
-      && ['wetland_frog', 'workshop_maker', 'chef'].includes(proposal.direction_id) && !trial;
+      && PRACTICAL_TRIAL_DIRECTIONS.includes(proposal.direction_id) && !trial;
     const roleStage = roleStageReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
     const preview = roleStagePreview(world, { proposal, at: now().toISOString() });
     return { ...proposal, practical_trial: trial, practical_trial_connected: Boolean(trial), practical_trial_available: Boolean(available),

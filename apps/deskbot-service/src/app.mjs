@@ -644,6 +644,41 @@ export function createDeskBotServer({
         return;
       }
     }
+    if (url.pathname === '/api/life/world/feed' && request.method === 'GET') {
+      try {
+      const afterRaw = url.searchParams.get('after_sequence');
+      const beforeRaw = url.searchParams.get('before_sequence');
+      if ([afterRaw, beforeRaw].some(value => value !== null && value.trim() === '')) {
+        throw new InputError(400, 'invalid_life_feed_cursor', 'Life feed sequences must be non-negative integers');
+      }
+      const afterSequence = afterRaw === null ? null : Number(afterRaw);
+      const beforeSequence = beforeRaw === null ? null : Number(beforeRaw);
+      if ([afterSequence, beforeSequence].some(value => value !== null && (!Number.isSafeInteger(value) || value < 0))) {
+        throw new InputError(400, 'invalid_life_feed_cursor', 'Life feed sequences must be non-negative integers');
+      }
+      const afterId = url.searchParams.get('after_id');
+      const beforeId = url.searchParams.get('before_id');
+      const limit = Number(url.searchParams.get('limit') ?? 50);
+      const kind = url.searchParams.get('kind') || null;
+      const entries = persistentWorld.listLifeFeed({ afterSequence, beforeSequence, afterId, beforeId, limit, kind });
+      const firstSequence = entries[0]?.provenance?.sequence ?? null;
+      const lastSequence = entries.at(-1)?.provenance?.sequence ?? null;
+      const firstId = entries[0]?.id ?? null;
+      const lastId = entries.at(-1)?.id ?? null;
+      const allBefore = firstId === null ? [] : persistentWorld.listLifeFeed({ beforeId: firstId, limit: 1, kind });
+      const allAfter = lastId === null ? [] : persistentWorld.listLifeFeed({ afterId: lastId, limit: 1, kind });
+      sendJson(response, 200, {
+        schema: 'deskbot.world-life-feed-response.v1',
+        world_id: persistentWorld.get()?.world_id ?? null,
+        world_revision: persistentWorld.get()?.world_revision ?? null,
+        entries,
+        cursor: { before_id: firstId, after_id: lastId, before_sequence: firstSequence, after_sequence: lastSequence, has_more_before: allBefore.length > 0, has_more_after: allAfter.length > 0 },
+      });
+      } catch (error) {
+        sendJson(response, error.statusCode ?? 500, { error: error.code ?? 'internal_error', message: error.message });
+      }
+      return;
+    }
     if (url.pathname === '/api/life/world/replay' && request.method === 'POST') {
       readJson(request)
         .then(body => worldLife.replay(body))

@@ -1,12 +1,12 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段，2026-10-07。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
+**当前功能基线：v0.5 · 角色发展第 6 阶段及持续生活投影补强，2026-10-08。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 667 项通过（2026-10-08 本机复验） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
+| DeskBot 服务完整回归 | 684 项通过（2026-10-08 本机复验，含持续生活与 Explorer 生命周期） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
 | 3D 客户端 | 39 套、259 项通过 | 读模型、控制、样本、场景和组合几何；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 均通过 | 类型一致性和可构建性 |
@@ -23,6 +23,7 @@
 | 能力 | 主要覆盖 | 代表测试 |
 | --- | --- | --- |
 | 现实钟与持续任务 | 上海日期、停机校正、回拨保护、禁止生产快进、到期结算、重启和真实旅行 | `realtime-world.test.mjs`、`realtimeTravel.test.ts` |
+| 生活事实到故事投影 | 任务状态、真实结果、同地 NPC、跨槽延续、地点设置、feed 重启与分页 | `lived-scenes.test.mjs`、`world-life.test.mjs`、`persistent-world-http.test.mjs` |
 | 地图与环境 | 十地点目录、区域/物件、合法扩建、封路、重规划、天气与环境更新 | `world-map-content.test.mjs`、`world-environment.test.mjs`、`mapCatalog.test.ts`、`routeVisual.test.ts` |
 | 可感知场景 | 工作姿态、资源/项目读模型、风雨与昼夜、家庭和工作灯光、光粒居民造型 | `activityProjection.test.ts`、`sceneWorkplace.test.ts`、`domesticLights.test.ts`、`shapingFigures.test.ts` |
 | 自主生活与供给 | 有限候选、需要优先、真实任务、库存预留、生态恢复、错开生产、帮助与食物交接 | `autonomous-life.test.mjs`、`living-resources.test.mjs`、`life-supply-cycle.test.mjs`、`supply-coordination.test.mjs`、`supply-help.test.mjs` |
