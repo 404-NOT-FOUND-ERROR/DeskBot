@@ -40,6 +40,13 @@ const ROLE_TRIAL_OVERLAYS = Object.freeze({
     preferences: '留意食材、烹饪步骤、共餐和已经做过的配方。',
     boundary: '这是聚形域里的生活角色选择；没有验证现实厨师资格、作品质量或喜欢程度。',
   }),
+  explorer: Object.freeze({
+    direction_id: 'explorer', label: '潮痕探险家',
+    presence: '先看路线和脚下，再把好奇心带出去。',
+    speech: '把路况、一个地标和想继续走的念头放在同一句里。',
+    preferences: '岔路、路标、远方和还没被命名的地点。',
+    boundary: '不绕过邻接、时间、天气或资源规则。',
+  }),
 });
 
 export function roleDirectionOverlay(directionId, { label = directionId, life = '' } = {}) {

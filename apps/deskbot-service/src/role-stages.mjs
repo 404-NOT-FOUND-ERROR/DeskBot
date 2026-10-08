@@ -33,6 +33,11 @@ const definitions = Object.freeze({
     accessories: ['chef-hat', 'chef-apron'], palette: { secondary: '#d8b384', light: '#ffe7ac' },
     summary: '同一虚拟形体加上厨帽与灶边围裙；采用厨师方向不等于获得职业资格。',
     life: '参与原有采集、备料、做饭和送餐循环；不赠送食材，不绕过厨房与长桌容量。' },
+  explorer: { axis: 'vocation', label: '潮痕探险家', interests: ['explore', 'observe'], places: ['tidal-old-road', 'backlit-grove', 'echo-waterside'],
+    activity: 'scout-route', topic: 'explore', title: '沿着旧路观察十步', figure_vocation: 'explorer',
+    accessories: ['route-scarf', 'map-badge'], palette: { secondary: '#6aa5a8', light: '#c8f0df' },
+    summary: '保留地图邻接和时间规则，以路线围巾与地图纹章表达探险方向。',
+    life: '增加远方地点和合法邻接路线的观察选择；不把想去说成已经抵达。' },
 });
 
 export class RoleStageError extends Error {
@@ -248,7 +253,13 @@ export function roleStageCandidates(world, state, at) {
       || (objects['parts-drawers']?.stock.wood ?? 0) < 3 || (objects['parts-drawers']?.stock.fasteners ?? 0) < 5)) continue;
     if (stage.direction_id === 'chef' && ((objects['shared-table']?.stock.rations ?? 0) >= 10 || (objects['trial-stove']?.stock.water ?? 0) < 3)) continue;
     try {
-      const steps = design.activity === 'cook' ? cookAndStoreSteps(world, state.actor_id) : activitySteps(world, state.actor_id, design.activity);
+      const steps = design.activity === 'cook' ? cookAndStoreSteps(world, state.actor_id)
+        : design.activity === 'observe' ? [{ kind: 'observe', title: design.title, duration_seconds: 900 }]
+          : activitySteps(world, state.actor_id, design.activity);
+      if (design.activity === 'observe' && design.places?.length && !design.places.includes(person(world, state.actor_id)?.location_id)) {
+        const destination = design.places.find(place => findWorldPath(world, person(world, state.actor_id)?.location_id, place));
+        if (destination) steps.unshift({ kind: 'travel', location_id: destination });
+      }
       if (stage.direction_id === 'workshop_maker') {
         const location = objectId => world.map_catalog?.areas?.find(area => area.area_id === world.map_catalog.objects.find(object => object.object_id === objectId)?.area_id)?.location_id;
         const nursery = location('seedling-rack'), bench = location('repair-bench');

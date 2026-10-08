@@ -39,6 +39,8 @@ import { createRoleEvolution } from './role-evolution.mjs';
 import { practicalTrialReadModel } from './role-practical-trials.mjs';
 import { roleStageReadModel } from './role-stages.mjs';
 import { createWorldCandidateStore, WorldCandidateError } from './world-candidates.mjs';
+import { listRoleExperiencePackages } from './role-experience-packages.mjs';
+import { roleExperiencePerformance } from './role-experience-performance.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
 import {
@@ -1249,6 +1251,16 @@ export function createDeskBotServer({
         rule_version: 'fantasy-pull.v0.3',
         character_id: characterId,
         pulls: rolePulls({ characterId, limit: url.searchParams.get('limit') ?? 200 }),
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/roles/experience-packages') {
+      const axis = url.searchParams.get('axis') ?? null;
+      sendJson(response, 200, {
+        schema: 'deskbot.role-experience-package-list.v1',
+        packages: listRoleExperiencePackages({ axis }),
+        performance: roleExperiencePerformance(url.searchParams.getAll('direction_id')),
       });
       return;
     }

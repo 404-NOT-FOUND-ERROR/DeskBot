@@ -29,6 +29,7 @@ const INITIAL = {
 };
 // Recipes fix targets, time, inputs and outputs. Client titles/effects cannot mint stock.
 export const ACTIVITIES = Object.freeze([
+  { activity_id: 'scout-route', title: '沿旧路观察十步', kind: 'care', target: 'floating-frame', seconds: 900, inputs: [] },
   { activity_id: 'water-bed', title: '给苗床浇水', kind: 'care', target: 'garden-bed', seconds: 300, inputs: [{ container: 'seedling-rack', resource: 'water', count: 3 }] },
   { activity_id: 'drain-bed', title: '疏通苗床排水', kind: 'care', target: 'garden-bed', seconds: 600, inputs: [] },
   { activity_id: 'tend-bed', title: '整理和照料苗木', kind: 'care', target: 'garden-bed', seconds: 720, inputs: [{ container: 'seedling-rack', resource: 'water', count: 1 }] },

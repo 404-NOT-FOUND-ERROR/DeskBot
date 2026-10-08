@@ -12,6 +12,7 @@ const DEFINITIONS = Object.freeze({
   workshop_maker: [{ id: 'craft', label: '做一只育苗托盘', activities: ['craft-tray'] },
     { id: 'repair', label: '修缮一处实际磨损的设施', activities: ['repair-bench', 'repair-frame', 'repair-rack', 'repair-stove', 'stitch-canopy', 'repair-pump'] }],
   chef: [{ id: 'cook', label: '实际做苔芽餐', activities: ['cook-moss'] }, { id: 'stew', label: '实际煮林间光果餐', activities: ['cook-grove-stew'] }],
+  explorer: [{ id: 'scout', label: '沿旧路实际观察十步', activities: ['scout-route'] }],
 });
 const clean = value => typeof value === 'string' && value.trim() && value.length <= 500 ? value.trim() : null;
 const validAt = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -155,7 +156,7 @@ function buildCandidate(world, trial, at) {
         reason: '先把基本需要和原有安排留好余地，再实际试一小次这份愿望。', score: 34, available: true,
         steps: steps.map((step, index) => ({ ...step, role_trial_primary: index === primary })),
         discretionary_practice: true,
-        development_topic: trial.direction_id === 'wetland_frog' ? 'care' : trial.direction_id === 'chef' ? 'cook' : trial.variant_id === 'repair' ? 'repair' : 'craft',
+        development_topic: trial.direction_id === 'wetland_frog' ? 'care' : trial.direction_id === 'chef' ? 'cook' : trial.direction_id === 'explorer' ? 'explore' : trial.variant_id === 'repair' ? 'repair' : 'craft',
         role_trial: { trial_id: trial.trial_id, proposal_id: trial.proposal_id, direction_id: trial.direction_id, axis: trial.axis,
           attempt_id: attemptId, primary_activity_id: activityId } };
     } catch (error) { if (!error.code) throw error; lastError = error; }

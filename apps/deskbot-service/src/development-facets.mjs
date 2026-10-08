@@ -27,6 +27,7 @@ export function activityTopic(activityId) {
   if (activityId.startsWith('cook-') || activityId.startsWith('soup-')) return 'cook';
   if (activityId.startsWith('repair-') || activityId.startsWith('pump-') || activityId === 'stitch-canopy') return 'repair';
   if (activityId.startsWith('craft-')) return 'craft';
+  if (activityId === 'scout-route') return 'explore';
   if (activityId.startsWith('seedbed-') || ['harvest-float-bed', 'sow-float-bed', 'water-bed', 'drain-bed', 'tend-bed', 'harvest-bed', 'sow-bed', 'gather-light-fruit', 'collect-water', 'save-seeds'].includes(activityId)) return 'care';
   return null;
 }
