@@ -16,6 +16,7 @@ Jev Town 3D 生活客户端 :5173 / DeskBot Web 研究界面 :4322
   生活调度 -> 合法候选 -> 规则或有限模型选择 -> 实际执行
   实际结果 -> 共同经历 -> 分维度发展 -> 愿望 -> 生活试做
   达标试做与确认 -> 当前双轴阶段 -> 生活、表达、3D 投影
+  accepted stage -> versioned Role Experience Package -> prompt / Scene / NPC hooks / virtual performance
   统一答语与身体输出 -> 幂等设备 outbox / WebSocket ACK
                          |
                          +--> SQLite WAL：持久世界、事件与审计记录
@@ -24,6 +25,12 @@ Jev Town 3D 生活客户端 :5173 / DeskBot Web 研究界面 :4322
                          +--> 可选本地语音 sidecar
                          +--> 版本化设备桥：实体固件尚待适配
 ```
+
+角色方向的 authored 数据集中在 `role-experience-packages.mjs` 的
+`deskbot.role-experience-package.v1` 注册表。现有 proposal/trial/stage
+状态机仍是唯一生命周期；体验包只提供身份、生活、世界钩子、表达和虚拟
+外观投影。`role-experience-performance.v1` 为客户端、屏幕和未来 TTS
+提供统一只读表现，始终把实体外壳变化标为未发生。
 
 `apps/deskbot-service` 使用 Node.js 24+ 与内置 `node:sqlite`。世界 mutation、结果和幂等账本在服务端事务中提交，客户端不能直接操作 SQLite。`apps/jev-town-client` 是基于 CeciliaW888/jev-town 的 React/Three.js 投影客户端；`apps/deskbot-web` 提供原生 Web 研究界面。两个客户端共用世界接口，不保存另一套可写世界。第三方来源与授权范围见 [Jev Town 接入说明](jev-town-adoption.md)。
 

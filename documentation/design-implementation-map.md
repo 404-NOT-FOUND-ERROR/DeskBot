@@ -20,10 +20,11 @@ DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活
 | 记忆区分“发生过”和“听说过” | 世界事实、他人消息、个人理解分层；任务、项目、关系与发展维度共用结果根 | `lived-memory.mjs`、`development-evidence.mjs`；同一结果不重复计算，模型回复不循环变成外部证据 |
 | 兴趣、能力和愿望不是一个总分 | 分开记录接触、自主继续、受邀实践、具体表现、条件困难、需要与规则自评 | `development-facets.mjs`；主人建议能促成实践，建议本身不能证明能力或稳定兴趣 |
 | 它有理由提出想成为谁 | 当前生活满足兴趣、准备、处境、冷却等前提后，保存形态或职业愿望及冻结依据 | `role-wishes.mjs`、`role-evolution.mjs`；单句“变成青蛙”不会直接改形态，旧关键词草稿不能替代新生活愿望 |
+| 角色方向是一套可演进的体验 | 版本化体验包统一身份、兴趣、行动、Scene/NPC 钩子、口癖、TTS、表情、虚拟外观、组合和回退 | `role-experience-packages.mjs`、`role-experience-performance.mjs`；P0-P5 已覆盖 baseline、青蛙、学徒、厨师、探险家等包 |
 | 先试着生活，再决定采用 | 原愿望进入实际试做，复用自主生活、路线、配方、耗时、材料和结果；支持暂停、调整、退出 | `role-practical-trials.mjs`；成功、喜欢与资格分开，准备旅行和聊天回合不算主要成功 |
 | 外观跟随选择，并能看见和回退 | 荷叶青蛙、工坊学徒、灶边厨师；形态与职业双轴组合，纯预览、明确采用、版本历史和按轴回退 | `role-stages.mjs`、`tests/roleStageFigures.test.ts`；两上海日的两项实际主要成功是采用前提之一，回退保留材料、任务、记忆和关系 |
 | 始终能认出是同一个个体 | 虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒；当前双轴同时进入生活、表达和正式地图 | `world.role_stages` 是唯一当前阶段权威；有限作者制作造型，尚无开放图像、几何或外壳生成 |
-| 说话有特色，信息也清楚 | DeepSeek Flash 对话、来源与生活上下文、有限闲时选择；明确发展状态提问经事实校准后统一供屏幕、mock TTS 和设备文字使用 | `prompt-composer.mjs`、`chat-orchestrator.mjs`、`role-wish-fact-guard.mjs`；模型不能直接写世界，有限状态校准不能保证所有对话都可靠 |
+| 说话有特色，信息也清楚 | DeepSeek Flash 对话、来源与生活上下文、包内口癖与表达提示；统一 expression intent 供屏幕、mock TTS 和设备文字使用 | `prompt-composer.mjs`、`chat-orchestrator.mjs`、`expression-intent.mjs`；模型不能直接写世界，真实中文 TTS 仍未接入 |
 | 现实身体能力如实表达 | 头部触摸、触屏、双麦方向与磁识别的软件合同，受限单轴转头意图、outbox 与 ACK、失败和过期记录 | `body-perception.mjs`、[固件审计](../research/hardware/body-bridge-audit-v0.1.md)；实机仍是未适配的小智固件，软件模拟不证明物理执行 |
 
 表中的文件名指向 `apps/deskbot-service/src/` 或 `apps/jev-town-client/src/`；测试文件位于客户端 `tests/`。结构关系见 [架构](architecture.md)，执行过程见 [关键流程](flows.md)。

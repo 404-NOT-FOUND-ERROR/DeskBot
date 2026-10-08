@@ -6,7 +6,7 @@
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 652 项通过（2026-10-08 本机复验） | 世界、存档、资源、生活、来源、记忆、角色发展、设备与接口规则的回归基线 |
+| DeskBot 服务完整回归 | 667 项通过（2026-10-08 本机复验） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
 | 3D 客户端 | 39 套、259 项通过 | 读模型、控制、样本、场景和组合几何；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 均通过 | 类型一致性和可构建性 |
@@ -14,7 +14,7 @@
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)。2026-10-08 在 Windows 工作站重新运行服务端 652 项、客户端 39 套 259 项、类型检查、生产构建和 voice-sidecar 16 项，全部通过。三组旧研究界面测试在提取源码函数前统一 CRLF/LF，未改变生产逻辑；原第 6 阶段 649 项与 37 项专项仍保留为历史验收快照。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md) 和 [角色体验包路线](role-experience-roadmap-v1.md)。2026-10-08 在 Windows 工作站重新运行服务端 667 项、客户端类型检查与生产构建，全部通过。体验包合同、运行迁移、Chef 垂直样板、统一表现投影和 Explorer 路线扩展均有专项测试。
 
 ## 当前自动覆盖
 
@@ -32,6 +32,7 @@
 | 有依据的愿望 | 前提、冻结依据、冷却、主人回应、旧关键词/聊天旁路限制、事实校准 | `role-wishes.test.mjs`、`role-wish-lifecycle.test.mjs`、`role-wishes-http.test.mjs`、`role-wish-chat-guard.test.mjs` |
 | 实际试做 | 原任务准入、当前方式及回顾窗口的主要成功、两上海日、缺料与失败区分、暂停/调整/退出、预留释放与重载 | `role-practical-trials.test.mjs`、`role-practical-trials-http.test.mjs`、`rolePracticalTrials.test.ts` |
 | 阶段采用与回退 | 只读预览、指纹过期、双轴组合、封存试做、当前阶段回退、重试与恢复、实际生活候选 | `role-stages.test.mjs`、`role-stages-http.test.mjs`、`roleStages.test.ts`、`roleStageFigures.test.ts` |
+| 角色体验包 | 合同校验、组合/冲突/回退、运行时迁移、Chef 世界投影、包内表达、统一表现、Explorer 实际活动与只读 HTTP | `role-experience-packages.test.mjs`、`role-experience-runtime.test.mjs`、`role-experience-world-life.test.mjs`、`role-package-prompt-expression.test.mjs`、`role-experience-performance.test.mjs`、`role-explorer.test.mjs`、`role-experience-http.test.mjs` |
 | 表达一致性 | 当前双轴、历史不冒充当前、单方向与组合问答、屏幕/mock TTS/outbox 共用答语 | `role-stage-expression.test.mjs`、`role-wish-fact-guard.test.mjs`、`role-practical-expression.test.mjs` |
 | 身体与输出协议 | 登记能力、可信感知、未知壳、坐标、受限 yaw、ACK、失败、过期和重启 | `body-perception-domain.test.mjs`、`body-perception-http.test.mjs`、`body-device-config.test.mjs`、`websocket-bridge.test.mjs` |
 | 网络与配置 | provider 错误不泄露上游正文/密钥、天气缓存、配置重载、音频工件与 sidecar 合同 | `llm-http-error.test.mjs`、`weather-persistence.test.mjs`、`voice-sidecar-client.test.mjs`、`audio-artifacts.test.mjs` |
