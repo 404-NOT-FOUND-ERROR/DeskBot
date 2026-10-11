@@ -5,6 +5,8 @@ import type { DeskBotLocation, DeskBotObjectState } from "../deskbot/types.ts";
 import { sceneOperationAt, type SceneLightChannel } from './sceneLife.ts';
 import { addShapingDetails, createSceneLifeEffects, createSoftLightTexture, type SceneLifeContext } from './sceneLifeEffects.ts';
 import { createResourceSupplyEffects } from './resourceSupplyEffects.ts';
+import {createFantasyInquiryScene} from './fantasyInquiryScene.ts';
+import {createResonantLifeScene} from './resonantLifeScene.ts';
 import {createProjectScene} from './projectScene.ts';
 
 const C = { wood:0x997052, dark:0x5e5142, cream:0xe8dfc3, teal:0x508e86, soil:0x765b40, leaf:0x7eab59, water:0x6eabb2, red:0xb6513c };
@@ -55,6 +57,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
   const objects=new Map<string,THREE.Group>(), water:THREE.Mesh[]=[], lamps:THREE.Mesh[]=[], trees:THREE.Group[]=[], flags:THREE.Group[]=[];
   const lifeEffects:{locationId:string;effect:ReturnType<typeof createSceneLifeEffects>}[]=[];
   const supplyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResourceSupplyEffects>>}[]=[];
+  const fantasyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createFantasyInquiryScene>>}[]=[];
+  const resonantEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResonantLifeScene>>}[]=[];
   const projectEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createProjectScene>>}[]=[];
   const cloth:THREE.Group[]=[];
   const glowTexture=createSoftLightTexture();
@@ -261,6 +265,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       light.userData={light_channel:'work',location_id:place.location_id,model:binding.model,pool:true};group.add(light);lamps.push(light);
     }
     m.finish(`building:${binding.model}`);
+    if(binding.model==='nursery'){const effect=createFantasyInquiryScene(group);if(effect)fantasyEffects.push({locationId:place.location_id,effect});}
+    if(['waterside','square'].includes(binding.model)){const effect=createResonantLifeScene(group);if(effect)resonantEffects.push({locationId:place.location_id,effect});}
     for(const [id,spec] of Object.entries(stockSpec)){
       const object=objects.get(id);if(!object || object.parent!==group)continue;
       spec.resources.forEach((resource,row)=>{
@@ -289,6 +295,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       // State owns the final foliage color; tinting green vertex colors hides wilt.
       if(plant.material.vertexColors){plant.material.vertexColors=false;plant.material.needsUpdate=true;}
       plant.material.color.set(0x9e7847).lerp(new THREE.Color(C.leaf),bed.health??0);
+      plant.material.emissive.set(0x72d5a4);plant.material.emissiveIntensity=(bed.glow_moss?.brightness??0)*.6;
       const soil=garden.getObjectByName('soil-moisture') as THREE.Mesh<THREE.BufferGeometry,THREE.MeshLambertMaterial>;
       soil.material.color.set(0xffffff).lerp(new THREE.Color(0x695c49),bed.moisture??0);garden.userData.state=bed;
     }
@@ -329,6 +336,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     const floating=objects.get("floating-frame");if(floating)floating.rotation.z=(1-(floating.userData.condition??1))*.06+(reducedMotion ? 0 : Math.sin(time*1.1)*.015);
     for(const {locationId,effect} of lifeEffects)effect.update(time,night,wind,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
     for(const {locationId,effect} of supplyEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
+    for(const {locationId,effect} of fantasyEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
+    for(const {locationId,effect} of resonantEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
     for(const {locationId,effect} of projectEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
   }};
 }

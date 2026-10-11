@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash,randomUUID } from 'node:crypto';
 
 function requireText(value, field) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -78,6 +78,7 @@ export function createOpenAiCompatibleLlm({
   emptyResponseRetries = 1,
   thinking = null,
   max_tokens = null,
+  onUsage = null,
 } = {}) {
   const endpoint = completionUrl(baseUrl);
   const secret = requireText(apiKey, 'api_key');
@@ -97,6 +98,9 @@ export function createOpenAiCompatibleLlm({
       const attempts = choosing?1:Math.max(0, Number(emptyResponseRetries)) + 1;
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const callId=`llm:${randomUUID()}`,started=performance.now();
+        const usage=(status,extra={})=>onUsage?.({call_id:callId,category:purpose??'chat',scope:'live',model:modelId,attempt:attempt+1,status,latency_ms:Math.round(performance.now()-started),...extra});
+        usage('calling');
         let response;
         try {
           response = await fetchImpl(endpoint, {
@@ -116,6 +120,7 @@ export function createOpenAiCompatibleLlm({
             signal: AbortSignal.timeout(choosing?20_000:timeoutMs),
           });
         } catch (error) {
+          usage('failed',{error_code:'llm_transport_error'});
           lastError = new LlmProviderError('llm_transport_error', 'LLM request failed before a provider response was received', {
             retryable: true,
           });
@@ -123,6 +128,7 @@ export function createOpenAiCompatibleLlm({
         }
 
         if (!response.ok) {
+          usage('failed',{error_code:'llm_http_error'});
           const error = new LlmProviderError(
             'llm_http_error',
             `LLM endpoint returned HTTP ${response.status}`,
@@ -139,10 +145,12 @@ export function createOpenAiCompatibleLlm({
         try {
           body = await response.json();
         } catch {
+          usage('failed',{error_code:'llm_invalid_response'});
           lastError = new LlmProviderError('llm_invalid_response', 'LLM endpoint returned invalid JSON');
           continue;
         }
         const text = body?.choices?.[0]?.message?.content;
+        usage(typeof text==='string'&&text.trim()?'completed':'failed',{usage:body.usage??null,...(typeof text==='string'&&text.trim()?{}:{error_code:'llm_invalid_response'})});
         if (typeof text !== 'string' || text.trim() === '') {
           lastError = new LlmProviderError('llm_invalid_response', 'LLM endpoint returned no assistant text');
           continue;
@@ -166,7 +174,7 @@ export function createOpenAiCompatibleLlm({
 // Read the local file on each request so saving a key or changing the model
 // takes effect without restarting the persistent world. Never fall back to
 // generated test text when a real provider is unavailable.
-export function createReloadableLlm({ env = process.env, configPath, fetchImpl, now = () => new Date() } = {}) {
+export function createReloadableLlm({ env = process.env, configPath, fetchImpl, now = () => new Date(),onUsage=null } = {}) {
   let verified = null;
   let failure = null;
   const read = () => loadLlmConfiguration({ env: { ...env, DESKBOT_LLM_PROVIDER: 'deepseek' }, configPath });
@@ -193,7 +201,7 @@ export function createReloadableLlm({ env = process.env, configPath, fetchImpl, 
       }
       const key = signature(c);
       try {
-        const result = await createOpenAiCompatibleLlm({ ...c, fetchImpl }).complete(input);
+        const result = await createOpenAiCompatibleLlm({ ...c, fetchImpl,onUsage }).complete(input);
         verified = { signature: key, at: now().toISOString() };
         failure = null;
         return { ...result, provider: this.id };
@@ -213,6 +221,7 @@ export function createConfiguredLlm(options = {}) {
       ...configuration,
       temperature: options.temperature ?? process.env.DESKBOT_LLM_TEMPERATURE ?? 0.55,
       fetchImpl: options.fetchImpl,
+      onUsage: options.onUsage,
     });
 }
 

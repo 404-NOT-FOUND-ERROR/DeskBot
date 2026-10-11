@@ -6,6 +6,7 @@ import { AUTONOMY_VERSION, installAutonomy, syncLifeNeeds, lifeNote } from './li
 import { activitySteps, waterSupplySteps, seedSupplySteps, depositSteps, cookAndStoreSteps, fruitSupplySteps } from './life-planning.mjs';
 import { RESIDENT_PROFILES } from './resident-life.mjs';
 import { advanceSocialLife, reservedSocialActors } from './social-life.mjs';
+import {deliverCognitiveSocialResults} from './cognitive-social.mjs';
 import { influenceLifeChoices, recordInputDecision, settleRefraction } from './input-refraction.mjs';
 import { influenceRememberedChoices } from './lived-memory.mjs';
 import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote } from './life-choice.mjs';
@@ -14,6 +15,7 @@ import { influenceBodyChoices, recordBodyLifeDecision } from './body-perception.
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 import { practicalTrialCandidates, practicalTrialPlanMayContinue, recordPracticalTrialTask } from './role-practical-trials.mjs';
 import { roleStageLifeProfile, roleStageCandidates } from './role-stages.mjs';
+import { syncLifeRhythm, lifeFollowupCandidates, readFollowupSite } from './life-rhythm.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -105,9 +107,11 @@ function candidates(world, state, at) {
     const candidate=result.find(c=>c.goal===goal);if(candidate)Object.assign(candidate,{activity_id:id,development_topic:activityTopic(id)});}
   const night=minute>=1380||minute<360;
   if(state.energy<.4 || night) add('rest','休息一会儿',night?'天晚了，先留出休息的时间。':'有些累了，先恢复精神。',state.energy<.2?150:night?115:100,()=>{
-    const destination=world.locations.some(l=>l.location_id===profile.rest)?profile.rest:actor(world,id).location_id;
+    // Exhausted residents recover where they are before undertaking a walk.
+    const destination=state.energy<.2?actor(world,id).location_id:world.locations.some(l=>l.location_id===profile.rest)?profile.rest:actor(world,id).location_id;
     const reachable=findWorldPath(world,actor(world,id).location_id,destination);
-    const duration=night?Math.min(21600,Math.max(3600,((minute<360?360:1800)-minute)*60)):2700;
+    const duration=night?Math.min(21600,Math.max(3600,((minute<360?360:1800)-minute)*60))
+      :Math.min(10800,Math.max(2700,Math.ceil((.65-state.energy)/.22*3600)));
     return [...(reachable&&destination!==actor(world,id).location_id?[{kind:'travel',location_id:destination}]:[]),{kind:'rest',duration_seconds:duration,title:'休息一会儿'}];
   });
   if(carried(world,id,'rations')>0&&stock(world,'shared-table','rations')<(objects['shared-table'].capacity??24))
@@ -140,11 +144,16 @@ function candidates(world, state, at) {
       add('fruit-supply','采一篮光果送回苗圃','林间果枝有成熟光果时，采下实际的一篮，送到公共食材架。',hungry?86:62,()=>fruitSupplySteps(world,id));
   }
   const blockedMeal=result.find(choice=>choice.goal==='meal'&&!choice.available);
+  if(!blockedMeal)state.meal_wait_started_at=null;
   if(blockedMeal&&(stock(world,'shared-table','rations')>0||world.tasks.some(task=>['running','paused'].includes(task.status)&&task.target_object_id==='shared-table')||supplyClaims(world,at,id).some(claim=>claim.target==='trial-stove')))
     add('wait-meal','在饭桌附近等一小会儿','已有饭或有人正在做这餐，先过去等空位，三分钟后再看真实结果。',state.appetite>.9?139:94,()=>{
       if(!findWorldPath(world,actor(world,id).location_id,'warm-pot-courtyard'))throw planError('到饭桌的路暂时不通。');
-      return [...(actor(world,id).location_id==='warm-pot-courtyard'?[]:[{kind:'travel',location_id:'warm-pot-courtyard'}]),{kind:'observe',title:'等长桌和厨房空下来',duration_seconds:180}];
+      const longer=Date.parse(at)-Date.parse(state.meal_wait_started_at??at)>=15*MINUTE;
+      return [...(actor(world,id).location_id==='warm-pot-courtyard'?[]:[{kind:'travel',location_id:'warm-pot-courtyard'}]),
+        {kind:longer?'rest':'observe',title:longer?'在长桌旁歇歇，稍后再看这餐':'等长桌和厨房空下来',duration_seconds:longer?900:180}];
     });
+  const waiting=result.find(c=>c.goal==='wait-meal');
+  if(waiting?.steps?.some(s=>s.kind==='rest'))waiting.reason='这餐还在准备或等空位，先在旁边歇十五分钟，再核验饭桌和厨房的实际结果。';
   for(const project of projectCandidates(world,id,at)) {
     if(!project.available) result.push(project);
     else add(project.goal,project.title,project.reason,project.score,()=>activitySteps(world,id,project.activity_id));
@@ -161,6 +170,16 @@ function candidates(world, state, at) {
     catch(error) { result.push({...stage,available:false,blocked_reason:error.message}); }
   }
   addDiscretionaryPractice(world,state,at,result,add);
+  for(const followup of lifeFollowupCandidates(world,state,at,{
+    travel:destination=>{
+      if(!findWorldPath(world,actor(world,id).location_id,destination))throw planError('到原现场的通路暂时不可行。');
+      return actor(world,id).location_id===destination?[]:[{kind:'travel',location_id:destination}];
+    },practice:recipe=>checkSupplyClaim(world,at,id,activitySteps(world,id,recipe)),
+  })) {
+    result.push(followup);
+    const opportunity=world.memory.development.rhythm.opportunities.find(o=>o.id===followup.life_followup?.id);
+    if(opportunity&&!followup.available)opportunity.reason=followup.blocked_reason;
+  }
   const index=hash(`${id}:${localWorldDate(at,world.clock.time_zone).date}:${Math.floor(minute/180)}`)%profile.places.length;
   for(const destination of world.memory ? profile.places : [profile.places[index]]) {
   add(`interest:${destination}`,world.memory?`${world.locations.find(l=>l.location_id===destination)?.name??destination} · ${profile.quiet}`:profile.quiet,'留点时间做自己感兴趣的事。',30,()=>{
@@ -185,7 +204,7 @@ function abandon(world,state,at,reason,cancelled=false) {
 }
 function executeStep(world,state,at,eventId) {
   const plan=state.plan, step=plan.steps[plan.index];
-  if(!step){plan.status='completed';plan.finished_at=at;const cooldown=plan.goal==='wait-meal'?0:['meal','cook','store-meals','store-fruit','fruit-supply'].includes(plan.goal)?5:120;
+  if(!step){plan.status='completed';plan.finished_at=at;const cooldown=plan.goal==='wait-meal'?0:plan.goal==='rest'?5:['meal','cook','store-meals','store-fruit','fruit-supply'].includes(plan.goal)?5:120;
     state.cooldowns[plan.goal]=new Date(Date.parse(at)+cooldown*MINUTE).toISOString();state.next_decision_at=new Date(Date.parse(at)+(plan.goal==='wait-meal'?0:5)*MINUTE).toISOString();feedback(world,state,at,'plan_completed',`“${plan.title}”这件事做完了。`,{plan_id:plan.plan_id});return;}
   const id=state.actor_id, actionId=`${eventId}:${id}:${state.sequence}:${plan.index}`;
   if(step.kind==='travel' && actor(world,id).location_id===step.location_id){plan.index++;return;}
@@ -216,6 +235,8 @@ function executeStep(world,state,at,eventId) {
     recordPracticalTrialTask(world,stored,at);
   }
   if(plan.role_stage) stored.role_stage=structuredClone(plan.role_stage);
+  if(plan.life_followup)stored.life_followup=structuredClone(plan.life_followup);
+  if(step.kind==='observe'&&plan.life_followup)stored.life_followup_site=readFollowupSite(world,plan.life_followup,at);
   for(const record of world.refraction?.records??[])if(plan.source_ids?.includes(record.id))record.source_task_ids=[...(record.source_task_ids??[]),task.task_id].slice(-16);
   plan.task_id=task.task_id;plan.status='executing';
   if(id!==world.protagonist.character_id && step.kind!=='travel')actor(world,id).status=step.kind==='rest'?'正在休息':task.title;
@@ -223,11 +244,14 @@ function executeStep(world,state,at,eventId) {
 }
 
 export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budget=8}={}) {
+  reservedActors=[...reservedActors,...Object.values(world.cognition?.actors??{}).filter(a=>a.enabled).map(a=>a.actor_id)];
   if(world.clock?.mode!=='real_time' || world.living?.recovery.pending || at<world.clock.synced_at || world.tasks.some(t=>t.status==='running'&&t.due_at<=at))return {accepted:false,reason:'life_waiting_for_recovery'};
   installAutonomy(world,at);syncLifeNeeds(world,at);
+  syncLifeRhythm(world,at);
   settleResidentProjects(world,at);
   settleRefraction(world,at);
   if(world.social)advanceSocialLife(world,at,{eventId,reservedActors});
+  deliverCognitiveSocialResults(world,at);
   const socialReserved=reservedSocialActors(world);
   const states=Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id));
   const rotate=(Math.floor(Date.parse(at)/MINUTE)*Math.min(8,budget))%Math.max(1,states.length);
@@ -257,6 +281,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       const choices=candidates(world,state,at);state.last_candidates=choices.map(({steps,...choice})=>choice).slice(0,12);
       const selection=prepareLifeChoice(world,state,choices,at);if(selection.waiting)continue;
       const choice=selection.choice;if(!choice)continue;
+      if(choice.goal==='wait-meal')state.meal_wait_started_at??=at;
       state.sequence++;
       state.plan={plan_id:`life-plan:${state.actor_id}:${state.sequence}`,goal:choice.goal,title:choice.title,reason:choice.reason,steps:choice.steps,index:0,status:'planned',task_id:null,created_at:at};
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
@@ -266,6 +291,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.plan.development_topic=choice.development_topic??null;
       if(choice.role_trial)state.plan.role_trial=structuredClone(choice.role_trial);
       if(choice.role_stage)state.plan.role_stage=structuredClone(choice.role_stage);
+      if(choice.life_followup)state.plan.life_followup=structuredClone(choice.life_followup);
       if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
       recordBodyLifeDecision(world,state,choice,at);

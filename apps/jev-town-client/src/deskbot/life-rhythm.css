@@ -1,0 +1,8 @@
+.life-rhythm{margin:14px 0 20px;padding:14px;background:linear-gradient(135deg,rgba(175,204,158,.12),rgba(188,211,209,.08));border:1px solid rgba(175,204,158,.19);border-radius:14px}
+.life-rhythm h3{font-size:14px;margin:0}.life-rhythm h4{font-size:12px;margin:15px 0 8px;color:var(--life-teal,#567e78)}
+.life-rhythm p{font-size:12px;line-height:1.7;margin:7px 0;color:var(--life-ink,#293b3a)}.life-rhythm small{font-size:10px;color:var(--life-muted,#6d7b76);overflow-wrap:anywhere}
+.life-rhythm__topics{display:grid;gap:8px;margin-top:12px}.life-rhythm__topics article{padding:10px;border-left:2px solid #637f71;border-radius:4px;background:rgba(160,187,153,.035)}
+.life-rhythm__topics article.is-primary{border-left-color:var(--life-teal,#567e78);background:rgba(160,187,153,.07)}
+.life-rhythm__topics strong,.life-rhythm__followups strong{font-size:12px}.life-rhythm__followups article{padding:10px 0;border-top:1px solid rgba(161,188,156,.15)}
+.life-rhythm details{font-size:11px;margin-top:9px}.life-rhythm summary{cursor:pointer;color:var(--life-teal,#567e78)}.life-rhythm details small{display:block;margin-top:5px}
+.life-rhythm__archive{padding-top:9px;border-top:1px solid rgba(161,188,156,.15)}

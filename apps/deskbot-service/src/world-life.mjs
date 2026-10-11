@@ -627,7 +627,7 @@ export function createWorldLife({
       && sameParticipants;
     if (sameContext && current.slot_key !== selected.slot_key) {
       ingest({
-        event_id: `world-life-v2:continue:${current.scene_id}:${selected.slot_key}`,
+        event_id: `world-life-v3:continue:${current.scene_id}:${selected.slot_key}:from-${world.world_revision ?? 0}`,
         type: 'world.mutation',
         source: 'world-life-engine',
         source_kind: 'world_engine',
@@ -646,7 +646,9 @@ export function createWorldLife({
       world = worldSnapshot();
     } else if (!current || current.slot_key !== selected.slot_key || current.location_id !== selected.location_id || !sameContext) {
       ingest({
-        event_id: `world-life-v2:scene:${selected.scene_id}`,
+        // A person may leave and return within one scene slot. The authored
+        // scene identity stays stable; this adoption is a new state transition.
+        event_id: `world-life-v3:scene:${selected.scene_id}:from-${world.world_revision ?? 0}`,
         type: 'world.mutation',
         source: 'world-life-engine',
         source_kind: 'world_engine',

@@ -21,6 +21,8 @@ import './body-status.css';
 import {fetchRoleStagePreview,createRoleStageController} from './bridge.ts';
 import type {DeskBotRoleStageOperation} from './types.ts';
 import type {ShapingAppearance} from '../three/shapingAppearance.ts';
+import {LifeObservation} from './LifeObservation.tsx';
+import {Conversation,mergeConversation,type ConversationLine} from './Conversation.tsx';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -75,6 +77,12 @@ export function DeskBotApp() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [storyLines, setStoryLines] = useState<StoryLine[]>([]);
+  const [savedConversation,setSavedConversation]=useState<ConversationLine[]>([]);
+  const [historyError,setHistoryError]=useState('');
+  const [chatExpanded,setChatExpanded]=useState(false);
+  const chatField=useRef<HTMLTextAreaElement>(null);
+  const [observationRequest,setObservationRequest]=useState(()=>new URLSearchParams(window.location.search).get('view')==='journal'?1:0);
+  const conversation=useMemo(()=>mergeConversation(savedConversation,storyLines),[savedConversation,storyLines]);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [placeFocusRequest,setPlaceFocusRequest]=useState(0);
   const [selectedRoute, setSelectedRoute] = useState<DeskBotWorldRouteResponse | null>(null);
@@ -142,6 +150,13 @@ export function DeskBotApp() {
   function appendStoryLine(line: StoryLine) {
     setStoryLines((current) => [...current.filter((item) => item.id !== line.id), line].slice(-16));
   }
+
+  useEffect(()=>{
+    let active=true;const controller=new AbortController();
+    const read=async()=>{try {const r=await fetch(`${baseUrl}/api/chat/history`,{cache:'no-store',signal:controller.signal});if(!r.ok)throw Error(`HTTP ${r.status}`);const data=await r.json() as {messages:ConversationLine[]};if(active){setSavedConversation(data.messages);setHistoryError('');}}catch(e){if(active)setHistoryError(e instanceof Error?e.message:'读取失败');}};
+    void read();const timer=window.setInterval(()=>void read(),30000);
+    return()=>{active=false;controller.abort();window.clearInterval(timer);};
+  },[baseUrl]);
 
   async function runLivingAction(activityId:string|null,objectId?:string,resource?:string,operation?:"take"|"store") {
     const fingerprint=JSON.stringify([activityId,objectId,resource,operation]);
@@ -341,6 +356,8 @@ export function DeskBotApp() {
       : newWorldEventId("chat");
     chatRetry.current = { fingerprint, id: eventId };
     setChatBusy(true);
+    setChatExpanded(true);
+    setSelectedPlaceId(null);
     setChatInput("");
     setMessage("喵呜正在听你说……");
     appendStoryLine({ id: `${eventId}:user`, speaker: "你", text });
@@ -531,7 +548,7 @@ export function DeskBotApp() {
         <div className="deskbot-mode__status">
           <div className="deskbot-mode__clock"><span>{glance.date?`${glance.date} · 上海`:'上海 · 与现实相伴'}</span><strong>{glance.clock}</strong></div>
           <div className="deskbot-mode__weather" aria-label="当前昼夜和天气"><span className="deskbot-mode__phase"><i aria-hidden="true">{['午夜','深夜','入夜'].includes(glance.phase)?'☾':'✧'}</i>{glance.phase}</span><span title={map?.environment?.weather.wind_mps!=null&&glance.weatherState==='fresh'?`风 ${map.environment.weather.wind_mps.toFixed(1)} m/s`:undefined}>{glance.weather}{glance.temperature!==null?` ${glance.temperature}°`:''}</span></div>
-          <div className="deskbot-mode__header-actions"><button type="button" disabled={!map} onClick={()=>map&&handlePlaceClick(map.protagonist.location_id)}>看看喵呜 <span aria-hidden="true">↗</span></button><button type="button" onClick={() => void refresh()} aria-label="刷新小镇近况">↻</button></div>
+          <div className="deskbot-mode__header-actions"><button className="deskbot-essential-action" type="button" onClick={()=>{setChatExpanded(true);setSelectedPlaceId(null);chatField.current?.focus();chatField.current?.scrollIntoView({block:'nearest'});}}>和喵呜说话</button><button className="deskbot-essential-action" type="button" onClick={()=>setObservationRequest(n=>n+1)}>观察日子</button><button type="button" disabled={!map} onClick={()=>map&&handlePlaceClick(map.protagonist.location_id)}>看看喵呜 <span aria-hidden="true">↗</span></button><button type="button" onClick={() => void refresh()} aria-label="刷新小镇近况">↻</button></div>
         </div>
       </header>
 
@@ -559,7 +576,7 @@ export function DeskBotApp() {
             routePreview={routePreview}
             activities={sceneActivities}
           />
-          <details className="deskbot-mode__story" aria-label="雾灯镇当前故事" open={storyLines.length>0?true:undefined}><summary><span>喵呜 · {map?.locations.find(l=>l.current)?.name??"雾灯镇"}</span><strong>{currentTask?taskTitle:"此刻的日常"}</strong></summary>
+          <details className="deskbot-mode__story" aria-label="雾灯镇当前故事"><summary><span>喵呜 · {map?.locations.find(l=>l.current)?.name??"雾灯镇"}</span><strong>{currentTask?taskTitle:"此刻的日常"}</strong></summary>
             <div className="deskbot-mode__story-scene">
               <span>{travelling ? "此刻 · 在路上" : `此刻 · ${map?.locations.find((location) => location.current)?.name ?? "雾灯镇"}`}</span>
               <h2>{currentTask ? taskTitle : life?.current_scene?.title ?? "雾灯镇的日常"}</h2>
@@ -567,15 +584,6 @@ export function DeskBotApp() {
               {!currentTask && life?.current_scene?.sensory_cue ? <em>{life.current_scene.sensory_cue}</em> : null}
               {!currentTask && life?.current_scene?.opportunity ? <small>喵呜还在惦记：{life.current_scene.opportunity}（尚未发生）</small> : null}
             </div>
-            {storyLines.length ? (
-              <ol className="deskbot-mode__story-lines" aria-live="polite" aria-relevant="additions text">
-                {storyLines.slice(-6).map((line) => (
-                  <li key={line.id} className={line.speaker === "你" ? "is-user" : "is-character"}>
-                    <strong>{line.speaker}</strong><p>{line.text}</p>
-                  </li>
-                ))}
-              </ol>
-            ) : null}
             {lastInteraction?.experience ? <small className="deskbot-mode__story-note">共同经历已记入：{lastInteraction.experience.summary}</small> : null}
             {lastInteraction?.role_evidence?.direction ? <small className="deskbot-mode__story-note">角色方向线索：{lastInteraction.role_evidence.direction.label} · 观察中，尚未改变身份或外壳</small> : null}
           </details>
@@ -634,16 +642,18 @@ export function DeskBotApp() {
 
           {arrivalText ? <div className="deskbot-mode__arrival" role="status">{arrivalText}</div> : null}
 
+          <Conversation lines={conversation} expanded={chatExpanded} onToggle={()=>setChatExpanded(v=>!v)} historyError={historyError}>
           <form className="deskbot-mode__composer" onSubmit={(event) => void submitChat(event)}>
             <label className="sr-only" htmlFor="deskbot-world-chat">和喵呜对话</label>
             <textarea
               id="deskbot-world-chat"
+              ref={chatField}
               rows={1}
               maxLength={2000}
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   event.currentTarget.form?.requestSubmit();
                 }
@@ -653,9 +663,10 @@ export function DeskBotApp() {
             />
             <button type="submit" disabled={chatBusy || !chatInput.trim() || !map}>{chatBusy ? "正在听…" : "发送"}</button>
           </form>
+          </Conversation>
         </section>
 
-        <LifeSidebar roleWishes={roleWishes} onRoleWish={(id,choice)=>void chooseWish(id,choice)} onPracticalTrial={(id,operation,variant)=>void changePracticalTrial(id,operation,variant)} onStagePreview={id=>fetchRoleStagePreview(id,baseUrl)} onStageControl={(id,operation,binding)=>void changeRoleStage(id,operation,binding)} onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
+        <LifeSidebar observationRequest={observationRequest} observationDetail={<LifeObservation baseUrl={baseUrl}/>} roleWishes={roleWishes} onRoleWish={(id,choice)=>void chooseWish(id,choice)} onPracticalTrial={(id,operation,variant)=>void changePracticalTrial(id,operation,variant)} onStagePreview={id=>fetchRoleStagePreview(id,baseUrl)} onStageControl={(id,operation,binding)=>void changeRoleStage(id,operation,binding)} onSuggest={id=>void sendSuggestion(id)} map={map} selectedNpcId={selectedNpc?.npc_id??null} selectionRequest={npcSelectionRequest} busy={busy} onPlace={handlePlaceClick} onSelectNpc={id=>{setSelectedNpcId(id);setCandidate(null);}} onAutonomy={()=>void toggleAutonomy()} onRespond={(id,operation)=>void respondInvitation(id,operation)} taskDetail={currentTask ? <section className="deskbot-mode__place-card" aria-label="正在进行的活动">
             <p className="deskbot-mode__task-time">{taskTimeLabel(currentTask)}</p>
             {travelling ? <small>正从{map?.locations.find(place => place.current)?.name??'上一处地点'}出发，尚未抵达。</small> : null}
             {currentTask.role_trial?<small className="deskbot-mode__task-note">这是实际试做中的活动。请到下方试做卡暂停或退出，材料会归还，日常生活继续。</small>:<div className="deskbot-mode__task-controls"><button type="button" disabled={busy} onClick={() => { void (async () => { setBusy(true); try { await controlWorldTask(currentTask.task_id, currentTask.status === "paused" ? "resume" : "pause", baseUrl); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "更新失败"); } finally { setBusy(false); } })(); }}>{currentTask.status === "paused" ? "继续" : "暂停"}</button>

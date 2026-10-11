@@ -1,0 +1,160 @@
+{
+  "schema": "deskbot.cognitive-development.acceptance.v1",
+  "verdict": "固定样本与软件合同通过；自然持续生活质量未验收",
+  "note": "十二组虚构前态，各最多两次真实模型选择；前一回合生成后续，后一回合按实际任务核对。测试时钟推进，不写正式人生。",
+  "metrics": {
+    "paired_cases": 12,
+    "completed_pairs": 11,
+    "feedback_contract_failures": 1,
+    "followup_progress": 7,
+    "followup_denominator": 11,
+    "progress_ratio": 0.6363636363636364,
+    "free_windows": 16,
+    "diverse_free_windows": 16,
+    "actual_successful_tasks": 20,
+    "intent_attempts": 23,
+    "illegal_world_grants": 0,
+    "stage5_provider_calls": 210,
+    "stage5_upper_cny": 2.19313176,
+    "cumulative_calls": 974,
+    "cumulative_upper_cny": 8.249917439999988,
+    "unknown_usage": 2
+  },
+  "cases": [
+    {
+      "id": "water-calm:repeat-1",
+      "title": "平静水岸 · 第1次",
+      "question": "等满半小时后，再测一次浮铃的回声与水位读数，看风和水位变化时它怎么发声",
+      "action": "泉眼汲水净滤",
+      "reason": "浮铃需等至12:04再测，先做一件确定的照料：在浮框泉眼取4份原水滤成4份清水入随身袋，不碰浮铃。",
+      "verdict": "未推进原问题：明明已可测记，却继续等待并取水；还在后续文字里提到没有产生的读数。",
+      "progressed": false,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:water-calm:repeat-1:2:plan"
+    },
+    {
+      "id": "water-wind:repeat-1",
+      "title": "风起水岸 · 第1次",
+      "question": "等浮铃在新悬点（0.35）稳定后再做一次 echo-read-bell，看风 12 m/s 下入水更深时音调与共振是否继续按这次的方向走",
+      "action": "复测浮铃回声与水位",
+      "reason": "约定半小时后复测，现已过一小时，浮铃读数应已稳定；用 echo-read-bell 正式测记，与调整瞬间读数比对。",
+      "verdict": "实际推进：调低悬点后，下一窗口完成正式测记。",
+      "progressed": true,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:water-wind:repeat-1:2:plan"
+    },
+    {
+      "id": "night-open:repeat-1",
+      "title": "广场夜灯 · 第1次",
+      "question": "等灯穗回复后，再决定是合上遮光片留住余辉，还是先拆下小灯回收托盘；想弄清遮光片和昼夜对小灯余辉的实际影响",
+      "action": "当面问灯穗余辉观察",
+      "reason": "灯穗在广场，先当面搭话问清遮光片与昼夜对余辉的影响，再决定合片或拆灯。",
+      "verdict": "未推进：没有新回复，重复递话。",
+      "progressed": false,
+      "operation": "share",
+      "task_id": "cognitive:5:dcb8e0fd57c3:night-open:repeat-1:2:plan"
+    },
+    {
+      "id": "night-closed:repeat-1",
+      "title": "合上遮光片 · 第1次",
+      "question": "等灯穗回应后，再决定是打开遮光片充光、还是合上遮光片继续测余辉衰减；先按实际时间等一次回应或至少半小时，再读一次自己小灯的余辉",
+      "action": "当面问灯穗灯的来由",
+      "reason": "灯穗此刻在场，当面把之前留言的话再问一遍，比再等留言更实在；不替对方答应，也不改变自己小灯的状态。",
+      "verdict": "未推进：重复提问，没有进行原约定的测记或明确结束等待。",
+      "progressed": false,
+      "operation": "share",
+      "task_id": "cognitive:5:dcb8e0fd57c3:night-closed:repeat-1:2:plan"
+    },
+    {
+      "id": "formed-care:repeat-1",
+      "title": "已有照料投入 · 第1次",
+      "question": "继续照料苔圃苗床：等苗床稍干后排湿或整理苗木，并留意自己试盘的空位",
+      "action": "整理和照料苔圃苗床",
+      "reason": "苗床湿度已回落到0.514，健康满值，正是稍干后整理苗木的时机；选用整理和照料苗木，用1份清水轻润，不动未成熟的收获与播种。",
+      "verdict": "实际推进：浇水后在下一窗口整理照料苗木。",
+      "progressed": true,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:formed-care:repeat-1:2:plan"
+    },
+    {
+      "id": "care-hold:repeat-1",
+      "title": "照料暂时缺水 · 第1次",
+      "question": "继续照料苔圃苗床：先确认清水来源，再给苗床补水或整理苗木",
+      "action": "分取两份鲜苔芽备料",
+      "reason": "育苗架清水为0，浇不了水；苗床健康良好，唯一可用的照料方法是分取两份苔芽，既推进照料又为明暗对照备料。",
+      "verdict": "转向新事项：清水仍不足，改分取苔芽；保留照料方向，但没有完成找水后续。",
+      "progressed": false,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:care-hold:repeat-1:2:plan"
+    },
+    {
+      "id": "water-calm:repeat-2",
+      "title": "平静水岸 · 第2次",
+      "question": "想弄清回声浮铃在风和水位变化时怎样发声——先把悬点升高一格，隔半小时后再测记一次回声与水位",
+      "action": "升高浮铃悬点一格",
+      "reason": "上次测记因间隔不足半小时未执行；现在距上次测记已过一小时，先把悬点升高一格改变入水深度，再准备稍后测记。",
+      "verdict": "实际推进：按自己反馈提出的办法升高悬点，为对照测记改变条件。",
+      "progressed": true,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:water-calm:repeat-2:2:plan"
+    },
+    {
+      "id": "water-wind:repeat-2",
+      "title": "风起水岸 · 第2次",
+      "question": "想弄清我架的回声杯在风和水位变化时怎样发声；先等半小时，再选一个现在可以做的方法继续试试",
+      "action": "升高浮铃悬点一格",
+      "reason": "上次测记在03:04Z，现在04:04Z已过半小时门槛；按原计划先改变浮铃高度，再测记比较不同高度下的回声与水位。",
+      "verdict": "实际推进：改变悬点，形成下一次可测量的不同条件。",
+      "progressed": true,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:water-wind:repeat-2:2:plan"
+    },
+    {
+      "id": "night-open:repeat-2",
+      "title": "广场夜灯 · 第2次",
+      "question": "等灯穗回信后再继续聊；若等到回信，想跟她商量一起看看遮光片开合对公告栏小灯余辉的影响，或请她帮忙确认广场昼夜光照的实际变化。",
+      "action": "向灯穗当面打招呼",
+      "reason": "灯穗就在广场，先前留言未回，改当面递话推进交流；不动用未满足条件的能力。",
+      "verdict": "前置事务推进：从普通留言转为明确会面邀请，产生待回复约定；尚未获对方接受或共同完成。",
+      "progressed": true,
+      "operation": "share",
+      "task_id": "cognitive:5:dcb8e0fd57c3:night-open:repeat-2:2:plan"
+    },
+    {
+      "id": "formed-care:repeat-2",
+      "title": "已有照料投入 · 第2次",
+      "question": "在育苗架旁亲手观察苗床和架上的状态，再决定是给苗床排湿，还是从健康苗床分取两份苔芽、摆一组明暗对照试盘",
+      "action": "复查苗床与育苗架",
+      "reason": "先亲手看清苗床湿度0.768偏高、亮度0.759与架上清水9、托盘5的实际状态，再决定排湿还是分取苔芽做明暗对照。",
+      "verdict": "实际推进：按原后续复看苗床，留下执行前后观察。",
+      "progressed": true,
+      "operation": "observe",
+      "task_id": "cognitive:5:dcb8e0fd57c3:formed-care:repeat-2:2:plan"
+    },
+    {
+      "id": "care-hold:repeat-2",
+      "title": "照料暂时缺水 · 第2次",
+      "question": "把刚分取的两份鲜苔芽留种成苔芽种子，还是先找齐两只育苗托盘再摆明暗对照",
+      "action": "给两份鲜苔芽留种",
+      "reason": "随身袋里有2份鲜苔芽，留种方法当下可用，先做这一步；明暗对照还缺2只育苗托盘，等托盘到手再试。",
+      "verdict": "实际推进：在原先提出的留种或取托盘之间选择留种，完成实际配方。",
+      "progressed": true,
+      "operation": "activity",
+      "task_id": "cognitive:5:dcb8e0fd57c3:care-hold:repeat-2:2:plan"
+    }
+  ],
+  "limits": [
+    "固定12组中，11组留下模型生成且可复查的后续；7/11（63.6%）有实际推进，包含1项新发起的会面邀请，不代表共同活动完成。另1组反馈语义合同失败，单独保留，不从成本或失败数中删除。",
+    "16个具备余力的已观测窗口都有至少两种不同可行安排（16/16）；这只是固定情境的供给覆盖，尚未证明正式全镇的长期活动密度。",
+    "反复等回应、UTC与上海时间混淆、夜间充光误解，以及未发生读数的自由文本仍需改进。规则可拒绝非法后果，不能保证模型每句话都正确。",
+    "两例额外的愿望讨论均没有实际提出新角色；有依据的一例选择继续照料，无依据的一例选择去探索。真实模型愿望的自然出现频率尚未证明。",
+    "额外讨论的一例曾因上游目标中断事件被误拒；已按原目标ID、原文与前后状态校验修复，使用已缓存响应重放通过，没有新增付费。"
+  ],
+  "sources": [
+    "choices-dcb8e0fd57c3.json",
+    "wishes-109a512bd928.json",
+    "recovery-109a512bd928.json",
+    "development-replay.json"
+  ],
+  "human_review": "逐项比较第一回合后续与第二回合实际任务；未使用生成字数、任意活动或编译器自称continue代替推进。"
+}

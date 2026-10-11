@@ -4,6 +4,7 @@ import { ACTIVITIES } from './living-resources.mjs';
 import { syncDevelopmentEvidence, developmentReadModel } from './development-evidence.mjs';
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 import { safePracticalTrialMetadata } from './role-practical-trials.mjs';
+import { lifeRhythmReadModel } from './life-rhythm.mjs';
 
 export const MEMORY_VERSION = 'deskbot.lived-memory.v1';
 export const TOPICS = { care:'照料', craft:'制作', repair:'修缮', cook:'做饭', explore:'观察小镇', connection:'与人相处' };
@@ -139,14 +140,18 @@ export function influenceRememberedChoices(w,state,choices) {
   return choices.map(c=>{
     const topic=Object.hasOwn(c,'development_topic')?c.development_topic:activityTopic(c.activity_id)??goalTopic(c.goal);
     const preference=topics.find(t=>t.topic===topic)?.interest;
-    const baseScore=c.score-(c.memory_bonus??0),bonus=c.available&&Number.isFinite(preference?.bonus)?Math.max(0,Math.min(6,preference.bonus)):0;
+    const rhythm=w.memory?.development?.rhythm?.actors[state.actor_id];
+    const maintained=rhythm?.topics[topic]?.formed_at&&rhythm?.topics[topic]?.status!=='parked';
+    const focused=topic===rhythm?.primary_topic||rhythm?.side_topics.includes(topic);
+    const preferenceBonus=rhythm?.topics[topic]?.status==='parked'?0:maintained?(focused?6:0):(preference?.bonus??0);
+    const baseScore=c.score-(c.memory_bonus??0),bonus=c.available?Math.max(0,Math.min(6,preferenceBonus)):0;
     // Keep the full quantitative evidence in the shared ledger. A choice only
     // carries a small set that actually participated in the interest threshold.
     const roots=bonus?[...(preference.threshold_root_ids??[])].slice(-16):[];
     const memoryIds=[...new Set(records.filter(r=>roots.includes(r.root_outcome_id)).flatMap(r=>r.views?.memory_ids??[]))].slice(-8);
     return {...c,score:baseScore+bonus,memory_bonus:bonus,memory_ids:memoryIds,facet_root_ids:roots,
       development_topic:topic??null,
-      reason:bonus?`${c.reason} 最近我还主动留意过${TOPICS[topic]}，想继续看看。`:c.reason};
+      reason:bonus?`${c.reason} 之前主动投入过${TOPICS[topic]}，有机会想继续看看。`:c.reason};
   }).sort((a,b)=>b.score-a.score);
 }
 
@@ -164,7 +169,11 @@ export function modelDevelopmentContext(w,actorId=w?.protagonist?.character_id) 
         :['self_continuation','need','invited'].includes(r.causes?.motivation?.kind)?r.causes.motivation.kind:'unknown',
       ...(r.outcome==='completed'?{}:{failure:{classification:['resource','condition','route','coordination','performance','cancelled'].includes(r.failure?.classification)?r.failure.classification:'unclassified',
         ...(Object.hasOwn(knownFailureReasons,r.failure?.code??'')?{known_reason:knownFailureReasons[r.failure.code]}:{})}})}));
+  const rhythm=lifeRhythmReadModel(w,{actorId});
   return {enabled:model.enabled,schema:model.schema,basis:'canonical_unique_root_outcomes',automatic_wishes:false,
+    life_rhythm:rhythm?{primary_topic:rhythm.actors[0]?.primary_topic??null,
+      topics:Object.values(rhythm.actors[0]?.topics??{}).map(t=>({topic:t.topic,status:t.status,formed:Boolean(t.formed_at)})),
+      followups:rhythm.opportunities.filter(o=>['available','waiting_day','in_progress'].includes(o.status)).map(o=>({topic:o.topic,kind:o.kind,status:o.status,not_before:o.not_before}))}:null,
     recent_actual_outcomes:recentActual,
     topics:(actor?.topics??[]).map(t=>({topic:t.topic,label:TOPICS[t.topic]??t.topic,
       contact_count:t.contact?.count??0,
@@ -200,6 +209,7 @@ export function memoryReadModel(w) {
   const m=w.memory;
   return {schema:m.schema,installed_at:m.installed_at,revision:m.revision,identity_preserved:true,owner_id:w.protagonist.character_id,
     development:developmentReadModel(w),
+    life_rhythm:lifeRhythmReadModel(w),
     counts:Object.fromEntries(['world_fact','personal_interpretation','hearsay'].map(kind=>[kind,m.episodes.filter(e=>e.kind===kind).length])),
     actors:Object.values(m.actors).map(a=>({...structuredClone(a),display_name:a.actor_id===w.protagonist.character_id?w.protagonist.display_name:w.npcs.find(n=>n.npc_id===a.actor_id)?.display_name})),
     recent:structuredClone(m.episodes.slice(-48).reverse()),own:structuredClone(m.episodes.filter(e=>e.actor_ids.includes(w.protagonist.character_id)).slice(-24).reverse()),

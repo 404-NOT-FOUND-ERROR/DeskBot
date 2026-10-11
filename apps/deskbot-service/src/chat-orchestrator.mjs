@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { normalizeChat } from './input-store.mjs';
+import { cognitiveDialogueContext } from './cognitive-life-state.mjs';
 import { composePrompt } from './prompt-composer.mjs';
 import { DEFAULT_TTS_PROFILE, canonicalCharacterId } from './world-definition.mjs';
 import { applyRoleTrialExpressionIntent, normalizeExpressionIntent } from './expression-intent.mjs';
@@ -227,6 +228,7 @@ export function createChatOrchestrator({
     );
     const runtimePromptContext = {
       ...(runtimeContext ?? {}),
+      cognitive_life:cognitiveDialogueContext(currentWorldSnapshot(),userEvent.character_id),
       weather_request: weatherRefreshResult
         ? { status: 'refreshed', cached: weatherRefreshResult.cached === true }
         : weatherForecastResult
@@ -543,6 +545,16 @@ export function createChatOrchestrator({
 
   return {
     get: (turnId) => turns.get(turnId) ?? null,
+    history: (characterId) => {
+      const id=canonicalCharacterId(characterId)??'unbound',boundary=conversationHistoryAfter?.(characterId);
+      return [...turns.values()].filter(t=>(canonicalCharacterId(t.input_event?.character_id)??'unbound')===id
+        && (!boundary || Date.parse(t.input_event?.occurred_at)>Date.parse(boundary)))
+        .sort((a,b)=>String(a.input_event?.occurred_at).localeCompare(String(b.input_event?.occurred_at)))
+        .slice(-20).flatMap(t=>[
+          {id:`${t.turn_id}:user`,speaker:'你',text:t.input_event?.payload?.text,at:t.input_event?.occurred_at},
+          {id:`${t.turn_id}:assistant`,speaker:'喵呜',text:t.reply_event?.payload?.text??t.reply,at:t.reply_event?.occurred_at}
+        ]).filter(m=>typeof m.text==='string'&&m.text.trim()).map(m=>({...m,text:m.text.slice(0,2000)}));
+    },
     run,
   };
 }

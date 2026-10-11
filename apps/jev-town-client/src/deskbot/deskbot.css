@@ -405,6 +405,22 @@
 .deskbot-mode__supply-note { font-size: 11px; line-height: 1.7; color: #71847d; padding-left: 9px; border-left: 2px solid #abc8bc; }
 .life-facility-projects { display: grid; gap: 7px; margin: 8px 0; padding: 8px 9px; border-radius: 8px; background: #edf3e8; }
 .life-facility-projects p { display: grid; gap: 4px; margin: 0 !important; overflow-wrap: anywhere; }
+
+.deskbot-conversation { position:absolute; z-index:9; bottom:18px; left:50%; transform:translateX(-50%); width:min(560px,calc(100% - 32px)); max-height:58%; display:flex; flex-direction:column; overflow:hidden; border:1px solid #d8e3d3; border-radius:16px; background:#fffef9f5; box-shadow:0 8px 26px #284c2e18; }
+.deskbot-conversation__head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 13px 5px; color:#3b665a; font-size:12px; }
+.deskbot-conversation__head button { padding:5px 8px; font-size:10px; border:0; background:#edf3e8; color:#527869; }
+.deskbot-conversation__history { overflow-y:auto; min-height:0; padding:4px 14px; border-bottom:1px solid #e2e8dc; }
+.deskbot-conversation__history>p { font-size:11px; line-height:1.7; color:#6c7e70; }
+.deskbot-conversation ol { list-style:none; padding:0; margin:0; display:grid; gap:12px; }
+.deskbot-conversation li { font-size:12px; color:#416358; }
+.deskbot-conversation li.is-user { color:#6c7c6f; }.deskbot-conversation li strong { font-size:10px; }
+.deskbot-conversation li time { margin-left:8px; font-size:9px; color:#869182; }.deskbot-conversation li p { margin:4px 0 8px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.deskbot-mode__stage .deskbot-conversation .deskbot-mode__composer { position:static; width:100%; max-width:none; transform:none; border:0; border-radius:0; box-shadow:none; background:transparent; padding:8px 10px; flex-shrink:0; }
+.deskbot-conversation textarea:focus-visible { outline:2px solid #6d9787; outline-offset:1px; border-radius:5px; }
+.review-live-link { display:inline-flex; gap:8px; align-items:center; color:#355f54; text-decoration:none; border:1px solid #bacdbc; border-radius:9px; padding:8px 12px; margin-bottom:8px; background:#fffdf4; font-size:12px; }
+.review-sample-notice { font-size:12px; color:#6b7d70; margin:0 0 10px; }
+@media(max-width:620px) { .deskbot-mode__status button.deskbot-essential-action { display:inline-block; font-size:10px; padding:5px 6px; }.deskbot-mode__header-actions { flex-wrap:wrap; gap:4px; }.deskbot-conversation { bottom:13px; width:calc(100% - 26px); max-height:60%; }.deskbot-conversation__head { font-size:11px; } }
+@media(max-width:700px) { .deskbot-mode__stage .map-controls { top:auto; bottom:132px; }.deskbot-mode__stage:has(.deskbot-conversation__history) .map-controls { display:none; } }
 .life-facility-projects strong { font-size: 11px; color: #5d7b66; }.life-facility-projects span,.life-facility-projects small { font-size: 10px; color: #85917b; margin: 0; }
 .life-facility-projects--compact { margin: 5px 0 0; padding: 5px 0 0 7px; border-left: 2px solid #aec8b1; border-radius: 0; background: transparent; }
 .life-facility-projects--compact strong { color: #49644f; }.life-facility-projects--compact span { color: #526a58; }

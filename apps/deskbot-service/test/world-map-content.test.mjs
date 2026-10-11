@@ -34,7 +34,8 @@ test('catalog connects ten stable locations, internal areas and inspectable obje
   assert.equal(map.locations.flatMap(place=>place.areas.flatMap(area=>area.objects)).length,21);
   for(const place of map.locations){assert.ok(getWorldRoute(world,{destinationLocationId:place.location_id}).found);assert.deepEqual(place.presentation,content.locations.find(item=>item.location_id===place.location_id).presentation);}
   assert.equal(map.content.objects_have_simulated_state,true);
-  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,9);
+  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,10);
+  assert.equal(map.objects.find(object=>object.object_id==='square-noticeboard').state_scope,'persistent_living','night lanterns are projected from actual world state');
   assert.equal(content.objects.every(object=>object.state_scope==='catalog_only'),true,'the authored directory cannot forge live state');
 });
 

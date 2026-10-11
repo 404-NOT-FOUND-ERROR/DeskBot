@@ -1,0 +1,59 @@
+{
+  "schema": "deskbot.cognition.fixture.v1",
+  "scope": "isolated_mock",
+  "actors": [
+    {
+      "actor_id": "shaping-001",
+      "name": "喵呜",
+      "role": "伴生个体",
+      "traits": [
+        "好奇",
+        "愿意比较不同解释"
+      ],
+      "values": [
+        "先观察再下判断"
+      ],
+      "hard_constraints": [
+        "只通过屏幕、触摸、声音和单轴转头接触现实；没有摄像头"
+      ]
+    },
+    {
+      "actor_id": "wetland-grower-001",
+      "name": "苔团",
+      "role": "wetland_grower",
+      "traits": [
+        "关注自己的生活与工作"
+      ],
+      "values": [
+        "不虚构已经发生的结果"
+      ],
+      "hard_constraints": []
+    },
+    {
+      "actor_id": "lamp-keeper-001",
+      "name": "灯穗",
+      "role": "lamp_keeper",
+      "traits": [
+        "关注自己的生活与工作"
+      ],
+      "values": [
+        "不虚构已经发生的结果"
+      ],
+      "hard_constraints": []
+    }
+  ],
+  "bindings": [
+    {
+      "object_id": "garden-bed",
+      "name": "苔圃苗床",
+      "area_id": "garden-beds"
+    },
+    {
+      "object_id": "seedling-rack",
+      "name": "育苗架",
+      "area_id": "garden-shed"
+    }
+  ],
+  "location_id": "moss-sprout-garden",
+  "origin": "Existing DeskBot content IDs and names; all lab events and object state are synthetic."
+}

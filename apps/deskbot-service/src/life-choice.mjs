@@ -47,7 +47,7 @@ export function prepareLifeChoice(w,state,choices,at) {
   if(cooling||legal.length<2)return {choice:first,decision:{source:'rules',reason:cooling?'留出独立生活时间，本轮按经历与当前条件安排。':'当前只有少量可行安排。'}};
   const memories=retrieveModelMemory(w,{actorId:state.actor_id,query:legal.map(c=>c.title).join(' '),at,limit:8});
   const r={id:`life-choice:${state.actor_id}:${state.sequence}:${at}`,actor_id:state.actor_id,key,status:'waiting',created_at:at,
-    expires_at:new Date(Date.parse(at)+90_000).toISOString(),candidates:legal.map(({steps,...c})=>c),memories,
+    expires_at:new Date(Date.parse(at)+90_000).toISOString(),candidates:legal.map(({steps,life_followup,...c})=>c),memories,
     development:modelDevelopmentContext(w,state.actor_id),relationships:Object.values(w.social?.relationships??{}).filter(r=>r.actors.includes(state.actor_id)).slice(0,6),
     energy:state.energy,appetite:state.appetite,choice:null};
   planner.requests[state.actor_id]=r;choiceNote(w,r,at,'waiting','留一小会儿，结合自己的经历挑下一件事。');return {waiting:true};

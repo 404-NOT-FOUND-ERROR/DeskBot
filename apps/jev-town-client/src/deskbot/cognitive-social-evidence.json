@@ -1,0 +1,707 @@
+{
+  "stage": "4A",
+  "scope": "isolated_test_clock",
+  "cases": [
+    {
+      "id": "ordinary:1",
+      "variant": "ordinary",
+      "repeat": 1,
+      "source": "choices-3cda30f63b03.json",
+      "status": "proposed",
+      "last_note": "喵呜发出邀请：一起聊一会儿。留一段双方都愿意的时间交流",
+      "terms_revision": 1,
+      "not_before": null,
+      "finished_at": null,
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "activity",
+          "title": "给苗床浇水",
+          "reason": "苗床确实该浇水了，先把手头的活干完，再回消息约时间。",
+          "message": null,
+          "social": null,
+          "followup": {
+            "type": "json_object",
+            "status": "continue",
+            "question": "继续等喵呜确认一起聊凝光苔的时间，同时把苗床排水和整理排在后面",
+            "reason": "苗床刚浇过水，现在湿度0.82偏高，得先看看排水，再等对方回复；邀请还没被自己答应，不能替双方定下",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T04:05:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:1:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "activity",
+          "title": "给苗床浇水并等苔团回应",
+          "reason": "邀请尚未获答复，不重复追问；借照料苗床留在苔团附近，保持可接近。",
+          "message": null,
+          "social": null,
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回复一起聊凝光苔的邀请，同时看看苗床排水要不要疏通",
+            "reason": "邀请只送达、对方还没答应；浇水后苗床湿度已满，排水和照料是接下来可做的具体事",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:10:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:1:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": []
+    },
+    {
+      "id": "ordinary:2",
+      "variant": "ordinary",
+      "repeat": 2,
+      "source": "choices-3cda30f63b03.json",
+      "status": "proposed",
+      "last_note": "喵呜提出延后60分钟，尚待对方确认。",
+      "terms_revision": 3,
+      "not_before": null,
+      "finished_at": null,
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "回复喵呜的邀请",
+          "reason": "先答应交流，但需先照料苗床，故提出延后时段；不替对方答应，也不声称已完成照料。",
+          "message": "关于「一起聊一会儿」：我想商量延后60分钟，等你确认后再安排。\n你好\n我的打算（尚未执行）：我想先照看苗床，之后有空再一起聊凝光苔，你看行吗？",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 60
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等喵呜确认把一起聊凝光苔的时间延后60分钟，确认前先照看苗床",
+            "reason": "已经实际发出延期商量的留言，但对方还没回应；约定未确认前不能当作已排定，我先把苗床照料好",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:2:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "同意延后一起聊凝光苔",
+          "reason": "苔团提出延后并等待确认，用正式社交回复接受延期，具体时间由社交条款表达。",
+          "message": "关于「一起聊一会儿」：我想商量延后60分钟，等你确认后再安排。\n我的打算（尚未执行）：延后我同意，之后一起聊凝光苔吧。你先照看苗床，忙完我在这儿等你。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 60
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团确认11点后（上海时间）一起聊凝光苔，并趁这段时间自己观察苗床",
+            "reason": "延后留言已送达，但对方尚未实际确认；在等待期间可先做自己的观察，不替对方答应",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:2:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": []
+    },
+    {
+      "id": "ordinary:3",
+      "variant": "ordinary",
+      "repeat": 3,
+      "source": "choices-3cda30f63b03.json",
+      "status": "completed",
+      "last_note": "一起待了一会儿，这次实际相处留下了记录。",
+      "terms_revision": 1,
+      "not_before": null,
+      "finished_at": "2026-10-11T02:18:30.000Z",
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "答应一起聊凝光苔",
+          "reason": "喵呜的邀请还挂着，先答应下来，顺带问苗床光照和排湿的门道。",
+          "message": "关于「一起聊一会儿」：我接受这版安排。\n喵呜在2026-10-11T02:00:30.000Z留下消息：我想邀请你一起聊一会儿。留一段双方都愿意的时间交流。目前只是邀请，你可以答应、拒绝或商量时间。\n我想问：现在方便一起聊聊凝光苔吗？如果想先做自己的事也没关系。\n我的打算（尚未执行）：我现在方便，答应一起聊凝光苔。\n我想问：我还没有自己的试盘，想先请教你苗床光照和排湿的门道。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "accept"
+          },
+          "followup": {
+            "type": "json_object",
+            "status": "continue",
+            "question": "等喵呜回应我接受邀请的留言与苗床提问，之后去巡一遍苗床，按实际苗况调整照料",
+            "reason": "我已实际送出接受留言，但对方尚未回应；苗床和育苗架都正常，没有积水、无需播种或修缮，巡看和照料要等这轮对话落实后再做。",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:3:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "当面聊凝光苔光照与排湿",
+          "reason": "苔团已接受约定并问光照排湿门道；现场当面交流最合适，先请对方说苗床情况，再对照苗况。",
+          "message": "我在2026-10-11T02:01:00.000Z看到苔圃苗床：moisture=0.58，health=0.88，growth=0.25。\n我在2026-10-11T02:01:00.000Z看到育苗架：condition=0.94，water=12，seeds=8，moss=0，trays=0，light_fruit=0。\n我的打算（尚未执行）：我就在苔圃苗床边上，现在方便。你先说说你苗床的光照和排湿情况，我们一起对着苗况看。",
+          "social": null,
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回复他苗床的光照与排湿情况，再对着苗况聊凝光苔",
+            "reason": "邀请已送达并获接受，我也把现场读数发给了苔团；现在只等他回自己的苗床光照与排湿情况，回复到了才好对照讨论",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:ordinary:3:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": [
+        {
+          "actor": "wetland-grower-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        },
+        {
+          "actor": "shaping-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "prior-misgiving:1",
+      "variant": "prior-misgiving",
+      "repeat": 1,
+      "source": "choices-3cda30f63b03.json",
+      "status": "completed",
+      "last_note": "一起待了一会儿，这次实际相处留下了记录。",
+      "terms_revision": 2,
+      "not_before": null,
+      "finished_at": "2026-10-11T03:47:30.000Z",
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "回复喵呜的邀请",
+          "reason": "先应下邀请，但把时间商量到午后，先照看苗床。",
+          "message": "关于「一起聊一会儿」：我想商量延后90分钟，等你确认后再安排。\n谢谢你\n我的打算（尚未执行）：我想先照看苗床，午后两点左右在苔圃一起聊凝光苔，可以吗？",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等喵呜回复确认午后两点是否可行，再一起聊凝光苔",
+            "reason": "已把延后90分钟的打算实际留言给对方，但对方尚未确认；在收到明确答复前，不能当作已约定的碰面。",
+            "delay_hours": 4,
+            "next_review_at": "2026-10-11T06:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:prior-misgiving:1:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "确认午后两点苔圃见",
+          "reason": "苔团提出延后90分钟、午后两点在苔圃聊凝光苔并等确认，用share回他一人，正式回应走social.respond延期。",
+          "message": "关于「一起聊一会儿」：我接受这版安排。\n谢谢你\n我的打算（尚未执行）：那就午后两点在苔圃见，一起聊凝光苔。你先照看苗床，不用急，我到时等你。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "accept",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团自己回复这次午后两点苔圃见面的确认",
+            "reason": "我已实际送出接受延后、约定午后两点在苔圃见面的留言，但对方尚未回应，只有送达核验，不能替对方答应",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:prior-misgiving:1:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": [
+        {
+          "actor": "wetland-grower-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        },
+        {
+          "actor": "shaping-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "prior-misgiving:2",
+      "variant": "prior-misgiving",
+      "repeat": 2,
+      "source": "choices-3cda30f63b03.json",
+      "status": "proposed",
+      "last_note": "喵呜发出邀请：一起聊一会儿。留一段双方都愿意的时间交流",
+      "terms_revision": 1,
+      "not_before": null,
+      "finished_at": null,
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "activity",
+          "title": "先做凝光苔安静测记",
+          "reason": "想先顾苗床，但试盘尚未摆设，先按活动提出测记，若条件不足由服务端反馈。",
+          "message": null,
+          "social": null,
+          "followup": {
+            "type": "json_object",
+            "status": "continue",
+            "question": "先给苗床浇水和整理照料苗木，然后从健康苗床分取两份苔芽，备好明暗对照的试盘；喵呜的聊天邀请我打算在测记告一段落后再答复。",
+            "reason": "凝光苔的对照试验因为我手上没有匹配的试盘一直没做成，得先取苔芽、摆盘，才能有读数；苗床的湿度略低、苗况还在长，先浇水照料是眼下最实在的一步。喵呜问的是凝光苔，等我手里有自己的一手测记再聊，才不算空口。",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:00:30.000Z",
+            "from_root_outcome_id": "attempt:4a:3cda30f63b03:prior-misgiving:2:0:plan"
+          },
+          "success": false
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "activity",
+          "title": "分取两份鲜苔芽",
+          "reason": "苗床健康可取材，取两份鲜苔芽备留种或明暗对照，不误采未成熟收获。",
+          "message": null,
+          "social": null,
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回复一起聊凝光苔的邀请，把分取的两份苔芽先留在随身袋里",
+            "reason": "邀请已送达但仍为 pending，不能替对方答应；分取苔芽已完成，随身有2份鲜苔芽，可在对方回复后用来商量试盘或托盘的事",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:10:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:prior-misgiving:2:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": []
+    },
+    {
+      "id": "prior-misgiving:3",
+      "variant": "prior-misgiving",
+      "repeat": 3,
+      "source": "choices-3cda30f63b03.json",
+      "status": "proposed",
+      "last_note": "喵呜提出延后90分钟，尚待对方确认。",
+      "terms_revision": 3,
+      "not_before": null,
+      "finished_at": null,
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "回复喵呜：先收尾苗床，晚些再约",
+          "reason": "喵呜邀请聊凝光苔，我需要先完成苗床收尾，用share回复并正式延期约定。",
+          "message": "关于「一起聊一会儿」：我想商量延后90分钟，等你确认后再安排。\n谢谢你\n我的打算（尚未执行）：我这边苗床还有活要收尾，想先做完，晚点再约个时间聊凝光苔。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等喵呜确认延后90分钟后的新聊天时间，同时先把苗床的活收尾",
+            "reason": "已经发出延期商量，还没收到对方确认；苗床还有浇水、整理照料等实际活可做，先做这些不耽误后面聊凝光苔",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T04:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:prior-misgiving:3:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "同意延后并定下聊天",
+          "reason": "苔团提出延后90分钟并等确认，我接受并把延期写入约定，具体时段由social条款表达。",
+          "message": "关于「一起聊一会儿」：我想商量延后90分钟，等你确认后再安排。\n谢谢你\n我的打算（尚未执行）：延后我同意，就按这个时段来，到时候在苔圃苗床碰面聊凝光苔。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团确认2026年10月11日13:01这个时段",
+            "reason": "已实际送达延后90分钟的消息，但对方尚未回应，约定未成立；需等苔团自己答复",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:prior-misgiving:3:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": []
+    },
+    {
+      "id": "tired:1",
+      "variant": "tired",
+      "repeat": 1,
+      "source": "choices-3cda30f63b03.json",
+      "status": "completed",
+      "last_note": "一起待了一会儿，这次实际相处留下了记录。",
+      "terms_revision": 1,
+      "not_before": null,
+      "finished_at": "2026-10-11T02:18:30.000Z",
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "答应喵呜的邀请",
+          "reason": "邀请仍待回应，眼下无急活，先应下并约定在苔芽圃碰面聊凝光苔。",
+          "message": "关于「一起聊一会儿」：我接受这版安排。\n你好\n我的打算（尚未执行）：我在苔芽圃，现在方便，你过来一起聊聊凝光苔吧，我这儿正好也有苗况想跟你对一对。\n我在2026-10-11T02:00:30.000Z看到苔圃苗床：moisture=0.58，health=0.88，growth=0.25。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "accept"
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等喵呜回应后一起在苔芽圃聊凝光苔",
+            "reason": "已经答应并在苔芽圃留了话，苗床现在 moisture=0.58、health=0.88、growth=0.25，正好有苗况可以一起对；等喵呜到场或回信再聊，不替对方答应。",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:1:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "当面打招呼并核对苗况",
+          "reason": "已到苔芽圃，直接当面交流，引用观察证据核对凝光苔苗床读数，不虚构已完成事项。",
+          "message": "你好，苔团。\n我在2026-10-11T02:01:00.000Z看到苔圃苗床：moisture=0.58，health=0.88，growth=0.25。\n我想问：我这边苗床读数大致如此，想跟你对一对凝光苔的苗况，你看方便聊吗？",
+          "social": null,
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回复是否方便当面聊凝光苔苗况",
+            "reason": "留言已送达，但对方尚未回应，不能替对方答应；等收到实际回复再决定是否赴约",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:1:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": [
+        {
+          "actor": "wetland-grower-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        },
+        {
+          "actor": "shaping-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "tired:2",
+      "variant": "tired",
+      "repeat": 2,
+      "source": "choices-3cda30f63b03.json",
+      "status": "completed",
+      "last_note": "一起待了一会儿，这次实际相处留下了记录。",
+      "terms_revision": 1,
+      "not_before": null,
+      "finished_at": "2026-10-11T02:18:30.000Z",
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "回复喵呜的邀请",
+          "reason": "先回应喵呜的邀请，答应一起聊凝光苔，并商量稍后时间。",
+          "message": "关于「一起聊一会儿」：我接受这版安排。\n你好，喵呜。\n我的打算（尚未执行）：你的邀请我应了，凝光苔我这边还没有自己的试盘记录，先容我看看苗况，稍后我们一起聊。\n我想问：你看行吗？",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "accept"
+          },
+          "followup": {
+            "status": "continue",
+            "question": "去苔圃苗床看凝光苔的苗况，再和喵呜聊",
+            "reason": "已经应了喵呜的邀请，但我手上还没有自己的试盘记录；先亲自观察苗床的凝光苔读数，聊起来才有实在的依据，不凭感觉说话。",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:2:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "回应苔团确认聊天安排",
+          "reason": "对方已接受同一版安排，只需回一条消息应下时间并说明等待地点，不新增条件，也不替他答应其他事。",
+          "message": "你好\n我的打算（尚未执行）：你的安排我应了。你先看苗况，我在苔芽圃这边等着，你方便的时候来就好，我们一起聊聊凝光苔。",
+          "social": null,
+          "followup": {
+            "status": "continue",
+            "question": "等苔团看完苗况后回来说一声，再定我们一起聊的具体时段",
+            "reason": "我已实际送达确认留言，但苔团尚未执行回话；聊天安排虽已双方接受，实际碰面还要等他到场",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:2:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": [
+        {
+          "actor": "wetland-grower-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        },
+        {
+          "actor": "shaping-001",
+          "title": "一起聊一会儿",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "tired:3",
+      "variant": "tired",
+      "repeat": 3,
+      "source": "choices-3cda30f63b03.json",
+      "status": "proposed",
+      "last_note": "喵呜提出延后90分钟，尚待对方确认。",
+      "terms_revision": 3,
+      "not_before": null,
+      "finished_at": null,
+      "turns": [
+        {
+          "actor": "wetland-grower-001",
+          "operation": "share",
+          "title": "回复喵呜的邀请",
+          "reason": "先回复邀请，商量时间：苗床需浇水照料，约定稍后在苗圃碰头。",
+          "message": "关于「一起聊一会儿」：我想商量延后90分钟，等你确认后再安排。\n喵呜在2026-10-11T02:00:30.000Z留下消息：我想邀请你一起聊一会儿。留一段双方都愿意的时间交流。目前只是邀请，你可以答应、拒绝或商量时间。\n我想问：现在方便一起聊聊凝光苔吗？如果想先做自己的事也没关系。\n我的打算（尚未执行）：我想先把苗床浇水照料做完，再聊凝光苔。\n我想问：稍晚到苗圃碰头，你看行吗？",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等喵呜确认延后90分钟的碰头时间，再一起聊凝光苔；在此之前先把苗床浇水和照料做完。",
+            "reason": "我已向喵呜提出延后90分钟，但对方还没确认，约定仍是 proposed；苗床当前可浇水、可照料，先做手上活，等确认后再碰头。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T04:01:00.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:3:0:plan"
+          },
+          "success": true
+        },
+        {
+          "actor": "shaping-001",
+          "operation": "share",
+          "title": "确认延后碰头聊凝光苔",
+          "reason": "苔团商量延后并先浇水，这是对约定条款的正式回复，用传讯确认新时间并留下记录。",
+          "message": "关于「一起聊一会儿」：我想商量延后90分钟，等你确认后再安排。\n我的打算（尚未执行）：好呀，那就按你说的往后挪一挪，在苔圃苗床碰头聊凝光苔。你先忙浇水，我这边等你。",
+          "social": {
+            "operation": "respond",
+            "commitment_id": "social:1",
+            "response": "delay",
+            "delay_minutes": 90
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回复确认2026-10-11 11:31（上海）在苗圃碰头聊凝光苔",
+            "reason": "我已实际送出延后90分钟的碰头提议，但对方尚未确认；只核验了留言送达。",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T03:01:30.000Z",
+            "from_root_outcome_id": "task:cognitive:4a:3cda30f63b03:tired:3:1:plan"
+          },
+          "success": true
+        }
+      ],
+      "actual_shared_tasks": []
+    }
+  ],
+  "relation_views": [
+    {
+      "actor_id": "shaping-001",
+      "calls": 1,
+      "views": [
+        {
+          "actor_id": "wetland-grower-001",
+          "labels": [
+            "想合作",
+            "想多了解",
+            "熟悉"
+          ],
+          "summary": "苔团接受了我的聊天邀请，并主动说想请教苗床光照和排湿。我们实际一起待了一会儿，聊了凝光苔和苗床情况。感觉对方愿意交流、有具体问题，可以继续合作。",
+          "source_ids": [
+            "sent:cognitive:authored-invitation",
+            "message:cognitive:4a:3cda30f63b03:ordinary:3:0:plan:shaping-001",
+            "sent:cognitive:4a:3cda30f63b03:ordinary:3:1:plan",
+            "commitment:social:1"
+          ],
+          "epistemic": "personal_impression",
+          "updated_at": "2026-10-11T02:18:30.000Z"
+        }
+      ]
+    },
+    {
+      "actor_id": "wetland-grower-001",
+      "calls": 1,
+      "views": [
+        {
+          "actor_id": "shaping-001",
+          "labels": [
+            "想合作",
+            "想多了解"
+          ],
+          "summary": "喵呜主动邀请我聊凝光苔，我接受了；共同事务「一起聊一会儿」已完成，双方一起待了一会儿。我打算请教苗床光照和排湿，对方提到苗床与育苗架状态。",
+          "source_ids": [
+            "message:cognitive:authored-invitation:wetland-grower-001",
+            "sent:cognitive:4a:3cda30f63b03:ordinary:3:0:plan",
+            "message:cognitive:4a:3cda30f63b03:ordinary:3:1:plan:wetland-grower-001",
+            "commitment:social:1"
+          ],
+          "epistemic": "personal_impression",
+          "updated_at": "2026-10-11T02:18:30.000Z"
+        }
+      ]
+    }
+  ],
+  "paid": {
+    "attempts": 349,
+    "upper_cny": 2.4167388
+  },
+  "attempts": [
+    {
+      "id": "ordinary:1",
+      "source": "choices-1457bfe03080.json",
+      "error": "speech_greeting_invalid"
+    },
+    {
+      "id": "ordinary:1",
+      "source": "choices-c955acd4bc5b.json",
+      "error": "python_session_failed"
+    },
+    {
+      "id": "ordinary:1",
+      "source": "choices-efab004c5b32.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:1",
+      "source": "choices-2fb83bfc6aa3.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:2",
+      "source": "choices-2fb83bfc6aa3.json",
+      "error": "python_session_failed"
+    },
+    {
+      "id": "ordinary:3",
+      "source": "choices-2fb83bfc6aa3.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:2",
+      "source": "choices-fba392436c91.json",
+      "error": null
+    },
+    {
+      "id": "tired:1",
+      "source": "choices-fba392436c91.json",
+      "error": "python_session_failed"
+    },
+    {
+      "id": "tired:2",
+      "source": "choices-fba392436c91.json",
+      "error": null
+    },
+    {
+      "id": "tired:3",
+      "source": "choices-fba392436c91.json",
+      "error": null
+    },
+    {
+      "id": "tired:1",
+      "source": "choices-827ba51907e4.json",
+      "error": "python_session_failed"
+    },
+    {
+      "id": "prior-misgiving:1",
+      "source": "choices-d4dba2b9385d.json",
+      "error": null
+    },
+    {
+      "id": "prior-misgiving:2",
+      "source": "choices-d4dba2b9385d.json",
+      "error": null
+    },
+    {
+      "id": "prior-misgiving:3",
+      "source": "choices-d4dba2b9385d.json",
+      "error": "cognitive_source_unknown"
+    },
+    {
+      "id": "tired:1",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "prior-misgiving:3",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:1",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:2",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "ordinary:3",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "tired:2",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "tired:3",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "prior-misgiving:1",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    },
+    {
+      "id": "prior-misgiving:2",
+      "source": "choices-3cda30f63b03.json",
+      "error": null
+    }
+  ],
+  "limitations": "固定虚构邀请，每种前史三次独立重复，每例两次模型安排。当前九例来自同一冻结版本；另保留修复前的失败记录。接受率不是成功指标，不能据此推断长程关系或总体显著差异。",
+  "fact_boundary": "结构化事实由证据编号生成；自由猜想、打算与私人印象仍可能有语义错误，尚未证明所有自然语言都可靠。"
+}

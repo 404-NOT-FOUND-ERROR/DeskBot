@@ -16,6 +16,7 @@ const scrollBehavior=():ScrollBehavior=>typeof matchMedia==='function'&&matchMed
 interface Props {
   map:DeskBotWorldMap|null;selectedNpcId:string|null;selectionRequest:number;busy:boolean;
   npcDetail:ReactNode;taskDetail:ReactNode;experienceDetail:ReactNode;
+  observationDetail?:ReactNode;observationRequest?:number;
   onSelectNpc:(id:string)=>void;onPlace:(id:string)=>void;
   onAutonomy:()=>void;onRespond:(id:string,operation:'join'|'decline'|'withdraw')=>void;
   replay?:boolean;onSuggest?:(id:string)=>void;
@@ -23,10 +24,11 @@ interface Props {
   onPracticalTrial?:(id:string,operation:DeskBotPracticalTrialOperation,variant?:string)=>void;
   onStagePreview?:StagePreview;onStageControl?:StageControl;
 }
-export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,taskDetail,experienceDetail,onSelectNpc,onPlace,onAutonomy,onRespond,onSuggest,roleWishes,onRoleWish,onPracticalTrial,onStagePreview,onStageControl,replay=false}:Props) {
+export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,taskDetail,experienceDetail,observationDetail,observationRequest=0,onSelectNpc,onPlace,onAutonomy,onRespond,onSuggest,roleWishes,onRoleWish,onPracticalTrial,onStagePreview,onStageControl,replay=false}:Props) {
   const [tab,setTab]=useState('now'),[query,setQuery]=useState('');
   const tabRefs=useRef<(HTMLButtonElement|null)[]>([]),inputArea=useRef<HTMLDivElement>(null),residentDetail=useRef<HTMLDivElement>(null);
   useEffect(()=>{if(selectionRequest){setTab('people');requestAnimationFrame(()=>residentDetail.current?.scrollIntoView({block:'nearest',behavior:scrollBehavior()}));}},[selectionRequest]);
+  useEffect(()=>{if(observationRequest){setTab('journal');requestAnimationFrame(()=>document.querySelector('.life-observation')?.scrollIntoView({block:'nearest',behavior:scrollBehavior()}));}},[observationRequest]);
   const own=map?.autonomy?.actors.find(a=>a.actor_id===map.protagonist.character_id),current=map?.locations.find(l=>l.current);
   const currentTask=activeActorTask(map,map?.protagonist.character_id);
   const promises=map?.social?.commitments??[],ongoing=promises.filter(active);
@@ -83,8 +85,8 @@ export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,t
         {selectedNpcId?<section className="life-block"><h3>与大家的来往</h3>{Object.values(map?.social?.relationships??{}).filter(r=>r.actors.includes(selectedNpcId)).slice(0,4).map(r=><p key={r.actors.join('|')}>{r.actors.map(name).join(' · ')}<br/><small>见过 {r.encounters} 次 · 办成 {r.kept} 次 · 未办成 {r.missed} 次</small></p>)}</section>:null}
       </div>
       <div role="tabpanel" id="life-view-social" aria-labelledby="life-tab-social" hidden={tab!=='social'}><div className="life-block__head"><span className="deskbot-mode__eyebrow">有来有往</span><h2>说好的那些小事</h2><p>先答应，再见面，结果慢慢发生。</p></div>{ongoing.length?ongoing.map(card):<p className="life-empty">眼下没有未完成的约定。大家还在忙自己的事。</p>}<details className="life-settled"><summary>以前的约定 · {promises.length-ongoing.length}</summary>{promises.filter(c=>!active(c)).reverse().slice(0,8).map(card)}</details></div>
-      <div role="tabpanel" id="life-view-journal" aria-labelledby="life-tab-journal" hidden={tab!=='journal'}><div className="life-block__head"><span className="deskbot-mode__eyebrow">一些留下来的光</span><h2>日子留下的痕迹</h2><p>真正做过的事、当时的想法、听来的消息。</p></div>{map?<LivedMemory memory={map.memory} actorId={map.protagonist.character_id} journal/>:null}<InputInfluences inputs={map?.refraction} journal replay={replay}/>{map?.social?.notices.length?<section className="life-block"><h3>簌簌的小报</h3>{map.social.notices.slice(-3).reverse().map(n=><article key={n.id} className="life-notice"><p>{n.text}</p><small>{time(n.at)} · 来自实际发生的来往</small><button className="life-place-link" onClick={()=>setTab('social')}>查看来往 ↗</button></article>)}</section>:null}<ol className="life-timeline">{recent.map((e,i)=><li key={`${e.at}:${i}`}><time>{time(e.at)}</time><div><strong>{e.name}</strong><p>{e.text}</p></div></li>)}</ol>{!recent.length?<p className="life-empty">今天的记录会随着生活逐渐留下。</p>:null}{experienceDetail}</div>
+      <div role="tabpanel" id="life-view-journal" aria-labelledby="life-tab-journal" hidden={tab!=='journal'}>{observationDetail}<div className="life-block__head"><span className="deskbot-mode__eyebrow">一些留下来的光</span><h2>日子留下的痕迹</h2><p>真正做过的事、当时的想法、听来的消息。</p></div>{map?<LivedMemory memory={map.memory} actorId={map.protagonist.character_id} journal/>:null}<InputInfluences inputs={map?.refraction} journal replay={replay}/>{map?.social?.notices.length?<section className="life-block"><h3>簌簌的小报</h3>{map.social.notices.slice(-3).reverse().map(n=><article key={n.id} className="life-notice"><p>{n.text}</p><small>{time(n.at)} · 来自实际发生的来往</small><button className="life-place-link" onClick={()=>setTab('social')}>查看来往 ↗</button></article>)}</section>:null}<ol className="life-timeline">{recent.map((e,i)=><li key={`${e.at}:${i}`}><time>{time(e.at)}</time><div><strong>{e.name}</strong><p>{e.text}</p></div></li>)}</ol>{!recent.length?<p className="life-empty">今天的记录会随着生活逐渐留下。</p>:null}{experienceDetail}</div>
     </div>
-    <div className="life-sidebar__foot"><span><i aria-hidden="true"/>{replay?'独立样本 · 不写入正式世界':map?.living?.recovery.pending?'正在接上离开时的日子':'与现实一起，慢慢过日子'}</span>{!replay?<a href="/life-review.html" target="_blank" rel="noreferrer">独立回放 ↗</a>:null}</div>
+    <div className="life-sidebar__foot"><span><i aria-hidden="true"/>{replay?'独立样本 · 不写入正式世界':map?.living?.recovery.pending?'正在接上离开时的日子':'与现实一起，慢慢过日子'}</span>{!replay?<a href="/life-review.html" target="_blank" rel="noreferrer">独立回放 ↗</a>:<a href="/?mode=deskbot&deskbotUrl=http%3A%2F%2F127.0.0.1%3A4311">回到正式世界 ↗</a>}</div>
   </aside>;
 }

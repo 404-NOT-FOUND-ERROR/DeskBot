@@ -1,0 +1,231 @@
+{
+  "repository": "https://github.com/dreamscroll-lab/asamana",
+  "commit": "e9fc862642369ba8b177595d2f8e3f20c1636da4",
+  "license": "Apache-2.0",
+  "notice_present": false,
+  "upstream_unmodified": true,
+  "files": [
+    {
+      "path": "agent/__init__.py",
+      "sha256": "25a4bf077016cfd2ebf16fa9b8902380287e08cfcc35306a711b7b11a18abaff"
+    },
+    {
+      "path": "agent/agent.py",
+      "sha256": "ad94709657f27449514064234a28cc713bd08254e2328672e4ddeeabde1aba96"
+    },
+    {
+      "path": "agent/decision.py",
+      "sha256": "05ca7a67bba0af9828056818ebcb02a542f05a62de5e7d593b5b08ad42477ab8"
+    },
+    {
+      "path": "agent/goals.py",
+      "sha256": "83c3b9153d83e18cb3270e30c0c8d73b15298e38f99eed7b33a3832989d55730"
+    },
+    {
+      "path": "agent/importance_evaluator.py",
+      "sha256": "2403aabde18a39a6861f6bc14e8642d33ce262b0295d0b5396be6a2cb7a89b96"
+    },
+    {
+      "path": "agent/memory.py",
+      "sha256": "204f7031f30be370b35c8726c09a5dcf983c05dc69cf1eb1695a2562f6e37bbe"
+    },
+    {
+      "path": "agent/memory_ranking.py",
+      "sha256": "510fa0afadd499a0b1824cdd430aa7886f6bf9fbd9ce45b52aec4e1303740e58"
+    },
+    {
+      "path": "agent/memory_types.py",
+      "sha256": "127c12626c60455e05fd86fcb598e5abc5b3916af26858ea5aa03bc453a8787c"
+    },
+    {
+      "path": "agent/memory_write_queue.py",
+      "sha256": "a860bb59df8e700a0b8c4069b9bcebe349edfc2ed00bb7a3f453cb625bc9be65"
+    },
+    {
+      "path": "agent/motivation.py",
+      "sha256": "0d92ce77985f7c8bfaef7441cbe2aacc69ff41af744419f7c5351a32be573c98"
+    },
+    {
+      "path": "agent/need.py",
+      "sha256": "dcb3161d504d52dae3f7bc90c865347dd6eeac72fcd099dcf326ab9d4faeef6f"
+    },
+    {
+      "path": "agent/perception.py",
+      "sha256": "6b8e924dbc6fc11421f0e149f7ff1de0cbedc72078fcab4ea6d190970917f0be"
+    },
+    {
+      "path": "agent/perception_emotion.py",
+      "sha256": "7f00ff788520962e29148178f1caf98d1b482fa35f8159fee6e8b5251373d3e0"
+    },
+    {
+      "path": "agent/perception_layer.py",
+      "sha256": "6f9395fd5cc062bbf53b83043865a6b338f534f05817afb2d5d88813870878f2"
+    },
+    {
+      "path": "agent/personality.py",
+      "sha256": "9881b27b19ddab54c5811c42482121fd6344fb5ca31a7809be47597539be5d71"
+    },
+    {
+      "path": "agent/reflection.py",
+      "sha256": "a06aceaf4ea2872768d2230c9400f8d566112bc72f1a58bceb4cf5346e7cc2dc"
+    },
+    {
+      "path": "agent/relation.py",
+      "sha256": "7616657f47f3248120fa38995ac2d6ac64a102adba84f52a793257cd3229d940"
+    },
+    {
+      "path": "agent/relation_evolution.py",
+      "sha256": "cd7eb3ef26483289ea01b897983000e95c7345bcc45eb5cf870f60a08cb47a8b"
+    },
+    {
+      "path": "core/__init__.py",
+      "sha256": "bf59a4d5aefef97c71a977675372e3d97b963ff8fde278aca0d0a8ead2b68cb8"
+    },
+    {
+      "path": "core/coerce.py",
+      "sha256": "782373a884da709d74aef8658ff01a3f44d533735d579c564afeed1fdaa657d1"
+    },
+    {
+      "path": "core/context.py",
+      "sha256": "a0f5d5be56df92a2bae2d8638d9de25416850fd86869b776265971589bf58ce2"
+    },
+    {
+      "path": "core/duration.py",
+      "sha256": "835acb9bd56e6944c0750cc8acb48f3553496d4e7d9a43674c31b9f9668d60df"
+    },
+    {
+      "path": "core/factory.py",
+      "sha256": "48caddabba194a36988247d51746ad9f963a7c98bc3e379320c6f3a6511209b3"
+    },
+    {
+      "path": "core/interfaces/__init__.py",
+      "sha256": "c8daa88f1745c954b1726ff969e0ec91c3ef00009c5427d3d49f0772b011c020"
+    },
+    {
+      "path": "core/interfaces/action.py",
+      "sha256": "9d9b2a1d2bf63fa34d27878ee74f9e91d013214e535fdd011af6056e522778f4"
+    },
+    {
+      "path": "core/interfaces/agent_store.py",
+      "sha256": "db361875a0734a8bf1f530a128e40d22551c69707158838289d1d1747d6774b4"
+    },
+    {
+      "path": "core/interfaces/condition.py",
+      "sha256": "0631f1d35eff9c2763cc0b676d472b33f8b02ec0b374955e828c6f3f354943e6"
+    },
+    {
+      "path": "core/interfaces/embedding.py",
+      "sha256": "cacd1c1baeea5241ac555843ea75c309717c4c97baf895afe671dab98cfbe2e2"
+    },
+    {
+      "path": "core/interfaces/llm.py",
+      "sha256": "65a9bfb892d47bdaf7dda59a1b9fa5bad47b4c7ce3e8a477e2bf83d7feac8b45"
+    },
+    {
+      "path": "core/interfaces/message.py",
+      "sha256": "da80603b546a6f285a33a6927ffc1ed209fa33fa0706fd7c31ecb483772977f4"
+    },
+    {
+      "path": "core/interfaces/perception.py",
+      "sha256": "871700985a7dd55063ce87248acb9d5a53e60cbaeff71fa8fa33f7274e4116dd"
+    },
+    {
+      "path": "core/interfaces/phenomenon.py",
+      "sha256": "1eea1cefd0295d12eb1696b2ebe55ca748ce02fede632df4f9e906ac8de831d2"
+    },
+    {
+      "path": "core/interfaces/place.py",
+      "sha256": "04ec90defc85b37c4d45b81760cd8d77dae320c09afe8332ebdb5b950e8b2e4d"
+    },
+    {
+      "path": "core/interfaces/severity.py",
+      "sha256": "6edc6f96065de88a66f2afe57e2eebc714ed17398a8fa422ee89373190603287"
+    },
+    {
+      "path": "core/interfaces/snapshot.py",
+      "sha256": "556fa951a517d011c6e3e2b6242a2fc3be87ebd26838c9cd74f3e8287512645d"
+    },
+    {
+      "path": "core/interfaces/trace.py",
+      "sha256": "54128daa235c043ddf7384c013b85085a0e18b406d9a957c14a7b2b0a2cd176f"
+    },
+    {
+      "path": "core/interfaces/urgency.py",
+      "sha256": "dc13bff1ed5821d45d30c9b304bd86885ad72bdd4a550a9a8a0a94bb5a9b6623"
+    },
+    {
+      "path": "core/interfaces/vector_store.py",
+      "sha256": "881cbefaba93064fe5dc0dba08072815a473d92f163e9fef6e02162a42341ec7"
+    },
+    {
+      "path": "core/interfaces/world_config.py",
+      "sha256": "da685cd000bebb7fbe0b1946c3b4d46ed7253b5451f7cb2fc7432574f960b8dc"
+    },
+    {
+      "path": "core/logging.py",
+      "sha256": "8e02a57c8ea3229a2e4f39228fed25b0a83d465d892a56f84f7434e1ee86a676"
+    },
+    {
+      "path": "core/numeric.py",
+      "sha256": "25f3f215b6af0e08f765ed11fad7eb9149eb888eb76ec5e4881834fcf0a30b35"
+    },
+    {
+      "path": "core/prompts.py",
+      "sha256": "2ac70748cb9567e32971fb3cd31ce23be60b1475ec1e8772f1589d996d795fcc"
+    },
+    {
+      "path": "core/rate_gate.py",
+      "sha256": "16740531fbcc06a86113d7d11faa4ed7c728af05bc4b6fe60951dfec8b2c90c5"
+    },
+    {
+      "path": "core/serialization.py",
+      "sha256": "41c2687a745df59ebab5ae66ddec10ca3052a46d8aa899a1e08b11546584d78a"
+    },
+    {
+      "path": "providers/__init__.py",
+      "sha256": "3a25fe5981f0799fc509e192fec8921099dd2d77d68f687c234026d7a3fb2984"
+    },
+    {
+      "path": "providers/agent_store/__init__.py",
+      "sha256": "25fbb2ea5a5d73f60699ab9cb6c4c6a0e879adcd93af4b40403e3a156d8df967"
+    },
+    {
+      "path": "providers/agent_store/file.py",
+      "sha256": "7910d0047953b88563cee263402840554a1fc014afbceed697e1f04848b8fa43"
+    },
+    {
+      "path": "providers/agent_store/in_memory.py",
+      "sha256": "9e5bb22a40cfcf0fce0da26675d2a32d09b53e0ec03dce1eb96f90b41dab5442"
+    },
+    {
+      "path": "providers/vector_store/__init__.py",
+      "sha256": "0b176c0532efae90eb3a0a8d41aeef389d295bab9bf34adc69076e39a8c51023"
+    },
+    {
+      "path": "providers/vector_store/file.py",
+      "sha256": "67a16b8346258b529433d75d0c1f1a23a4be54dbe15ca6877777211e79821652"
+    },
+    {
+      "path": "providers/vector_store/in_memory.py",
+      "sha256": "0299b06d2ce7da5effd9cb7bed752d54732ebb55c29a1a41dfd63e8557ee8bc2"
+    },
+    {
+      "path": "providers/vector_store/similarity.py",
+      "sha256": "59bec89ff07cee420149400a5dce2f9352ed2d56dbe0d3a6a40fc12424d69590"
+    }
+  ],
+  "invoked": [
+    "agent.agent.Agent.plan_step",
+    "agent.need.NeedEngine.run",
+    "agent.decision.DecisionEngine.decide",
+    "agent.memory.MemorySystem.record_event",
+    "agent.memory.MemorySystem.retrieve",
+    "agent.reflection.ReflectionEngine.reflect",
+    "agent.personality.PersonalityLayer",
+    "core.interfaces.llm.LLMRouter",
+    "core.interfaces.llm.IndexedRef",
+    "providers.agent_store.in_memory.InMemoryAgentStore",
+    "providers.vector_store.in_memory.InMemoryVectorStore"
+  ],
+  "remaining_modules": "Cognitive components are called through bounded adapters. File stores, world engine and official executors are not used."
+}

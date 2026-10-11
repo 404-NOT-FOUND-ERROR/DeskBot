@@ -1,5 +1,7 @@
 # 聚形域内容包
 
+当前后续内容设计见 [世界内容规范](../research/design/world-content-v1.md) 与 [持续生活设计](../research/design/continuous-world-design-v1.md)。地点、设施、活动、项目、居民与角色方向共用真实世界状态；规范中的新字段与机制尚待执行器、合同和迁移实现，不能直接作为现有内容包安装格式。
+
 这里保存可评审的世界内容合同。当前运行时的唯一事实源仍是
 `apps/deskbot-service` 的 canonical world 和 SQLite；这些文件是“雾灯镇
 （Morrowmere）”第一版内容基线，用来让地图、Scene、NPC 行程和 Lorebook

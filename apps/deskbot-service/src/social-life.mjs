@@ -23,10 +23,10 @@ function relation(w,c,at,kind,text) {
   if(kind==='failed'){r.trust=Math.max(-10,r.trust-1);r.missed++;}
   r.last_event={at,kind,text,commitment_id:c.id};
 }
-export function reservedSocialActors(w) { return [...new Set((w.social?.commitments??[]).filter(c=>LIVE.includes(c.status)).flatMap(c=>c.status==='proposed'?c.actors.filter(id=>id!==w.protagonist.character_id || (c.responses[id]==='join'&&!['planned','executing'].includes(w.autonomy?.actors[id]?.plan?.status))):c.actors))]; }
+export function reservedSocialActors(w) { return [...new Set((w.social?.commitments??[]).filter(c=>LIVE.includes(c.status)).flatMap(c=>c.control==='cognitive'&&(c.status==='proposed'||Date.parse(c.not_before_at??'')>Date.parse(w.clock?.synced_at??'')+15*M)?[]:c.status==='proposed'?c.actors.filter(id=>id!==w.protagonist.character_id || (c.responses[id]==='join'&&!['planned','executing'].includes(w.autonomy?.actors[id]?.plan?.status))):c.actors))]; }
 function interruptible(w,id,commitmentId=null) {
   const state=w.autonomy?.actors[id],task=activeWorldTask(w,id);
-  const reserved=w.social.commitments.some(c=>c.id!==commitmentId&&LIVE.includes(c.status)&&c.actors.includes(id));
+  const reserved=w.social.commitments.some(c=>c.id!==commitmentId&&LIVE.includes(c.status)&&!(c.control==='cognitive'&&c.status==='proposed')&&c.actors.includes(id));
   const explicitJoin=id===w.protagonist.character_id&&w.social.commitments.some(c=>c.id===commitmentId&&c.responses[id]==='join');
   return !task && (!state?.paused||explicitJoin) && !['planned','executing'].includes(state?.plan?.status) && !reserved;
 }
@@ -62,6 +62,7 @@ function propose(w,at,definition) {
 export function respondSocialInvitation(w,at,id,operation) {
   const c=w.social?.commitments.find(c=>c.id===id),own=w.protagonist.character_id;
   if(!c||!c.actors.includes(own))fail('invitation_not_for_character','这不是喵呜的约定。');
+  if(c.control==='cognitive')fail('cognitive_reply_required','这项安排由人物自己回复；可以通过对话提出建议。');
   if(!['join','decline','withdraw'].includes(operation))fail('invalid_social_response','约定操作无效。');
   if(operation==='withdraw') {
     if(!['accepted','meeting','working'].includes(c.status))fail('invitation_already_settled','这项约定已不在进行中。');
@@ -99,6 +100,10 @@ function startTask(w,c,id,at,eventId,payload) {
     task=startTravelTask(w,{eventId,at,actorId:id,locationId:route[1],destinationId:payload.location_id,reason:c.reason}).task;
   } else task=startActivityTask(w,{actor_id:id,task_id:`social-task:${eventId}`,...payload},{eventId,at}).task;
   const actual=w.tasks.find(t=>t.task_id===task.task_id);actual.origin='social_life';actual.social_commitment_id=c.id;actual.life_action=payload.activity_id?'activity':payload.kind==='travel'?'travel':'social';
+  if(c.control==='cognitive') {
+    Object.assign(actual,structuredClone(c.causes_by_actor?.[id]??{}));
+    actual.accepted_obligation={commitment_id:c.id,terms_revision:c.terms_revision,accepted_at:c.updated_at};
+  }
   c.tasks[id]=actual.task_id;if(id!==w.protagonist.character_id)person(w,id).status=actual.title;
   record(w,c,at,'started',`${person(w,id).display_name}开始${actual.title}。`,{task_id:actual.task_id});return actual;
 }
@@ -112,6 +117,15 @@ function drainTask(w,c,id,at) {
   delete c.tasks[id];return true;
 }
 function progress(w,c,at,eventId,reserved) {
+  if(c.control==='cognitive') {
+    // Only delivered explicit replies change agreement. The legacy NPC auto-join
+    // and automatic deadline extension do not apply to cognitive contracts.
+    if(Date.parse(at)>Date.parse(c.deadline_at)){close(w,c,at,c.status==='proposed'?'declined':'failed',c.status==='proposed'?'邀请窗口结束，没有得到双方确认。':'约定超过共同确认的期限，保留已发生的结果。');return;}
+    if(c.status==='proposed')return;
+    if(c.not_before_at&&at<c.not_before_at)return;
+    if(c.actors.some(id=>w.cognition?.actors[id]?.pending||w.cognition?.actors[id]?.job?.status==='calling'))return;
+    reserved=reserved.filter(id=>!c.actors.includes(id));
+  }
   if(c.status==='proposed') {
     for(const id of c.actors.filter(id=>c.responses[id]==='pending')) {
       if(id===w.protagonist.character_id&&Date.parse(at)<Date.parse(c.respond_after))continue;
@@ -251,6 +265,36 @@ export function advanceSocialLife(w,at,{eventId,reservedActors=[]}={}) {
     w.social.next_offer_at=new Date(Date.parse(at)+10*M).toISOString();
   }
   w.social.revision++;
+}
+
+// Reuse the same task/resource/relationship executor, with an explicit agreement gate.
+export function proposeCognitiveCommitment(w,at,definition,initiatorId,messageId) {
+  if(!definition.actors.includes(initiatorId))fail('invalid_social_initiator','邀请者不在这项约定里。');
+  if(w.social.commitments.some(c=>c.invitation_message_id===messageId))return w.social.commitments.find(c=>c.invitation_message_id===messageId);
+  const c=propose(w,at,{...definition,control:'cognitive',initiator_id:initiatorId,invitation_message_id:messageId,terms_revision:1});
+  if(!c)fail('cognitive_invitation_unavailable','对方已有约定，或刚结束相同邀请，暂时不再打扰。');
+  c.responses=Object.fromEntries(c.actors.map(id=>[id,id===initiatorId?'join':'pending']));
+  c.reply_messages=[];return c;
+}
+
+export function respondCognitiveCommitment(w,at,id,actorId,operation,{revision,messageId,delayMinutes=0}={}) {
+  const c=w.social?.commitments.find(c=>c.id===id);
+  if(!c||c.control!=='cognitive'||!c.actors.includes(actorId))fail('private_commitment_scope','这不是自己的认知约定。');
+  if(c.reply_messages.includes(messageId))return c;
+  if(!LIVE.includes(c.status)||revision!==c.terms_revision||Date.parse(at)>Date.parse(c.deadline_at))fail('commitment_terms_changed','约定已结束、过期或条件有变化，需要重新读取。');
+  if(!['accept','decline','delay','withdraw'].includes(operation))fail('invalid_social_response','未知回复。');
+  if(operation==='withdraw') { close(w,c,at,'withdrawn',`${person(w,actorId).display_name}明确退出；已开始的任务仍按实际状态结算。`); }
+  else {
+    if(c.status!=='proposed'||c.responses[actorId]!=='pending')fail('invitation_already_answered','不能替别人答应，或重复回复同一条件。');
+    if(operation==='delay') {
+      if(!Number.isSafeInteger(delayMinutes)||delayMinutes<15||delayMinutes>240||(c.negotiation_rounds??0)>=2)fail('invalid_negotiated_delay','最多协商两轮，每次延后15至240分钟。');
+      c.negotiation_rounds=(c.negotiation_rounds??0)+1;c.terms_revision++;c.not_before_at=new Date(Date.parse(at)+delayMinutes*M).toISOString();
+      c.deadline_at=new Date(Date.parse(c.not_before_at)+90*M).toISOString();c.responses=Object.fromEntries(c.actors.map(id=>[id,id===actorId?'join':'pending']));
+      record(w,c,at,'counteroffer',`${person(w,actorId).display_name}提出延后${delayMinutes}分钟，尚待对方确认。`);
+    } else if(operation==='decline') {c.responses[actorId]='decline';close(w,c,at,'declined',`${person(w,actorId).display_name}明确拒绝这次安排。`);}
+    else {c.responses[actorId]='join';c.status=c.actors.every(id=>c.responses[id]==='join')?'accepted':'proposed';record(w,c,at,'accepted','双方明确确认同一版条件；实际执行仍需到场、时间和材料。');}
+  }
+  c.reply_messages.push(messageId);w.social.revision++;return c;
 }
 export function socialReadModel(w) {
   if(!w.social)return null;

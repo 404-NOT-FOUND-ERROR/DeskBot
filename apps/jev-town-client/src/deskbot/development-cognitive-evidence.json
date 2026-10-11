@@ -1,0 +1,309 @@
+{
+  "schema": "deskbot.development-replay.v1",
+  "note": "确定性合同回放。测试日期、资源、体力、安排和机会由夹具给定；任务通过实际执行器结算。不是模型自然长成的兴趣，也不是现实跨日。",
+  "trajectories": [
+    {
+      "id": "explore",
+      "title": "自己想继续，逐渐形成投入",
+      "explanation": "第一次尝试单独记录；三个上海日返回、两个实际方法，才形成持续投入。",
+      "snapshots": [
+        {
+          "label": "第一次自选探索",
+          "at": "2026-10-01T02:05:00.000Z",
+          "interest": "initial",
+          "status": "trying",
+          "active": 0,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 1,
+          "opportunity_days": 0,
+          "reason": "已有主动尝试，继续看它会不会跨日发展。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "跨日返回",
+          "at": "2026-10-02T02:12:00.000Z",
+          "interest": "initial",
+          "status": "trying",
+          "active": 1,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 2,
+          "opportunity_days": 0,
+          "reason": "已有主动尝试，继续看它会不会跨日发展。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "跨日返回",
+          "at": "2026-10-03T02:05:00.000Z",
+          "interest": "trying",
+          "status": "trying",
+          "active": 2,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 3,
+          "opportunity_days": 0,
+          "reason": "已有主动尝试，继续看它会不会跨日发展。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "跨日返回",
+          "at": "2026-10-04T02:12:00.000Z",
+          "interest": "continuing",
+          "status": "invested",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 0,
+          "reason": "已经形成投入，继续留出自己的时间。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "invited",
+      "title": "做成了，不自动等于喜欢",
+      "explanation": "四次受邀工作积累实际经验，仍不生成稳定兴趣或角色资格。",
+      "snapshots": [
+        {
+          "label": "受邀做成一次",
+          "at": "2026-10-01T02:12:00.000Z",
+          "interest": "unobserved",
+          "status": "attention",
+          "active": 0,
+          "exploration": 0,
+          "invited": 1,
+          "practice": 1,
+          "opportunity_days": 0,
+          "reason": "目前只是留意，还没有形成稳定投入。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "受邀做成一次",
+          "at": "2026-10-02T02:12:00.000Z",
+          "interest": "unobserved",
+          "status": "attention",
+          "active": 0,
+          "exploration": 0,
+          "invited": 2,
+          "practice": 2,
+          "opportunity_days": 0,
+          "reason": "目前只是留意，还没有形成稳定投入。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "受邀做成一次",
+          "at": "2026-10-03T02:12:00.000Z",
+          "interest": "unobserved",
+          "status": "attention",
+          "active": 0,
+          "exploration": 0,
+          "invited": 3,
+          "practice": 3,
+          "opportunity_days": 0,
+          "reason": "目前只是留意，还没有形成稳定投入。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "受邀做成一次",
+          "at": "2026-10-04T02:12:00.000Z",
+          "interest": "unobserved",
+          "status": "attention",
+          "active": 0,
+          "exploration": 0,
+          "invited": 4,
+          "practice": 4,
+          "opportunity_days": 0,
+          "reason": "目前只是留意，还没有形成稳定投入。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "title": "暂时没条件，保留原来的牵挂",
+      "explanation": "这段测试时间不计入有效机会；保留形成依据，不推断讨厌或遗忘。",
+      "snapshots": [
+        {
+          "label": "已有持续投入",
+          "at": "2026-10-04T02:12:00.000Z",
+          "interest": "continuing",
+          "status": "invested",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 0,
+          "reason": "已经形成投入，继续留出自己的时间。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "没有实际机会的二十二天",
+          "at": "2026-10-26T02:00:00.000Z",
+          "interest": "continuing",
+          "status": "held",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 0,
+          "reason": "最近还没有可返回这个方向的当地方法",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "return",
+      "title": "可以放下，也能重新想起",
+      "explanation": "新输入先唤起注意，不补造实践；是否真的回来，仍等待它的下一次选择。",
+      "snapshots": [
+        {
+          "label": "留下原来的投入",
+          "at": "2026-10-04T02:12:00.000Z",
+          "interest": "continuing",
+          "status": "invested",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 0,
+          "reason": "已经形成投入，继续留出自己的时间。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "三个有效日没有返回",
+          "at": "2026-10-07T02:00:00.000Z",
+          "interest": "continuing",
+          "status": "quiet",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 3,
+          "reason": "最近暂未继续，先留着这份投入。",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "七个有效日选择其他安排",
+          "at": "2026-10-11T02:00:00.000Z",
+          "interest": "continuing",
+          "status": "parked",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 7,
+          "reason": "七个有实际机会的上海日里选择了其他安排，暂时搁置",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        },
+        {
+          "label": "新问题重新带来机会",
+          "at": "2026-10-11T02:00:00.000Z",
+          "interest": "continuing",
+          "status": "reawakened",
+          "active": 3,
+          "exploration": 1,
+          "invited": 0,
+          "practice": 4,
+          "opportunity_days": 7,
+          "reason": "七个有实际机会的上海日里选择了其他安排，暂时搁置",
+          "roots": [
+            "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z",
+            "task:cognitive:fixture:1:2026-10-02T02:00:00.000Z",
+            "task:cognitive:fixture:2:2026-10-03T02:00:00.000Z",
+            "task:cognitive:fixture:3:2026-10-04T02:00:00.000Z"
+          ]
+        }
+      ]
+    }
+  ],
+  "lifecycle": [
+    {
+      "title": "已有资格，还没有说想变",
+      "detail": "满足证据门槛仅显示方向；不会自动换形。"
+    },
+    {
+      "title": "本人提出愿望",
+      "detail": "照料后想试试水边生活"
+    },
+    {
+      "title": "决定试做以后，沿原任务执行",
+      "detail": "两个不同上海日完成实际照料；材料、体力与占用照常结算。试做也能暂停或退出。"
+    },
+    {
+      "title": "经过复核，明确采用",
+      "detail": "仅采用现有数字阶段图层，身份与过去结果保留；这不代表实体外壳已经更换。"
+    },
+    {
+      "title": "可以撤回这次采用",
+      "detail": "撤回当前图层，保留所有做过的事情，不倒带资源和关系。"
+    }
+  ],
+  "trial": {
+    "roots": [
+      "task:cognitive:fixture:4:2026-10-05T02:00:00.000Z",
+      "task:cognitive:fixture:5:2026-10-06T02:00:00.000Z"
+    ],
+    "successes": 2,
+    "ready": true
+  },
+  "limits": [
+    "实际试做、采用与撤回沿用现有明确操作入口；本回放由夹具发起，未宣称模型自行完成采用。",
+    "四类轨迹验证规则和数据连接；兴趣是否有趣、节奏是否自然，需要第六阶段综合对照与第七阶段自然跨日观察。",
+    "兴趣维持看有效机会，形成仍看跨日实际证据；不设固定频率换角色的配额。"
+  ]
+}

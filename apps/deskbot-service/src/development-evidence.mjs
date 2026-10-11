@@ -3,6 +3,7 @@ import { ACTIVITIES, LIVING_RULE_VERSION } from './living-resources.mjs';
 import { goalTopic } from './lived-memory.mjs';
 import { activityTopic, syncDevelopmentFacets, developmentFacetsReadModel } from './development-facets.mjs';
 import { safePracticalTrialMetadata } from './role-practical-trials.mjs';
+import { syncLifeRhythm } from './life-rhythm.mjs';
 
 // A projection of already settled world results, not another reward engine.
 export const DEVELOPMENT_VERSION = 'deskbot.development-evidence.v1';
@@ -25,8 +26,8 @@ function safeDecision(decision) {
 }
 
 function safeMotivation(value) {
-  if (!value || !['need', 'self_continuation', 'invited', 'unknown'].includes(value.kind)) return { kind: 'unknown', facet_root_ids: [] };
-  return { kind: value.kind, ...(Number.isFinite(value.basis_score) ? { basis_score: value.basis_score } : {}),
+  if (!value || !['need', 'self_exploration', 'self_continuation', 'invited', 'accepted_obligation', 'unknown'].includes(value.kind)) return { kind: 'unknown', facet_root_ids: [] };
+  return { kind: value.kind, ...(string(value.commitment_id)?{commitment_id:value.commitment_id}:{}), ...(Number.isFinite(value.basis_score) ? { basis_score: value.basis_score } : {}),
     facet_root_ids: strings(value.facet_root_ids).filter(id => /^(task|commitment):/.test(id)).slice(0, 16) };
 }
 
@@ -46,11 +47,13 @@ function taskCauses(w, task) {
   const ids = strings(task.life_source_ids);
   const sources = sourceDetails(w, task, ids);
   const invited = task.social_commitment_id || task.origin === 'social_life'
-    || sources.some(s => s.attested && ['user', 'agent'].includes(s.category));
+    || (task.origin === 'cognitive_life' ? task.life_motivation?.kind === 'invited'
+      : sources.some(s => s.attested && ['user', 'agent'].includes(s.category)));
   const unresolved = sources.some(s => !s.attested || s.category === 'unknown');
   return { source_record_ids: ids, source_event_ids: strings([task.cause_event_id, ...sources.flatMap(s => [s.event_id, s.origin_id])]), sources,
     plan_id: string(task.life_plan_id), decision: safeDecision(task.life_decision), motivation: safeMotivation(task.life_motivation),
-    trigger: invited ? 'invited' : !unresolved && task.origin === 'autonomous_life' && Array.isArray(task.life_source_ids) ? 'own' : 'unknown' };
+    trigger: invited ? 'invited' : !unresolved && Array.isArray(task.life_source_ids)
+      && (task.origin === 'autonomous_life' || task.origin === 'cognitive_life' && ['need','self_exploration','self_continuation','accepted_obligation'].includes(task.life_motivation?.kind)) ? 'own' : 'unknown' };
 }
 
 const unknownCauses = () => ({ source_record_ids: [], source_event_ids: [], sources: [], plan_id: null, decision: null, trigger: 'unknown', motivation: { kind: 'unknown', facet_root_ids: [] } });
@@ -79,6 +82,10 @@ function fromTask(w, task, at, registered) {
     { kind: 'canonical_task', task_id: task.task_id, commitment_id: string(task.social_commitment_id), task_kind: string(task.kind),
       life_action: ['observe', 'rest'].includes(task.life_action) ? task.life_action : null });
   const trialLink = safePracticalTrialMetadata(task.role_trial);
+  if (string(task.life_followup?.id) && string(task.life_followup?.source_root_id)) {
+    r.source.life_followup_id = task.life_followup.id;
+    r.source.prior_root_id = task.life_followup.source_root_id;
+  }
   if (trialLink) r.source.role_trial = trialLink;
   r.activity_id = string(task.activity_id);
   r.title = titleFor(r.activity_id, task.kind, task.life_action);
@@ -168,7 +175,7 @@ function fromCommitment(w, c, at, registered) {
   const actorIds = strings(c.actors).filter(id => registered.has(id));
   if (!string(c.id) || !actorIds.length || !TERMINAL_COMMITMENTS.has(c.status) || !validAt(c.finished_at, at)) return null;
   const r = recordBase(`commitment:${c.id}`, actorIds, c.finished_at, c.status,
-    { kind: 'canonical_commitment', task_id: null, commitment_id: c.id, task_kind: null, commitment_kind: string(c.kind) });
+    { kind: 'canonical_commitment', task_id: null, commitment_id: c.id, task_kind: null, life_action: null, commitment_kind: string(c.kind) });
   r.title = '实际约定结果'; r.topic = 'connection'; r.location_id = string(c.location_id);
   r.causes.trigger = 'invited';
   r.effect = { practice: false, relationship: true, legacy_interest_eligible: ['completed', 'failed'].includes(c.status), legacy_interest_known: true, completion_effect: 'canonical_relationship_outcome' };
@@ -253,12 +260,16 @@ export function syncDevelopmentEvidence(w, at) {
   development.records = [...records.values()].map(record => {
     // Stage 3 reinterprets the enacted activity, never its enclosing plan title.
     // The result root, original causal metadata and retained facts are preserved.
-    if (record.activity_id) { record.topic = activityTopic(record.activity_id); if (!record.topic) record.effect.practice = false; }
+    if (record.activity_id) {
+      record.topic = activityTopic(record.activity_id);
+      if (!record.topic) record.effect.practice = false;
+      else if(record.source.kind==='canonical_task'&&record.effect.completion_effect===LIVING_RULE_VERSION&&record.source.task_kind!=='travel')record.effect.practice=true;
+    }
     return record;
   }).sort((a, b) => a.at.localeCompare(b.at) || a.root_outcome_id.localeCompare(b.root_outcome_id)).slice(-MAX_RECORDS);
   // Received topics stay in the same development namespace, but are contact
   // references rather than task outcomes. No private text is copied or rewarded.
-  const contacts = new Map((development.contacts ?? []).map(c => [c.source_record_id, c]));
+  const contacts = new Map((development.contacts ?? []).map(c => [c.contact_key??c.source_record_id, c]));
   const suggestionTopics = { water: 'care', tend: 'care', tray: 'craft', waterside: 'explore', grove: 'explore' };
   for (const r of w.refraction?.records ?? []) {
     if (r.attested !== true || r.freshness !== 'fresh' || !validAt(r.received_at, at) || contacts.has(r.id)) continue;
@@ -267,10 +278,20 @@ export function syncDevelopmentEvidence(w, at) {
     contacts.set(r.id, { source_record_id: r.id, actor_id: w.protagonist.character_id, topic, at: r.received_at,
       category: r.category === 'dialogue' ? 'user' : r.category, expires_at: string(r.expires_at) });
   }
+  // Personal refraction links attention to an authored object's activities.
+  // Negations and quotations stay inert. No free-text keyword creates practice.
+  for(const [actorId,life] of Object.entries(w.cognition?.actors??{}))for(const i of life.interpretations??[]){
+    if(!['inquiry','offer','attention'].includes(i.effect)||!['affirmed','uncertain'].includes(i.stance)||!validAt(i.interpreted_at,at)||i.expires_at&&i.expires_at<=at)continue;
+    const topics=strings(ACTIVITIES.filter(a=>i.target_object_ids?.includes(a.target)).map(a=>activityTopic(a.activity_id)));
+    for(const topic of topics){const key=`${actorId}:${i.source_id}:${topic}`;if(contacts.has(key))continue;
+      contacts.set(key,{contact_key:key,source_record_id:i.source_id,actor_id:actorId,topic,at:i.interpreted_at,category:i.source_category,expires_at:i.expires_at,epistemic:'personal_attention'});
+    }
+  }
   development.contacts = [...contacts.values()].sort((a, b) => a.at.localeCompare(b.at) || a.source_record_id.localeCompare(b.source_record_id)).slice(-384);
   const changed = fresh || before !== JSON.stringify(development.records) || beforeContacts !== JSON.stringify(development.contacts);
   if (changed) development.revision++;
   const facets = syncDevelopmentFacets(w, at);
+  syncLifeRhythm(w, at);
   return { enabled: true, installed: fresh, changed: changed || facets.changed, added_roots: added, revision: development.revision };
 }
 

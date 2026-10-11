@@ -30,10 +30,18 @@ export interface DeskBotObject {
   resource_names?: Record<string,string>;
 }
 
+export interface GlowSample {id:string;light:number;charge:number;moisture:number;cohesion:number;brightness:number}
+export interface GlowTrial {trial_id:string;owner_id:string;started_at:string;changed_at:string;updated_at:string;setup_root:string;sheltered:boolean;read_count:number;samples:GlowSample[]}
+export interface GlowStudy {study_id:string;owner_id:string;created_at:string;root_outcome_id:string;observation_root:string;charge:number;cohesion:number;brightness:number;title:string}
+export interface EchoBell {bell_id:string;owner_id:string;height:number;dampened:boolean;measurement:{water_level:number;immersion:number;resonance:number;noise:number;tone:number;wind_mps:number}}
+export interface NightLantern {lantern_id:string;owner_id:string;study_id:string;observation_root:string;charge:number;cohesion:number;brightness:number;closed:boolean}
 export interface DeskBotObjectState {
   object_id: string; kind: string; updated_at: string;
   water_level?: number; moisture?: number; health?: number; growth?: number; quantity?: number; dead_quantity?:number; condition?: number;
   stock?: Record<string,number>; capacity?: number;
+  glow_moss?:{rule_version:string;charge:number;cohesion:number;brightness:number;updated_at:string};
+  glow_trials?:GlowTrial[];glow_studies?:GlowStudy[];
+  echo_bells?:EchoBell[];night_lanterns?:NightLantern[];
   project_assets?: {
     floating_seedbed?: { project_id:string; status:'prototype'|'growing'|'ready'|'empty'|'dead'; installed_at:string; accepted_at?:string|null; quantity:number; health:number; moisture:number; growth:number; last_cared_at?:string|null; last_inspected_at?:string|null };
     small_water_pump?: { project_id:string; status:'assembled'|'moved'|'installed_trial'|'ready'|'broken'; assembled_at?:string; carrier_id?:string; installed_at?:string; accepted_at?:string|null; condition?:number; last_used_at?:string|null; use_count?:number };
@@ -112,9 +120,21 @@ export interface DeskBotLivedMemory {
   actors:{actor_id:string;display_name:string;interests:Record<string,{topic:string;days:string[];stage:string;successes:number;setbacks:number;bonus:number;evidence_ids:string[]}>}[];
   own:DeskBotMemoryEpisode[];recent:DeskBotMemoryEpisode[];
   development?:DeskBotDevelopmentEvidence|null;
+  life_rhythm?:DeskBotLifeRhythm|null;
   planner:{enabled:boolean;policy:string;limits:{per_hour:number;per_day:number;actor_cooldown_minutes:number};attempts_last_hour:number;
     requests:{id:string;actor_id:string;status:string;failure?:string;model?:string;choice?:{goal:string;reason:string;memory_ids:string[]}|null}[];
     recent:{id:string;actor_id:string;at:string;status:string;reason:string;model:string|null;goal:string|null}[]};
+}
+export interface DeskBotLifeRhythm {
+  schema:'deskbot.life-rhythm.v1';installed_at:string;revision:number;
+  actors:{actor_id:string;primary_topic:string|null;side_topics:string[];topics:Record<string,{
+    topic:string;label:string;status:string;summary:string;reason:string;formed_at:string|null;last_active_at:string|null;
+    root_outcome_ids:string[];reawakening_source_id?:string|null;
+  }>}[];
+  opportunities:{id:string;actor_id:string;topic:string;kind:string;title:string;location_id:string;activity_id:string;
+    source_root_id:string;created_at:string;not_before:string;expires_at:string;status:string;reason:string;result_root_id:string|null;
+    inspection?:{started:{at:string;name:string;values:Record<string,number>}|null;finished:{at:string;name:string;values:Record<string,number>}|null}}[];
+  policy:{primary_limit:number;side_limit:number;quiet_after_days:number;park_after_days:number;followups_per_day:number;automatic_role_change:boolean};
 }
 export interface DeskBotArea {
   area_id: string;

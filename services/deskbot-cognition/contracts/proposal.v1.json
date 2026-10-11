@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deskbot.cognition.proposal.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "request_id",
+    "actor_id",
+    "context_digest",
+    "expected_actor_version",
+    "interpretation",
+    "goal",
+    "intent",
+    "source_event_ids",
+    "generated_at",
+    "provider_mode"
+  ],
+  "properties": {
+    "schema": {
+      "const": "deskbot.cognition.proposal.v1"
+    },
+    "scope": {
+      "const": "isolated_mock"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "context_digest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "expected_actor_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primitive",
+        "object_id",
+        "expected_object_version"
+      ],
+      "properties": {
+        "primitive": {
+          "const": "observe"
+        },
+        "object_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "expected_object_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "source_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "maxItems": 12
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "provider_mode": {
+      "const": "mock"
+    }
+  }
+}

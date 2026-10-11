@@ -688,9 +688,15 @@ export function createRoleEvolution({
         if (direction) roles.refreshWish(proposal.proposal_id, direction, { at });
       }
       for (const direction of model.directions) {
+        // Once this person has continuous cognition, eligibility alone is no
+        // longer a spoken wish. Their own bounded proposal must name it first.
+        const cognitive=world.cognition?.actors[characterId];
+        if(cognitive?.continuous&&(cognitive.role_wish_choice?.decision!=='propose'||cognitive.role_wish_choice.direction_id!==direction.direction_id))continue;
         const gate = roles.wishGate(direction, { characterId, at, currentDirectionIds: canonicalCurrentDirectionIds(world, characterId, at) });
         if (!gate.eligible) continue;
-        const proposal = roles.propose(null, { characterId, proposalId: nextWishId(characterId, direction.direction_id), now: at, livedWish: direction });
+        if(cognitive?.continuous&&roles.list({characterId,limit:200}).some(p=>p.origin==='lived_wish'&&p.direction_id===direction.direction_id&&p.proposed_at>=cognitive.role_wish_choice.at))continue;
+        const proposal = roles.propose(null, { characterId, proposalId: nextWishId(characterId, direction.direction_id), now: at,
+          livedWish: cognitive?.continuous?{...direction,authored_reason:cognitive.role_wish_choice.reason}:direction });
         if (proposal) created.push(proposal);
         // A single announcement consumes the shared 24-hour window. Other
         // eligible axes remain visible and can be considered on a later day.

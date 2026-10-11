@@ -128,7 +128,7 @@ Write-Output "Web error log: $webErrorLog"
 }
 
 if ($StartWorld) {
-  $world = Start-Process -FilePath $node -WorkingDirectory $worldRoot -ArgumentList @($viteEntry, '--host', '127.0.0.1', '--port', '5173') -RedirectStandardOutput $worldLog -RedirectStandardError $worldErrorLog -PassThru -WindowStyle Hidden
+  $world = Start-Process -FilePath $node -WorkingDirectory $worldRoot -ArgumentList @('node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5173', '--strictPort') -RedirectStandardOutput $worldLog -RedirectStandardError $worldErrorLog -PassThru -WindowStyle Hidden
   Write-Output "Jev Town world client started: PID=$($world.Id) http://127.0.0.1:5173/?mode=deskbot&deskbotUrl=http://127.0.0.1:4311"
   Write-Output "World log: $worldLog"
   Write-Output "World error log: $worldErrorLog"
@@ -137,7 +137,7 @@ if ($StartWorld) {
 Write-Output ("LLM provider requested: {0}; weather token present in this process: {1}" -f $env:DESKBOT_LLM_PROVIDER, [bool]($env:DESKBOT_WEATHER_TOKEN))
 
 function Wait-ForHealth([string]$Uri, [int]$Port, [System.Diagnostics.Process]$Process, [string]$Name) {
-  $deadline = (Get-Date).AddSeconds(20)
+  $deadline = (Get-Date).AddSeconds(60)
   do {
     if ($Process.HasExited) {
       throw "$Name exited before becoming ready (exit code $($Process.ExitCode)); see the log files above"
@@ -148,7 +148,7 @@ function Wait-ForHealth([string]$Uri, [int]$Port, [System.Diagnostics.Process]$P
     } catch { }
     Start-Sleep -Milliseconds 250
   } while ((Get-Date) -lt $deadline)
-  throw "$Name did not become ready at $Uri within 20 seconds; see the log files above"
+  throw "$Name did not become ready at $Uri within 60 seconds; see the log files above"
 }
 
 Wait-ForHealth 'http://127.0.0.1:4311/health' 4311 $service 'DeskBot service'

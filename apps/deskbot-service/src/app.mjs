@@ -21,6 +21,9 @@ import { DEVELOPMENT_VERSION, developmentReadModel } from './development-evidenc
 import { createLifeChoiceWorker } from './life-choice.mjs';
 import { createFakeLlm, LlmProviderError } from './llm.mjs';
 import { createChatOrchestrator } from './chat-orchestrator.mjs';
+import { createLifeObservation } from './life-observation.mjs';
+import { createCognitiveRuntime } from './cognitive-runtime.mjs';
+import { createCognitionStage1 } from './cognition-stage1.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
 import { createOutputRouter, OutputRouterError } from './output-router.mjs';
 import { createDeviceRegistry, DeviceRegistryError } from './device-registry.mjs';
@@ -182,6 +185,12 @@ export function createDeskBotServer({
   livedMemoryEnabled = false,
   bodyPerceptionEnabled = residentLifeEnabled,
   bodyDeviceProfiles = [],
+  cognitionStage1: configuredCognitionStage1 = null,
+  cognitionStage1Filename = undefined,
+  cognitiveRuntime: configuredCognitiveRuntime = null,
+  cognitiveBudgetFilename = undefined,
+  cognitiveExperimentFilename = undefined,
+  modelUsage = null,
 } = {}) {
   const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
   function bodyContextForPeer(peer) {
@@ -236,6 +245,11 @@ export function createDeskBotServer({
   });
   const reservedForLife=() => persistentWorld.get().npcs.filter(n => npcGoals.reserved(n.npc_id) || sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending','waiting','failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === n.npc_id))).map(n => n.npc_id);
   const autonomousLife = createAutonomousLife({ world: persistentWorld, now, enabled: autonomousLifeEnabled,reserved:reservedForLife });
+  const lifeObservation = createLifeObservation({worldSnapshot:()=>persistentWorld.get(),persistence,now});
+  let cognitionStage1 = configuredCognitionStage1;
+  let cognitiveRuntime=configuredCognitiveRuntime;
+  const cognitiveLife=()=>cognitiveRuntime??=createCognitiveRuntime({world:persistentWorld,now,budgetFilename:cognitiveBudgetFilename,experimentFilename:cognitiveExperimentFilename,modelUsage});
+  const cognitionLab = () => cognitionStage1 ??= createCognitionStage1({filename:cognitionStage1Filename});
   let lifeChoiceWorker;
   function tickAutonomousLife(options) {
     try { const result=autonomousLife.tick(options);void lifeChoiceWorker?.tick().catch(()=>{});return result; }
@@ -547,6 +561,48 @@ export function createDeskBotServer({
 
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
+    if(url.pathname.startsWith('/api/life/cognitive-life/') && request.method!=='OPTIONS'){
+      const reportError=e=>sendJson(response,e.code==='cognitive_actor_busy'?409:422,{error:{code:e.code??'cognitive_life_failed',message:e.message}});
+      try{
+        if(request.method==='GET'&&url.pathname==='/api/life/cognitive-life/status'){sendJson(response,200,cognitiveLife().status());return;}
+        if(request.method==='GET'&&url.pathname==='/api/life/model-usage'){sendJson(response,200,modelUsage?.status()??{schema:'deskbot.model-usage.v1',available:false,note:'此服务未安装调用观测。'});return;}
+        if(request.method==='POST'&&url.pathname==='/api/life/cognitive-life/run'){
+          readJson(request,4096).then(body=>{
+            if(Object.keys(body).some(k=>!['scope','actor_id','phase'].includes(k)))throw Object.assign(new Error('Only scope, actor_id and phase allowed.'),{code:'invalid_cognitive_request'});
+            return cognitiveLife().run(body);
+          }).then(value=>sendJson(response,200,value)).catch(reportError);return;
+        }
+        if(request.method==='POST'&&url.pathname==='/api/life/cognitive-life/test-clock'){
+          readJson(request,4096).then(body=>{
+            if(Object.keys(body).some(k=>k!=='operation'))throw Object.assign(new Error('Test clock is server-owned.'),{code:'invalid_cognitive_request'});
+            return cognitiveLife().advance(body);
+          }).then(value=>sendJson(response,200,value)).catch(reportError);return;
+        }
+        sendJson(response,404,{error:{code:'unknown_cognitive_life_route'}});return;
+      }catch(error){reportError(error);return;}
+    }
+    if (url.pathname.startsWith('/api/life/cognition/') && request.method !== 'OPTIONS') {
+      const respondError = error => sendJson(response, ['python_unavailable','python_timeout'].includes(error.code) ? 503 : 422,
+        {error:{code:error.code ?? 'cognition_lab_failed',message:error.message}});
+      try {
+        if (request.method === 'GET' && url.pathname === '/api/life/cognition/status') {
+          sendJson(response,200,cognitionLab().status()); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/life/cognition/run') {
+          readJson(request,4096).then(body => {
+            if (Object.keys(body).some(key=>key!=='run_id')) throw Object.assign(new Error('Only run_id is accepted; experiment contexts are server-owned.'),{code:'invalid_lab_request'});
+            return cognitionLab().run(body);
+          }).then(result=>sendJson(response,200,result)).catch(respondError); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/life/cognition/rebuild-index') {
+          readJson(request,4096,{allowEmpty:true}).then(body=>{
+            if(Object.keys(body).length) throw Object.assign(new Error('Index rebuild accepts no overrides.'),{code:'invalid_lab_request'});
+            return cognitionLab().rebuildIndex();
+          }).then(result=>sendJson(response,200,result)).catch(respondError);return;
+        }
+        sendJson(response,404,{error:{code:'unknown_cognition_lab_route'}}); return;
+      } catch(error) {respondError(error);return;}
+    }
     if (url.pathname === '/api/life/story-packages') {
       if (request.method === 'GET') { sendJson(response, 200, { schema: 'deskbot.story-package-list.v0.1', packages: listStoryPackages() }); return; }
       if (request.method === 'POST') {
@@ -595,6 +651,12 @@ export function createDeskBotServer({
       });
       sendJson(response,200,{...(bodyReadModel(persistentWorld.get(),now().toISOString())??{enabled:false}),
         connection:{devices,hardware_verified:devices.some(device=>device.connected&&device.hardware_verified)}});return;
+    }
+    if(request.method==='GET' && url.pathname==='/api/life/observation') {
+      sendJson(response,200,lifeObservation.read());return;
+    }
+    if(request.method==='GET' && url.pathname==='/api/chat/history') {
+      sendJson(response,200,{schema:'deskbot.conversation-history.v1',messages:orchestrator.history?.(persistentWorld.get().protagonist.character_id)??[]});return;
     }
     if(url.pathname==='/api/life/inputs') {
       if(request.method==='GET'){sendJson(response,200,inputReadModel());return;}
@@ -2193,6 +2255,7 @@ export function createDeskBotServer({
     if(livedMemoryEnabled)tickAutonomousLife();
     void lifeChoiceWorker.tick().catch(()=>{});
     worldLife.tick();
+    if(autonomousLifeEnabled)lifeObservation.start();
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
     if (externalIds.length) void inputRuntime.tick({ sourceIds: externalIds });
@@ -2214,10 +2277,12 @@ export function createDeskBotServer({
       } catch (error) {
         console.error(`[role-evolution] scheduled sync failed: ${error.message}`);
       }
-      sharedLife.tick();
-      npcGoals.tick();
-      tickAutonomousLife();
-      worldLife.tick();
+      void cognitiveRuntime?.tick().catch(error=>console.error(`[cognitive-life] ${error.code??error.message}`));
+      for (const [name, tick] of [['shared-life',()=>sharedLife.tick()], ['npc-goals',()=>npcGoals.tick()],
+        ['autonomous-life',tickAutonomousLife], ['world-life',()=>worldLife.tick()],
+        ['life-observation',()=>{if(autonomousLifeEnabled)lifeObservation.sample();}]]) {
+        try { tick(); } catch(error) { console.error(`[${name}] scheduled tick failed: ${error.code??error.message}`); }
+      }
     }, 60_000);
     timer.unref();
     const taskTimer = setInterval(() => {
@@ -2233,6 +2298,8 @@ export function createDeskBotServer({
       clearInterval(timer);
       clearInterval(taskTimer);
       inputRuntime.stop();lifeChoiceWorker.stop();
+      void cognitionStage1?.close();
+      void cognitiveRuntime?.close();
     });
   });
   return server;

@@ -1,55 +1,59 @@
-# 桌宠角色—形态研究底座
+# 聚形域研究与设计资料
 
-本目录用于同济大学工业设计（机械）毕业设计的研究与工程记录。
+> 2026-10-11 当前版本 v0.6：Asamana 迁移第 1–5 阶段固定样本通过，下一步第六阶段成本/质量与第七阶段自然跨日。见 [当前验收](milestones/asamana-cognition-stage5-v1.md) 和 [迁移管线](design/asamana-migration-pipeline-v2.md)。下文旧 v0.5 与早期迁移状态保留为历史；不与本轮编号混用。
 
-当前开发主线见 [伴生世界开发路线 v0.4](development-roadmap-v0.4.md)，居民内容见 [雾灯镇居民生活设计](npcs/resident-life-design-v1.md)。前四步已完成规则合同、现实同步时钟与持久任务、十个地点及内部区域与对象目录、八件对象的环境与有限资源状态和对应模型变化。下一步为喵呜与居民共用自主生活循环；十二名居民的正式安装仍在第六步。地图设计见 [持续生活地图](world/living-map-v1.md)，规则见 [环境与资源](world/living-resources-v1.md)，本次证据见 [第四步验收](milestones/companion-world-step4.md)。
 
-## 当前研究问题
+本目录保存同济大学工业设计机械方向毕业设计的研究、设计与工程记录。研究目标是让同一个桌边个体拥有持续生活，由多源输入、实际选择和共同经历形成兴趣与角色愿望，并通过形象、声音、屏幕、单轴转头和可换外壳被感受到。
 
-如何将对话、设备感知和事件记录等多源证据，转化为可解释的角色状态变化，并进一步映射为桌宠的行为反馈与可打印、可装配、可替换外壳。
+当前软件能力基线为 v0.5，角色发展工程第 1 至第 6 阶段已接通。后续按 [持续生活与角色设计](design/continuous-world-design-v1.md) 推进，第一阶段设计已整理；[第二阶段生活机制](milestones/continuous-life-stage2-v1.md) 已接通投入维持、跨日后续与等待恢复，完成隔离验证。真实长期效果、美术与结构方案继续分别验证。
 
-## 技术底座与研究边界
+[Asamana 认知迁移第二阶段](milestones/asamana-cognition-stage2-v1.md) 已接通三角色的目标、实际任务、个人记忆、引用反思和后续，完成有限额度的真实模型隔离实验。工程接通与生活质量分开验收；多源折射、奇幻规律和正式跨日继续推进。
 
-- DeskBot Service：唯一的输入收口、角色状态真相和 LLM/输出编排核心，记录证据、权重、状态变化和触发理由。
-- RisuAI：仅参考或对照“文本 -> 情绪标签 -> 立绘”映射，不作为运行依赖。
-- SillyTavern：仅参考或对照“条件触发 -> prompt 选择性注入”机制，不作为运行依赖。
-- ESP-CLAW：ESP32 薄设备运行时，负责感知、显示、语音播放和运动执行，不保存角色真相。
-- ESP-VoCat v1.2 成品适配目标；ESP-Ditto 标准版作为模块化硬件与扩展接口参考。
-- 自研内骨架与外壳接口：保护硬件并保证外壳可打印、可装配、可替换。
+## 当前设计入口
 
-开源项目只承担基础设施，不替代以下研究贡献：多源证据建模、角色演化规则、语义到行为/形态的映射、可打印几何约束和用户评价。
+| 资料 | 用途 |
+| --- | --- |
+| [持续生活与角色设计](design/continuous-world-design-v1.md) | 目标、现状、第一阶段范围和后续八阶段路线 |
+| [生活节奏](design/life-rhythm-v1.md) | 关注、投入、维持、搁置、机会、变化频率与评价 |
+| [世界内容规范](design/world-content-v1.md) | 六类内容、活动内容卡、38 项现有配方对照及扩展规则 |
+| [生活案例](design/life-cases-v1.md) | 七种人生过程、实际依据、用户感知和验收 |
+| [实体约束](design/physical-constraints-v1.md) | 最小核心、主题外壳、已知能力、待测条件与联合设计 |
+| [持续生活第二阶段](milestones/continuous-life-stage2-v1.md) | 本轮实现、存档副本对照、验收入口与真实观察边界 |
+| [Asamana 认知迁移第二阶段](milestones/asamana-cognition-stage2-v1.md) | 实际行动与后续、真实 token 及费用、生成质量问题和验收边界 |
 
-## 最小闭环
+## 现有实现与研究边界
 
-```text
-一条对话或设备事件
-  -> DeskBot Service 统一事件
-  -> 情绪/世界条件/CAPS-inspired 融合
-  -> evidence ledger + role-state.v1
-  -> LLM 回复 + interaction-contract.v0.1 输出计划
-  -> ESP-CLAW/VoCat 表情、语音、朝向/NFC 事件
-  -> 形态变化候选
-```
+DeskBot Service 和 SQLite 保存唯一的世界事实，处理输入分级、路线、任务、材料、关系、共同经历和角色阶段。DeepSeek 参与对话与有限闲时选择，模型解释不直接写入世界后果。3D 客户端与研究界面读取服务状态。
 
-## 目录
+喵呜与十二位居民已有自主生活循环，地图有五个地区、十个地点。苗圃、水岸、厨房与工坊使用有限资源；浮圃、小泵和叶芽汤有实际项目。共同经历连接兴趣、具体能力、愿望、真实试做和双轴阶段。正式生活稳定性、自然愿望与沉浸感需要继续验证。
 
-- `development-roadmap-v0.4.md`：当前执行路线，包含地图扩展、世界变化、十二名居民、现实折射、自主生活、身体表达和形态落地的顺序与验收。
-- `development-roadmap-v0.1.md` 至 `development-roadmap-v0.3.md`：历史计划及能力验证记录。
-- `role-state-v1.md`：角色状态协议、字段说明和示例。
-- `protocol/interaction-contract-v0.1.md`：DeskBot Service、设备桥接层和实体桌宠之间的软件—硬件交互契约。
-- `protocol/input-state-output-v0.1.md`：DeskBot 对话、统一输入层、情绪/CAPS 状态和网页/硬件输出的职责边界。
-- `shell-interface-v1.md`：固定内骨架与可替换外壳的接口规范草案。
-- `mvp-2-week-checklist.md`：两周最小可行原型及记录要求。
-- `research-design-v0.1.md`：研究问题、实验变量、评价指标与阶段性实验。
-- `visual-language-v0.1.md`：桌面潮玩、持续世界、沉浸角色和电子前沿界面的视觉/文案迁移决策。
-- `hardware/esp-ditto-reproduction-guide-v0.1.md`：从开源工程到 PCBA、装配和上电的复刻流程。
-- `hardware/pcba-preorder-gate.md`：首批 PCBA 付款前的硬性检查清单。
-- `hardware/mcu-decision.md`：N8R8、N16R8 与页面 N8R4 录入值的选择结论。
-- `hardware/vocat-firmware-audit-v0.1.md`：已组装喵伴 v1.2 的 Coze/OpenAI Launchpad 镜像、源码可复现性、API 兼容性和刷写记录。
-- `hardware/vocat-baseline-g0.md`：任何固件改造前的喵伴 v1.2 硬件、原厂语音链路和稳定性基线记录表。
-- `logs/`：实验日志、测量数据、故障记录。
-- `cad/`：硬件包络、内骨架、接口件和外壳版本。
+实体目标是 ESP 喵伴本体与一个左右旋转自由度的底座，无摄像头和行走能力。头部触摸、触控屏幕、双麦克风方位、地磁换壳识别与输出协议按当前身体合同设计。样机运行小智固件，DeskBot 实机联调尚未完成；历史 NFC、额外轴和 Ditto 方案作为参考。
 
-## 版本规则
+外壳设计围绕实际安装、声学、触摸、维护、运动空间与打印条件展开。当前造型特征可以演变；内部尺寸、接口、材料、公差与完整运动范围需要实测和样件验证。
 
-所有协议和机械接口都带版本号。接口一旦用于打印或联调，只做向后兼容修改；破坏性修改升级主版本，并保留旧版样件和记录。
+## 实际生活到表达的流程
+
+有效输入经过分级，影响处境、关注与可行机会。选择进入原任务或约定，实际结果写入共同经历。兴趣、能力依据、项目与关系读取这些结果，愿望和试做再形成角色阶段。场景与表达读取同一状态，实体输出经过设备能力与回执处理。
+
+语义角色依据、艺术方案、可编辑模型、打印样件和实际安装壳分别有版本与验收。新设计不能用一条模型对白替代这些过程。
+
+## 文档目录
+
+- [角色发展 v0.5 工程记录](development-roadmap-v0.5.md)：已实现阶段、隔离实验与兼容规则。
+- [共同经历](world/development-evidence-v1.md)、[兴趣能力](world/development-facets-v1.md)、[愿望](world/role-wishes-v1.md)、[试做](world/role-practical-trials-v1.md)、[阶段](world/role-stages-v1.md)：角色发展规则。
+- [生活地图](world/living-map-v1.md)、[资源](world/living-resources-v1.md)、[补给](world/community-supply-v1.md)、[居民项目](world/resident-projects-v1.md)：现有世界规则。
+- [居民设计](npcs/resident-life-design-v1.md)：十二名居民的作者目标、关系与不同选择。
+- [身体协议](protocol/body-perception-v1.md)、[固件审计](hardware/body-bridge-audit-v0.1.md)：当前软件身体与实机缺口。
+- [研究设计](research-design-v0.1.md)：原研究问题、实验变量与评价思路，后续以当前设计范围补充。
+- [历史外壳草案](shell-interface-v1.md)、[视觉语言](visual-language-v0.1.md)、[原角色状态](role-state-v1.md)：早期方案与协议背景，适用范围见各文件说明。
+- `milestones/`：各次交付的验收和实验记录。
+- `logs/`：研究日志与测量记录；公开资料遵守本地数据排除规则。
+- `cad/`：硬件包络、接口件、结构样件与壳版本。
+- `development-roadmap-v0.1.md` 至 `development-roadmap-v0.4.md`：历史计划和能力验证记录。
+- `hardware/`：原硬件复刻、部件选择、付款检查与样机基线等资料，使用前核对当前硬件版本。
+
+## 版本与记录
+
+内容规范、执行规则、软件包、美术和机械接口分别管理版本。已用于存档、打印或联调的版本保留兼容与来源，破坏性改动需要迁移和新验证。设计目标、隔离样本、正式世界记录、设备报告和实测结果注明各自范围。
+
+第一阶段只交付设计与内容对照。下一阶段先复现正式生活中的供给、等待与恢复，再验证投入和后续机制，沿用原任务与共同结果。

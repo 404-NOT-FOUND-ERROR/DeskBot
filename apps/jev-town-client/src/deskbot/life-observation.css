@@ -1,0 +1,19 @@
+.life-observation { overflow-wrap:anywhere; }
+.life-observation p,.life-observation small { font-size:11px; line-height:1.8; color:#66786f; }
+.life-observation h2 { font-size:16px; }
+.life-observation__status { color:#335f57!important; font-weight:600; }
+.life-observation__dates,.life-observation__scope { display:flex; flex-wrap:wrap; gap:5px; margin:10px 0; }
+.life-observation button { font-size:11px; padding:6px 9px; border-radius:8px; }
+.life-observation button[aria-pressed=true] { color:#fff; background:#527d70; border-color:#527d70; }
+.life-observation__coverage { display:grid; gap:6px; font-size:12px; padding:12px; background:#edf3eb; border-radius:10px; }
+.life-observation__coverage span { font-size:10px; color:#60736c; line-height:1.7; }
+.life-observation__metrics { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
+.life-observation__metrics div { display:grid; gap:5px; border:1px solid #e2e8df; padding:10px; border-radius:9px; }
+.life-observation__metrics dt { font-size:10px; color:#6d7c73; }.life-observation__metrics dd { margin:0; font-size:18px; color:#345d53; }
+.life-observation>details { border-top:1px solid #e2e8df; padding-top:10px; margin-top:12px; }
+.life-observation summary { cursor:pointer; font-size:11px; color:#52796f; line-height:1.6; }
+.life-observation__basis { border-left:2px solid #93ad8c; padding:6px 10px; margin:15px 0; font-size:12px; }
+.life-observation__basis p { margin:5px 0; }.life-observation__results { list-style:none; padding:0; display:grid; gap:12px; }
+.life-observation__results li { display:grid; gap:5px; border-top:1px solid #e2e8df; padding-top:10px; font-size:11px; }
+.life-observation__results time,.life-observation__results span { color:#6a7b72; font-size:10px; line-height:1.6; }
+.life-observation code { font-size:9px; overflow-wrap:anywhere; }.life-observation__gate { padding:10px; border-radius:9px; background:#f5f0e3; color:#766349!important; }

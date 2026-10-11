@@ -152,7 +152,9 @@ function buildCandidate(world, trial, at) {
       if (primary < 0) continue;
       const attemptId = `${trial.trial_id}:attempt:${trial.attempt_sequence + 1}`;
       return { goal: `role-trial:${trial.trial_id}:${trial.attempt_sequence + 1}`, title: variantFor(trial).label,
-        reason: '先把基本需要和原有安排留好余地，再实际试一小次这份愿望。', score: 34, available: true,
+        // An explicitly accepted trial gets room ahead of ambient observation
+        // and optional follow-ups. Needs, prior tasks and daily limits still win.
+        reason: '先把基本需要和原有安排留好余地，再实际试一小次这份愿望。', score: 44, available: true,
         steps: steps.map((step, index) => ({ ...step, role_trial_primary: index === primary })),
         discretionary_practice: true,
         development_topic: trial.direction_id === 'wetland_frog' ? 'care' : trial.direction_id === 'chef' ? 'cook' : trial.variant_id === 'repair' ? 'repair' : 'craft',
@@ -171,7 +173,7 @@ export function practicalTrialCandidates(world, state, at) {
 /** Stamp only after the original task engine actually admitted the real task. */
 export function recordPracticalTrialTask(world, task, at) {
   const link = safePracticalTrialMetadata(task.role_trial), trial = link && world.practical_role_trials?.trials?.[link.trial_id];
-  if (!trial || trial.actor_id !== task.actor_id || task.origin !== 'autonomous_life' || !alive(trial)
+  if (!trial || trial.actor_id !== task.actor_id || !['autonomous_life','cognitive_life'].includes(task.origin) || !alive(trial)
     || !validAt(at) || Date.parse(at) < Date.parse(trial.started_at) || link.direction_id !== trial.direction_id || link.proposal_id !== trial.proposal_id) fail('practical_trial_task_mismatch', '试做关联已经变化，先保留原有实际记录。');
   if (trial.admitted_tasks?.some(item => item.task_id === task.task_id)) return;
   if (link.attempt_id !== `${trial.trial_id}:attempt:${trial.attempt_sequence + 1}`) fail('practical_trial_attempt_mismatch', '试做安排已变化，重新看当前实际条件。');

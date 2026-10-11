@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {DevelopmentEvidence} from './DevelopmentEvidence.tsx';
+import {LifeRhythm} from './LifeRhythm.tsx';
 import type {DeskBotLivedMemory,DeskBotMemoryEpisode} from './types.ts';
 
 const topics:Record<string,string>={care:'照料',craft:'制作',repair:'修缮',cook:'做饭',explore:'观察小镇',connection:'与人相处'};
@@ -25,6 +26,7 @@ export function LivedMemory({memory,actorId,journal=false}:{memory?:DeskBotLived
   return <section className="life-block life-memory" aria-label={journal?'长期生活记忆':'兴趣相关经历'}>
     <div className="life-row"><h2>{journal?'记得的那些小事':'兴趣相关经历'}</h2><small>身份一直是自己</small></div>
     {!journal?<p className="life-memory__intro">把当时的选择、实际做过的事和结果连起来看。</p>:null}
+    <LifeRhythm rhythm={memory.life_rhythm} actorId={actorId}/>
     <DevelopmentEvidence development={memory.development} actorId={actorId} journal={journal}/>
     {!journal&&!developmentReady?<>
       <div className="life-memory__interests">{Object.values(actor?.interests??{}).map(i=><article key={i.topic}>

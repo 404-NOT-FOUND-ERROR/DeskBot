@@ -1,3 +1,5 @@
+import { applyCognitiveMutation,settleCognitiveTask } from './cognitive-life-state.mjs';
+import {prepareCognitiveArchive,persistCognitiveArchive,retrieveCognitiveMemories,memoryNamespace} from './cognitive-memory-archive.mjs';
 import { installLivedMemory, syncLivedMemory, memoryReadModel } from './lived-memory.mjs';
 import { syncDevelopmentEvidence } from './development-evidence.mjs';
 import { startPracticalTrial, controlPracticalTrial, settlePracticalTrials, PracticalRoleTrialError } from './role-practical-trials.mjs';
@@ -8,6 +10,8 @@ import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuth
 import { getWorldEnvironment } from './world-environment.mjs';
 import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
 import { installResidentLife } from './resident-life.mjs';
+import {installFantasyInquiry} from './fantasy-inquiry.mjs';
+import {installResonantLife} from './resonant-life.mjs';
 import { installResidentProjects, projectReadModel } from './resident-projects.mjs';
 import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
@@ -95,6 +99,7 @@ const MULTISOURCE_LAYERS = Object.freeze([
 ]);
 
 const SUPPORTED_WORLD_ACTIONS = Object.freeze([
+  {action:'cognitive_life',layer:'world_line',required:['actor_id','operation','job_id'],optional:[],description:'服务端认知采用与反馈；与实际任务在同一世界事务提交'},
   { action:'install_input_refraction',layer:'world_line',required:[],optional:[],description:'安装有限的现实输入参考，不回填历史；消息只提供候选，实际任务仍须核验' },
   { action:'install_lived_memory',layer:'world_line',required:[],optional:['planner_enabled'],description:'从实际记录安装生活记忆与缓慢兴趣' },
   { action:'install_development_evidence',layer:'world_line',required:[],optional:[],description:'在生活记忆内连接同根的实际任务、项目与约定结果' },
@@ -606,6 +611,13 @@ function migrateWorldToCurrentSetting(world, now) {
     changed=true;next.world_revision++;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-community-supply-v1',applied_at:timestamp,
       scope:'additive_finite_forage_source',preserved_existing_tasks:true,preserved_existing_stocks:true,past_events_created:0}];
+  }
+
+  if(installFantasyInquiry(next,timestamp)){
+    changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'shaping-glow-moss-v1',applied_at:timestamp,scope:'additive_fictional_physics',past_events_created:0,preserved_existing_stocks:true}];
+  }
+  if(installResonantLife(next,timestamp)){
+    changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'shaping-resonant-life-v1',applied_at:timestamp,scope:'additive_fictional_physics',past_events_created:0,preserved_existing_stocks:true}];
   }
 
   const initialField = createInitialShapingField(
@@ -1188,6 +1200,8 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
       advanceLivingResources(next, at, { force: true });
       details = transferLivingResource(next, payload, at);
       break;
+    case 'cognitive_life':
+      details=applyCognitiveMutation(next,payload,at,event.event_id);break;
     case 'start_activity':
       advanceLivingResources(next, at, { force: true });
       details = startActivityTask(next, payload, { eventId: event.event_id, at });
@@ -1201,6 +1215,8 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
       break;
     case 'advance_task':
       details = advanceWorldTask(next, payload, at);
+      settleCognitiveTask(next,next.tasks.find(t=>t.task_id===payload.task_id),at);
+      details.task=clone(next.tasks.find(t=>t.task_id===payload.task_id));
       break;
     case 'advance_time': {
       if (next.clock?.mode === 'real_time') throw new PersistentWorldError(409, 'real_time_clock_locked', 'Real-time worlds cannot fast-forward');
@@ -1423,9 +1439,14 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   if (!['simulation', 'realtime'].includes(timeMode)) throw new TypeError('timeMode must be simulation or realtime');
   localWorldDate(now().toISOString(), timeZone);
   const storedWorlds = persistence?.list('canonical-world.states') ?? [];
+  const archiveEnabled=Boolean(persistence?.searchMemory);
   const worlds = new Map();
   for (const storedWorld of storedWorlds) {
     const migrated = migrateWorldToCurrentSetting(storedWorld, now);
+    if(archiveEnabled){
+      const entries=prepareCognitiveArchive(migrated.world);
+      if(entries.length)persistence.transaction(()=>{persistCognitiveArchive(persistence,entries);persistence.put('canonical-world.states',migrated.world.world_id,migrated.world);});
+    }
     worlds.set(migrated.world.world_id, migrated.world);
     if (migrated.changed) persistence?.put('canonical-world.states', migrated.world.world_id, migrated.world);
   }
@@ -1434,11 +1455,17 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     installWorldMapContent(initial, loadWorldMapContent(), initial.created_at);
     installLivingResources(initial, initial.created_at);
     installCommunitySupply(initial, initial.created_at);
+    installFantasyInquiry(initial,initial.created_at);
+    installResonantLife(initial,initial.created_at);
     worlds.set(initial.world_id, initial);
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }
 
-  const storedMutations = persistence?.list('canonical-world.mutations') ?? [];
+  const lazyMutationHistory = Boolean(persistence?.listMetadata && persistence?.get);
+  const mutationIndexFields = ['mutation_id', 'event_id', 'world_id', 'sequence'];
+  const storedMutations = lazyMutationHistory
+    ? persistence.listMetadata('canonical-world.mutations', mutationIndexFields)
+    : persistence?.list('canonical-world.mutations') ?? [];
   const mutationsByEvent = new Map(storedMutations.map((mutation) => [mutation.event_id, mutation]));
   const mutationsById = new Map(storedMutations.map((mutation) => [mutation.mutation_id, mutation]));
   const countedTurns = new Map(
@@ -1450,9 +1477,26 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     0,
   ) + 1;
 
+  function readMutation(index) {
+    if (!index) return null;
+    if (!lazyMutationHistory) return index;
+    const value = persistence.get('canonical-world.mutations', index.mutation_id);
+    if (!value) throw new PersistentWorldError(500, 'missing_mutation_history', `missing stored mutation ${index.mutation_id}`);
+    return value;
+  }
+
   function get(worldId = DEFAULT_WORLD_ID) {
     const world = worlds.get(worldId);
     return world ? clone(world) : null;
+  }
+
+  function cognitionView(id){
+    const view=get(),life=view.cognition?.actors[id];
+    if(archiveEnabled&&life){
+      const query=[life.followup?.question,...(life.inbox??[]).slice(-3).map(m=>m.text)].filter(Boolean).join(' ');
+      life.memories=retrieveCognitiveMemories(persistence,view,id,query);
+      life.memory_archive={...life.memory_archive,total:persistence.count(memoryNamespace(view.world_id,id))};
+    }return view;
   }
 
   function listMutations({ worldId = DEFAULT_WORLD_ID, afterSequence = 0, limit = 50, eventId = null } = {}) {
@@ -1463,11 +1507,12 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         && mutation.sequence > parsedAfter
         && (eventId === null || mutation.event_id === eventId))
       .slice(0, boundedLimit)
-      .map(clone);
+      .map(index => clone(readMutation(index)));
   }
 
-  function persistCommit(world, mutation, countedTurn = null) {
+  function persistCommit(world, mutation, countedTurn = null, archiveEntries=[]) {
     const operation = () => {
+      if(archiveEnabled)persistCognitiveArchive(persistence,archiveEntries);
       persistence?.put('canonical-world.states', world.world_id, world);
       if (persistence?.insert) {
         persistence.insert('canonical-world.mutations', mutation.mutation_id, mutation);
@@ -1641,7 +1686,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     const eventType = requireText(event.type, 'event.type');
     const world = worlds.get(DEFAULT_WORLD_ID);
     const eventFingerprint = fingerprint(event);
-    const existingMutation = mutationsByEvent.get(eventId);
+    const existingMutation = readMutation(mutationsByEvent.get(eventId));
     if (existingMutation) {
       if (existingMutation.event_fingerprint !== eventFingerprint) {
         throw new PersistentWorldError(409, 'world_event_conflict', `event ${eventId} already mutated the world differently`);
@@ -1671,7 +1716,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       const turnKey = turnKeyFor(event);
       const existingTurn = countedTurns.get(turnKey);
       if (existingTurn) {
-        const existingTurnMutation = mutationsById.get(existingTurn.mutation_id);
+        const existingTurnMutation = readMutation(mutationsById.get(existingTurn.mutation_id));
         return {
           applied: false,
           duplicate: true,
@@ -1690,6 +1735,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       };
     } else if (eventType === 'world.mutation') {
       ensureWorldTarget(event, world);
+      if(event.payload?.action==='cognitive_life' && (event.source!=='cognitive-life-engine'||adapter.cognitiveInternal!==true))
+        throw new PersistentWorldError(403,'cognitive_requires_server_adapter','认知状态与任务只能由服务端核验后采用。');
       if (['start_role_practical_trial','control_role_practical_trial'].includes(event.payload?.action)
         && (event.source !== 'role-practical-trial-engine' || adapter.rolePracticalInternal !== true)) {
         throw new PersistentWorldError(403,'practical_trial_requires_server_adapter','实际角色试做只能由已核验愿望的服务端接口安排。');
@@ -1698,7 +1745,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         && (event.source !== 'role-stage-engine' || adapter.roleStageInternal !== true)) {
         throw new PersistentWorldError(403,'role_stage_requires_server_adapter','采用或回退角色阶段只能由已核验原愿望与实际试做的服务端接口处理。');
       }
-      try { projection = applyExplicitMutation(world, event, now().toISOString()); }
+      try { projection = applyExplicitMutation(event.payload?.action==='cognitive_life'&&archiveEnabled?cognitionView(event.payload.actor_id):world, event, now().toISOString()); }
       catch (error) {
         if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError || error instanceof PracticalRoleTrialError || error instanceof RoleStageError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
         throw error;
@@ -1734,6 +1781,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     const observationAccepted = projection.details?.accepted !== false;
     if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settlePracticalTrials(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
     const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
+    const archiveEntries=prepareCognitiveArchive(next,{enabled:archiveEnabled});
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {
       change.source_layer = 'L3';
@@ -1778,11 +1826,14 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       committed_at: now().toISOString(),
     };
 
-    persistCommit(next, mutation, countedTurn);
+    persistCommit(next, mutation, countedTurn,archiveEntries);
     worlds.set(next.world_id, next);
-    storedMutations.push(mutation);
-    mutationsByEvent.set(eventId, mutation);
-    mutationsById.set(mutation.mutation_id, mutation);
+    const mutationIndex = lazyMutationHistory
+      ? Object.fromEntries(mutationIndexFields.map(field => [field, mutation[field]]))
+      : mutation;
+    storedMutations.push(mutationIndex);
+    mutationsByEvent.set(eventId, mutationIndex);
+    mutationsById.set(mutation.mutation_id, mutationIndex);
     if (countedTurn) countedTurns.set(countedTurn.turn_key, countedTurn);
     nextSequence += 1;
 
@@ -1829,6 +1880,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   if (timeMode === 'realtime' || get().clock?.mode === 'real_time') syncWallClock();
   return {
     get,
+    cognitionView,
     ingest,
     listMutations,
     syncWallClock,

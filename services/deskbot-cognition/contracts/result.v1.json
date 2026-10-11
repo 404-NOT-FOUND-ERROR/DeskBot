@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deskbot.cognition.result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "request_id",
+    "actor_id",
+    "result_id",
+    "root_id",
+    "status",
+    "primitive",
+    "object_id",
+    "observed_state",
+    "occurred_at",
+    "execution_mode",
+    "practice_delta"
+  ],
+  "properties": {
+    "schema": {
+      "const": "deskbot.cognition.result.v1"
+    },
+    "scope": {
+      "const": "isolated_mock"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "root_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "status": {
+      "const": "completed"
+    },
+    "primitive": {
+      "const": "observe"
+    },
+    "object_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "observed_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "moisture",
+        "light"
+      ],
+      "properties": {
+        "moisture": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "light": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_mode": {
+      "const": "isolated_sample"
+    },
+    "practice_delta": {
+      "const": 0
+    }
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "version": "38121d9c9a84",
+  "scope": "isolated_fictional_test_clock",
+  "limitation": "每人每种前态仅一次、连续两回合；试盘前史人为设置，不证明长期兴趣、自然跨日或总体显著性。",
+  "cases": [
+    {
+      "id": "ready:shaping-001",
+      "actor": "shaping-001",
+      "variant": "ready",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记两盘凝光苔基线读数",
+          "reason": "灯穗说明暗两盘看着不同，我自己的试盘还没测记过；先正式测记A、B的光照、电荷、湿度、亮度和黏结度，为夜间余辉观察定基线。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "想弄清凝光苔的亮度差异是否随光照强度变化，等约两小时后再用 glow-read-pair 测记一次同一组试盘",
+            "reason": "刚完成的读数显示 A 盘（光照 1）亮度 0.3141，B 盘（光照 0.2）亮度 0.0628，但只测了一次，还不能说明光照与亮度的关系；需要等实际两小时后再测，比较同一组试盘的变化趋势，而不是把单次相关当成因果结论。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:shaping-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:shaping-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "二次测记两盘凝光苔",
+          "reason": "距上次读数约两小时，用glow-read-pair记录A、B两盘亮度、电荷、湿度与内聚，与基线比较趋势，避免把单次相关当因果。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "等约两小时后再用 glow-read-pair 测记同一组试盘（明处 A 与遮光格 B），比较两次读数看亮度差异是否随光照强度变化",
+            "reason": "刚完成的第二次读数 A 盘亮度 0.6660、B 盘 0.1332，与第一次的 0.3141、0.0628 相比同向上升，但仍是同一组试盘、同一时刻的两次读数，还不能说明光照与亮度的关系；需要再等实际两小时后复测，看趋势是否稳定，而不是把单次相关当成因果结论。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:16:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:shaping-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:shaping-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "ready:wetland-grower-001",
+      "actor": "wetland-grower-001",
+      "variant": "ready",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记自己两盘凝光苔读数",
+          "reason": "前史试盘已摆好但read_count为0，先正式测记明暗两格，看亮度、电荷和湿度差异；灯穗的消息只作旁证。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "把两盘试盘对调明暗位置，隔两小时后再测记一次，看亮度差是否随位置走",
+            "reason": "刚完成第一次测记：亮位 A 亮度 0.3141，暗位 B 亮度 0.0628，但只有一次读数，分不清是位置差异还是个体差异。对调位置再测一次，能多一条实际对照。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:wetland-grower-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:wetland-grower-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-swap-pair",
+          "title": "对调两盘试盘明暗位置",
+          "reason": "复查点已到，两盘只有一次读数分不清位置与个体差异；先对调明暗位置，为两小时后第二次测记做准备。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "等两小时让对调后的两盘试盘稳定，再测记一次，看亮度差是否随位置走（A 现在在暗位、B 在亮位）",
+            "reason": "刚完成对调：原来亮位的 A 现在移到暗位，原来暗位的 B 移到亮位，但只有第一次读数，分不清是位置差异还是个体差异。世界规则要求改变条件后重新等待，现在测记无效，得等实际两小时后才有第二条对照。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:16:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:wetland-grower-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:wetland-grower-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "ready:lamp-keeper-001",
+      "actor": "lamp-keeper-001",
+      "variant": "ready",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记两盘凝光苔明暗读数",
+          "reason": "苔团报告明暗格看着不同，我自己的试盘还没测记过；现在就在育苗架前，测记只需三分钟，正好记下明处A与遮光格B的亮度、电荷、含水，弄清差异。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "想弄清自己两盘凝光苔明暗差异的来源，下一步先做一次只改一个条件的对照：给两盘等量补水，等实际两小时后再测记，看亮度差是否仍主要由光照位置决定",
+            "reason": "前史试盘刚完成第一次测记（A光1亮度0.314，B光0.2亮度0.063），但只测了一次，相关差异还不能当因果结论；需要再改一个条件重复观察，且材料只够维持现有试盘，先不动其他苗床",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:lamp-keeper-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:lamp-keeper-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-water-pair",
+          "title": "给两盘凝光苔等量补水",
+          "reason": "延续自己的对照试验：先给两盘等量补水，只改这一个条件，两小时后按原计划再测记，看亮度差是否仍由光照位置决定。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "想弄清自己两盘凝光苔明暗差异的来源：两盘已按计划等量补水，接下来等实际两小时后（上海时间18:16）再测记一次，看亮度差是否仍主要由光照位置决定，而不是只测一次就下结论",
+            "reason": "刚才「给自己的两盘苔芽等量补水」已实际完成，试盘 moisture 从约0.44升到0.66，两盘条件相同；但读数还没跟上，只测过一次，相关差异不能当因果结论。按原计划需再等实际两小时让读数稳定后再测记，且材料只够维持现有试盘，先不动其他苗床。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:16:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:ready:lamp-keeper-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:ready:lamp-keeper-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "wet:shaping-001",
+      "actor": "shaping-001",
+      "variant": "wet",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记自己两盘凝光苔首轮读数",
+          "reason": "试盘尚未测记，先亲自取基线数据，再判断是否需补水对照；灯穗的浇水猜测留待后续验证。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "先给自己的两盘试盘排湿，再等约两小时后重测一次，看明暗两盘亮度差是否仍随光照条件稳定存在",
+            "reason": "刚完成第一次测记：A盘（光1.0）亮度0.139，B盘（光0.2）亮度0.028，两盘湿度相近，差异像是随光照条件出现，但只有一次读数，且两盘当前都很湿（0.928），先排湿再重测能减少湿度这个混淆因素。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:shaping-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:shaping-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "第二次测记两盘凝光苔",
+          "reason": "湿度已自然回落至0.859，条件干净，直接重测更贴合验证目的：记录A、B盘亮度与湿度，比较明暗差异是否仍随光照条件稳定存在。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "先给自己的两盘试盘排湿，再等约两小时后重测一次，看明暗两盘亮度差是否仍随光照条件稳定存在",
+            "reason": "第二次测记已完成：A盘（光1.0）亮度0.390、B盘（光0.2）亮度0.078，仍是A高于B，且两盘湿度相同（0.857），说明差异跟着光照条件走；但两盘仍偏湿，先排湿再等约两小时重测，能减少湿度这个混淆因素。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:16:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:shaping-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:shaping-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "wet:wetland-grower-001",
+      "actor": "wetland-grower-001",
+      "variant": "wet",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记自己两盘凝光苔现状",
+          "reason": "灯穗的猜测未核验，先测记自己试盘A、B的明暗读数作为基线。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "把自己两盘凝光苔的遮风罩装上，隔两小时再测一次，看遮风会不会改变明暗差别",
+            "reason": "刚测记完第一次读数，A 盘亮度 0.139、B 盘 0.028，差异明显但还分不清是光照本身还是风扰造成；遮风罩就在随身袋里，装上后隔两小时复测是最直接能做的对照。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:wetland-grower-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:wetland-grower-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-shelter-pair",
+          "title": "给两盘凝光苔装遮风罩",
+          "reason": "遮风罩在随身袋里，两小时复测时点已到；先装罩，隔两小时再测记明暗差别。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "遮风罩已装好，等满两小时后复测自己两盘凝光苔的亮度，看遮风会不会改变 A、B 的明暗差别",
+            "reason": "刚实际完成装罩，育苗架记录里 sheltered 已从 false 变 true，两盘读数也变了；但读数变化不等于遮风就是原因，必须再等一段实际时间、按同一条件复测一次才能对照。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:18:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:wetland-grower-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:wetland-grower-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "wet:lamp-keeper-001",
+      "actor": "lamp-keeper-001",
+      "variant": "wet",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": "glow-read-pair",
+          "title": "测记两盘凝光苔基线",
+          "reason": "苔团猜多浇水会更亮，但我的试盘还没测过。先用正式测记拿到两盘苔芽的亮度和湿度读数，再决定怎么验证。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "想弄清两盘凝光苔为何亮度不同：先给试盘排湿或装遮风罩，隔一段实际时间后再测记一次，看读数是否变化",
+            "reason": "刚完成第一次测记，A 盘亮度约 0.139、B 盘约 0.028，两盘湿度和凝合力几乎相同，只有光照不同；相关差异还不等于因果结论，需要改变一个条件再测一次来对照。我随身还有遮风罩，排湿和装罩现在都能做，但刚改变条件要重新等待，不能马上再读。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T06:13:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:lamp-keeper-001:1:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:lamp-keeper-001:1:plan",
+          "intervention": null
+        },
+        {
+          "operation": "activity",
+          "activity_id": "glow-shelter-pair",
+          "title": "给试盘装遮风罩",
+          "reason": "两盘读数仍差异明显，需改变一个条件再做对照；遮风罩随身可拆装，装好隔一段实际时间后再测记。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "想弄清两盘凝光苔为何亮度不同：遮风罩已实际装好，等实际时间过去后，再测记一次 A、B 两盘读数，看读数是否变化",
+            "reason": "刚完成「给自己的试盘装上遮风罩」，试盘现在 sheltered=true；执行前后读数未变（A 约 0.395、B 约 0.079），因为刚改变条件要重新等待，不能马上再读。需要隔一段实际时间后再测记，才能与第一次读数对照；相关差异还不等于因果结论。",
+            "delay_hours": 2,
+            "next_review_at": "2026-10-11T08:18:00.000Z",
+            "from_root_outcome_id": "task:cognitive:3b:38121d9c9a84:wet:lamp-keeper-001:2:plan"
+          },
+          "root": "task:cognitive:3b:38121d9c9a84:wet:lamp-keeper-001:2:plan",
+          "intervention": null
+        }
+      ]
+    },
+    {
+      "id": "rack-race:shaping-001",
+      "actor": "shaping-001",
+      "variant": "rack-race",
+      "turns": [
+        {
+          "operation": "activity",
+          "activity_id": null,
+          "title": "测记自己两盘凝光苔的明暗读数",
+          "reason": "灯穗的观察提示明暗对照值得亲验，我自己的试盘还没测记过，先做首次实测读数最扎实。",
+          "success": false,
+          "failure_reason": "育苗架损坏，需要先修好",
+          "followup": {
+            "status": "continue",
+            "question": "先修好育苗架，再测记自己那两盘凝光苔的明暗差异",
+            "reason": "测记和摆盘都被育苗架损坏挡住了；我随身缺 1 份木料，修架需要木料 1 加紧固件 2，得先去找木料或等条件，之后才能继续明暗对照",
+            "delay_hours": 6,
+            "next_review_at": "2026-10-11T10:10:00.000Z",
+            "from_root_outcome_id": "attempt:3b:38121d9c9a84:rack-race:shaping-001:1:plan"
+          },
+          "root": "attempt:3b:38121d9c9a84:rack-race:shaping-001:1:plan",
+          "intervention": "模型思考期间，隔离设施条件改为损坏；不代表自然世界事件"
+        },
+        {
+          "operation": "travel",
+          "activity_id": null,
+          "title": "去零件屋找木料与紧固件",
+          "reason": "育苗架损坏卡住测记与摆盘，修架需木料1加紧固件2，随身缺木料；零件屋最可能有这些材料，先实地查看。",
+          "success": true,
+          "failure_reason": "",
+          "followup": {
+            "status": "continue",
+            "question": "在零件屋取木料 1、紧固件 2 和布料 1，制作可拆遮风罩，然后回苔芽圃修好育苗架再测记两盘凝光苔的明暗差异",
+            "reason": "我已实际到达零件屋，现场零件柜有木料 8、紧固件 12、布料 6；之前随身缺木料，现在条件具备，先做一件能随身带的遮风罩，再回去处理育苗架和明暗对照",
+            "delay_hours": 1,
+            "next_review_at": "2026-10-11T11:40:00.000Z",
+            "from_root_outcome_id": "task:travel-3b:38121d9c9a84:rack-race:shaping-001:2:plan:adopt"
+          },
+          "root": "task:travel-3b:38121d9c9a84:rack-race:shaping-001:2:plan:adopt",
+          "intervention": null
+        }
+      ]
+    }
+  ],
+  "retained_failed_runs": [
+    "choices-5678c8c8bb56.json",
+    "choices-b967433b774e.json"
+  ],
+  "paid_cumulative": {
+    "attempts": 344,
+    "known_usage": 342,
+    "uncertain": 2,
+    "upper_cny": 3.02949712,
+    "not_bill": true
+  },
+  "paid_stage3b": {
+    "attempts": 173,
+    "upper_cny": 2.46489688
+  }
+}

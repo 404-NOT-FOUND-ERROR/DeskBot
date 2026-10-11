@@ -33,6 +33,8 @@ export default defineConfig({
         lifeReview: fileURLToPath(new URL("./life-review.html", import.meta.url)),
         bodyReview: fileURLToPath(new URL("./body-review.html", import.meta.url)),
         developmentReview: fileURLToPath(new URL("./development-review.html", import.meta.url)),
+        cognitiveLifeReview:fileURLToPath(new URL("./cognitive-life-review.html",import.meta.url)),
+        cognitionReview: fileURLToPath(new URL("./cognition-review.html", import.meta.url)),
       },
     },
     // The lazily loaded 3D scene chunk is mostly Three.js itself (~135 kB gzipped).
@@ -40,7 +42,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
     globals: false,
   },
 });

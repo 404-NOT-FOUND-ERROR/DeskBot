@@ -11,6 +11,7 @@ import { createPersistentWorld } from '../src/persistent-world.mjs';
 import { createNpcGoals } from '../src/npc-goals.mjs';
 import { createWorldLife, NPC_ROUTINE_SLOT_MINUTES, NPC_ROUTINE_SLOT_MS, NPC_ROUTINES, SLOT_MS, WORLD_REPLAY_MAX_MINUTES } from '../src/world-life.mjs';
 import { loadMorrowmereContent } from '../src/content-packages.mjs';
+import {createInputStore} from '../src/input-store.mjs';
 
 function mutation(eventId, payload, occurredAt = '2026-09-17T02:00:00.000Z') {
   return {
@@ -36,6 +37,19 @@ function fixture(initial = '2026-09-17T02:00:00.000Z', persistence = null) {
     advance(milliseconds) { clock = new Date(clock.getTime() + milliseconds); },
   };
 }
+
+test('returning to a scene in one slot creates a new transition without an input ID collision',()=>{
+ const now=()=>new Date('2026-09-17T02:00:00Z'),world=createPersistentWorld({now}),inputs=createInputStore({now});
+ const life=createWorldLife({now,worldSnapshot:()=>world.get(),ingest:event=>{inputs.save(event);return world.ingest(event);}});
+ life.tick();const first=world.get().life.current_scene.scene_id;
+ // The travel executor clears the current scene on departure; restore the
+ // same location after an actual intervening world mutation, within one slot.
+ world.ingest(mutation('intervening-time',{action:'advance_time',minutes:1}));
+ world.get().life.current_scene=null;
+ assert.doesNotThrow(()=>life.tick({force:true}));
+ assert.equal(world.get().life.current_scene.scene_id,first);
+ const before=world.listMutations().length;life.tick({force:true});assert.equal(world.listMutations().length,before);
+});
 
 test('world life seeds bounded NPCs and one replayable scene per wall-clock slot', () => {
   const { world, life, advance } = fixture();

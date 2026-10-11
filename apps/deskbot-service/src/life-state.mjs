@@ -24,7 +24,10 @@ export function finishLifeTask(world, task, at) {
   const state = world.autonomy?.actors[task.actor_id];
   if (!state || task.status !== 'completed') return;
   if (task.activity_id === 'share-meal') state.appetite = clamp(state.appetite - .65);
-  if (task.life_action !== 'rest') state.energy = clamp(state.energy - (task.kind === 'travel' ? .025 : task.kind === 'craft' ? .06 : .025));
+  // Queue checks are quiet waiting. Elapsed needs still settle above, but a
+  // three-minute check must not cost as much effort as a real care activity.
+  if (task.life_action !== 'rest' && !(task.life_goal === 'wait-meal' && task.life_action === 'observe'))
+    state.energy = clamp(state.energy - (task.kind === 'travel' ? .025 : task.kind === 'craft' ? .06 : .025));
   state.updated_at = at;
 }
 export function lifeNote(world, at, actorId, kind, text, more = {}) {

@@ -20,6 +20,7 @@ export interface TownMapProps {
   activities?: readonly SceneLifeActivity[];
   focusLocationId?: string | null;
   focusRequest?: number;
+  focusObjectId?:string|null;
   citizens?: readonly Citizen[];
   shapingAppearances?:ReadonlyMap<number,ShapingAppearance>;
   labels?: readonly LabelSpec[];
@@ -50,7 +51,7 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
+export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
@@ -87,6 +88,7 @@ export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneL
               activities={activities}
               focusLocationId={focusLocationId}
               focusRequest={focusRequest}
+              focusObjectId={focusObjectId}
               positions={positions}
               durations={durations}
               actions={actions}

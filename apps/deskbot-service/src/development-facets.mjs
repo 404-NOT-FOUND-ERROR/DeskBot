@@ -7,8 +7,8 @@ const TOPICS = Object.freeze({ care: '照料', craft: '制作', repair: '修缮'
 const REGISTERED = new Set(ACTIVITIES.map(activity => activity.activity_id));
 const CONDITION_FAILURES = new Set(['resource', 'condition', 'route', 'coordination']);
 const SOURCE_RANK = { canonical_task: 3, canonical_commitment: 3, resident_project: 2, legacy_memory_fact: 1 };
-const CACHE_FORMAT = 'root_indexed_topics.v1';
-const INTEREST_ROOT_FIELDS = ['active_roots', 'invited_roots', 'obligation_roots', 'unknown_roots', 'threshold_root_ids'];
+const CACHE_FORMAT = 'root_indexed_topics.v2';
+const INTEREST_ROOT_FIELDS = ['active_roots', 'exploration_roots', 'invited_roots', 'obligation_roots', 'unknown_roots', 'threshold_root_ids'];
 const CAPABILITY_ROOT_FIELDS = ['success_roots', 'performance_failure_roots', 'condition_failure_roots', 'unknown_failure_roots', 'cancelled_roots', 'root_outcome_ids'];
 const clean = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 const unique = values => [...new Set(values.filter(Boolean))].sort();
@@ -24,6 +24,9 @@ const localDay = at => DAY_FORMAT.format(new Date(at));
 // establish what was actually practised. Eating is not social competence.
 export function activityTopic(activityId) {
   if (!REGISTERED.has(activityId) || activityId === 'share-meal') return null;
+  if (['glow-read-pair','glow-swap-pair','echo-read-bell','echo-raise-bell','echo-lower-bell','night-read-lantern'].includes(activityId)) return 'explore';
+  if (['glow-set-pair','glow-press-study','echo-craft-bell','echo-set-bell','echo-dampen-bell','echo-open-bell','night-mount-lantern'].includes(activityId)) return 'craft';
+  if (['glow-take-cuttings','glow-water-pair','glow-drain-pair','glow-shelter-pair','glow-unshelter-pair'].includes(activityId)) return 'care';
   if (activityId.startsWith('cook-') || activityId.startsWith('soup-')) return 'cook';
   if (activityId.startsWith('repair-') || activityId.startsWith('pump-') || activityId === 'stitch-canopy') return 'repair';
   if (activityId.startsWith('craft-')) return 'craft';
@@ -53,22 +56,24 @@ function uniqueRecords(development, at) {
 }
 
 function motivation(record) {
+  if(record.causes?.motivation?.kind==='accepted_obligation')return 'need';
   // An invitation cannot be relabelled independent by an old generic own flag.
   if (record.causes?.trigger === 'invited' || record.causes?.motivation?.kind === 'invited') return 'invited';
   const kind = record.causes?.motivation?.kind;
-  return kind === 'self_continuation' || kind === 'need' ? kind : 'unknown';
+  return ['self_continuation','self_exploration','need'].includes(kind) ? kind : 'unknown';
 }
 
 function interestSummary(status) {
   return status === 'continuing' ? '已在至少三个上海日主动继续，并有不同活动或观察情境；这表示持续投入的规则证据。'
     : status === 'trying' ? '已跨两个上海日主动继续，仍需更多实际情境观察。'
-      : status === 'initial' ? '已有一天的主动继续记录，还不足以判断稳定兴趣。'
+      : status === 'initial' ? '已有自选探索或单日返回记录，还不足以判断稳定兴趣。'
         : '尚无可确认的主动继续记录；做成、受邀或满足需要都不能单独证明喜欢。';
 }
 
 function interestView(records) {
   const complete = records.filter(record => record.outcome === 'completed');
   const active = complete.filter(record => motivation(record) === 'self_continuation');
+  const explorations=complete.filter(record=>motivation(record)==='self_exploration');
   const perDay = new Map(), threshold = [];
   for (const record of active) {
     const day = localDay(record.at), already = perDay.get(day) ?? 0;
@@ -79,10 +84,11 @@ function interestView(records) {
   const activeContexts = unique(threshold.filter(record => clean(record.location_id))
     .map(record => `${record.activity_id ?? 'observe'}:${record.location_id}`));
   const continuing = activeDays.length >= 3 && activeContexts.length >= 2;
-  const status = continuing ? 'continuing' : activeDays.length >= 2 ? 'trying' : active.length ? 'initial' : 'unobserved';
+  const status = continuing ? 'continuing' : activeDays.length >= 2 ? 'trying' : active.length||explorations.length ? 'initial' : 'unobserved';
   return {
     status, summary: interestSummary(status),
     active_roots: active.map(record => record.root_outcome_id),
+    exploration_roots: explorations.map(record=>record.root_outcome_id),
     invited_roots: complete.filter(record => motivation(record) === 'invited').map(record => record.root_outcome_id),
     obligation_roots: complete.filter(record => motivation(record) === 'need').map(record => record.root_outcome_id),
     unknown_roots: complete.filter(record => motivation(record) === 'unknown').map(record => record.root_outcome_id),

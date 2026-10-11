@@ -3,6 +3,7 @@ import { DEFAULT_CHARACTER_ID, canonicalCharacterId, canonicalLocationId } from 
 import { prepareLivingActivity, completeLivingActivity, releaseLivingReservation } from './living-resources.mjs';
 import { syncLifeNeeds, finishLifeTask } from './life-state.mjs';
 import { settleProjectTask } from './resident-projects.mjs';
+import { readFollowupSite } from './life-rhythm.mjs';
 
 export class RealTimeWorldError extends Error {
   constructor(statusCode, code, message) {
@@ -166,7 +167,8 @@ export function startActivityTask(world, payload, { eventId, at }) {
     title: authored?.title ?? text(payload.title, 'title'), status: 'running', revision: 0, cause_event_id: eventId,
     location_id: person.location_id, started_at: timestamp, updated_at: timestamp,
     due_at: new Date(Date.parse(timestamp) + seconds * 1000).toISOString(), duration_ms: seconds * 1000, remaining_ms: seconds * 1000,
-    completion_effect: authored?.completion_effect ?? 'record_activity_only', ...(authored ? { activity_id: authored.activity_id, target_object_id: authored.target_object_id, reservation: authored.reservation,
+    completion_effect: authored?.completion_effect ?? 'record_activity_only', ...(authored ? { activity_id: authored.activity_id, target_object_id: authored.target_object_id, reservation: authored.reservation, ...(authored.fantasy_rule?{life_action:authored.activity_id==='glow-read-pair'?'observe':authored.kind,fantasy_rule:authored.fantasy_rule,fantasy_trial_id:authored.fantasy_trial_id}:{}),
+      ...(authored.resonant_rule?{resonant_rule:authored.resonant_rule,resonant_asset_id:authored.resonant_asset_id,life_action:authored.activity_id.includes('-read-')?'observe':authored.kind}:{}),
       ...(authored.project_id ? { project_id: authored.project_id, project_stage_id: authored.project_stage_id, project_attempt: authored.project_attempt, project_version: authored.project_version,
         ...(authored.project_batch_id ? { project_batch_id: authored.project_batch_id } : {}) } : {}) } : {}),
     finished_at: null, failure_reason: null, completion: null, history: [],
@@ -259,6 +261,8 @@ export function advanceWorldTask(world, payload, at) {
     task.failure_classification = activityResult?.classification ?? (['location_changed', 'route_changed', 'passage_closed', 'location_closed', 'location_not_reachable'].includes(error) ? 'route' : 'unclassified');
     if (task.activity_id) releaseLivingReservation(world, task, timestamp); }
   if (task.status !== 'running') {
+    if (task.status === 'completed' && task.life_action === 'observe' && task.life_followup)
+      task.life_followup_inspection = {started: task.life_followup_site ?? null, finished: readFollowupSite(world, task.life_followup, dueAt)};
     finishLifeTask(world, task, dueAt);
     task.finished_at = timestamp;
     task.remaining_ms = 0;

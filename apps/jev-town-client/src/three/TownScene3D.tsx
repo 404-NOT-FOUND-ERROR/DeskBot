@@ -33,6 +33,7 @@ export interface TownScene3DProps {
   activities?: readonly SceneLifeActivity[];
   focusLocationId?: string | null;
   focusRequest?: number;
+  focusObjectId?: string|null;
   citizens: readonly Citizen[];
   shapingAppearances?:ReadonlyMap<number,ShapingAppearance>;
   labels?: readonly LabelSpec[];
@@ -57,6 +58,7 @@ export interface TownScene3DHandle {
   resetView: () => void;
   rotateBy: (radians: number) => void;
   focusPlace: (locationId: string) => void;
+  focusObject: (objectId: string) => void;
 }
 
 const DEFAULT_AZIMUTH = Math.PI / 4;
@@ -67,7 +69,7 @@ const MAX_ELEVATION = THREE.MathUtils.degToRad(72);
 const DEFAULT_ZOOM = 2;
 const FIT_ZOOM = 1;
 const MIN_ZOOM = 0.85;
-const MAX_ZOOM = 9;
+const MAX_ZOOM = 16;
 const CAMERA_DISTANCE = 220;
 const ROTATE_SPEED = 0.006;
 const VIEW_TWEEN_MS = 420;
@@ -173,6 +175,7 @@ interface ViewState {
   elevation: number;
   zoom: number;
   targetX: number;
+  targetY: number;
   targetZ: number;
 }
 
@@ -204,7 +207,7 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
+  { citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
   // World revisions replace object identities frequently. Scene construction is
@@ -216,6 +219,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
   const sceneLocationsRef=useRef(sceneLocations);sceneLocationsRef.current=sceneLocations;
   const environmentRef=useRef(environment);environmentRef.current=environment;
   const activitiesRef=useRef(activities);activitiesRef.current=activities;
+  const focusObjectRef=useRef(focusObjectId);focusObjectRef.current=focusObjectId;
   const focusLocationRef=useRef(focusLocationId);focusLocationRef.current=focusLocationId;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const callbacksRef = useRef({ getHotspot, onPlaceClick, onZoomChange, onContextLost });
@@ -235,6 +239,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     resetView: () => apiRef.current?.resetView(),
     rotateBy: (radians) => apiRef.current?.rotateBy(radians),
     focusPlace: (locationId) => apiRef.current?.focusPlace(locationId),
+    focusObject: (objectId) => apiRef.current?.focusObject(objectId),
   }));
 
   // Mount-only: builds the scene, starts the loop, wires input. Citizens are keyed by
@@ -378,6 +383,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       elevation: DEFAULT_ELEVATION,
       zoom: DEFAULT_ZOOM,
       targetX: 0,
+      targetY: 0,
       targetZ: 0,
     };
     let fitHalfHeight = 60;
@@ -412,8 +418,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         Math.sin(view.elevation),
         Math.cos(view.elevation) * Math.cos(view.azimuth),
       ).multiplyScalar(CAMERA_DISTANCE);
-      camera.position.set(targetX + offset.x, offset.y, targetZ + offset.z);
-      camera.lookAt(targetX, 0, targetZ);
+      camera.position.set(targetX + offset.x, view.targetY + offset.y, targetZ + offset.z);
+      camera.lookAt(targetX, view.targetY, targetZ);
       camera.left = -halfHeight * aspect;
       camera.right = halfHeight * aspect;
       camera.top = halfHeight;
@@ -455,14 +461,21 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
 
     apiRef.current = {
       zoomBy: (factor) => animateTo({ zoom: clamp(view.zoom * factor, MIN_ZOOM, MAX_ZOOM) }),
-      fitTown: () => animateTo({ zoom: FIT_ZOOM, targetX: 0, targetZ: 0 }),
+      fitTown: () => animateTo({ zoom: FIT_ZOOM, targetX: 0, targetY: 0, targetZ: 0 }),
       resetView: () =>
-        animateTo({ azimuth: DEFAULT_AZIMUTH, elevation: DEFAULT_ELEVATION, zoom: DEFAULT_ZOOM, targetX: 0, targetZ: 0 }),
+        animateTo({ azimuth: DEFAULT_AZIMUTH, elevation: DEFAULT_ELEVATION, zoom: DEFAULT_ZOOM, targetX: 0, targetY: 0, targetZ: 0 }),
       rotateBy: (radians) => animateTo({ azimuth: view.azimuth + radians }),
+      focusObject: (objectId) => {
+        const object=scenery.companion?.objects.get(objectId);if(!object)return;
+        object.updateWorldMatrix(true,true);
+        const local=object.userData.inspection_anchor;
+        const point=local?object.localToWorld(new THREE.Vector3(...local as [number,number,number])):new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+        animateTo({zoom:MAX_ZOOM,targetX:point.x,targetY:point.y,targetZ:point.z});
+      },
       focusPlace: (locationId) => {
         const place = labelObjects.find((item) => item.id === locationId)?.object.position;
         if (!place) return;
-        animateTo({ zoom: clamp(Math.max(view.zoom, 4.4), MIN_ZOOM, MAX_ZOOM), targetX: place.x, targetZ: place.z });
+        animateTo({ zoom: clamp(Math.max(view.zoom, 4.4), MIN_ZOOM, MAX_ZOOM), targetX: place.x, targetY: 0, targetZ: place.z });
       },
     };
 
@@ -753,6 +766,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         view.elevation = tween.from.elevation + (tween.to.elevation - tween.from.elevation) * e;
         view.zoom = tween.from.zoom * (tween.to.zoom / tween.from.zoom) ** e;
         view.targetX = tween.from.targetX + (tween.to.targetX - tween.from.targetX) * e;
+        view.targetY = tween.from.targetY + (tween.to.targetY - tween.from.targetY) * e;
         view.targetZ = tween.from.targetZ + (tween.to.targetZ - tween.from.targetZ) * e;
         updateCamera();
         if (k >= 1) tween = null;
@@ -789,7 +803,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     intersection.observe(container);
 
     handleResize();
-    if(focusLocationRef.current)apiRef.current?.focusPlace(focusLocationRef.current);
+    if(focusObjectRef.current)apiRef.current?.focusObject(focusObjectRef.current);else if(focusLocationRef.current)apiRef.current?.focusPlace(focusLocationRef.current);
     updateFountainJets(scenery.fountainJets, 0);
     requestFrame();
 
@@ -821,7 +835,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     };
   }, [citizenKey, labelKey, sceneryKey, onPlaceClick]);
 
-  useEffect(()=>{if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);else if((focusRequest??0)>0)apiRef.current?.fitTown();},[focusLocationId,focusRequest,citizenKey,labelKey,sceneryKey]);
+  useEffect(()=>{if(focusObjectId)apiRef.current?.focusObject(focusObjectId);else if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);else if((focusRequest??0)>0)apiRef.current?.fitTown();},[focusLocationId,focusRequest,focusObjectId,citizenKey,labelKey,sceneryKey]);
   // An expired observation or a minute change still updates a reduced-motion view.
   useEffect(()=>{requestFrameRef.current();const timer=setInterval(()=>requestFrameRef.current(),15000);return()=>clearInterval(timer);},[environment]);
 

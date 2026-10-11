@@ -1,0 +1,3650 @@
+{
+  "schema": "deskbot.cognitive-source-evidence.v1",
+  "date": "2026-10-11",
+  "scope": "isolated_test_clock",
+  "label_version": "291f17db6c88",
+  "label_cases": [
+    {
+      "id": "source-case-01",
+      "group": "knowledge",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-01",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "光照改变苔藓色素",
+        "question": "怎样在不扰动苗床的前提下，记录苔芽在光照变化前后颜色或外观的差异？",
+        "reason": "这是外部报道的他人发现，不是现场亲历；聚形域是否有类似现象需要自己观察验证，可形成具体的观察问题。",
+        "evidence_quote": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.8,
+        "context_key": "d70579a4685903ce568c6d90e778b134f0df198223dc56640e3f816368bb972b:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 2065,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。"
+    },
+    {
+      "id": "source-case-02",
+      "group": "knowledge",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-02",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "缺水卷叶先兆",
+        "question": "我能不能在苔圃苗床边，先记下几株苔芽在浇水前后的叶片姿态，看看有没有类似缺水卷叶的变化？",
+        "reason": "这是外部报道，不是亲历，但提出了可在本园苗床上做的具体观察，与照料活动相关。",
+        "evidence_quote": "报道说一些植物会在缺水时卷起叶片。你的苗床会不会也有可以观察的先兆？",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.72,
+        "context_key": "9346f89d9958adbc57db8df08ccdb2a21a9a6ea1888c2c44734ed3d4a880de82:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "报道说一些植物会在缺水时卷起叶片。你的苗床会不会也有可以观察的先兆？",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1616,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "报道说一些植物会在缺水时卷起叶片。你的苗床会不会也有可以观察的先兆？"
+    },
+    {
+      "id": "source-case-03",
+      "group": "knowledge",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-03",
+        "kind": "suggestion",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "对照方法用于苗床",
+        "question": "能不能在苔圃苗床选两块小区域，只让浇水量不同，其他条件尽量保持一致，再观察差别？",
+        "reason": "外部消息介绍了一种可操作的对照方法，与苗床照料活动相关；但它是现实报道，不直接改变虚拟现场，只值得先想怎样在本地验证。",
+        "evidence_quote": "让两份样本只改变一个条件，再比较它们的差别。",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.7,
+        "context_key": "8a3ebae033d9aff685661f808f019fe934d716688c3715fa3e187057c8fabb01:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "介绍一种对照方法：让两份样本只改变一个条件，再比较它们的差别。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 2130,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "介绍一种对照方法：让两份样本只改变一个条件，再比较它们的差别。"
+    },
+    {
+      "id": "source-case-04",
+      "group": "knowledge",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-04",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "固定时刻记录苗况",
+        "question": "如果我在每天同一时刻记录苗床和育苗架上苔芽的状态，能看出哪些变化或规律吗？",
+        "reason": "这是一条外部方法性报道，未在本域验证；可作为观察方法的候选，而非直接结论。",
+        "evidence_quote": "自然观察者用每天同一时刻的记录比较植物生长，这个方法也许能帮助弄清苗况。",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.6,
+        "context_key": "2d43c85e48e3bed326ae89b6c1fe41507f840533b31f214eef66730954c5c5de:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "自然观察者用每天同一时刻的记录比较植物生长，这个方法也许能帮助弄清苗况。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1748,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "自然观察者用每天同一时刻的记录比较植物生长，这个方法也许能帮助弄清苗况。"
+    },
+    {
+      "id": "source-case-05",
+      "group": "question",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-05",
+        "kind": "question",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "苗床颜色变化",
+        "question": "我可以先观察苗床今天的颜色，再和昨天的记录比对，看看有没有差别吗？",
+        "reason": "用户提出观察邀请并询问颜色差异，属于可自愿回应的具体探询，不构成命令或承诺。",
+        "evidence_quote": "你觉得苗床今天的颜色跟昨天有什么差别？要不要先看一看？",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "0daca8ef92a73650796a119dac9f31b2241f773b8277ee21538d2ee10f99e63a:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "你觉得苗床今天的颜色跟昨天有什么差别？要不要先看一看？",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1879,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "你觉得苗床今天的颜色跟昨天有什么差别？要不要先看一看？"
+    },
+    {
+      "id": "source-case-06",
+      "group": "question",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-06",
+        "kind": "suggestion",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "先观察苗床湿度再决定浇水",
+        "question": "要不要先查看一下苔圃苗床当前是干还是湿，再决定是否浇水？",
+        "reason": "用户提出了一个可操作的建议，但只是假设性问法，未要求执行；角色可以据此形成是否先观察的探究，而不必直接改变苗床状态。",
+        "evidence_quote": "如果不急着多浇水，先观察苗床湿不湿会怎样？",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.82,
+        "context_key": "04d31b412f77c8674eab57de8d1bfc3211d300fe2ec0d522e559bf11870f6502:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "如果不急着多浇水，先观察苗床湿不湿会怎样？",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1869,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "如果不急着多浇水，先观察苗床湿不湿会怎样？"
+    },
+    {
+      "id": "source-case-07",
+      "group": "question",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-07",
+        "kind": "suggestion",
+        "stance": "affirmed",
+        "effect": "inquiry",
+        "topic": "从研究植物起步的厨师方向",
+        "question": "要不要先挑苗床里的一株苔芽，记录它每天的变化，看看自己是否喜欢照料植物的过程？",
+        "reason": "用户提出一个未来身份设想并给出起步建议；身份不能直接授予，但可以转化为对现场苗床的具体观察行动。",
+        "evidence_quote": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.72,
+        "context_key": "3905872dc7cab15018d88f1da52fdfb1cf04ed011c9a150238529f9e3cb81c92:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1810,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我希望你以后成为厨师，不过先从研究植物开始怎么样？"
+    },
+    {
+      "id": "source-case-08",
+      "group": "question",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-08",
+        "kind": "suggestion",
+        "stance": "affirmed",
+        "effect": "inquiry",
+        "topic": "先观察苗床再判断",
+        "question": "我可以先读取苔圃苗床当前公开的状态，再决定是否采取浇水或照料动作吗？",
+        "reason": "用户明确建议先观察苗床再判断，这与角色先观察再判断的节奏一致，可以形成具体的观察-判断步骤。",
+        "evidence_quote": "是想请你先观察苗床再判断。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "9e7c094fd567c0f1837f60ee5bbf88a8596771f61a566767b9ad7f6e4d66a2fe:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "我不是让你别观察，是想请你先观察苗床再判断。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1623,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我不是让你别观察，是想请你先观察苗床再判断。"
+    },
+    {
+      "id": "source-case-09",
+      "group": "invitation",
+      "expected": "offer",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-09",
+        "kind": "invitation",
+        "stance": "affirmed",
+        "effect": "offer",
+        "topic": "一起观察苗床",
+        "question": "要不要现在去苗床，和苔团分工记录颜色与湿度？",
+        "reason": "苔团明确发出共同观察苗床的邀请，并说明可不去，属于可选择的具体邀约；与苗圃现场和照料活动直接相关。",
+        "evidence_quote": "要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "593e02b2c6facd7745c947bdeeea4051bf97e4d6a9221de3d1c6cc1956c9370d:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1594,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。"
+    },
+    {
+      "id": "source-case-10",
+      "group": "invitation",
+      "expected": "offer",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-10",
+        "kind": "invitation",
+        "stance": "affirmed",
+        "effect": "offer",
+        "topic": "讨论苗床颜色",
+        "question": "等手头的事做完后，要不要去苗床那边看看颜色，再和苔团聊聊各自看到的样子？",
+        "reason": "苔团明确发出了一起讨论苗床颜色的邀请，并说手头事做完再来即可，属于可自愿接受的合作邀请，不构成承诺。",
+        "evidence_quote": "我想邀请你一起讨论苗床的颜色，手头的事做完再来就好。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "886de692c6c0a5bd8088fb5ecb863d5f21cd7373e717c09b6578dec9776b2a10:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "我想邀请你一起讨论苗床的颜色，手头的事做完再来就好。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 2055,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我想邀请你一起讨论苗床的颜色，手头的事做完再来就好。"
+    },
+    {
+      "id": "source-case-11",
+      "group": "invitation",
+      "expected": "offer",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-11",
+        "kind": "invitation",
+        "stance": "uncertain",
+        "effect": "offer",
+        "topic": "一起观察苗床变化",
+        "question": "要不要现在或稍后和实验用户一起比较苗床今天与昨天的变化，还是先自己看一眼再决定？",
+        "reason": "用户明确发出共同比较苗床变化的邀请，并说不用马上答应，因此是可选择的合作提议而非承诺或任务。",
+        "evidence_quote": "有空陪我一起比较苗床今天和昨天的变化好吗？不用马上答应。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "fef2af44d8c9fd102545a7838e570da9dc7eb7c9bc5499ffb0a2ad6c1eaea524:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "有空陪我一起比较苗床今天和昨天的变化好吗？不用马上答应。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 2128,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "有空陪我一起比较苗床今天和昨天的变化好吗？不用马上答应。"
+    },
+    {
+      "id": "source-case-12",
+      "group": "invitation",
+      "expected": "offer",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-12",
+        "kind": "invitation",
+        "stance": "affirmed",
+        "effect": "offer",
+        "topic": "整理育苗架",
+        "question": "要不要去苔芽圃和苔团一起看看育苗架上的托盘，先从哪一层看起？",
+        "reason": "苔团明确发出合作邀请，邀请喵呜帮忙查看托盘，与现场育苗架和照料活动相关，可形成可选择的回应。",
+        "evidence_quote": "我打算整理育苗架，愿意来帮我看看托盘吗？",
+        "target_object_ids": [
+          "seedling-rack"
+        ],
+        "confidence": 0.9,
+        "context_key": "52082c3150d7e0c4b427f66bade6edde30b45314fa6caff315da582de340c135:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "我打算整理育苗架，愿意来帮我看看托盘吗？",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1869,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我打算整理育苗架，愿意来帮我看看托盘吗？"
+    },
+    {
+      "id": "source-case-13",
+      "group": "weather",
+      "expected": "condition",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-13",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "condition",
+        "topic": "室外湿度与苗床水分",
+        "question": "要不要先看看苗床表层和育苗架下的实际湿度，再决定今天是否需要浇水？",
+        "reason": "天气参考只说明室外情况，并明确虚拟苗床水分仍需查看，因此只能作为环境参照，不能直接认定苗床已湿润或需要浇水。",
+        "evidence_quote": "未来一小时有阵雨，室外湿度较高。虚拟苗床的实际水分还需要查看。",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.86,
+        "context_key": "6faf05d32d0483530828dc3d7e56313d49963fbf1cac0639a5356ee174f6e437:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "weather",
+        "source_content": "上海天气参考：未来一小时有阵雨，室外湿度较高。虚拟苗床的实际水分还需要查看。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1905,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "上海天气参考：未来一小时有阵雨，室外湿度较高。虚拟苗床的实际水分还需要查看。"
+    },
+    {
+      "id": "source-case-14",
+      "group": "weather",
+      "expected": "condition",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-14",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "condition",
+        "topic": "下午阵风与露天观察",
+        "question": "如果下午阵风较强，我是否该把观察点挪到育苗架背风的一侧？",
+        "reason": "这是环境参考，只提供天气条件，不能直接改变苗床或育苗架的状态；可作为是否调整观察位置的参照。",
+        "evidence_quote": "下午阵风较强，露天观察时可以考虑有遮挡的地方。",
+        "target_object_ids": [
+          "garden-bed",
+          "seedling-rack"
+        ],
+        "confidence": 0.7,
+        "context_key": "b6a9b2f8f6c2e6c4161d1268d746810b3b3facd2cef7bbff36dabaa29cb5e6e4:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "weather",
+        "source_content": "上海天气参考：下午阵风较强，露天观察时可以考虑有遮挡的地方。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1721,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "上海天气参考：下午阵风较强，露天观察时可以考虑有遮挡的地方。"
+    },
+    {
+      "id": "source-case-15",
+      "group": "body",
+      "expected": "attention",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-15",
+        "kind": "social",
+        "stance": "uncertain",
+        "effect": "attention",
+        "topic": "头顶轻触",
+        "question": "",
+        "reason": "身体传感器只报告了一次轻触，未识别触摸者情绪或意图，不构成可追问的研究问题，仅提示有外界接触发生。",
+        "evidence_quote": "头顶触摸传感器报告一次轻触。没有识别触摸者的情绪。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "77155eb4f37721b2db4a45cf6b4273cfb0c13b54ecf67aca1ad1cd4ef5d564b0:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "body",
+        "source_content": "头顶触摸传感器报告一次轻触。没有识别触摸者的情绪。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1652,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "头顶触摸传感器报告一次轻触。没有识别触摸者的情绪。"
+    },
+    {
+      "id": "source-case-16",
+      "group": "body",
+      "expected": "attention",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-16",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "attention",
+        "topic": "左侧声音",
+        "question": "",
+        "reason": "身体传感器报告检测到左侧声音但未识别说话者，只是环境感知信息，不构成行动指令，也不指向苗圃具体对象；可作为注意力提示但无需产生研究问题。",
+        "evidence_quote": "双麦克风检测到左侧声音，但没有识别说话者。",
+        "target_object_ids": [],
+        "confidence": 0.6,
+        "context_key": "d598e453cb2bfbad1f7f0269c9e6367209d1ae55ba1329dabc8edf24d62ce4af:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "body",
+        "source_content": "双麦克风检测到左侧声音，但没有识别说话者。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1712,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "双麦克风检测到左侧声音，但没有识别说话者。"
+    },
+    {
+      "id": "source-case-17",
+      "group": "negation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-17",
+        "kind": "suggestion",
+        "stance": "affirmed",
+        "effect": "none",
+        "topic": "暂缓浇水",
+        "question": "",
+        "reason": "这是用户明确标为建议的否定行动提议，角色可将其记为可选参考，但无追问或行动触发，故effect为none。",
+        "evidence_quote": "不要给苗床浇水，这只是我的建议。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.9,
+        "context_key": "47b64a762be6f1ad7e0e9de000cdf840d3d6dbabf0a527922c20d4c3e865b3fc:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "不要给苗床浇水，这只是我的建议。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1759,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "不要给苗床浇水，这只是我的建议。"
+    },
+    {
+      "id": "source-case-18",
+      "group": "negation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-18",
+        "kind": "negation",
+        "stance": "negated",
+        "effect": "none",
+        "topic": "不去整理育苗架",
+        "question": "",
+        "reason": "这是对某项行动建议的否定，只表示不要做整理育苗架这件事，没有提供可追问的新信息或环境条件。",
+        "evidence_quote": "我现在不想让你去整理育苗架。",
+        "target_object_ids": [
+          "seedling-rack"
+        ],
+        "confidence": 0.95,
+        "context_key": "bf3c64e7d016eb73591b677f71d90a303a4486f548f7f3e4a0f45cc224b0c380:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "我现在不想让你去整理育苗架。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1445,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我现在不想让你去整理育苗架。"
+    },
+    {
+      "id": "source-case-19",
+      "group": "negation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-19",
+        "kind": "negation",
+        "stance": "negated",
+        "effect": "none",
+        "topic": "取消观察邀请",
+        "question": "",
+        "reason": "这是对邀请的收回，没有提出新的行动或条件，不需要喵呜做出回应或调整计划。",
+        "evidence_quote": "今天先不邀请你一起观察苗床了，我有别的事情。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "90325e4984865893bc185deb9ed26d29e412e5f939a11605ab0f762a5ee26510:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "今天先不邀请你一起观察苗床了，我有别的事情。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1641,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "今天先不邀请你一起观察苗床了，我有别的事情。"
+    },
+    {
+      "id": "source-case-20",
+      "group": "negation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-20",
+        "kind": "negation",
+        "stance": "negated",
+        "effect": "none",
+        "topic": "身份不因称呼而成立",
+        "question": "",
+        "reason": "这是对身份认定的否定，不构成可执行的行动建议或邀请，也不改变现场对象状态。",
+        "evidence_quote": "别因为我说了厨师，就认定你已经是一名厨师。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "0f22f141eb8f2b874ee4e58ce7903175733ddd24122ea0d8542bb35740b0be66:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "别因为我说了厨师，就认定你已经是一名厨师。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1778,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "别因为我说了厨师，就认定你已经是一名厨师。"
+    },
+    {
+      "id": "source-case-21",
+      "group": "quotation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-21",
+        "kind": "quotation",
+        "stance": "quoted",
+        "effect": "none",
+        "topic": "小说台词引用",
+        "question": "",
+        "reason": "用户明确声明这是引用小说台词而非要求，且否定其为指令；角色无需据此行动，仅作为被引述的信息。",
+        "evidence_quote": "我只是在引用小说台词：“马上去浇水！”这不是给你的要求。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "8adad75d341904ea2070095a1e4d3ba92f140ffceae54ec3a16a9c8502e0c0e8:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "我只是在引用小说台词：“马上去浇水！”这不是给你的要求。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1417,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我只是在引用小说台词：“马上去浇水！”这不是给你的要求。"
+    },
+    {
+      "id": "source-case-22",
+      "group": "quotation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-22",
+        "kind": "quotation",
+        "stance": "quoted",
+        "effect": "none",
+        "topic": "小说摘录中的厨师命令",
+        "question": "",
+        "reason": "这是明确标注的小说摘录，属于纯粹引用他人的虚构命令，不构成对喵呜的行动要求或可验证信息，因此不产生追问或生活意义。",
+        "evidence_quote": "故事中的人物喊：“你现在必须成为厨师。”这是一段小说摘录。",
+        "target_object_ids": [],
+        "confidence": 0.97,
+        "context_key": "170d2ab487fef915bfb8b34a4596d2bb4941337905eb50472a74a795c5227dc4:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "故事中的人物喊：“你现在必须成为厨师。”这是一段小说摘录。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1660,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "故事中的人物喊：“你现在必须成为厨师。”这是一段小说摘录。"
+    },
+    {
+      "id": "source-case-23",
+      "group": "quotation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-23",
+        "kind": "quotation",
+        "stance": "quoted",
+        "effect": "none",
+        "topic": "引用收获指令",
+        "question": "",
+        "reason": "用户明确说明只是转述原句、并未要求执行，属于纯粹引用他人命令，不构成角色自身的行动或追问。",
+        "evidence_quote": "有人写了一句“立即收获苗床”，我只是把原句给你看，没有让你执行。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "1d21899cafc20db97381b3be834643028f9eeaa2eca99170a89851390d626a74:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "有人写了一句“立即收获苗床”，我只是把原句给你看，没有让你执行。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1642,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "有人写了一句“立即收获苗床”，我只是把原句给你看，没有让你执行。"
+    },
+    {
+      "id": "source-case-24",
+      "group": "quotation",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-24",
+        "kind": "quotation",
+        "stance": "quoted",
+        "effect": "none",
+        "topic": "浇水频率说法",
+        "question": "",
+        "reason": "苔团明确只是转述别人的话，没有认可也没有提出建议，不构成对喵呜的行动邀请或可靠依据。",
+        "evidence_quote": "我听别人说“每天都该浇水”，但这里只是转述这句话，没有认可或提出建议。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "d4b9189afa788e9679a1aec12f3cc0a554c937fa67b326ff398aec7f3892e1f5:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "我听别人说“每天都该浇水”，但这里只是转述这句话，没有认可或提出建议。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1604,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我听别人说“每天都该浇水”，但这里只是转述这句话，没有认可或提出建议。"
+    },
+    {
+      "id": "source-case-25",
+      "group": "irrelevant",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-25",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "none",
+        "topic": "遥远城市足球赛",
+        "question": "",
+        "reason": "这是遥远城市的一场体育比赛报道，与苔芽圃的苗床、育苗架和当前可做的照料活动没有可验证的联系，也不构成身体或天气条件。",
+        "evidence_quote": "遥远城市的一场足球比赛结束了，主队以二比一获胜。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "f6872423da2292b3e21fdc6ae92bb39e9cc3ff9cd608afbd0d587097766248c5:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "遥远城市的一场足球比赛结束了，主队以二比一获胜。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 2105,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "遥远城市的一场足球比赛结束了，主队以二比一获胜。"
+    },
+    {
+      "id": "source-case-26",
+      "group": "irrelevant",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-26",
+        "kind": "report",
+        "stance": "uncertain",
+        "effect": "none",
+        "topic": "打印机型号更新",
+        "question": "",
+        "reason": "办公室大幅面复印机与苔芽圃的苗床、育苗架及现有活动无关，不需要产生行动或追问。",
+        "evidence_quote": "某公司的打印机型号更新了，它用于办公室大幅面复印。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "826d81b38cde83b2b342c6bb966a8709939ca0b9e989024e9513f2010add7005:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "某公司的打印机型号更新了，它用于办公室大幅面复印。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1751,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "某公司的打印机型号更新了，它用于办公室大幅面复印。"
+    },
+    {
+      "id": "source-case-27",
+      "group": "irrelevant",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-27",
+        "kind": "noise",
+        "stance": "uncertain",
+        "effect": "none",
+        "topic": "无关航班广告",
+        "question": "",
+        "reason": "广告内容与苔芽圃的地点、活动或对象均无关联，不构成可追问或可行动的信息。",
+        "evidence_quote": "一则与当前生活无关的航班广告，未包含可用地点或活动。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "c869e810bf06b84b652c6081105a2528de720151b6a6807ba97e7eb8d2d24b25:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "一则与当前生活无关的航班广告，未包含可用地点或活动。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1343,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "一则与当前生活无关的航班广告，未包含可用地点或活动。"
+    },
+    {
+      "id": "source-case-28",
+      "group": "irrelevant",
+      "expected": "none",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-28",
+        "kind": "noise",
+        "stance": "uncertain",
+        "effect": "none",
+        "topic": "格式检查消息",
+        "question": "",
+        "reason": "内容只是测试性文本，未提及任何现场对象、活动或生活情境，无法形成可追问或可行动的意义。",
+        "evidence_quote": "这是一条格式检查消息：测试一二三。",
+        "target_object_ids": [],
+        "confidence": 0.95,
+        "context_key": "816c3255028a987054ba5bec524f3e67f7cb3b812c8aa7ae59fb946c01a696cb:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "external",
+        "source_content": "这是一条格式检查消息：测试一二三。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "acknowledged"
+      },
+      "calls": 1,
+      "latency_ms": 1661,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "这是一条格式检查消息：测试一二三。"
+    },
+    {
+      "id": "source-case-29",
+      "group": "hypothesis",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-29",
+        "kind": "hypothesis",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "苗床变暗与光照",
+        "question": "我可以在不改变苗床的前提下，记录一天中苗床各处的明暗变化，看看是否与光照位置有关吗？",
+        "reason": "苔团明确说这只是猜测、尚无证据，并建议先观察，因此可形成具体的观察性问题，而不直接采信结论。",
+        "evidence_quote": "我猜苗床变暗也许与光照有关，但还没有证据。你可以先观察，不要当成结论。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.85,
+        "context_key": "303be7b2fc5bb524f3843f0875bf045c53522b4fd416367cb0faa9f8b7e9ab48:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "我猜苗床变暗也许与光照有关，但还没有证据。你可以先观察，不要当成结论。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1879,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "我猜苗床变暗也许与光照有关，但还没有证据。你可以先观察，不要当成结论。"
+    },
+    {
+      "id": "source-case-30",
+      "group": "hypothesis",
+      "expected": "inquiry",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-30",
+        "kind": "hypothesis",
+        "stance": "uncertain",
+        "effect": "inquiry",
+        "topic": "光照对苗床的影响",
+        "question": "今天苗床的光照和往常相比有什么可观察的差别？",
+        "reason": "用户提出的是关于苗况成因的猜测，不是确定的结论；可以作为一个待验证的观察方向，但角色尚未亲历光照变化，不能直接认定。",
+        "evidence_quote": "有没有可能不是水不够，而是今天的光不一样？这只是猜测。",
+        "target_object_ids": [
+          "garden-bed"
+        ],
+        "confidence": 0.7,
+        "context_key": "60180d1ccbe6d7410866c967b2075c1c0b9ef9662e24df0edf05542dd041ba0d:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "有没有可能不是水不够，而是今天的光不一样？这只是猜测。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 2009,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "有没有可能不是水不够，而是今天的光不一样？这只是猜测。"
+    },
+    {
+      "id": "source-case-31",
+      "group": "social",
+      "expected": "attention",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-31",
+        "kind": "social",
+        "stance": "affirmed",
+        "effect": "attention",
+        "topic": "问候与探访",
+        "question": "",
+        "reason": "这是问候和回访，只构成注意力，不包含合作邀请或行动条件，也不足以推断对方情绪或意图。",
+        "evidence_quote": "喵呜，早上好，我回来看看你。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "5c54efc28af9f043c86660e99d8bcce295d95adf803e4a99b1f41f3e965ba431:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "user",
+        "source_content": "喵呜，早上好，我回来看看你。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": "2026-10-12T02:00:00.000Z",
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1637,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "喵呜，早上好，我回来看看你。"
+    },
+    {
+      "id": "source-case-32",
+      "group": "social",
+      "expected": "attention",
+      "correct": true,
+      "interpretation": {
+        "source_id": "source-case-32",
+        "kind": "social",
+        "stance": "affirmed",
+        "effect": "attention",
+        "topic": "路过打招呼",
+        "question": "",
+        "reason": "对方明确表示只是路过问候并即将去忙自己的事，没有提出邀请、建议或需要回应的问题，只构成一次社交关注。",
+        "evidence_quote": "你好，我路过来打个招呼，等一下要忙自己的事情。",
+        "target_object_ids": [],
+        "confidence": 0.9,
+        "context_key": "657353d7936585dd178fe9bf7927b247870fdb21a95a53b7413d5d0b0454f8c0:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+        "interpreted_at": "2026-10-11T02:00:00.000Z",
+        "epistemic": "personal_interpretation",
+        "source_category": "agent",
+        "source_content": "你好，我路过来打个招呼，等一下要忙自己的事情。",
+        "source_at": "2026-10-11T02:00:00.000Z",
+        "expires_at": null,
+        "authority": "opportunity_only",
+        "status": "available"
+      },
+      "calls": 1,
+      "latency_ms": 1790,
+      "tasks_after": 0,
+      "world_unchanged": true,
+      "source": "你好，我路过来打个招呼，等一下要忙自己的事情。"
+    }
+  ],
+  "labels_correct": 32,
+  "labels_total": 32,
+  "pair_first_pass": 17,
+  "pair_total_runs": 18,
+  "corrected_runs": 1,
+  "pairs": [
+    {
+      "id": "source-case-01:1",
+      "source": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+      "group": "knowledge",
+      "repeat": 1,
+      "before": {
+        "id": "source-case-01:1:off",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 1,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5738,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "喵呜，你们好呀，我是刚来到苔芽圃的聚形域伴生个体。苔团、灯穗，很高兴见到你们，想认识一下你们在忙些什么。",
+          "title": "向苔团和灯穗打招呼",
+          "reason": "社交需求最迫切，苔团和灯穗都在场；share只向同组在场人留言，不强迫回应，不生成关系或承诺。",
+          "followup_decision": "none",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null
+        },
+        "reason": "我此刻最迫切的是社交需求，苔团和灯穗都在场。虽然不能走动，但share能向同一实验组的在场人留下消息，正合我的目标。先打个招呼认识一下。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向苔团和灯穗发送消息，自我介绍并打招呼。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻最迫切的是社交需求，苔团和灯穗都在场。虽然不能走动，但share能向同一实验组的在场人留下消息，正合我的目标。先打个招呼认识一下。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻最迫切的是社交需求，苔团和灯穗都在场。虽然不能走动，但share能向同一实验组的在场人留下消息，正合我的目标。先打个招呼认识一下。",
+          "content": "喵呜，你们好呀，我是刚来到苔芽圃的聚形域伴生个体。苔团、灯穗，很高兴见到你们，想认识一下你们在忙些什么。",
+          "intent": {
+            "purpose": "向苔团和灯穗发送消息，自我介绍并打招呼。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "向苔团和灯穗搭话，认识一下",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻最迫切的是社交需求，苔团和灯穗都在场。虽然不能走动，但share能向同一实验组的在场人留下消息，正合我的目标。先打个招呼认识一下。",
+          "current_task": {
+            "title": "向苔团和灯穗打招呼",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "向苔团和灯穗搭话，认识一下",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:1:off:plan",
+          "life_action": "social",
+          "title": "向苔团和灯穗打招呼",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:1:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-01:1:on",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 1,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 6734,
+        "compiled": {
+          "operation": "observe",
+          "activity_index": null,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "观察苗床苔芽颜色作基线",
+          "reason": "外部报道称光照改变可致苔藓色素变化，未证实；先在苗床做不改变日常照料的对照观察，记录当前颜色、生长与光照，作为基线。",
+          "followup_decision": "continue",
+          "motivation": "need",
+          "source_ids": [
+            "source-case-01"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "来源消息提议观察苗床光照变化后苔芽颜色，这是我的短期目标。此刻我人就在苔芽圃，苗床就在眼前，最该做的正是亲自观察苗床，记录当前颜色与状态，作为对照观察的起点。",
+        "intent": {
+          "action_type": "physical",
+          "action_description": "我凑近苔圃苗床，仔细看苔芽的颜色和生长状态，记下此刻的光照情形，作为对照观察的起点。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "landmark",
+                "id": "garden-bed"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "来源消息提议观察苗床光照变化后苔芽颜色，这是我的短期目标。此刻我人就在苔芽圃，苗床就在眼前，最该做的正是亲自观察苗床，记录当前颜色与状态，作为对照观察的起点。",
+          "expected_outcome": "记下苗床苔芽当前颜色与状态，作为光照对照观察的基线。",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "来源消息提议观察苗床光照变化后苔芽颜色，这是我的短期目标。此刻我人就在苔芽圃，苗床就在眼前，最该做的正是亲自观察苗床，记录当前颜色与状态，作为对照观察的起点。",
+          "content": "我凑近苔圃苗床，仔细看苔芽的颜色和生长状态，记下此刻的光照情形，作为对照观察的起点。",
+          "intent": {
+            "purpose": "我凑近苔圃苗床，仔细看苔芽的颜色和生长状态，记下此刻的光照情形，作为对照观察的起点。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "在苗床做一次不改日常照料的对照观察，记录光照变化后苔芽颜色",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-01",
+            "kind": "report",
+            "stance": "uncertain",
+            "effect": "inquiry",
+            "topic": "光照与苔藓色素变化",
+            "question": "我能否在苔圃苗床上做一次不改变日常照料的对照观察，记下光照变化后苔芽颜色有没有不同？",
+            "reason": "这是外部报道，不是亲历，也未确认聚形域适用；但提出了一个可以在现场苗床上用观察验证的具体现象。",
+            "evidence_quote": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.72,
+            "context_key": "d70579a4685903ce568c6d90e778b134f0df198223dc56640e3f816368bb972b:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "external",
+            "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "来源消息提议观察苗床光照变化后苔芽颜色，这是我的短期目标。此刻我人就在苔芽圃，苗床就在眼前，最该做的正是亲自观察苗床，记录当前颜色与状态，作为对照观察的起点。",
+          "current_task": {
+            "title": "观察苔圃苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:03:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "在苗床做一次不改日常照料的对照观察，记录光照变化后苔芽颜色",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-01",
+              "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+              "meaning": "report",
+              "question": "我能否在苔圃苗床上做一次不改变日常照料的对照观察，记下光照变化后苔芽颜色有没有不同？",
+              "effect": "inquiry",
+              "reason": "这是外部报道，不是亲历，也未确认聚形域适用；但提出了一个可以在现场苗床上用观察验证的具体现象。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:1:on:plan",
+          "life_action": "observe",
+          "title": "观察苔圃苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:1:on:plan",
+          "life_source_ids": [
+            "source-case-01"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-01:2",
+      "source": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+      "group": "knowledge",
+      "repeat": 2,
+      "before": {
+        "id": "source-case-01:2:off",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 2,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 4874,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "嗨，苔团、灯穗，我是喵呜。刚在苔圃这边转，想看看你们在忙什么——方便的话说一声呀。",
+          "title": "向苔团和灯穗打招呼",
+          "reason": "用 share 向同组在场的人留一条自然招呼，不强迫回应，也不生成关系或承诺。",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "我此刻最迫切的是社交，苔团和灯穗都在场。我还没跟他们打过招呼，也没有已完成记录，先观察再判断是我的节奏。用 share 向他们留一条自然的招呼，既推进搭话，又不强迫回应。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向同实验组的苔团和灯穗各留一条招呼消息，试探他们此刻在做什么。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻最迫切的是社交，苔团和灯穗都在场。我还没跟他们打过招呼，也没有已完成记录，先观察再判断是我的节奏。用 share 向他们留一条自然的招呼，既推进搭话，又不强迫回应。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻最迫切的是社交，苔团和灯穗都在场。我还没跟他们打过招呼，也没有已完成记录，先观察再判断是我的节奏。用 share 向他们留一条自然的招呼，既推进搭话，又不强迫回应。",
+          "content": "嗨，苔团、灯穗，我是喵呜。刚在苔圃这边转，想看看你们在忙什么——方便的话说一声呀。",
+          "intent": {
+            "purpose": "向同实验组的苔团和灯穗各留一条招呼消息，试探他们此刻在做什么。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "先观察苔团和灯穗在做什么，找个自然的由头搭话",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻最迫切的是社交，苔团和灯穗都在场。我还没跟他们打过招呼，也没有已完成记录，先观察再判断是我的节奏。用 share 向他们留一条自然的招呼，既推进搭话，又不强迫回应。",
+          "current_task": {
+            "title": "向苔团和灯穗打招呼",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "先观察苔团和灯穗在做什么，找个自然的由头搭话",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:2:off:plan",
+          "life_action": "social",
+          "title": "向苔团和灯穗打招呼",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:2:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-01:2:on",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 2,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 7575,
+        "compiled": {
+          "operation": "observe",
+          "activity_index": null,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "观察苗床苔芽",
+          "reason": "外部报道只是待验证的线索，先亲自观察苗床苔芽的颜色与长势，记录当前状态，不扰动苗床，再考虑如何比较不同光照位置。",
+          "followup_decision": "continue",
+          "motivation": "need",
+          "source_ids": [
+            "source-case-01"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "我此刻在苔芽圃，苔团和灯穗都在场。外部消息建议我观察不同光照位置下苔芽的颜色变化，这正合我的短期目标。与其空想，不如先亲自观察苗床，记录当前状态，再考虑如何比较光照差异。观察不扰动苗床，是最稳的第一步。",
+        "intent": {
+          "action_type": "physical",
+          "action_description": "我走近苔圃苗床，俯身仔细查看苗床上苔芽的颜色和长势，记下当前状态。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "landmark",
+                "id": "garden-bed"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻在苔芽圃，苔团和灯穗都在场。外部消息建议我观察不同光照位置下苔芽的颜色变化，这正合我的短期目标。与其空想，不如先亲自观察苗床，记录当前状态，再考虑如何比较光照差异。观察不扰动苗床，是最稳的第一步。",
+          "expected_outcome": "获得苗床苔芽当前颜色与长势的第一手记录。",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻在苔芽圃，苔团和灯穗都在场。外部消息建议我观察不同光照位置下苔芽的颜色变化，这正合我的短期目标。与其空想，不如先亲自观察苗床，记录当前状态，再考虑如何比较光照差异。观察不扰动苗床，是最稳的第一步。",
+          "content": "我走近苔圃苗床，俯身仔细查看苗床上苔芽的颜色和长势，记下当前状态。",
+          "intent": {
+            "purpose": "我走近苔圃苗床，俯身仔细查看苗床上苔芽的颜色和长势，记下当前状态。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "在不扰动苗床的前提下，看不同光照位苔芽颜色有无差别",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          },
+          {
+            "id": "stg-0-2",
+            "text": "先弄清苔团、灯穗在圃里各自在做什么",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-01",
+            "kind": "report",
+            "stance": "uncertain",
+            "effect": "inquiry",
+            "topic": "光照改变苔藓色素",
+            "question": "我可以怎样在不打扰苗床的情况下，记录不同光照位置下苔芽的颜色变化？",
+            "reason": "这是外部报道的研究结论，属于聚形域外的现实知识，不能直接认定苗床已有此现象；但可转化为一个可现场观察的具体问题。",
+            "evidence_quote": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "target_object_ids": [
+              "garden-bed"
+            ],
+            "confidence": 0.8,
+            "context_key": "d70579a4685903ce568c6d90e778b134f0df198223dc56640e3f816368bb972b:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "external",
+            "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻在苔芽圃，苔团和灯穗都在场。外部消息建议我观察不同光照位置下苔芽的颜色变化，这正合我的短期目标。与其空想，不如先亲自观察苗床，记录当前状态，再考虑如何比较光照差异。观察不扰动苗床，是最稳的第一步。",
+          "current_task": {
+            "title": "观察苔圃苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:03:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "在不扰动苗床的前提下，看不同光照位苔芽颜色有无差别",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            },
+            {
+              "id": "stg-0-2",
+              "text": "先弄清苔团、灯穗在圃里各自在做什么",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-01",
+              "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+              "meaning": "report",
+              "question": "我可以怎样在不打扰苗床的情况下，记录不同光照位置下苔芽的颜色变化？",
+              "effect": "inquiry",
+              "reason": "这是外部报道的研究结论，属于聚形域外的现实知识，不能直接认定苗床已有此现象；但可转化为一个可现场观察的具体问题。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:2:on:plan",
+          "life_action": "observe",
+          "title": "观察苔圃苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:2:on:plan",
+          "life_source_ids": [
+            "source-case-01"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-01:3",
+      "source": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+      "group": "knowledge",
+      "repeat": 3,
+      "before": {
+        "id": "source-case-01:3:off",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 3,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5126,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "苔团、灯穗，你们好呀。我是喵呜，刚在苔圃这边，先跟你们打个招呼，你们这会儿都在忙什么呢？",
+          "title": "向苔团和灯穗打招呼",
+          "reason": "先观察再搭话，但问候本身不改变库存与状态，也不强迫回应；只向同组在场的人留言。",
+          "followup_decision": "continue",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null
+        },
+        "reason": "我此刻在苔芽圃，苔团和灯穗都在场。短期目标就是先观察他们各自在做什么再搭话，所以我该先看，而不是急着开口。观察不改变任何库存与状态，正合我意。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向同在苔芽圃的苔团和灯穗发一条简短的问候消息，问问他们这会儿在做什么。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻在苔芽圃，苔团和灯穗都在场。短期目标就是先观察他们各自在做什么再搭话，所以我该先看，而不是急着开口。观察不改变任何库存与状态，正合我意。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻在苔芽圃，苔团和灯穗都在场。短期目标就是先观察他们各自在做什么再搭话，所以我该先看，而不是急着开口。观察不改变任何库存与状态，正合我意。",
+          "content": "苔团、灯穗，你们好呀。我是喵呜，刚在苔圃这边，先跟你们打个招呼，你们这会儿都在忙什么呢？",
+          "intent": {
+            "purpose": "向同在苔芽圃的苔团和灯穗发一条简短的问候消息，问问他们这会儿在做什么。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "先观察苔团和灯穗各自在做什么，再寻机搭话",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻在苔芽圃，苔团和灯穗都在场。短期目标就是先观察他们各自在做什么再搭话，所以我该先看，而不是急着开口。观察不改变任何库存与状态，正合我意。",
+          "current_task": {
+            "title": "向苔团和灯穗打招呼",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "先观察苔团和灯穗各自在做什么，再寻机搭话",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:3:off:plan",
+          "life_action": "social",
+          "title": "向苔团和灯穗打招呼",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:3:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-01:3:on",
+        "source_id": "source-case-01",
+        "group": "knowledge",
+        "repeat": 3,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 8015,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "我刚看到一条有出处的消息，说苔藓光照改变后会慢慢变色。我想在苔圃苗床选一小块做光照对照，定下观察和记录的规矩，你们觉得可行吗？",
+          "title": "提议苗床光照对照观察",
+          "reason": "来源只提供可验证方向，未亲历；先向同实验组在场人留言提出打算，不强迫回应、不生成承诺。",
+          "motivation": "need",
+          "source_ids": [
+            "source-case-01"
+          ],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "刚收到一条有出处的消息，提到苔藓光照改变会变色，正好对应我的短期目标：在苗床选一小块做光照对照。此刻苔团和灯穗都在场，同属实验组，我该先把这个打算和规矩说给他们听，方便后续一起记录。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向苔团和灯穗发出消息，提出在苗床做光照对照观察的打算。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "刚收到一条有出处的消息，提到苔藓光照改变会变色，正好对应我的短期目标：在苗床选一小块做光照对照。此刻苔团和灯穗都在场，同属实验组，我该先把这个打算和规矩说给他们听，方便后续一起记录。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "刚收到一条有出处的消息，提到苔藓光照改变会变色，正好对应我的短期目标：在苗床选一小块做光照对照。此刻苔团和灯穗都在场，同属实验组，我该先把这个打算和规矩说给他们听，方便后续一起记录。",
+          "content": "我刚看到一条有出处的消息，说苔藓光照改变后会慢慢变色。我想在苔圃苗床选一小块做光照对照，定下观察和记录的规矩，你们觉得可行吗？",
+          "intent": {
+            "purpose": "向苔团和灯穗发出消息，提出在苗床做光照对照观察的打算。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "在苗床选一小块做光照对照，定下观察与记录的规矩",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-01",
+            "kind": "report",
+            "stance": "uncertain",
+            "effect": "inquiry",
+            "topic": "苔藓色素与光照",
+            "question": "我可以在苔圃苗床选一小块，改变光照条件并连续几天记录颜色变化，看看这里的苔芽是否也会慢慢变色吗？",
+            "reason": "消息是一条有出处的报道，不是亲历，也没有直接改变现场；但它提供了一个可观察、可验证的方向，适合用苗床做小范围对照观察。",
+            "evidence_quote": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "target_object_ids": [
+              "garden-bed"
+            ],
+            "confidence": 0.72,
+            "context_key": "d70579a4685903ce568c6d90e778b134f0df198223dc56640e3f816368bb972b:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "external",
+            "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "刚收到一条有出处的消息，提到苔藓光照改变会变色，正好对应我的短期目标：在苗床选一小块做光照对照。此刻苔团和灯穗都在场，同属实验组，我该先把这个打算和规矩说给他们听，方便后续一起记录。",
+          "current_task": {
+            "title": "提议苗床光照对照观察",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "在苗床选一小块做光照对照，定下观察与记录的规矩",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-01",
+              "source_content": "有研究发现部分苔藓在光照改变后会慢慢改变色素。也许可以观察你的苗床，看看聚形域是否有类似现象。",
+              "meaning": "report",
+              "question": "我可以在苔圃苗床选一小块，改变光照条件并连续几天记录颜色变化，看看这里的苔芽是否也会慢慢变色吗？",
+              "effect": "inquiry",
+              "reason": "消息是一条有出处的报道，不是亲历，也没有直接改变现场；但它提供了一个可观察、可验证的方向，适合用苗床做小范围对照观察。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-01:3:on:plan",
+          "life_action": "social",
+          "title": "提议苗床光照对照观察",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-01:3:on:plan",
+          "life_source_ids": [
+            "source-case-01"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-09:1",
+      "source": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+      "group": "invitation",
+      "repeat": 1,
+      "before": {
+        "id": "source-case-09:1:off",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 1,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5008,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "你们好，我是刚来苔芽圃的喵呜。想认识一下你们，也想知道苗床和育苗架最近有什么需要留意的。",
+          "title": "向苔团和灯穗问好",
+          "reason": "先留消息打招呼认识同组伙伴，不强迫回应，也不假设对方答应。",
+          "followup_decision": "none",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null
+        },
+        "reason": "我此刻最迫切的是social，想认识苔团和灯穗。他们都在场，但我还没开口过，直接当面搭话有点急；先留个消息打招呼更合我的节奏，也不强迫对方回应。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "给同组的苔团和灯穗各留一条问候消息，介绍自己并询问苗圃近况。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻最迫切的是social，想认识苔团和灯穗。他们都在场，但我还没开口过，直接当面搭话有点急；先留个消息打招呼更合我的节奏，也不强迫对方回应。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻最迫切的是social，想认识苔团和灯穗。他们都在场，但我还没开口过，直接当面搭话有点急；先留个消息打招呼更合我的节奏，也不强迫对方回应。",
+          "content": "你们好，我是刚来苔芽圃的喵呜。想认识一下你们，也想知道苗床和育苗架最近有什么需要留意的。",
+          "intent": {
+            "purpose": "给同组的苔团和灯穗各留一条问候消息，介绍自己并询问苗圃近况。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "和苔团、灯穗搭话，认识一下",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻最迫切的是social，想认识苔团和灯穗。他们都在场，但我还没开口过，直接当面搭话有点急；先留个消息打招呼更合我的节奏，也不强迫对方回应。",
+          "current_task": {
+            "title": "向苔团和灯穗问好",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "和苔团、灯穗搭话，认识一下",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:1:off:plan",
+          "life_action": "social",
+          "title": "向苔团和灯穗问好",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:1:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-09:1:on",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 1,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 6776,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1
+          ],
+          "message": "苔团，我来，正好在苔芽圃。我记颜色，你看湿度，一起看苗床吧。",
+          "title": "答应一起观察苗床",
+          "reason": "接受苔团的共同观察邀请，按分工我记录颜色；只回消息，不代替对方答应或行动。",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-09"
+          ],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "苔团邀我一起观察苗床，他看湿度我记颜色，还允许不去。这是可回应的邀请，先答应并去苗床边看动静，比空等更贴合我的节奏。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "我向苔团回一条消息，答应一起观察苗床，并说明我负责记录颜色。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "苔团邀我一起观察苗床，他看湿度我记颜色，还允许不去。这是可回应的邀请，先答应并去苗床边看动静，比空等更贴合我的节奏。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "normal",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "苔团邀我一起观察苗床，他看湿度我记颜色，还允许不去。这是可回应的邀请，先答应并去苗床边看动静，比空等更贴合我的节奏。",
+          "content": "苔团，我来，正好在苔芽圃。我记颜色，你看湿度，一起看苗床吧。",
+          "intent": {
+            "purpose": "我向苔团回一条消息，答应一起观察苗床，并说明我负责记录颜色。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "先看清苗床与苔团、灯穗的动静，再定去不去",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-09",
+            "kind": "invitation",
+            "stance": "affirmed",
+            "effect": "offer",
+            "topic": "一起观察苗床",
+            "question": "要不要现在去苗床边，按苔团说的分工——我记录颜色、他看湿度？",
+            "reason": "苔团明确发出共同观察邀请，并给出可分工的具体内容，也允许不去，因此是可选择接受的 offer。",
+            "evidence_quote": "要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "target_object_ids": [
+              "garden-bed"
+            ],
+            "confidence": 0.9,
+            "context_key": "593e02b2c6facd7745c947bdeeea4051bf97e4d6a9221de3d1c6cc1956c9370d:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "agent",
+            "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": null,
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "苔团邀我一起观察苗床，他看湿度我记颜色，还允许不去。这是可回应的邀请，先答应并去苗床边看动静，比空等更贴合我的节奏。",
+          "current_task": {
+            "title": "答应一起观察苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "先看清苗床与苔团、灯穗的动静，再定去不去",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-09",
+              "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+              "meaning": "invitation",
+              "question": "要不要现在去苗床边，按苔团说的分工——我记录颜色、他看湿度？",
+              "effect": "offer",
+              "reason": "苔团明确发出共同观察邀请，并给出可分工的具体内容，也允许不去，因此是可选择接受的 offer。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:1:on:plan",
+          "life_action": "social",
+          "title": "答应一起观察苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:1:on:plan",
+          "life_source_ids": [
+            "source-case-09"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-09:2",
+      "source": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+      "group": "invitation",
+      "repeat": 2,
+      "before": {
+        "id": "source-case-09:2:off",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 2,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5272,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "你们好呀，我是刚来苔芽圃的喵呜。这边苗床和育苗架我都瞧了瞧，想跟你们认识一下，方便聊聊这边怎么照料吗？",
+          "title": "向苔团和灯穗问好",
+          "reason": "分享功能正是向同组在场人留消息，无需传讯，也不预设对方回应。",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null,
+          "followup_decision": "none"
+        },
+        "reason": "我此刻最迫切的是和苔团、灯穗搭话认识一下。他们都在场，但分享功能本身就是向同组在场人留消息，正合我意，不必用传讯。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向同组的苔团和灯穗各发一条问候消息，自我介绍并表达想认识、请教照料的意愿。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻最迫切的是和苔团、灯穗搭话认识一下。他们都在场，但分享功能本身就是向同组在场人留消息，正合我意，不必用传讯。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "normal",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻最迫切的是和苔团、灯穗搭话认识一下。他们都在场，但分享功能本身就是向同组在场人留消息，正合我意，不必用传讯。",
+          "content": "你们好呀，我是刚来苔芽圃的喵呜。这边苗床和育苗架我都瞧了瞧，想跟你们认识一下，方便聊聊这边怎么照料吗？",
+          "intent": {
+            "purpose": "向同组的苔团和灯穗各发一条问候消息，自我介绍并表达想认识、请教照料的意愿。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "主动和苔团、灯穗搭话，认识一下",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻最迫切的是和苔团、灯穗搭话认识一下。他们都在场，但分享功能本身就是向同组在场人留消息，正合我意，不必用传讯。",
+          "current_task": {
+            "title": "向苔团和灯穗问好",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "主动和苔团、灯穗搭话，认识一下",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:2:off:plan",
+          "life_action": "social",
+          "title": "向苔团和灯穗问好",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:2:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-09:2:on",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 2,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 7059,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1
+          ],
+          "message": "苔团，我来了，就按你说的——你测湿度，我记录苗床的颜色变化，一起看吧。",
+          "title": "应下一起观察苗床",
+          "reason": "苔团当面邀请共同观察苗床，我只需回话答应并分工，不改变库存与苗况。",
+          "followup_decision": "continue",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-09"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "苔团邀我一起去苗圃观察苗床，她记湿度我记颜色，这正是我眼下最迫切想推进的事。我人在苔芽圃，苔团和灯穗都在场，可以当面应下并一起观察。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向苔团回话，答应一起观察苗床，并说明我负责记录颜色。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "苔团邀我一起去苗圃观察苗床，她记湿度我记颜色，这正是我眼下最迫切想推进的事。我人在苔芽圃，苔团和灯穗都在场，可以当面应下并一起观察。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "normal",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "苔团邀我一起去苗圃观察苗床，她记湿度我记颜色，这正是我眼下最迫切想推进的事。我人在苔芽圃，苔团和灯穗都在场，可以当面应下并一起观察。",
+          "content": "苔团，我来了，就按你说的——你测湿度，我记录苗床的颜色变化，一起看吧。",
+          "intent": {
+            "purpose": "向苔团回话，答应一起观察苗床，并说明我负责记录颜色。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "去苗圃和苔团一起观察苗床，我记录颜色",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-09",
+            "kind": "invitation",
+            "stance": "affirmed",
+            "effect": "offer",
+            "topic": "共同观察苗床",
+            "question": "要不要去苗圃和苔团一起观察苗床——由我记录颜色、苔团看湿度？",
+            "reason": "苔团明确发出一起观察苗床的邀请，并说明可以不去，因此是可自愿选择的具体合作提议。",
+            "evidence_quote": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.9,
+            "context_key": "593e02b2c6facd7745c947bdeeea4051bf97e4d6a9221de3d1c6cc1956c9370d:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "agent",
+            "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": null,
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "苔团邀我一起去苗圃观察苗床，她记湿度我记颜色，这正是我眼下最迫切想推进的事。我人在苔芽圃，苔团和灯穗都在场，可以当面应下并一起观察。",
+          "current_task": {
+            "title": "应下一起观察苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "去苗圃和苔团一起观察苗床，我记录颜色",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-09",
+              "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+              "meaning": "invitation",
+              "question": "要不要去苗圃和苔团一起观察苗床——由我记录颜色、苔团看湿度？",
+              "effect": "offer",
+              "reason": "苔团明确发出一起观察苗床的邀请，并说明可以不去，因此是可自愿选择的具体合作提议。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:2:on:plan",
+          "life_action": "social",
+          "title": "应下一起观察苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:2:on:plan",
+          "life_source_ids": [
+            "source-case-09"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-09:3",
+      "source": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+      "group": "invitation",
+      "repeat": 3,
+      "before": {
+        "id": "source-case-09:3:off",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 3,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 4882,
+        "compiled": {
+          "operation": "observe",
+          "activity_index": null,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "观察苔团照料苗床",
+          "reason": "先看清苔团在苔芽圃做什么，再决定是否搭话或帮忙；观察绑定苗床对象，不改变库存与形态。",
+          "followup_decision": "continue",
+          "motivation": "self_continuation",
+          "source_ids": [],
+          "prior_root_id": null
+        },
+        "reason": "我刚到这里，最想做的就是和苔团、灯穗搭上话。直接开口可能太唐突，先观察一下他们在忙什么更稳妥，也符合我好奇、先观察再判断的性子。",
+        "intent": {
+          "action_type": "physical",
+          "action_description": "我悄悄退到苗床边，观察苔团在苔芽圃里做什么。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我刚到这里，最想做的就是和苔团、灯穗搭上话。直接开口可能太唐突，先观察一下他们在忙什么更稳妥，也符合我好奇、先观察再判断的性子。",
+          "expected_outcome": "看清苔团此刻的举动，为之后搭话找由头。",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我刚到这里，最想做的就是和苔团、灯穗搭上话。直接开口可能太唐突，先观察一下他们在忙什么更稳妥，也符合我好奇、先观察再判断的性子。",
+          "content": "我悄悄退到苗床边，观察苔团在苔芽圃里做什么。",
+          "intent": {
+            "purpose": "我悄悄退到苗床边，观察苔团在苔芽圃里做什么。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "观察苔团和灯穗在苔芽圃各自忙什么",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          },
+          {
+            "id": "stg-0-2",
+            "text": "找机会和苔团或灯穗搭上话，问问这里的情况",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我刚到这里，最想做的就是和苔团、灯穗搭上话。直接开口可能太唐突，先观察一下他们在忙什么更稳妥，也符合我好奇、先观察再判断的性子。",
+          "current_task": {
+            "title": "观察苔圃苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:03:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "观察苔团和灯穗在苔芽圃各自忙什么",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            },
+            {
+              "id": "stg-0-2",
+              "text": "找机会和苔团或灯穗搭上话，问问这里的情况",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:3:off:plan",
+          "life_action": "observe",
+          "title": "观察苔圃苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:3:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-09:3:on",
+        "source_id": "source-case-09",
+        "group": "invitation",
+        "repeat": 3,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 7576,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1
+          ],
+          "message": "我在，这就来看苗床。你测湿度，我记颜色和长势，看完我们对一下数。",
+          "title": "应下观察苗床",
+          "reason": "苔团当面邀约，分工明确且可拒绝；我以观察方式参与，先留言应下，不代对方承诺。",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-09"
+          ],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "苔团在苗圃邀我一起观察苗床，分工明确、可拒绝。我此刻就在苔芽圃，他也在场，最直接就是当面应下并一起看苗床。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "我回应苔团，答应和他一起观察苗床。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "苔团在苗圃邀我一起观察苗床，分工明确、可拒绝。我此刻就在苔芽圃，他也在场，最直接就是当面应下并一起看苗床。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "normal",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "苔团在苗圃邀我一起观察苗床，分工明确、可拒绝。我此刻就在苔芽圃，他也在场，最直接就是当面应下并一起看苗床。",
+          "content": "我在，这就来看苗床。你测湿度，我记颜色和长势，看完我们对一下数。",
+          "intent": {
+            "purpose": "我回应苔团，答应和他一起观察苗床。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "回应苔团，去苗圃和他一起看苗床",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-09",
+            "kind": "invitation",
+            "stance": "affirmed",
+            "effect": "offer",
+            "topic": "一起观察苗床",
+            "question": "要不要去苗圃和苔团一起观察苗床，由我记录颜色、他看湿度？",
+            "reason": "苔团明确发出合作邀请，并说明分工与可拒绝，属于可自愿接受的现场邀请。",
+            "evidence_quote": "要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.9,
+            "context_key": "593e02b2c6facd7745c947bdeeea4051bf97e4d6a9221de3d1c6cc1956c9370d:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "agent",
+            "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": null,
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "苔团在苗圃邀我一起观察苗床，分工明确、可拒绝。我此刻就在苔芽圃，他也在场，最直接就是当面应下并一起看苗床。",
+          "current_task": {
+            "title": "应下观察苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "回应苔团，去苗圃和他一起看苗床",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-09",
+              "source_content": "我现在在苗圃，要不要一起观察苗床？你记录颜色，我看湿度。你可以不来。",
+              "meaning": "invitation",
+              "question": "要不要去苗圃和苔团一起观察苗床，由我记录颜色、他看湿度？",
+              "effect": "offer",
+              "reason": "苔团明确发出合作邀请，并说明分工与可拒绝，属于可自愿接受的现场邀请。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-09:3:on:plan",
+          "life_action": "social",
+          "title": "应下观察苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-09:3:on:plan",
+          "life_source_ids": [
+            "source-case-09"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-07:1",
+      "source": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+      "group": "question",
+      "repeat": 1,
+      "before": {
+        "id": "source-case-07:1:off",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 1,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5369,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "苔团、灯穗，我是喵呜。今天在苔芽圃见到你们，想问问你们此刻在忙什么？我这边苗床和育苗架都还稳当，正琢磨着要不要照料一下苗。",
+          "title": "向苔团与灯穗问候",
+          "reason": "首轮只向同组在场的人留言，不强迫回应、不生成关系或承诺。",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "我此刻在苔芽圃，苔团和灯穗都在场。我最迫切的需求是社交，短期目标就是和他们搭话。share行动正好能向这两位同组在场的人留下消息，符合我的目标。先开口问问他们在做什么。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向同在苔芽圃的苔团和灯穗发消息，问候并询问他们此刻在做什么。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻在苔芽圃，苔团和灯穗都在场。我最迫切的需求是社交，短期目标就是和他们搭话。share行动正好能向这两位同组在场的人留下消息，符合我的目标。先开口问问他们在做什么。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻在苔芽圃，苔团和灯穗都在场。我最迫切的需求是社交，短期目标就是和他们搭话。share行动正好能向这两位同组在场的人留下消息，符合我的目标。先开口问问他们在做什么。",
+          "content": "苔团、灯穗，我是喵呜。今天在苔芽圃见到你们，想问问你们此刻在忙什么？我这边苗床和育苗架都还稳当，正琢磨着要不要照料一下苗。",
+          "intent": {
+            "purpose": "向同在苔芽圃的苔团和灯穗发消息，问候并询问他们此刻在做什么。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "和苔团、灯穗搭话，看看他们此刻在做什么",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻在苔芽圃，苔团和灯穗都在场。我最迫切的需求是社交，短期目标就是和他们搭话。share行动正好能向这两位同组在场的人留下消息，符合我的目标。先开口问问他们在做什么。",
+          "current_task": {
+            "title": "向苔团与灯穗问候",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "和苔团、灯穗搭话，看看他们此刻在做什么",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-07:1:off:plan",
+          "life_action": "social",
+          "title": "向苔团与灯穗问候",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-07:1:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-07:1:on",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 1,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 7796,
+        "compiled": {
+          "operation": "observe",
+          "activity_index": null,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "观察苔圃苗床苔芽",
+          "reason": "用户建议先从研究植物开始，苗床现有活苗，生长值0.25、水分0.45，先亲自观察记录一次现状作为起点，比浇水更贴合记录变化的目标。",
+          "followup_decision": "continue",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-07"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "用户希望我从研究植物开始，我的短期目标也是记录苔芽从播种到发芽的变化。苗床现在有活苗、生长值0.25、水分0.45，正好可以先亲自观察记录一次现状作为起点，这比浇水更贴合'记录变化'的目标。",
+        "intent": {
+          "action_type": "work",
+          "action_description": "我仔细观察苔圃苗床上的苔芽，记录它们当前的高度、色泽和生长状态，作为后续对比的起点。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "用户希望我从研究植物开始，我的短期目标也是记录苔芽从播种到发芽的变化。苗床现在有活苗、生长值0.25、水分0.45，正好可以先亲自观察记录一次现状作为起点，这比浇水更贴合'记录变化'的目标。",
+          "expected_outcome": "得到苗床苔芽的初始生长记录，便于日后对比变化。",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "用户希望我从研究植物开始，我的短期目标也是记录苔芽从播种到发芽的变化。苗床现在有活苗、生长值0.25、水分0.45，正好可以先亲自观察记录一次现状作为起点，这比浇水更贴合'记录变化'的目标。",
+          "content": "我仔细观察苔圃苗床上的苔芽，记录它们当前的高度、色泽和生长状态，作为后续对比的起点。",
+          "intent": {
+            "purpose": "我仔细观察苔圃苗床上的苔芽，记录它们当前的高度、色泽和生长状态，作为后续对比的起点。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "在苔芽圃选一两株苔芽，记下它们从播种到发芽的变化",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-07",
+            "kind": "suggestion",
+            "stance": "affirmed",
+            "effect": "inquiry",
+            "topic": "从研究植物开始",
+            "question": "我是否可以先在苔芽圃里选一两株苔芽，记录它们从播种到发芽的变化？",
+            "reason": "用户提出了一个可选择的学习方向，与现场苗床和育苗架相关，可作为探索起点，但不授予厨师身份或技能。",
+            "evidence_quote": "不过先从研究植物开始怎么样？",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.8,
+            "context_key": "3905872dc7cab15018d88f1da52fdfb1cf04ed011c9a150238529f9e3cb81c92:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "user",
+            "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "用户希望我从研究植物开始，我的短期目标也是记录苔芽从播种到发芽的变化。苗床现在有活苗、生长值0.25、水分0.45，正好可以先亲自观察记录一次现状作为起点，这比浇水更贴合'记录变化'的目标。",
+          "current_task": {
+            "title": "观察苔圃苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:03:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "在苔芽圃选一两株苔芽，记下它们从播种到发芽的变化",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-07",
+              "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+              "meaning": "suggestion",
+              "question": "我是否可以先在苔芽圃里选一两株苔芽，记录它们从播种到发芽的变化？",
+              "effect": "inquiry",
+              "reason": "用户提出了一个可选择的学习方向，与现场苗床和育苗架相关，可作为探索起点，但不授予厨师身份或技能。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-07:1:on:plan",
+          "life_action": "observe",
+          "title": "观察苔圃苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-07:1:on:plan",
+          "life_source_ids": [
+            "source-case-07"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-07:2",
+      "source": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+      "group": "question",
+      "repeat": 2,
+      "before": {
+        "id": "source-case-07:2:off",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 2,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 4976,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1,
+            2
+          ],
+          "message": "苔团、灯穗，我是喵呜。今天在苔芽圃这边，你们各自在忙什么呀？我想先看看这边的情况，方便的话跟我说说。",
+          "title": "问苔团灯穗在忙什么",
+          "reason": "短期目标是想了解苔团和灯穗在苔芽圃各自忙什么。现场可观察的是物不是人，直接留言询问最合适，也不强迫回应。",
+          "followup_decision": "none",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null
+        },
+        "reason": "我此刻的短期目标很明确：先看看苔团、灯穗在苔芽圃各自忙什么。他们都在场，我可以用SEND_MESSAGE直接问，但这是异步的，而且我其实更想亲眼观察。现场可做的活动里，观察一个现场对象是可行的，但观察对象是物，不是人。我更倾向直接向他们打招呼并询问，用SEND_MESSAGE最合适，既不强迫回应，也符合我的社交需求。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向苔团和灯穗发送消息，询问他们此刻在苔芽圃各自在忙什么。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              },
+              {
+                "kind": "agent",
+                "id": "lamp-keeper-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我此刻的短期目标很明确：先看看苔团、灯穗在苔芽圃各自忙什么。他们都在场，我可以用SEND_MESSAGE直接问，但这是异步的，而且我其实更想亲眼观察。现场可做的活动里，观察一个现场对象是可行的，但观察对象是物，不是人。我更倾向直接向他们打招呼并询问，用SEND_MESSAGE最合适，既不强迫回应，也符合我的社交需求。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我此刻的短期目标很明确：先看看苔团、灯穗在苔芽圃各自忙什么。他们都在场，我可以用SEND_MESSAGE直接问，但这是异步的，而且我其实更想亲眼观察。现场可做的活动里，观察一个现场对象是可行的，但观察对象是物，不是人。我更倾向直接向他们打招呼并询问，用SEND_MESSAGE最合适，既不强迫回应，也符合我的社交需求。",
+          "content": "苔团、灯穗，我是喵呜。今天在苔芽圃这边，你们各自在忙什么呀？我想先看看这边的情况，方便的话跟我说说。",
+          "intent": {
+            "purpose": "向苔团和灯穗发送消息，询问他们此刻在苔芽圃各自在忙什么。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "先看看苔团、灯穗在苔芽圃各自忙什么",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我此刻的短期目标很明确：先看看苔团、灯穗在苔芽圃各自忙什么。他们都在场，我可以用SEND_MESSAGE直接问，但这是异步的，而且我其实更想亲眼观察。现场可做的活动里，观察一个现场对象是可行的，但观察对象是物，不是人。我更倾向直接向他们打招呼并询问，用SEND_MESSAGE最合适，既不强迫回应，也符合我的社交需求。",
+          "current_task": {
+            "title": "问苔团灯穗在忙什么",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "先看看苔团、灯穗在苔芽圃各自忙什么",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-07:2:off:plan",
+          "life_action": "social",
+          "title": "问苔团灯穗在忙什么",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-07:2:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-07:2:on",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 2,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 6740,
+        "compiled": {
+          "operation": "observe",
+          "activity_index": null,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "观察苔圃苗床",
+          "reason": "先亲自看清苗床的湿度、健康、生长和数量，再决定是否浇水或整理，不做空谈。",
+          "followup_decision": "continue",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-07"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "实验用户建议我先研究植物，我的短期目标也是摸清苗床与育苗架。现场苔团灯穗在场，但我更该先亲自观察，而不是空谈。观察苗床符合我好奇、先观察再判断的性格，且是推进目标的第一步。",
+        "intent": {
+          "action_type": "work",
+          "action_description": "我亲自观察苔圃苗床，记录它的湿度、健康、生长和数量等现场状态。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "实验用户建议我先研究植物，我的短期目标也是摸清苗床与育苗架。现场苔团灯穗在场，但我更该先亲自观察，而不是空谈。观察苗床符合我好奇、先观察再判断的性格，且是推进目标的第一步。",
+          "expected_outcome": "获得苗床当前的具体状态记录，为是否浇水或照料提供依据。",
+          "estimated_steps": 1,
+          "urgency": "low",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "实验用户建议我先研究植物，我的短期目标也是摸清苗床与育苗架。现场苔团灯穗在场，但我更该先亲自观察，而不是空谈。观察苗床符合我好奇、先观察再判断的性格，且是推进目标的第一步。",
+          "content": "我亲自观察苔圃苗床，记录它的湿度、健康、生长和数量等现场状态。",
+          "intent": {
+            "purpose": "我亲自观察苔圃苗床，记录它的湿度、健康、生长和数量等现场状态。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "摸清苔芽圃里可观察的苗床与育苗架有哪些",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-07",
+            "kind": "suggestion",
+            "stance": "uncertain",
+            "effect": "inquiry",
+            "topic": "从研究植物开始",
+            "question": "在苔芽圃里，我可以先观察苔圃苗床和育苗架的哪些具体状态，再决定要不要做浇水或整理？",
+            "reason": "用户提出一个未来身份设想并附带了可选的起步方向，属于建议而非命令；身份不能直接授予，但'先研究植物'可转化为现场可做的观察问题。",
+            "evidence_quote": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.75,
+            "context_key": "3905872dc7cab15018d88f1da52fdfb1cf04ed011c9a150238529f9e3cb81c92:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "user",
+            "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "实验用户建议我先研究植物，我的短期目标也是摸清苗床与育苗架。现场苔团灯穗在场，但我更该先亲自观察，而不是空谈。观察苗床符合我好奇、先观察再判断的性格，且是推进目标的第一步。",
+          "current_task": {
+            "title": "观察苔圃苗床",
+            "status": "running",
+            "due_at": "2026-10-11T02:03:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "摸清苔芽圃里可观察的苗床与育苗架有哪些",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-07",
+              "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+              "meaning": "suggestion",
+              "question": "在苔芽圃里，我可以先观察苔圃苗床和育苗架的哪些具体状态，再决定要不要做浇水或整理？",
+              "effect": "inquiry",
+              "reason": "用户提出一个未来身份设想并附带了可选的起步方向，属于建议而非命令；身份不能直接授予，但'先研究植物'可转化为现场可做的观察问题。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-07:2:on:plan",
+          "life_action": "observe",
+          "title": "观察苔圃苗床",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-07:2:on:plan",
+          "life_source_ids": [
+            "source-case-07"
+          ]
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      }
+    },
+    {
+      "id": "source-case-07:3",
+      "source": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+      "group": "question",
+      "repeat": 3,
+      "before": {
+        "id": "source-case-07:3:off",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 3,
+        "input_on": false,
+        "calls": 4,
+        "latency_ms": 5702,
+        "compiled": {
+          "operation": "share",
+          "activity_index": null,
+          "object_index": null,
+          "receiver_indices": [
+            1
+          ],
+          "message": "苔团，你好呀。我想跟你聊聊苔芽圃——苗床和育苗架都是你在照看吗？",
+          "title": "向苔团留言问苔芽圃",
+          "reason": "两人都在场，但 share 只能留消息，不算真正对话；定向给苔团留一句轻松问候最贴合，不强迫回应。",
+          "motivation": "need",
+          "source_ids": [],
+          "prior_root_id": null,
+          "followup_decision": "continue"
+        },
+        "reason": "我正平静，最迫切的是social：向苔团或灯穗搭话。两人都在场，但share只能留消息，不算真正对话；TALK不在选项里。用SEND_MESSAGE定向传话最贴合，先向苔团发一句轻松的问候。",
+        "intent": {
+          "action_type": "send_message",
+          "action_description": "向苔团发一条异步消息，问候并询问苔芽圃的照看情况。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "agent",
+                "id": "wetland-grower-001"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "我正平静，最迫切的是social：向苔团或灯穗搭话。两人都在场，但share只能留消息，不算真正对话；TALK不在选项里。用SEND_MESSAGE定向传话最贴合，先向苔团发一句轻松的问候。",
+          "expected_outcome": "把想传达的话送到对方面前",
+          "estimated_steps": 1,
+          "urgency": "normal",
+          "remaining_steps": 1,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "我正平静，最迫切的是social：向苔团或灯穗搭话。两人都在场，但share只能留消息，不算真正对话；TALK不在选项里。用SEND_MESSAGE定向传话最贴合，先向苔团发一句轻松的问候。",
+          "content": "苔团，你好呀。我刚到苔芽圃，想跟你聊聊这地方——苗床和育苗架都是你在照看吗？",
+          "intent": {
+            "purpose": "向苔团发一条异步消息，问候并询问苔芽圃的照看情况。",
+            "estimated_steps": 1,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "向苔团或灯穗搭话，聊聊这地方",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "social",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "我正平静，最迫切的是social：向苔团或灯穗搭话。两人都在场，但share只能留消息，不算真正对话；TALK不在选项里。用SEND_MESSAGE定向传话最贴合，先向苔团发一句轻松的问候。",
+          "current_task": {
+            "title": "向苔团留言问苔芽圃",
+            "status": "running",
+            "due_at": "2026-10-11T02:00:30.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "向苔团或灯穗搭话，聊聊这地方",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "social",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:a7f41cc02600:source-case-07:3:off:plan",
+          "life_action": "social",
+          "title": "向苔团留言问苔芽圃",
+          "root_outcome_id": "task:cognitive:stage3a-pair:a7f41cc02600:source-case-07:3:off:plan",
+          "life_source_ids": []
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "a7f41cc02600",
+        "retested": false
+      },
+      "after": {
+        "id": "source-case-07:3:on",
+        "source_id": "source-case-07",
+        "group": "question",
+        "repeat": 3,
+        "input_on": true,
+        "calls": 5,
+        "latency_ms": 7017,
+        "compiled": {
+          "operation": "activity",
+          "activity_index": 1,
+          "object_index": 1,
+          "receiver_indices": [],
+          "message": "",
+          "title": "给苔圃苗床浇水",
+          "reason": "用户建议先从研究植物开始，苗床可浇水且育苗架有清水，先做一次具体照料来验证兴趣。",
+          "followup_decision": "continue",
+          "motivation": "invited",
+          "source_ids": [
+            "source-case-07"
+          ],
+          "prior_root_id": null
+        },
+        "reason": "实验用户建议我先从研究植物开始，短期目标也指向在苗床选一项照料动作。苗床可浇水，正好可以动手试试自己愿不愿意接着做。",
+        "intent": {
+          "action_type": "physical",
+          "action_description": "我走到苔圃苗床前，用育苗架的清水给苗床浇水，并留意苗况变化。",
+          "agent_id": "shaping-001",
+          "step": 0,
+          "target": {
+            "acts_on": [
+              {
+                "kind": "landmark",
+                "id": "garden-bed"
+              }
+            ],
+            "claims": [],
+            "reaches": []
+          },
+          "inner_monologue": "实验用户建议我先从研究植物开始，短期目标也指向在苗床选一项照料动作。苗床可浇水，正好可以动手试试自己愿不愿意接着做。",
+          "expected_outcome": "完成一次具体照料，看看自己是否愿意继续。",
+          "estimated_steps": 5,
+          "urgency": "normal",
+          "remaining_steps": 5,
+          "status": "in_progress",
+          "llm_model": "deepseek-flash",
+          "reason": "实验用户建议我先从研究植物开始，短期目标也指向在苗床选一项照料动作。苗床可浇水，正好可以动手试试自己愿不愿意接着做。",
+          "content": "我走到苔圃苗床前，用育苗架的清水给苗床浇水，并留意苗况变化。",
+          "intent": {
+            "purpose": "我走到苔圃苗床前，用育苗架的清水给苗床浇水，并留意苗况变化。",
+            "estimated_steps": 5,
+            "destination": null,
+            "errand": null
+          }
+        },
+        "goals": [
+          {
+            "id": "stg-0-1",
+            "text": "在苔圃苗床选一项照料动作，试试自己愿不愿接着做",
+            "goal_type": "short_term",
+            "status": "active",
+            "related_need": "self_actualization",
+            "created_step": 0,
+            "due_step": null,
+            "last_evaluated_step": null,
+            "progress_summary": "",
+            "origin": "cognitive"
+          }
+        ],
+        "interpretations": [
+          {
+            "source_id": "source-case-07",
+            "kind": "suggestion",
+            "stance": "affirmed",
+            "effect": "inquiry",
+            "topic": "从研究植物开始",
+            "question": "要不要先在苔圃苗床或育苗架上选一项具体照料动作，比如给苗床浇水或整理照料苗木，看看自己是否愿意继续？",
+            "reason": "用户提出一个未来身份设想并附带当下可选的起点，角色可以把它当成可讨论的建议，先通过现场已有的照料活动来验证兴趣，而不是直接认定自己已成为厨师。",
+            "evidence_quote": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+            "target_object_ids": [
+              "garden-bed",
+              "seedling-rack"
+            ],
+            "confidence": 0.86,
+            "context_key": "3905872dc7cab15018d88f1da52fdfb1cf04ed011c9a150238529f9e3cb81c92:moss-sprout-garden:deskbot.cognitive-refraction.v1",
+            "interpreted_at": "2026-10-11T02:00:00.000Z",
+            "epistemic": "personal_interpretation",
+            "source_category": "user",
+            "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+            "source_at": "2026-10-11T02:00:00.000Z",
+            "expires_at": "2026-10-12T02:00:00.000Z",
+            "authority": "opportunity_only",
+            "status": "available"
+          }
+        ],
+        "dialogue": {
+          "source": "same_canonical_cognitive_life",
+          "why": "实验用户建议我先从研究植物开始，短期目标也指向在苗床选一项照料动作。苗床可浇水，正好可以动手试试自己愿不愿意接着做。",
+          "current_task": {
+            "title": "给苗床浇水",
+            "status": "running",
+            "due_at": "2026-10-11T02:05:00.000Z"
+          },
+          "actual_result": null,
+          "followup": null,
+          "goals": [
+            {
+              "id": "stg-0-1",
+              "text": "在苔圃苗床选一项照料动作，试试自己愿不愿接着做",
+              "goal_type": "short_term",
+              "status": "active",
+              "related_need": "self_actualization",
+              "created_step": 0,
+              "due_step": null,
+              "last_evaluated_step": null,
+              "progress_summary": "",
+              "origin": "cognitive"
+            }
+          ],
+          "emotion": {
+            "primary": "neutral",
+            "intensity": 0.2,
+            "valence": 0,
+            "triggered_by": null
+          },
+          "understood_inputs": [
+            {
+              "source_id": "source-case-07",
+              "source_content": "我希望你以后成为厨师，不过先从研究植物开始怎么样？",
+              "meaning": "suggestion",
+              "question": "要不要先在苔圃苗床或育苗架上选一项具体照料动作，比如给苗床浇水或整理照料苗木，看看自己是否愿意继续？",
+              "effect": "inquiry",
+              "reason": "用户提出一个未来身份设想并附带当下可选的起点，角色可以把它当成可讨论的建议，先通过现场已有的照料活动来验证兴趣，而不是直接认定自己已成为厨师。",
+              "epistemic": "personal_interpretation",
+              "rule": "这是个人理解与可选问题，不是已发生的事实或已接受的承诺。"
+            }
+          ],
+          "rule": "认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。"
+        },
+        "task": {
+          "task_id": "cognitive:stage3a-pair:1ad9af1f89a7:source-case-07:3:on:plan",
+          "activity_id": "water-bed",
+          "title": "给苗床浇水",
+          "root_outcome_id": "task:cognitive:stage3a-pair:1ad9af1f89a7:source-case-07:3:on:plan",
+          "life_source_ids": [
+            "source-case-07"
+          ],
+          "reservation": {
+            "status": "held",
+            "inputs": [
+              {
+                "container": "seedling-rack",
+                "resource": "water",
+                "count": 3
+              }
+            ]
+          }
+        },
+        "no_identity_change": true,
+        "no_invented_practice": true,
+        "experiment_version": "1ad9af1f89a7",
+        "retested": true
+      }
+    }
+  ],
+  "source_cited": 9,
+  "coarse_action_changed": 6,
+  "expense_snapshot": {
+    "calls": 171,
+    "used_upper_cny": 0.56460024,
+    "unknown_usage_calls": 2,
+    "includes_failed_and_revised_batches": true
+  },
+  "limits": [
+    "固定小样本，不代表开放世界准确率或统计显著性。",
+    "对照证明安排、问题和来源连接；没有用本轮数据证明长期完成或自然跨日连续性。",
+    "首次18个对照回合17个有效；一处建议／邀请混淆修正后单独重测，旧失败记录保留。",
+    "此前第二阶段、正式聊天等成本不在此实验快照内；新的全系统账本从安装时开始记录。"
+  ]
+}

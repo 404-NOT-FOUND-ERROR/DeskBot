@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deskbot.cognition.memory-commit.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "request_id",
+    "actor_id",
+    "memory_id",
+    "result_id",
+    "root_id",
+    "memory_group_id",
+    "facts",
+    "interpretation",
+    "recorded_at",
+    "practice_delta"
+  ],
+  "properties": {
+    "schema": {
+      "const": "deskbot.cognition.memory-commit.v1"
+    },
+    "scope": {
+      "const": "isolated_mock"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "memory_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "root_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "memory_group_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      },
+      "maxItems": 8
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "practice_delta": {
+      "const": 0
+    }
+  }
+}

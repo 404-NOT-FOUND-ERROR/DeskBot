@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deskbot.cognition.context.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scope",
+    "request_id",
+    "actor_id",
+    "context_digest",
+    "actor_version",
+    "cognition_sequence",
+    "created_at",
+    "expires_at",
+    "identity",
+    "location_id",
+    "known_objects",
+    "visible_events",
+    "memories",
+    "allowed_primitives"
+  ],
+  "properties": {
+    "schema": {
+      "const": "deskbot.cognition.context.v1"
+    },
+    "scope": {
+      "const": "isolated_mock"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "context_digest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cognition_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "role",
+        "traits",
+        "values",
+        "hard_constraints"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "traits": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "maxItems": 6
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "maxItems": 6
+        },
+        "hard_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "maxItems": 6
+        }
+      }
+    },
+    "location_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "known_objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object_id",
+          "name",
+          "version",
+          "state"
+        ],
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "moisture",
+              "light"
+            ],
+            "properties": {
+              "moisture": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "light": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      },
+      "maxItems": 8
+    },
+    "visible_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "root_id",
+          "source",
+          "visibility",
+          "text",
+          "occurred_at"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "root_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "source": {
+            "const": "lab.synthetic"
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "actor_private"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "maxItems": 12
+    },
+    "memories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memory_id",
+          "text",
+          "root_id"
+        ],
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          },
+          "root_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "maxItems": 6
+    },
+    "allowed_primitives": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "observe"
+        ]
+      },
+      "maxItems": 1
+    }
+  }
+}

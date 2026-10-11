@@ -157,6 +157,7 @@ function composeMultisourceContext(worldSnapshot, runtimeContext, includeWorld) 
   const userProfile = worldSnapshot.user_profile ?? {};
   return {
     real_time: runtimeContext?.real_time ?? null,
+    cognitive_life:runtimeContext?.cognitive_life??null,
     sources: runtimeContext?.sources ?? [],
     weather_request: runtimeContext?.weather_request ?? { status: 'not_requested' },
     world_line: includeWorld ? {
