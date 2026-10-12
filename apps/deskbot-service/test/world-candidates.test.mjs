@@ -74,6 +74,9 @@ test('external observations become approval candidates while assistant and mutat
   }));
   assert.equal(spoofed.ignored, false);
   assert.equal(spoofed.candidate.status, 'pending');
+  assert.equal(spoofed.candidate.replay.authority, 'audit_only');
+  assert.equal(spoofed.candidate.trace.schema, 'deskbot.runtime-trace.v1');
+  assert.deepEqual(spoofed.candidate.trace.stages.map(stage => stage.stage), ['decision', 'action']);
   assert.deepEqual(spoofed.candidate.proposed_actions, [{ action: 'advance_time', minutes: 1440 }]);
   assert.equal(world.get().world_revision, 0);
 
@@ -107,6 +110,8 @@ test('preview is side-effect free and accept uses only server-derived actions', 
     actions: [{ action: 'advance_time', minutes: 10080 }],
   });
   assert.equal(accepted.accepted, true);
+  assert.equal(accepted.replay.world_revision_after, accepted.world.world_revision);
+  assert.equal(candidates.get(candidate.candidate_id).replay.world_revision_after, accepted.world.world_revision);
   assert.equal(accepted.world_mutations.length, 1);
   assert.equal(accepted.world_mutations[0].mutation.action, 'apply_world_line_event');
   assert.equal(accepted.world.world_revision, 1);
@@ -169,6 +174,25 @@ test('candidate and decision records recover after store restart', () => {
   });
   assert.equal(second.get(candidate.candidate_id).status, 'dismissed');
   assert.equal(second.list({ status: 'dismissed' }).length, 1);
+});
+
+test('accept recovery restores replay revision metadata from the durable decision', () => {
+  const first = fixture();
+  const candidate = observeCandidate(first.candidates, externalEvent()).candidate;
+  const accepted = first.candidates.accept(candidate.candidate_id);
+  // Emulate stopping after the accept decision row, before the candidate
+  // projection's final status/metadata commit in a nontransactional adapter.
+  first.persistence.put('world.candidates', candidate.candidate_id, candidate);
+  const resumed = createWorldCandidateStore({
+    now: () => new Date('2026-09-29T09:00:00.000Z'), persistence: first.persistence,
+    worldSnapshot: () => first.world.get(), ingest: event => first.world.ingest(event),
+  });
+  const repaired = resumed.get(candidate.candidate_id);
+  assert.equal(repaired.status, 'accepted');
+  assert.equal(repaired.accepted_world_revision, accepted.world.world_revision);
+  assert.deepEqual(repaired.replay, accepted.replay);
+  assert.equal(resumed.accept(candidate.candidate_id).duplicate, true);
+  assert.equal(first.world.listMutations().length, 1);
 });
 
 test('accept retries recover partial canonical commits from the mutation ledger', () => {

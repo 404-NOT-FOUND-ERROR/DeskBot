@@ -30,6 +30,11 @@ test('P4 role evolution waits for two logical days before materializing a propos
   const eventStore = structuredClone(events);
   const evolution = createRoleEvolution({ now: fixedNow, inputStore: inputStoreFor(eventStore), roles, computeFantasyPull, persistence });
   const first = evolution.sync({ characterId: 'shaping-001' });
+  assert.equal(first.replay.schema, 'deskbot.runtime-replay-metadata.v1');
+  assert.equal(first.replay.authority, 'audit_only');
+  assert.deepEqual(first.replay.input_event_ids, events.map(event => event.event_id).sort());
+  assert.ok(first.replay.evidence_ids.length > 0);
+  assert.equal(first.replay.input_capture, 'captured_content');
   const pull = first.pulls.find((item) => item.direction_id === 'wetland_frog');
   assert.equal(pull.status, 'candidate');
   assert.equal(first.materialized.filter((item) => item.created).length, 0);
@@ -59,6 +64,7 @@ test('P4 role evolution waits for two logical days before materializing a propos
   assert.equal(roles.list({ characterId: 'shaping-001' }).length, 1);
   const second = evolution.sync({ characterId: 'shaping-001' });
   assert.equal(second.duplicate, true);
+  assert.deepEqual(second.replay, acrossDays.replay);
   assert.equal(roles.list({ characterId: 'shaping-001' }).length, 1);
   assert.equal(evolution.snapshot({ characterId: 'shaping-001' }).candidates[0].proposal_status, 'proposed');
 

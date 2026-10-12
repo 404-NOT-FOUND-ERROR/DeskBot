@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   ROLE_EXPERIENCE_PACKAGE_SCHEMA,
   getRoleExperiencePackage,
@@ -7,7 +8,15 @@ import {
   validateRoleExperiencePackage,
   composeRoleExperiencePackages,
   roleExperienceContext,
+  resolveStageRoleExperience,
 } from '../src/role-experience-packages.mjs';
+
+const stableStringify = value => {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+};
+const digest = value => createHash('sha256').update(stableStringify(value)).digest('hex');
 
 test('built-in role experience packages satisfy the versioned contract', () => {
   const packages = listRoleExperiencePackages();
@@ -48,5 +57,32 @@ test('role context is safe for prompt and UI consumers', () => {
   assert.equal(context.schema, 'deskbot.role-experience-registry.v1');
   assert.equal(context.directions[0].expression.catchphrases.length > 0, true);
   assert.equal(context.directions[1].appearance.figure_vocation, 'chef');
+});
+
+test('accepted stage resolves its frozen package and rejects a tampered freeze', () => {
+  const packageValue = getRoleExperiencePackage('chef');
+  const original = structuredClone(packageValue);
+  const frozen = {
+    schema: 'deskbot.role-stage-experience-freeze.v1',
+    direction_id: 'chef',
+    package_id: packageValue.package_id,
+    package_version: packageValue.version,
+    content_hash: digest(packageValue),
+    package: packageValue,
+  };
+  const resolved = resolveStageRoleExperience({ direction_id: 'chef', axis: 'vocation', experience_freeze: frozen });
+  assert.deepEqual(resolved, original);
+  frozen.package.expression.speech = 'tampered';
+  assert.equal(resolveStageRoleExperience({ direction_id: 'chef', axis: 'vocation', experience_freeze: frozen }), null);
+  // A legacy stage remains compatible and reads the current authored package.
+  assert.deepEqual(resolveStageRoleExperience({ direction_id: 'chef', axis: 'vocation' }), original);
+});
+
+test('stage read-model wrapper resolves only a verified frozen asset binding', () => {
+  const packageValue = getRoleExperiencePackage('wetland_frog');
+  const binding = { schema: 'deskbot.role-stage-experience-freeze.v1', source: 'frozen', package_id: packageValue.package_id,
+    package_version: packageValue.version, content_hash: digest(packageValue) };
+  assert.deepEqual(resolveStageRoleExperience({ direction_id: 'wetland_frog', axis: 'form', experience: { ...binding, package: packageValue }, asset_binding: binding }), packageValue);
+  assert.equal(resolveStageRoleExperience({ direction_id: 'wetland_frog', axis: 'form', experience: { ...binding, package: packageValue }, asset_binding: { ...binding, content_hash: 'bad' } }), null);
 });
 

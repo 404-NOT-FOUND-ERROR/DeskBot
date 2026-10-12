@@ -33,6 +33,8 @@ test('input runtime persists success, TTL scheduling, and skips work before due'
   assert.equal(runs[0].completed_at, '2026-09-28T00:00:00.000Z');
   assert.deepEqual(runs[0].result_event_ids, []);
   assert.equal(runs[0].error, null);
+  assert.equal(runs[0].trace.schema, 'deskbot.runtime-trace.v1');
+  assert.equal(runs[0].replay.authority, 'audit_only');
   assert.equal(runtime.status().runs[0].run_id, runs[0].run_id);
   clock = new Date('2026-09-28T00:05:00.000Z');
   const skipped = await runtime.tick();
@@ -42,6 +44,8 @@ test('input runtime persists success, TTL scheduling, and skips work before due'
   assert.equal(skippedRun.status, 'skipped');
   assert.equal(skippedRun.skipped, true);
   assert.equal(skippedRun.source_id, 'test-source');
+  assert.equal(skippedRun.trace.status, 'skipped');
+  assert.deepEqual(skippedRun.trace.stages, []);
   persistence.close();
 
   const restoredPersistence = createSqlitePersistence({ filename, now });
@@ -50,6 +54,8 @@ test('input runtime persists success, TTL scheduling, and skips work before due'
   assert.equal(restored.status().sources[0].last_success_at, '2026-09-28T00:00:00.000Z');
   assert.equal(restored.status().runs.length, 2);
   assert.equal(restored.status().runs[0].run_id, runs[0].run_id);
+  assert.deepEqual(restored.status().runs[0].trace, runs[0].trace);
+  assert.deepEqual(restored.status().runs[0].replay, runs[0].replay);
   const restoredSkipped = await restored.tick();
   assert.equal(restoredSkipped[0].skipped, true);
   assert.equal(calls, 1);
@@ -102,6 +108,8 @@ test('input runtime persists result event ids and normalized errors in run recor
   await runtime.tick();
   const failed = runtime.status().runs.find((run) => run.source_id === 'failing-event-source');
   assert.equal(failed.status, 'error');
+  assert.equal(failed.trace.stages[0].status, 'error');
+  assert.equal(failed.trace.stages[0].error.code, 'transport');
   assert.deepEqual(failed.error, { code: 'transport', message: 'provider offline', retryable: true });
   assert.equal(failed.completed_at, '2026-09-28T00:00:00.000Z');
 });
@@ -141,4 +149,6 @@ test('input runtime ingests provider events through the supplied canonical callb
   });
   await runtime.tick();
   assert.deepEqual(ingested, ['weather-runtime-1']);
+  assert.deepEqual(runtime.status().runs[0].trace.stages.map(stage => stage.stage), ['input', 'perception']);
+  assert.deepEqual(runtime.status().runs[0].trace.result_event_ids, ['weather-runtime-1']);
 });

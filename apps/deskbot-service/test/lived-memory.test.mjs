@@ -7,7 +7,7 @@ import {createSqlitePersistence} from '../src/persistence.mjs';
 import {createPersistentWorld,getWorldMap} from '../src/persistent-world.mjs';
 import {createWorldLife} from '../src/world-life.mjs';
 import {installAutonomy} from '../src/life-state.mjs';
-import {installLivedMemory,syncLivedMemory,remember,retrieveLivedMemory,retrieveModelMemory,influenceRememberedChoices} from '../src/lived-memory.mjs';
+import {installLivedMemory,syncLivedMemory,remember,retrieveLivedMemory,retrieveModelMemory,influenceRememberedChoices,explainLivedMemoryRecall} from '../src/lived-memory.mjs';
 import {createAutonomousLife} from '../src/autonomous-life.mjs';
 import {createLifeChoiceWorker} from '../src/life-choice.mjs';
 import {createDeskBotServer} from '../src/app.mjs';
@@ -41,6 +41,30 @@ test('only settled canonical outcomes become lived facts; restart and reads cann
   h.advance(M);assert.equal(h.world.get().memory.episodes.filter(e=>e.source.task_id==='actual-observe').length,1);
   h.world.ingest({event_id:'assistant-fiction',type:'conversation.reply',payload:{role:'assistant',text:'我养成了青蛙性格并剪了头发。'}});assert.deepEqual(h.world.get().memory,h.world.get().memory);
   assert.equal(h.world.get().memory.episodes.some(e=>e.text.includes('青蛙')),false);
+});
+test('SQLite restart preserves ranked factual and experiential recall; repeated reads cannot grow interests or canonical roots',t=>{
+  const h=fixture(t,{planner:false});h.mutate('start_activity',{kind:'care',title:'照料苗圃',duration_seconds:900,task_id:'recall-actual'});
+  h.advance(15*M);
+  const completed=h.world.get().memory.episodes.find(e=>e.source.task_id==='recall-actual');
+  assert.ok(completed);assert.equal(completed.kind,'world_fact');
+  h.save(w=>remember(w,{origin_id:'recall-interpretation',kind:'personal_interpretation',actor_ids:['shaping-001'],
+    at:h.now().toISOString(),text:'苗圃这次收拾完了，我想再留意一下苔芽。',outcome:'intended',topic:'care',
+    source:{kind:'model_choice'},model_safe:true,independent_evidence:false,evidence_ids:[completed.id]}));
+  const before=h.world.get(),options={query:'苔芽',limit:2};
+  const local=explainLivedMemoryRecall(before,options),provider=retrieveModelMemory(before,options);
+  const growth=structuredClone({actors:before.memory.actors,development:before.memory.development,
+    revision:before.world_revision,ledger:h.world.listMutations()});
+  for(let i=0;i<20;i++){
+    assert.deepEqual(explainLivedMemoryRecall(before,options),local);
+    assert.deepEqual(retrieveModelMemory(before,options),provider);
+  }
+  assert.deepEqual(h.world.get(),before);
+  h.restart();
+  const restored=h.world.get();
+  assert.deepEqual(explainLivedMemoryRecall(restored,options),local);
+  assert.deepEqual(retrieveModelMemory(restored,options),provider);
+  assert.deepEqual({actors:restored.memory.actors,development:restored.memory.development,
+    revision:restored.world_revision,ledger:h.world.listMutations()},growth);
 });
 test('accounts and physical direction retain their source and cannot generate interests or identify a speaker',t=>{
   const h=fixture(t);h.mutate('install_input_refraction');

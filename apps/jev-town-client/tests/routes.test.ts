@@ -59,7 +59,9 @@ describe("routeBetween", () => {
         const length = routeLength(route);
         for (let d = 0; d <= length; d += 0.5) {
           const p = sampleRoute(route, d);
-          expect(onStreet(p, 0.1) || inSquare(p), `${JSON.stringify(p)} on ${JSON.stringify(route)}`).toBe(true);
+          const walkable = onStreet(p, 0.1) || inSquare(p);
+          // Keep every sample while constructing diagnostics only for a violation.
+          if (!walkable) expect(walkable, `${JSON.stringify(p)} on ${JSON.stringify(route)}`).toBe(true);
         }
       }
     }

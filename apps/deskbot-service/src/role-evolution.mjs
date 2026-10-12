@@ -7,6 +7,7 @@ import { roleWishReadModel } from './role-wishes.mjs';
 import { practicalTrialReadModel, practicalTrialsReadModel, PRACTICAL_TRIAL_DIRECTIONS } from './role-practical-trials.mjs';
 import { RoleProposalError, roleDirectionOverlay } from './role-proposals.mjs';
 import { roleStagePreview, roleStageReadModel, roleStagesReadModel } from './role-stages.mjs';
+import { safeReplayMetadata } from './runtime-contracts.mjs';
 
 const DEFAULT_CHARACTER_ID = 'shaping-001';
 const EVIDENCE_NAMESPACE = 'role.evidence';
@@ -224,6 +225,22 @@ export function createRoleEvolution({
 
   function saveRun(value) {
     const next = clone(value);
+    // Durable run records now carry an explicit replay contract. It is an
+    // audit fingerprint only; proposal/trial state machines remain the policy
+    // authority and are never reconstructed from this metadata.
+    next.replay = next.replay ?? safeReplayMetadata({
+      pipeline: 'role-evolution',
+      ruleVersion: next.rule_version ?? RULE_VERSION,
+      inputEventIds: next.event_ids ?? [],
+      evidenceIds: [
+        ...(next.evidence_ids ?? []),
+        ...(Array.isArray(next.pulls) ? next.pulls.flatMap(item => item.evidence_ids ?? []) : []),
+        ...(Array.isArray(next.materialized) ? next.materialized.flatMap(item => item.evidence_ids ?? []) : []),
+      ],
+      sourceFingerprint: next.event_fingerprint ?? next.wish_fingerprint ?? null,
+      worldRevisionBefore: next.world_revision ?? null,
+      worldRevisionAfter: next.world_revision ?? null,
+    });
     runs.set(next.run_id, next);
     persistence?.put?.(RUN_NAMESPACE, next.run_id, next);
     while (runs.size > Math.min(MAX_RUNS, Math.max(1, Number(maxRuns) || MAX_RUNS))) {
@@ -467,6 +484,15 @@ export function createRoleEvolution({
       event_ids: events.map((event) => event.event_id),
       result_event_ids: events.map((event) => event.event_id),
       event_fingerprint: eventFingerprint,
+      replay: safeReplayMetadata({
+        pipeline: 'role-evolution', ruleVersion: RULE_VERSION,
+        inputEventIds: events.map(event => event.event_id),
+        evidenceIds: pulls.flatMap(pull => pull.evidence_ids ?? []),
+        inputs: events,
+        sourceFingerprint: eventFingerprint,
+        worldRevisionBefore: world?.world_revision ?? null,
+        worldRevisionAfter: world?.world_revision ?? null,
+      }),
       pulls: pulls.map((pull) => ({
         direction_id: pull.direction_id,
         status: pull.status,
@@ -502,8 +528,8 @@ export function createRoleEvolution({
     });
   }
 
-  function wishView({ characterId = activeCharacter, at = now() } = {}) {
-    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+  function wishView({ characterId = activeCharacter, at = now(), worldOverride = null } = {}) {
+    const world = worldOverride ?? (typeof worldSnapshot === 'function' ? worldSnapshot() : null);
     const model = roleWishReadModel(world, { actorId: characterKey(characterId), at: new Date(at).toISOString() });
     const currentDirectionIds = canonicalCurrentDirectionIds(world, model.character_id, at);
     return { ...model, directions: model.directions.map(direction => ({ ...direction,
@@ -516,8 +542,8 @@ export function createRoleEvolution({
     return Object.values(model.current ?? {}).filter(Boolean).map(stage => stage.direction_id);
   }
 
-  function currentStages({ characterId = activeCharacter, limit = 10 } = {}) {
-    const actorId = characterKey(characterId, activeCharacter), world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+  function currentStages({ characterId = activeCharacter, limit = 10, worldOverride = null } = {}) {
+    const actorId = characterKey(characterId, activeCharacter), world = worldOverride ?? (typeof worldSnapshot === 'function' ? worldSnapshot() : null);
     const model = roleStagesReadModel(world, { actorId, at: now().toISOString() });
     const current = Object.values(model.current ?? {}).filter(Boolean).map(stage => ({ ...clone(stage),
       schema: 'deskbot.role-state.v1', origin: 'canonical_role_stage', character_id: stage.actor_id,
@@ -529,16 +555,16 @@ export function createRoleEvolution({
     return selected.slice(0, Math.min(Math.max(Number(limit) || 10, 1), 10));
   }
 
-  function wishProposals({ characterId = activeCharacter, status = null, limit = 50 } = {}) {
+  function wishProposals({ characterId = activeCharacter, status = null, limit = 50, worldOverride = null } = {}) {
     return roles.list({ characterId, status, limit }).map(proposal => {
       if (proposal.origin !== 'lived_wish') return proposal;
-      const model = wishView({ characterId: proposal.character_id });
+      const model = wishView({ characterId: proposal.character_id, worldOverride });
       const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
       return projectPracticalTrial({ ...proposal,
         current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [{ id: 'direction_unavailable', label: '这个方向当前没有可用的生活依据', scope: 'evidence' }], checks: [] }),
         proposal_gate: clone(direction?.proposal_gate ?? null),
         current_authored_reason: direction?.authored_reason ?? null,
-      });
+      }, worldOverride);
     });
   }
 
@@ -551,8 +577,8 @@ export function createRoleEvolution({
       proposal_gate: clone(direction?.proposal_gate ?? null), current_authored_reason: direction?.authored_reason ?? null });
   }
 
-  function projectPracticalTrial(proposal) {
-    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+  function projectPracticalTrial(proposal, worldOverride = null) {
+    const world = worldOverride ?? (typeof worldSnapshot === 'function' ? worldSnapshot() : null);
     const trial = practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
     const registered = world?.protagonist?.character_id === proposal.character_id || world?.npcs?.some(item => item.npc_id === proposal.character_id);
     const available = proposal.status === 'prepared' && proposal.user_choice === 'try' && registered
@@ -731,6 +757,17 @@ export function createRoleEvolution({
       run_id: runId, character_id: characterId, started_at: at.toISOString(), completed_at: at.toISOString(),
       event_count: 0, event_ids: [], result_event_ids: [], event_fingerprint: null,
       evidence_basis: 'canonical_life_outcomes', evidence_revision: model.evidence_revision,
+      evidence_ids: [...new Set(model.directions.flatMap(direction => direction.basis.root_outcome_ids ?? []))],
+      replay: safeReplayMetadata({
+        pipeline: 'role-evolution', ruleVersion: WISH_RULE_VERSION,
+        evidenceIds: model.directions.flatMap(direction => direction.basis.root_outcome_ids ?? []),
+        inputs: { wish_fingerprint: model.fingerprint, evidence_revision: model.evidence_revision,
+          directions: model.directions.map(direction => ({ direction_id: direction.direction_id,
+            fingerprint: direction.fingerprint, basis: direction.basis })) },
+        sourceFingerprint: model.fingerprint,
+        worldRevisionBefore: world?.world_revision ?? null,
+        worldRevisionAfter: world?.world_revision ?? null,
+      }),
       wish_fingerprint: model.fingerprint, pulls: [], materialized, evidence_count: world?.memory?.development?.records?.length ?? 0,
       pull_count: 0, world_revision: world?.world_revision ?? null,
     });

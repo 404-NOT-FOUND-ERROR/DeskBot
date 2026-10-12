@@ -3,11 +3,12 @@ import { practicalTrialReadModel } from './role-practical-trials.mjs';
 import { localWorldDate, activeWorldTask } from './realtime-world.mjs';
 import { activitySteps, cookAndStoreSteps, depositSteps } from './life-planning.mjs';
 import { findWorldPath } from './world-map-content.mjs';
-import { getRoleExperiencePackage } from './role-experience-packages.mjs';
+import { getRoleExperiencePackage, validateRoleExperiencePackage } from './role-experience-packages.mjs';
 
 export const ROLE_STAGES_SCHEMA = 'deskbot.role-stages.v1';
 export const ROLE_STAGE_SCHEMA = 'deskbot.role-stage.v1';
 export const ROLE_STAGE_PREVIEW_SCHEMA = 'deskbot.role-stage-preview.v1';
+export const ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA = 'deskbot.role-stage-experience-freeze.v1';
 const APPEARANCE_SCHEMA = 'deskbot.role-stage-appearance.v1';
 const DESIGN_VERSION = 'authored-role-stage-options.v1';
 const AXES = ['form', 'vocation'];
@@ -15,6 +16,17 @@ const clean = value => typeof value === 'string' && value.trim() && value.length
 const validAt = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const unique = values => [...new Set(values.filter(Boolean))].sort();
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+// Package hashes must be independent of object insertion order. This keeps a
+// preview/stage binding stable when an authored package is reformatted without
+// changing its meaning.
+const stableStringify = value => {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+const packageDigest = value => createHash('sha256').update(stableStringify(value)).digest('hex');
 const day = at => localWorldDate(at, 'Asia/Shanghai')?.date ?? null;
 const person = (world, id) => world?.protagonist?.character_id === id ? world.protagonist : world?.npcs?.find(npc => npc.npc_id === id) ?? null;
 const definitions = Object.freeze({
@@ -55,11 +67,85 @@ function currentStage(world, actorId, axis) {
   return archive?.versions?.find(stage => stage.stage_id === id && stage.actor_id === actorId && stage.axis === axis
     && stage.status === 'accepted' && definitions[stage.direction_id]?.axis === axis) ?? null;
 }
-function appearancePart(stage, directionId = stage?.direction_id) {
-  const design = definitions[directionId]; if (!design) return null;
+function currentPackage(directionId) {
   const packageValue = getRoleExperiencePackage(directionId);
+  return packageValue ? structuredClone(packageValue) : null;
+}
+function makeExperienceFreeze(directionId) {
+  const packageValue = currentPackage(directionId);
+  if (!packageValue) return null;
+  return {
+    schema: ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA,
+    direction_id: directionId,
+    package_id: packageValue.package_id,
+    package_version: packageValue.version,
+    content_hash: packageDigest(packageValue),
+    package: packageValue,
+  };
+}
+function validExperienceFreeze(freeze, directionId = null) {
+  return freeze?.schema === ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA
+    && (!directionId || freeze.direction_id === directionId)
+    && freeze.package && typeof freeze.package === 'object'
+    && freeze.package.direction_id === freeze.direction_id
+    && validateRoleExperiencePackage(freeze.package).valid
+    && freeze.package_id === freeze.package.package_id
+    && freeze.package_version === freeze.package.version
+    && freeze.content_hash === packageDigest(freeze.package);
+}
+/**
+ * Return the experience package bound to an accepted stage. New stages use
+ * their immutable snapshot; legacy stages explicitly fall back to the current
+ * authored registry and are marked as such by the read model.
+ */
+export function roleStageExperience(stage) {
+  if (!stage?.direction_id) return null;
+  // A present-but-invalid freeze is an integrity failure, not permission to
+  // silently adopt today's package. Callers can still render the authored
+  // baseline, while the read model exposes `invalid_freeze` for repair.
+  if (stage.experience_freeze) {
+    return validExperienceFreeze(stage.experience_freeze, stage.direction_id)
+      ? structuredClone(stage.experience_freeze.package) : null;
+  }
+  return currentPackage(stage.direction_id);
+}
+function experienceBinding(stage) {
+  if (validExperienceFreeze(stage?.experience_freeze, stage?.direction_id)) {
+    const freeze = stage.experience_freeze;
+    return { schema: ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA, source: 'frozen', package_id: freeze.package_id,
+      package_version: freeze.package_version, content_hash: freeze.content_hash };
+  }
+  if (stage?.experience_freeze) {
+    return { schema: ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA, source: 'invalid_freeze', package_id: stage.experience_freeze.package_id ?? null,
+      package_version: stage.experience_freeze.package_version ?? null, content_hash: stage.experience_freeze.content_hash ?? null };
+  }
+  const packageValue = currentPackage(stage?.direction_id);
+  return packageValue ? { schema: ROLE_STAGE_EXPERIENCE_FREEZE_SCHEMA, source: 'legacy_fallback',
+    package_id: packageValue.package_id, package_version: packageValue.version, content_hash: packageDigest(packageValue) } : null;
+}
+function designForStage(stage, directionId = stage?.direction_id) {
+  const design = definitions[directionId]; if (!design) return null;
+  const packageValue = roleStageExperience(stage);
+  if (!packageValue) return design;
+  return { ...design, label: packageValue.identity?.label || design.label,
+    interests: packageValue.life?.interests?.length ? [...packageValue.life.interests] : design.interests,
+    places: packageValue.life?.places?.length ? [...packageValue.life.places] : design.places,
+    activity: packageValue.life?.activity || design.activity,
+    figure_form: packageValue.appearance?.figure_form || design.figure_form,
+    figure_vocation: packageValue.appearance?.figure_vocation || design.figure_vocation,
+    accessories: packageValue.appearance?.accessories?.length ? [...packageValue.appearance.accessories] : design.accessories,
+    palette: { ...design.palette, ...(packageValue.appearance?.palette ?? {}) },
+    summary: packageValue.appearance?.summary || design.summary,
+    life: packageValue.life?.summary || design.life,
+    package: packageValue };
+}
+function appearancePart(stage, directionId = stage?.direction_id) {
+  const design = designForStage(stage, directionId); if (!design) return null;
+  const packageValue = roleStageExperience(stage);
   return { direction_id: directionId, stage_id: stage?.stage_id ?? null, label: design.label,
     package_id: packageValue?.package_id ?? null, package_version: packageValue?.version ?? null,
+    experience_source: experienceBinding(stage)?.source ?? 'none',
+    experience_hash: experienceBinding(stage)?.content_hash ?? null,
     ...(design.axis === 'form' ? { figure_form: packageValue?.appearance.figure_form || design.figure_form } : { figure_vocation: packageValue?.appearance.figure_vocation || design.figure_vocation }),
     accessories: [...(packageValue?.appearance.accessories ?? design.accessories)], palette: { ...(packageValue?.appearance.palette ?? {}), ...design.palette } };
 }
@@ -76,12 +162,16 @@ export function roleStageAppearance(world, actorId, replacing = null) {
 }
 function stageProjection(world, stage) {
   const current = currentStage(world, stage.actor_id, stage.axis)?.stage_id === stage.stage_id;
+  const design = designForStage(stage);
+  const binding = experienceBinding(stage);
+  const packageValue = roleStageExperience(stage);
   return { schema: ROLE_STAGE_SCHEMA, stage_id: stage.stage_id, proposal_id: stage.proposal_id, trial_id: stage.trial_id,
-    actor_id: stage.actor_id, direction_id: stage.direction_id, axis: stage.axis, label: definitions[stage.direction_id]?.label ?? stage.direction_id,
+    actor_id: stage.actor_id, direction_id: stage.direction_id, axis: stage.axis, label: design?.label ?? stage.direction_id,
     status: stage.status, current, allowed_actions: current ? ['rollback'] : [], accepted_at: stage.accepted_at,
     rolled_back_at: stage.rolled_back_at, accept_event_id: stage.accept_event_id, rollback_event_id: stage.rollback_event_id,
     predecessor_stage_id: stage.predecessor_stage_id, primary_root_ids: [...stage.primary_root_ids], primary_days: [...stage.primary_days],
-    frozen_wish_root_ids: [...stage.frozen_wish_root_ids], life_changes: lifeChanges(definitions[stage.direction_id]),
+    frozen_wish_root_ids: [...stage.frozen_wish_root_ids], life_changes: lifeChanges(design),
+    experience: packageValue ? { ...binding, package: packageValue } : null, asset_binding: binding,
     qualification_proven: false, preference_proven: false, physical_shell_changed: false };
 }
 function lifeChanges(design) {
@@ -135,12 +225,14 @@ export function roleStagePreview(world, { proposal, at = world?.clock?.synced_at
   if (basis.stored?.accepted_stage_id || prior) barrier('trial_already_consumed', '这份试做已经绑定阶段，旧结果不能重复采用。');
   if (currentStage(world, actorId, design?.axis)?.direction_id === directionId) barrier('direction_already_current', '这个方向已经是当前阶段，继续现有生活即可。');
   const before = roleStageAppearance(world, actorId), after = design ? roleStageAppearance(world, actorId, { direction_id: directionId }) : before;
+  const previewPackage = currentPackage(directionId);
   const current = roleStagesReadModel(world, { actorId }).current;
   const fingerprint = digest({ version: DESIGN_VERSION, actor_id: actorId, proposal_id: proposal?.proposal_id ?? null, direction_id: directionId ?? null,
     axis: proposal?.axis ?? null, current: AXES.map(axis => [axis, current[axis]?.stage_id ?? null]), trial_id: basis.trial?.trial_id ?? null,
     trial_status: basis.trial?.status ?? null, accepted_stage_id: basis.stored?.accepted_stage_id ?? null,
     variant: basis.trial?.variant_id ?? null, review_from: basis.stored?.review_from ?? null,
-    roots: basis.roots.map(item => [item.root_outcome_id, item.at, item.activity_id]), frozen: basis.frozen_wish_root_ids });
+    roots: basis.roots.map(item => [item.root_outcome_id, item.at, item.activity_id]), frozen: basis.frozen_wish_root_ids,
+    experience_hash: previewPackage ? packageDigest(previewPackage) : null });
   return { schema: ROLE_STAGE_PREVIEW_SCHEMA, proposal_id: proposal?.proposal_id ?? null, actor_id: actorId, direction_id: directionId ?? null,
     axis: design?.axis ?? proposal?.axis ?? null, eligible: barriers.length === 0, barriers, preview_fingerprint: fingerprint,
     current, stage: prior, appearance_before: before, appearance_preview: after,
@@ -186,7 +278,8 @@ export function acceptRoleStage(world, { proposalId, actorId, directionId, wishB
     proposal_id: proposalId, trial_id: trial.trial_id, actor_id: actorId, direction_id: directionId, axis: definitions[directionId].axis,
     status: 'accepted', accepted_at: at, rolled_back_at: null, accept_event_id: clean(eventId), rollback_event_id: null,
     predecessor_stage_id: archive.axis_current[definitions[directionId].axis], primary_root_ids: [...preview.basis.primary_root_ids],
-    primary_days: [...preview.basis.primary_days], frozen_wish_root_ids: [...preview.basis.frozen_wish_root_ids], design_version: DESIGN_VERSION };
+    primary_days: [...preview.basis.primary_days], frozen_wish_root_ids: [...preview.basis.frozen_wish_root_ids], design_version: DESIGN_VERSION,
+    experience_freeze: makeExperienceFreeze(directionId) };
   archive.versions.push(stage); archive.axis_current[stage.axis] = stage.stage_id;
   trial.accepted_stage_id = stage.stage_id; trial.accepted_at = at; trial.accept_event_id = clean(eventId);
   trial.revision++; trial.updated_at = at; world.practical_role_trials.revision++;
@@ -214,8 +307,8 @@ export function rollbackRoleStage(world, { stageId, at, eventId } = {}) {
 export function roleStageLifeProfile(world, actorId, baseline) {
   const active = AXES.map(axis => currentStage(world, actorId, axis)).filter(Boolean);
   if (!active.length) return baseline;
-  return { ...baseline, interests: unique([...baseline.interests, ...active.flatMap(stage => getRoleExperiencePackage(stage.direction_id)?.life.interests ?? definitions[stage.direction_id].interests)]),
-    places: unique([...baseline.places, ...active.flatMap(stage => getRoleExperiencePackage(stage.direction_id)?.life.places ?? definitions[stage.direction_id].places)]) };
+  return { ...baseline, interests: unique([...baseline.interests, ...active.flatMap(stage => roleStageExperience(stage)?.life.interests ?? definitions[stage.direction_id].interests)]),
+    places: unique([...baseline.places, ...active.flatMap(stage => roleStageExperience(stage)?.life.places ?? definitions[stage.direction_id].places)]) };
 }
 export function roleStageCandidates(world, state, at) {
   const minute = localWorldDate(at, 'Asia/Shanghai')?.minute_of_day;
@@ -224,7 +317,7 @@ export function roleStageCandidates(world, state, at) {
   const choices = [];
   for (const axis of AXES) {
     const stage = currentStage(world, state.actor_id, axis); if (!stage) continue;
-    const packageValue = getRoleExperiencePackage(stage.direction_id);
+    const packageValue = roleStageExperience(stage);
     const baseDesign = definitions[stage.direction_id];
     const design = packageValue ? { ...baseDesign, interests: packageValue.life.interests, places: packageValue.life.places,
       activity: packageValue.life.activity || baseDesign.activity, topic: packageValue.life.interests[0] || baseDesign.topic,

@@ -8,12 +8,16 @@ import { RESIDENT_PROFILES } from './resident-life.mjs';
 import { advanceSocialLife, reservedSocialActors } from './social-life.mjs';
 import { influenceLifeChoices, recordInputDecision, settleRefraction } from './input-refraction.mjs';
 import { influenceRememberedChoices } from './lived-memory.mjs';
-import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote } from './life-choice.mjs';
+import { prepareLifeChoice, fingerprintChoices, claimLifeChoice, resolveLifeChoice, choiceNote, discardLifeChoice } from './life-choice.mjs';
 import { projectCandidates, settleResidentProjects, updateProjectScheduling } from './resident-projects.mjs';
 import { influenceBodyChoices, recordBodyLifeDecision } from './body-perception.mjs';
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 import { practicalTrialCandidates, practicalTrialPlanMayContinue, recordPracticalTrialTask } from './role-practical-trials.mjs';
 import { roleStageLifeProfile, roleStageCandidates } from './role-stages.mjs';
+import { ensureCognitionCadence, cognitionCadenceReadModel } from './cognition-cadence.mjs';
+import { influenceSlowCognitionChoices, slowCognitionContext, bindSlowCognitionTask, syncSlowCognitionGoals } from './slow-cognition.mjs';
+import { influenceActorCognitionChoices } from './actor-perception.mjs';
+import { createActionFeedbackReceipt } from './action-feedback.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -57,7 +61,7 @@ const observationTopic=(destination,profile)=>destination==='moss-sprout-garden'
   :['backlit-grove','echo-waterside','tidal-old-road','fog-lamp-square','lamp-street-homes','whisper-market','shaping-field-desk'].includes(destination)?'explore':null;
 
 function addDiscretionaryPractice(world,state,at,result,add) {
-  if(state.energy<.55||state.appetite>.5||result.some(c=>c.available&&c.score>=50))return;
+  if(state.energy<.55||state.appetite>.5||result.some(c=>c.available&&c.score-(c.memory_bonus??0)-(c.cognition_bonus??0)>=50))return;
   const facets=developmentFacetsReadModel(world,{actorId:state.actor_id,at});
   if(!facets.enabled)return;
   const date=localWorldDate(at,world.clock.time_zone).date;
@@ -171,27 +175,43 @@ function candidates(world, state, at) {
   if(observation)observation.development_topic=observationTopic(destination,profile);
   }
   add('quiet-rest','在这里歇一歇','眼前能做的事暂时有限，先歇一会儿。',5,()=>[{kind:'rest',title:'在这里歇一歇',duration_seconds:1800}]);
-  return influenceRememberedChoices(world,state,influenceBodyChoices(world,state,at,influenceLifeChoices(world,state,at,profile,result)));
+  const shaped = influenceLifeChoices(world,state,at,profile,result);
+  const body = influenceBodyChoices(world,state,at,shaped);
+  const cognition = influenceSlowCognitionChoices(world,state,body,at);
+  // Actor perception is a bounded read model. It may make an already legal
+  // interest feel timely, but cannot create a task or grant knowledge of the
+  // rest of town. The world engine remains the sole mutation authority.
+  return influenceRememberedChoices(world,state,influenceActorCognitionChoices(world,state.actor_id,cognition,at));
 }
 function feedback(world,state,at,kind,text,more={}) {
-  state.last_feedback={at,kind,text,...more}; lifeNote(world,at,state.actor_id,kind,text,more);
+  const taskId=more.task_id??state.plan?.task_id??null;
+  const task=taskId?world.tasks.find(item=>item.task_id===taskId):null;
+  const taskStatus=task?.status??null;
+  let action_feedback=null;
+  try { action_feedback=createActionFeedbackReceipt({actorId:state.actor_id,planId:more.plan_id??state.plan?.plan_id??null,
+    taskId,eventId:more.event_id??null,causeEventId:task?.cause_event_id??null,kind,at,taskStatus,failureReason:more.failure_reason??state.plan?.failure_reason??null,
+    failureCode:task?.failure_code??null,failureClassification:task?.failure_classification??null,
+    locationId:actor(world,state.actor_id)?.location_id??null}); }
+  catch { /* audit metadata is best effort; life feedback remains authoritative */ }
+  const note={at,kind,text,...more,...(action_feedback?{action_feedback}:{})};
+  state.last_feedback=note; lifeNote(world,at,state.actor_id,kind,text,note);
 }
-function abandon(world,state,at,reason,cancelled=false) {
+function abandon(world,state,at,reason,cancelled=false,eventId=null) {
   const plan=state.plan;
   plan.status=cancelled?'cancelled':'failed';plan.finished_at=at;plan.failure_reason=reason;
   state.cooldowns[plan.goal]=new Date(Date.parse(at)+(cancelled?30:20)*MINUTE).toISOString();
   state.next_decision_at=new Date(Date.parse(at)+(cancelled?30:1)*MINUTE).toISOString();
-  feedback(world,state,at,cancelled?'cancelled':'replan',cancelled?'这次安排停下了，留点时间再决定。':`原来的安排没能继续：${reason}`,{plan_id:plan.plan_id});
+  feedback(world,state,at,cancelled?'cancelled':'replan',cancelled?'这次安排停下了，留点时间再决定。':`原来的安排没能继续：${reason}`,{plan_id:plan.plan_id,failure_reason:reason,event_id:eventId});
 }
 function executeStep(world,state,at,eventId) {
   const plan=state.plan, step=plan.steps[plan.index];
   if(!step){plan.status='completed';plan.finished_at=at;const cooldown=plan.goal==='wait-meal'?0:['meal','cook','store-meals','store-fruit','fruit-supply'].includes(plan.goal)?5:120;
-    state.cooldowns[plan.goal]=new Date(Date.parse(at)+cooldown*MINUTE).toISOString();state.next_decision_at=new Date(Date.parse(at)+(plan.goal==='wait-meal'?0:5)*MINUTE).toISOString();feedback(world,state,at,'plan_completed',`“${plan.title}”这件事做完了。`,{plan_id:plan.plan_id});return;}
+    state.cooldowns[plan.goal]=new Date(Date.parse(at)+cooldown*MINUTE).toISOString();state.next_decision_at=new Date(Date.parse(at)+(plan.goal==='wait-meal'?0:5)*MINUTE).toISOString();feedback(world,state,at,'plan_completed',`“${plan.title}”这件事做完了。`,{plan_id:plan.plan_id,event_id:eventId});return;}
   const id=state.actor_id, actionId=`${eventId}:${id}:${state.sequence}:${plan.index}`;
   if(step.kind==='travel' && actor(world,id).location_id===step.location_id){plan.index++;return;}
   if(step.kind==='transfer') {
     const transferred=transferLivingResource(world,{...step,actor_id:id},at);plan.index++;
-    feedback(world,state,at,'transfer',transferred.text,{plan_id:plan.plan_id});return;
+    feedback(world,state,at,'transfer',transferred.text,{plan_id:plan.plan_id,event_id:eventId});return;
   }
   let task;
   if(step.kind==='travel') {
@@ -211,6 +231,11 @@ function executeStep(world,state,at,eventId) {
   stored.life_motivation={...structuredClone(plan.motivation??{kind:'unknown',basis_score:null}),
     facet_root_ids:[...(plan.motivation?.facet_root_ids??[])].slice(-16)};
   if(step.kind==='observe'&&['care','craft','repair','cook','explore','connection'].includes(plan.development_topic))stored.life_topic=plan.development_topic;
+  if(plan.cognition_goal_id) {
+    // Preparation and travel steps are not the reflected activity itself.
+    // Only a successful canonical binding may stamp the goal on this task.
+    bindSlowCognitionTask(world, id, plan.cognition_goal_id, stored, at);
+  }
   if(plan.role_trial) {
     stored.role_trial={...plan.role_trial,step_role:step.role_trial_primary?'primary':'support'};
     recordPracticalTrialTask(world,stored,at);
@@ -219,12 +244,19 @@ function executeStep(world,state,at,eventId) {
   for(const record of world.refraction?.records??[])if(plan.source_ids?.includes(record.id))record.source_task_ids=[...(record.source_task_ids??[]),task.task_id].slice(-16);
   plan.task_id=task.task_id;plan.status='executing';
   if(id!==world.protagonist.character_id && step.kind!=='travel')actor(world,id).status=step.kind==='rest'?'正在休息':task.title;
-  feedback(world,state,at,'started',`开始${task.title}。`,{plan_id:plan.plan_id,task_id:task.task_id});
+  feedback(world,state,at,'started',`开始${task.title}。`,{plan_id:plan.plan_id,task_id:task.task_id,event_id:eventId});
 }
 
 export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budget=8}={}) {
   if(world.clock?.mode!=='real_time' || world.living?.recovery.pending || at<world.clock.synced_at || world.tasks.some(t=>t.status==='running'&&t.due_at<=at))return {accepted:false,reason:'life_waiting_for_recovery'};
   installAutonomy(world,at);syncLifeNeeds(world,at);
+  // Reconcile subjective intentions from canonical task outcomes before new
+  // choices are ranked; this is idempotent and never invents completion.
+  syncSlowCognitionGoals(world, at);
+  // M4 cadence is a persistent read/decision projection. It is initialized
+  // here when lived memory is installed, but it never gates the world clock,
+  // active tasks, travel, social work, or resource settlement below.
+  ensureCognitionCadence(world,at);
   settleResidentProjects(world,at);
   settleRefraction(world,at);
   if(world.social)advanceSocialLife(world,at,{eventId,reservedActors});
@@ -242,9 +274,9 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
     const plan=state.plan;
     if(plan?.task_id && ['planned','executing'].includes(plan.status)) {
       const task=world.tasks.find(t=>t.task_id===plan.task_id);
-      if(!task){abandon(world,state,at,'原任务记录已不在可恢复范围。');continue;}
-      if(task.status!=='completed'){abandon(world,state,at,task.failure_reason??'活动已取消',task.status==='cancelled');continue;}
-      feedback(world,state,at,'completed',task.completion?.result?.text??(task.life_action==='rest'?'休息结束了。':`${task.title}完成了。`),{task_id:task.task_id,completed_at:task.completion?.due_at});
+      if(!task){abandon(world,state,at,'原任务记录已不在可恢复范围。',false,eventId);continue;}
+      if(task.status!=='completed'){abandon(world,state,at,task.failure_reason??'活动已取消',task.status==='cancelled',eventId);continue;}
+      feedback(world,state,at,'completed',task.completion?.result?.text??(task.life_action==='rest'?'休息结束了。':`${task.title}完成了。`),{task_id:task.task_id,completed_at:task.completion?.due_at,event_id:eventId});
       if(state.actor_id!==world.protagonist.character_id){actor(world,state.actor_id).status=state.last_feedback.text;actor(world,state.actor_id).last_action=task.title;}
       plan.task_id=null;plan.index++;plan.status='planned';
     }
@@ -260,23 +292,24 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.sequence++;
       state.plan={plan_id:`life-plan:${state.actor_id}:${state.sequence}`,goal:choice.goal,title:choice.title,reason:choice.reason,steps:choice.steps,index:0,status:'planned',task_id:null,created_at:at};
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
+      state.plan.cognition_goal_id=choice.cognition_goal_id??null;
       const invited=(world.refraction?.records??[]).some(r=>choice.source_ids?.includes(r.id)&&r.attested===true&&['dialogue','user','agent'].includes(r.category));
       state.plan.motivation={kind:invited?'invited':choice.goal.startsWith('interest:')||choice.discretionary_practice?'self_continuation':'need',
-        basis_score:choice.score-(choice.memory_bonus??0),facet_root_ids:[...(choice.facet_root_ids??[])].slice(-16)};
+        basis_score:choice.score-(choice.memory_bonus??0)-(choice.cognition_bonus??0),facet_root_ids:[...(choice.facet_root_ids??[])].slice(-16)};
       state.plan.development_topic=choice.development_topic??null;
       if(choice.role_trial)state.plan.role_trial=structuredClone(choice.role_trial);
       if(choice.role_stage)state.plan.role_stage=structuredClone(choice.role_stage);
       if(choice.project_id)Object.assign(state.plan,{project_id:choice.project_id,project_stage_id:choice.project_stage_id});
       recordInputDecision(world,state,choices,choice,at);
       recordBodyLifeDecision(world,state,choice,at);
-      feedback(world,state,at,'decided',`想${choice.title}：${choice.reason}`,{plan_id:state.plan.plan_id});
+      feedback(world,state,at,'decided',`想${choice.title}：${choice.reason}`,{plan_id:state.plan.plan_id,event_id:eventId});
     }
     try {
       const trial=structuredClone(world);
       executeStep(trial,trial.autonomy.actors[state.actor_id],at,eventId);
       Object.assign(world,trial);
     }
-    catch(error){if(!error.code)throw error;abandon(world,state,at,error.message);}
+    catch(error){if(!error.code)throw error;abandon(world,state,at,error.message,false,eventId);}
   }
   world.autonomy.last_cycle_slot=Math.floor(Date.parse(at)/MINUTE);
   settleRefraction(world,at);
@@ -289,8 +322,11 @@ export function applyLifeChoice(world,at,payload) {
   const invalid=!world.memory.planner.enabled||state.paused||activeWorldTask(world,state.actor_id)||
     ['planned','executing'].includes(state.plan?.status)||reservedSocialActors(world).includes(state.actor_id)||
     payload.reserved_actors?.includes(state.actor_id)||world.living?.recovery.pending||
-    choices.some(c=>c.available&&c.score-(c.memory_bonus??0)>=50)||fingerprintChoices(world,state,choices)!==r.key;
-  if(invalid) {if(['waiting','calling','ready'].includes(r.status)){r.status='discarded';choiceNote(world,r,at,'discarded','手头已有事务，或可行条件变化，保留原结果但不执行旧选择。');}
+    choices.some(c=>c.available&&c.score-(c.memory_bonus??0)-(c.cognition_bonus??0)>=50)||fingerprintChoices(world,state,choices)!==r.key;
+  if(invalid) {if(['waiting','calling','ready'].includes(r.status)){discardLifeChoice(r,at,'current_context_changed',{
+    runtime_trace:payload.runtime_trace??null,
+    provider_ok:payload.action==='resolve_life_choice'&&!payload.error&&payload.text!==undefined?true:null,
+  });choiceNote(world,r,at,'discarded','手头已有事务，或可行条件变化，保留原结果但不执行旧选择。');}
     return {accepted:true,resolved:false,claimed:false,reason:'current_context_changed'};}
   return {accepted:true,...(payload.action==='claim_life_choice'?claimLifeChoice(world,r,at):resolveLifeChoice(world,r,payload,at))};
 }
@@ -303,7 +339,7 @@ export function controlAutonomy(world, at, operation) {
 export function autonomyReadModel(world) {
   if(!world.autonomy)return null;
   return {schema:AUTONOMY_VERSION,enabled:world.autonomy.enabled,installed_at:world.autonomy.installed_at,revision:world.autonomy.revision,
-    policy:world.memory?.planner.enabled?'bounded_model_choice_v1':'bounded_rules_v1',actors:Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id)).map(s=>({...structuredClone(s),display_name:actor(world,s.actor_id).display_name,location_id:actor(world,s.actor_id).location_id,inventory:structuredClone(world.living.inventories[s.actor_id]?.stock??{})})),recent:structuredClone(world.autonomy.recent.slice(-20))};
+    policy:world.memory?.planner.enabled?'bounded_model_choice_v1':'bounded_rules_v1',cadence:cognitionCadenceReadModel(world),actors:Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id)).map(s=>({...structuredClone(s),display_name:actor(world,s.actor_id).display_name,location_id:actor(world,s.actor_id).location_id,inventory:structuredClone(world.living.inventories[s.actor_id]?.stock??{})})),recent:structuredClone(world.autonomy.recent.slice(-20))};
 }
 export function createAutonomousLife({world,now=()=>new Date(),enabled=false,reserved=()=>[]}={}) {
   return {snapshot:()=>({...autonomyReadModel(world.get()),enabled}),tick({wakeId=null}={}){

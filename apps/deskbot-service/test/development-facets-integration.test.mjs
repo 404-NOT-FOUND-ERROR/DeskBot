@@ -130,11 +130,13 @@ test('choice and ordinary dialogue prompts use safe separate facets instead of o
     completion:{due_at:new Date(BASE-DAY).toISOString(),effect:'no_effect',result:{success:false}}}));
   syncLivedMemory(w,h.now().toISOString());
   const context=modelDevelopmentContext(w);assert.doesNotMatch(JSON.stringify(context),/private-/);
-  const choices=[{goal:'interest:moss-sprout-garden',score:30,available:true,title:'观察苗圃',reason:'观察',facet_root_ids:['private-task-id']},
+  const choices=[{goal:'interest:moss-sprout-garden',score:30,available:true,title:'观察苗圃',reason:'观察；远端私有库存 sentinel-remote-stock',blocked_reason:'sentinel-remote-blocked',steps:[{kind:'transfer',resource:'sentinel-remote-resource'}],facet_root_ids:['private-task-id']},
     {goal:'interest:backlit-grove',score:30,available:true,title:'观察林间',reason:'观察'}];
   prepareLifeChoice(w,own(w),choices,h.now().toISOString());
   const request=w.memory.planner.requests[OWN];request.memories=[];
   const choicePrompt=lifeChoicePrompt(w,request);assert.doesNotMatch(choicePrompt,/private-/);assert.match(choicePrompt,/做成不等于喜欢/);
+  assert.doesNotMatch(choicePrompt,/sentinel-remote/);
+  assert.doesNotMatch(choicePrompt,/sentinel-remote-resource|sentinel-remote-blocked/);
   const prompt=composePrompt({worldSnapshot:w,stateContext:'当前状态稳定。',userText:'你最近有兴趣继续做些什么？'}).prompt;
   assert.doesNotMatch(prompt,/private-/);assert.match(prompt,/条件困难不等于能力差/);
 });

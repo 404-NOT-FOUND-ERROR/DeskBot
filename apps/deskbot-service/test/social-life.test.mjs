@@ -9,6 +9,7 @@ import {createAutonomousLife} from '../src/autonomous-life.mjs';
 import {createWorldLife} from '../src/world-life.mjs';
 import {createDeskBotServer} from '../src/app.mjs';
 import {exchangeResidentResources,socialReadModel} from '../src/social-life.mjs';
+import {installLivedMemory} from '../src/lived-memory.mjs';
 const M=60000,BASE=Date.parse('2026-10-04T04:00:00Z'),mender='spare-mender-001',grower='wetland-grower-001',cook='pot-cook-001',own='shaping-001';
 function fixture(t) {
   const directory=mkdtempSync(join(tmpdir(),'deskbot-social-')),filename=join(directory,'world.sqlite');let time=BASE,p=createSqlitePersistence({filename}),world,loop;
@@ -43,6 +44,33 @@ test('cooperation makes and carries a real kit, hands it over, and only repair c
   assert.ok(c.handed_at);assert.ok(s.tasks.some(t=>t.activity_id==='craft-frame-kit'&&t.origin==='social_life'&&t.status==='completed'));assert.ok(s.tasks.some(t=>t.activity_id==='repair-frame'&&t.actor_id===grower&&t.status==='completed'));
   assert.ok(s.living.objects['floating-frame'].condition>.9);assert.ok(s.living.objects['parts-drawers'].stock.wood<=6);assert.equal(s.living.inventories[grower].stock.frame_kit,0);assert.equal(s.social.relationships[[mender,grower].sort().join('|')].kept,1);
   h.restart();const completed=h.world.get();h.tick();assert.deepEqual(h.world.get(),completed);
+});
+
+test('grounded slow-cognition relation view only biases a lawful offer and never writes numeric trust early',t=>{
+  const h=fixture(t);h.install();h.scope([mender,grower]);
+  h.save(s=>{
+    const at=h.now().toISOString();
+    installLivedMemory(s,at);
+    s.memory.episodes=[];s.memory.maintenance={actors:{}};s.memory.planner={enabled:false,requests:{}};
+    for(const actor of [s.protagonist.character_id,...s.npcs.map(n=>n.npc_id)]){
+      s.memory.actors[actor]??={actor_id:actor,interests:{}};
+      s.memory.maintenance.actors[actor]={actor_id:actor,feelings:[],goals:[],relations:[],digests:[],decay:[],request:null};
+    }
+    s.memory.episodes.push({id:'social-source-1',kind:'world_fact',actor_ids:[mender,grower],at,
+      model_safe:true,source:{kind:'canonical_commitment',commitment_id:'prior-social'},outcome:'completed',text:'两人曾完成一次实际协作。'});
+    s.memory.maintenance.actors[mender].relations=[{actor_id:grower,label:'comfortable_with',text:'愿意继续一起修东西。',authority:'subjective_view',source_ids:['social-source-1'],at,expires_at:new Date(Date.parse(at)+86400000).toISOString()}];
+  });
+  const before=h.world.get().social.relationships;
+  h.tick();
+  const s=h.world.get(),c=s.social.commitments.find(item=>item.key==='cooperate:frame');
+  assert.equal(c.preference_score,2);assert.deepEqual(c.preference_source_ids,['social-source-1']);
+  assert.equal(Object.keys(s.social.relationships).length,0,'a view cannot create a relationship record');
+  h.run(155);
+  const done=h.world.get().social.commitments.find(item=>item.id===c.id);
+  const rel=h.world.get().social.relationships[[mender,grower].sort().join('|')];
+  assert.equal(done.status,'completed');assert.equal(rel.trust,1);assert.equal(rel.encounters,1);
+  assert.deepEqual(rel.last_event.source_refs.commitment_id,c.id);assert.ok(rel.last_event.source_refs.task_ids.length);
+  assert.deepEqual(before,{});
 });
 test('reciprocal exchange conserves resources and is local, capacity checked and atomic',t=>{
   const h=fixture(t);h.install();h.save(s=>{s.protagonist.location_id='whisper-market';s.npcs.find(n=>n.npc_id===cook).location_id='whisper-market';s.living.inventories[own]={stock:{moss:2},capacity:24};s.living.inventories[cook]={stock:{rations:1},capacity:24};});

@@ -1,6 +1,6 @@
 # DeskBot 软件架构
 
-本文介绍 **v0.5 角色发展第 6 阶段（2026-10-07）** 的当前实现。开发步骤以 [v0.5 路线图](../research/development-roadmap-v0.5.md) 为准；服务包版本 `0.1.0` 是软件包标记，不代表产品能力仍停留在首版。
+本文介绍 **v0.5 角色发展第 6 阶段（2026-10-12）** 的当前实现。开发步骤以 [v0.5 路线图](../research/development-roadmap-v0.5.md) 为准；服务包版本 `0.1.0` 是软件包标记，不代表产品能力仍停留在首版。
 
 DeskBot 让同一个桌边个体“喵呜”在伴生奇幻空间“聚形域”持续生活。Node `deskbot-service` 保存唯一的世界事实、任务、资源、关系、记忆、角色阶段和设备输出记录；浏览器显示这些状态并提交受限请求。模型负责对话和合法候选中的有限选择，实际后果由世界规则核验。
 
@@ -21,6 +21,12 @@ canonical task / travel / NPC activity
 这一步让“世界确实在过日子”能被看见，但它不是无限故事生成器：地点叙事、NPC可执行行动和分支仍由有限内容包与规则候选组成；停机期间没有真正启动的行动不会被补造。自然长期生活、丰富的自主世界事件与声音/实体输出仍需真实运行观察和后续阶段验收。
 
 ## 运行结构与状态归属
+
+### Asamana 参考迁移（2026-10-12，本分支本地验证）
+
+新增 `runtime-contracts.mjs` 为来源调度、角色演化和世界候选提供审计合同、内容指纹和 replay 引用，始终标记 `audit_only`；它不取代 SQLite 幂等账本、不重放模型，也不授予 mutation 权限。`memory-ranking.mjs` 接入现有记忆召回，以词法相关性、近期性和重要性排序、同源/相似内容去重，并把解释关联到已有事实；读取不增加成长或写入世界。Jev Town 生活流按 canonical mutation sequence 排序，通过刷新 generation 门控拦截过时响应。慢认知目标严格绑定同角色、同活动和同话题的 canonical `activity_id`；主题相同但活动不同的记录不能结算目标。
+
+当前已接入 Asamana 的慢认知、自治 cadence、角色知识边界、行动仲裁/结构化反馈、统一只读世界 snapshot/stream 和版本化 replay tape；它们都是 DeskBot 现有 SQLite 世界与规则的适配层。行动回执只记录 audit/read model，依据 canonical task 状态区分计划、已开始、成功、真实失败、取消和未执行，不从角色台词推断完成。`world-message-transport.mjs` 在原社会 mutation 内做延迟投递，并保留撤回后的历史状态；主观关系视图只影响有限来往排序，不改信任和相遇事实。历史面板已接入；冻结 head 的双向分页、回最近和 `after_sequence` 重连标记已实现，提交边界统一 SQLite JSON 表示，新序列可严格回放，真实迁移断层、重复 sequence 和 revision 分叉仍返回 `history_unavailable`。本轮已人工验收基础页面、实时地图/居民、历史翻页与回最近；长时间断线、开放事件生成、真实模型长期体验和完整阶段像素验收仍未完成。统一 snapshot 只读裁剪重复历史，canonical 数据仍留在 SQLite 和分页接口；阶段采用冻结体验包版本，避免后续注册表改动影响历史个体。详细源码映射、本地部署和限制见 [Asamana 评估](asamana-review.md)，实施顺序见 [Asamana 迁移管线](asamana-migration-pipeline-v1.md)。
 
 ```text
 Jev Town 3D 生活客户端 :5173 / DeskBot Web 研究界面 :4322
@@ -143,9 +149,9 @@ NPC 当面对话读取人物档案、位置、实际任务、关系及共同经�
 
 ## 配置、验收与尚未交付的能力
 
-从公开仓库启动使用 `scripts/start-local.ps1 -StartWeb -StartWorld`。该脚本加载本地 DeepSeek 配置及可选天气文件，默认打开新闻、区域空气来源，检查端口归属和健康状态。凭据、城市、语音与设备调试登记的具体字段见 [本地配置](../config/README.md) 与 [变量说明](variables.md)，勿将密钥写进网页、事件或日志。
+从公开仓库启动使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -StartWeb -StartWorld`。该脚本加载本地 DeepSeek 配置及可选天气文件，默认打开新闻、区域空气来源，检查端口归属和健康状态。凭据、城市、语音与设备调试登记的具体字段见 [本地配置](../config/README.md) 与 [变量说明](variables.md)，勿将密钥写进网页、事件或日志。
 
-当前第 6 阶段可复现验收见 [阶段验收记录](../research/milestones/role-development-stage6.md)；九种隔离 SQLite 样本位于 `/development-review.html?sample=stages`。前置生活、试做、采用、组合、需要优先、重载和分轴回退在实际执行器中验证。正式世界没有导入这些样本；受控回放不能代替自然形成愿望或连续现实生活观察。当前组件、几何与构建已核验，浏览器自动化初始化失败，尚未补齐第 6 阶段截图验收。
+当前第 6 阶段可复现验收见 [阶段验收记录](../research/milestones/role-development-stage6.md)；九种隔离 SQLite 样本位于 `/development-review.html?sample=stages`。前置生活、试做、采用、组合、需要优先、重载和分轴回退在实际执行器中验证。正式世界没有导入这些样本；受控回放不能代替自然形成愿望或连续现实生活观察。本轮已完成人工浏览器基础验收并保存 DeskBot/Asamana 画面证据，但这不等于第 6 阶段完整像素、长断线或真实多日体验验收。
 
 下一阶段接通真实中文 ASR/TTS 并人工试听，之后适配小智固件、传感器、屏幕和受限转头，最后进行 7–14 天现实观察。开放生成、更多完整居民项目、完整经济、自由世界治理和无限自主目标都仍属于后续研究。
 

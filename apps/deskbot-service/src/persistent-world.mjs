@@ -10,6 +10,7 @@ import { installRefraction, refractInput, refractionReadModel } from './input-re
 import { installResidentLife } from './resident-life.mjs';
 import { installResidentProjects, projectReadModel } from './resident-projects.mjs';
 import { respondSocialInvitation, socialReadModel, SocialLifeError } from './social-life.mjs';
+import { installSlowCognition, prepareSlowCognition, claimSlowCognition, resolveSlowCognition } from './slow-cognition.mjs';
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
 import { LivingResourceError, installLivingResources, installResourceRenewal, installCommunitySupply, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
 import { createHash } from 'node:crypto';
@@ -99,8 +100,12 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
   { action:'install_input_refraction',layer:'world_line',required:[],optional:[],description:'安装有限的现实输入参考，不回填历史；消息只提供候选，实际任务仍须核验' },
   { action:'install_lived_memory',layer:'world_line',required:[],optional:['planner_enabled'],description:'从实际记录安装生活记忆与缓慢兴趣' },
   { action:'install_development_evidence',layer:'world_line',required:[],optional:[],description:'在生活记忆内连接同根的实际任务、项目与约定结果' },
+  { action:'install_slow_cognition',layer:'world_line',required:[],optional:[],description:'安装每日衰减、压缩、反思和关系投影；只由生活引擎调用' },
+  { action:'prepare_slow_cognition',layer:'world_line',required:[],optional:[],description:'为已发生的事实准备一次有来源的慢认知请求' },
+  { action:'claim_slow_cognition',layer:'world_line',required:['request_id'],optional:[],description:'领取一次受限慢认知模型请求' },
+  { action:'resolve_slow_cognition',layer:'world_line',required:['request_id'],optional:['text','model','error','trace'],description:'验证慢认知输出；只保存理解和意向，不直接改变世界事实' },
   { action:'claim_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:[],description:'服务端核验可行候选并领取有限思考额度' },
-  { action:'resolve_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:['text','model','error'],description:'服务端验证模型选择，保留理解与执行边界' },
+  { action:'resolve_life_choice',layer:'world_line',required:['actor_id','request_id'],optional:['text','model','error','runtime_trace','model_call'],description:'服务端验证模型选择，保留理解与执行边界' },
   { action:'start_role_practical_trial',layer:'world_line',required:['proposal_id','actor_id','direction_id','wish_basis'],optional:['variant'],description:'服务器核验已保存愿望后，登记有限实际试做安排；不直接接受角色或改变外观' },
   { action:'control_role_practical_trial',layer:'world_line',required:['trial_id','operation'],optional:['variant','reason'],description:'服务器暂停、恢复、调整或退出实际试做，只处理本试做绑定的原事务' },
   { action:'accept_role_stage',layer:'world_line',required:['proposal_id','actor_id','direction_id','wish_basis','preview_fingerprint'],optional:[],description:'服务端核对原愿望、跨日真实试做与当前预览，采用有限虚拟角色阶段；实机外壳不改变' },
@@ -137,6 +142,15 @@ const SUPPORTED_WORLD_ACTIONS = Object.freeze([
 
 function clone(value) {
   return structuredClone(value);
+}
+
+// Canonical state and its ledger share the JSON representation persisted by
+// SQLite. In particular, an absent field must not become an own undefined
+// field in the in-memory diff, and array holes/undefined persist as null.
+// Keep this normalization at the commit boundary, rather than weakening
+// history validation to treat a missing field as an arbitrary saved value.
+function canonicalJson(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function stableStringify(value) {
@@ -445,7 +459,7 @@ function lifeFeedItems(mutation, world, scenes = null) {
       }
     }
   }
-  return items;
+  return items.map((item, index) => ({ ...item, provenance: { ...item.provenance, item_index: index } }));
 }
 
 function createMultisourceState() {
@@ -903,6 +917,27 @@ function ensureWorldTarget(event, world) {
   }
 }
 
+function normalizePerceptionScope(value) {
+  const scope = {};
+  if (value.location_id !== undefined) scope.location_id = requireText(value.location_id, 'payload.event.location_id');
+  if (value.visibility !== undefined) {
+    if (!['public', 'private', 'local'].includes(value.visibility)) throw new PersistentWorldError(400, 'invalid_world_mutation', 'invalid event visibility');
+    scope.visibility = value.visibility;
+  }
+  if (value.public !== undefined) {
+    if (typeof value.public !== 'boolean') throw new PersistentWorldError(400, 'invalid_world_mutation', 'event public must be boolean');
+    scope.public = value.public;
+  }
+  for (const key of ['participants', 'audience']) {
+    if (value[key] === undefined) continue;
+    if (key === 'audience' && value[key] === 'public') { scope.audience = 'public'; continue; }
+    if (!Array.isArray(value[key]) || value[key].length > 64) throw new PersistentWorldError(400, 'invalid_world_mutation', `${key} must be a bounded array`);
+    scope[key] = uniqueStrings(value[key].map(id => requireText(id, `payload.event.${key}[]`)));
+  }
+  if (value.recipient_id !== undefined) scope.recipient_id = requireText(value.recipient_id, 'payload.event.recipient_id');
+  return scope;
+}
+
 function normalizeActiveEvent(value) {
   const event = requireObject(value, 'payload.event');
   return {
@@ -915,6 +950,7 @@ function normalizeActiveEvent(value) {
     arc_id: optionalText(event.arc_id ?? event.arc, 'payload.event.arc_id', null),
     source: optionalText(event.source, 'payload.event.source', 'world.mutation'),
     blocks_travel: event.blocks_travel === true,
+    ...normalizePerceptionScope(event),
   };
 }
 
@@ -1055,6 +1091,7 @@ function normalizeWorldLineEvent(value) {
     outcome: optionalText(item.outcome, 'payload.event.outcome', null),
     source: optionalText(item.source, 'payload.event.source', 'world-engine'),
     occurred_at: optionalDateTime(item.occurred_at, 'payload.event.occurred_at', null),
+    ...normalizePerceptionScope(item),
   };
 }
 
@@ -1353,6 +1390,14 @@ function applyExplicitMutation(world, event, at = world.clock?.synced_at ?? even
       if(!next.memory)throw new PersistentWorldError(409,'memory_required','先安装现有生活记忆，再连接发展经历。');
       syncDevelopmentEvidence(next,at);
       details={accepted:true,version:next.memory.development.schema};break;
+    case 'install_slow_cognition':
+      details=installSlowCognition(next,at);break;
+    case 'prepare_slow_cognition':
+      details=prepareSlowCognition(next,at);break;
+    case 'claim_slow_cognition':
+      details=claimSlowCognition(next,payload.request_id,at);break;
+    case 'resolve_slow_cognition':
+      details=resolveSlowCognition(next,payload.request_id,{text:payload.text,model:payload.model,error:payload.error,trace:payload.trace},at);break;
     case 'claim_life_choice':
     case 'resolve_life_choice':
       details=applyLifeChoice(next,at,payload);break;
@@ -1645,6 +1690,10 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     (highest, mutation) => Math.max(highest, mutation.sequence ?? 0),
     0,
   ) + 1;
+  // Read-only observers (map/life clients, replay tools) subscribe to the
+  // canonical mutation ledger.  The set intentionally lives beside the
+  // durable maps so a restart cannot create a second source of truth.
+  const mutationSubscribers = new Set();
 
   function get(worldId = DEFAULT_WORLD_ID) {
     const world = worlds.get(worldId);
@@ -1662,14 +1711,32 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       .map(clone);
   }
 
-  function listLifeFeed({ worldId = DEFAULT_WORLD_ID, afterSequence = null, beforeSequence = null, afterId = null, beforeId = null, limit = 50, kind = null } = {}) {
+  /**
+   * Subscribe to committed canonical mutations without granting write access.
+   * The callback receives a defensive copy and is never allowed to interrupt
+   * the world commit when it throws.  Calling the returned function is safe
+   * and idempotent.
+   */
+  function subscribeMutations(listener) {
+    if (typeof listener !== 'function') throw new TypeError('mutation listener must be a function');
+    mutationSubscribers.add(listener);
+    let active = true;
+    return () => {
+      if (!active) return false;
+      active = false;
+      return mutationSubscribers.delete(listener);
+    };
+  }
+
+  function listLifeFeed({ worldId = DEFAULT_WORLD_ID, afterSequence = null, beforeSequence = null, afterId = null, beforeId = null, headSequence = null, limit = 50, kind = null, strictLimit = false } = {}) {
     const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     const parsedAfter = afterSequence === null || afterSequence === undefined ? null : Math.max(Number.parseInt(afterSequence, 10) || 0, 0);
     const parsedBefore = beforeSequence === null || beforeSequence === undefined ? null : Math.max(Number.parseInt(beforeSequence, 10) || 0, 0);
     const scenes = new Map(storedMutations.filter(mutation => mutation.world_id === worldId && mutation.action === 'set_life_scene')
       .map(mutation => [mutation.details.scene?.scene_id, mutation.details.scene]).filter(([id]) => id));
     const projected = storedMutations
-      .filter((mutation) => mutation.world_id === worldId && mutation.applied !== false)
+      .filter((mutation) => mutation.world_id === worldId && mutation.applied !== false
+        && (headSequence === null || mutation.sequence <= headSequence))
       .flatMap((mutation) => lifeFeedItems(mutation, worlds.get(worldId), scenes))
       .map(clone);
     const cursorIndex = id => {
@@ -1702,9 +1769,137 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     };
     if (beforeIndex !== null) return entries.slice(-boundedLimit);
     if (afterIndex !== null) return entries.slice(0, boundedLimit);
+    if (strictLimit) return parsedAfter !== null && parsedBefore === null ? entries.slice(0, boundedLimit) : entries.slice(-boundedLimit);
     return parsedAfter !== null || parsedBefore !== null || afterIndex !== null || beforeIndex !== null
       ? (parsedBefore !== null || beforeIndex !== null ? sliceBackward(entries) : sliceForward(entries))
       : sliceBackward(entries);
+  }
+
+  /** A stable, bounded read window. The captured head prevents ongoing life
+   * from moving the end of a multi-page browse or a reconnect catch-up. */
+  function readLifeFeedPage({ worldId = DEFAULT_WORLD_ID, headSequence = null, limit = 50, ...filters } = {}) {
+    const world = get(worldId);
+    if (!world) throw new PersistentWorldError(404, 'world_not_found', `world ${worldId} does not exist`);
+    for (const value of [headSequence, filters.afterSequence, filters.beforeSequence]) {
+      if (value !== null && value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+        throw new PersistentWorldError(400, 'invalid_life_feed_cursor', 'Life feed sequences must be non-negative integers');
+      }
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
+      throw new PersistentWorldError(400, 'invalid_life_feed_limit', 'Life feed limit must be an integer from 1 to 200');
+    }
+    if (filters.afterId !== null && filters.afterId !== undefined && filters.beforeId !== null && filters.beforeId !== undefined) {
+      throw new PersistentWorldError(400, 'invalid_life_feed_cursor', 'Use one life feed entry cursor at a time');
+    }
+    const currentSequence = storedMutations.reduce((highest, mutation) => mutation.world_id === worldId
+      ? Math.max(highest, mutation.sequence ?? 0) : highest, 0);
+    const capturedHead = headSequence ?? currentSequence;
+    if (capturedHead > currentSequence) {
+      throw new PersistentWorldError(409, 'life_feed_head_ahead', 'The requested feed head is ahead of this world ledger');
+    }
+    const entries = listLifeFeed({ ...filters, worldId, headSequence: capturedHead, limit, strictLimit: true });
+    const first = entries[0], last = entries.at(-1);
+    return {
+      schema: 'deskbot.world-life-feed-response.v1', world_id: worldId, world_revision: world.world_revision,
+      head_sequence: capturedHead, current_sequence: currentSequence, entries,
+      cursor: {
+        before_id: first?.id ?? null, after_id: last?.id ?? null,
+        before_sequence: first?.provenance?.sequence ?? null, after_sequence: last?.provenance?.sequence ?? null,
+        has_more_before: Boolean(first && listLifeFeed({ worldId, headSequence: capturedHead, beforeId: first.id, limit: 1, kind: filters.kind }).length),
+        has_more_after: Boolean(last && listLifeFeed({ worldId, headSequence: capturedHead, afterId: last.id, limit: 1, kind: filters.kind }).length),
+      },
+    };
+  }
+
+  // One synchronous read turn captures the world and the complete ledger
+  // cursor; listMutations is paginated and cannot be used as a latest-sequence
+  // query once a long-lived world contains more than 200 mutations.
+  function readSnapshot({ worldId = DEFAULT_WORLD_ID, feedLimit = 40 } = {}) {
+    const world = get(worldId);
+    if (!world) return null;
+    const sequence = storedMutations.reduce((highest, mutation) => mutation.world_id === worldId
+      ? Math.max(highest, mutation.sequence ?? 0) : highest, 0);
+    const page = readLifeFeedPage({ worldId, headSequence: sequence, limit: Math.min(Math.max(Number.parseInt(feedLimit, 10) || 40, 1), 200) });
+    return { world, sequence, feed: page.entries, feed_cursor: page.cursor };
+  }
+
+  function readWorldAtSequence({ worldId = DEFAULT_WORLD_ID, sequence } = {}) {
+    if (!Number.isSafeInteger(sequence) || sequence < 0) {
+      throw new PersistentWorldError(400, 'invalid_history_sequence', 'History sequence must be a non-negative integer');
+    }
+    const world = get(worldId);
+    if (!world) throw new PersistentWorldError(404, 'world_not_found', `world ${worldId} does not exist`);
+    const ledger = storedMutations.filter(item => item.world_id === worldId)
+      .sort((left, right) => left.sequence - right.sequence);
+    const headSequence = ledger.at(-1)?.sequence ?? 0;
+    let availableFromSequence = world.world_revision === (ledger.at(-1)?.after_revision ?? world.world_revision) ? headSequence : null;
+    const unavailable = (reason, message, availableFromSequence = null) => {
+      const error = new PersistentWorldError(409, 'history_unavailable', message);
+      error.historyBoundary = { requested_sequence: sequence, head_sequence: headSequence,
+        available_from_sequence: availableFromSequence, reason };
+      return error;
+    };
+    if (ledger.some((item, index) => index > 0 && item.sequence === ledger[index - 1].sequence)) {
+      throw unavailable('ambiguous_sequence', 'The canonical ledger contains an ambiguous sequence');
+    }
+    if (sequence > headSequence || (sequence !== 0 && !ledger.some(item => item.sequence === sequence))) {
+      throw new PersistentWorldError(404, 'history_sequence_not_found', 'No canonical mutation exists at this sequence');
+    }
+    const historical = clone(world);
+    for (let index = ledger.length - 1; index >= 0; index -= 1) {
+      const mutation = ledger[index];
+      if (mutation.sequence <= sequence) break;
+      if (historical.world_revision !== mutation.after_revision) {
+        throw unavailable('revision_gap', 'The canonical ledger cannot reconstruct this revision', availableFromSequence);
+      }
+      for (const change of (mutation.changes ?? []).slice().reverse()) {
+        const path = change.field_path?.split('/').slice(1);
+        if (!path?.length || path.some(part => !part || part === '__proto__' || part === 'constructor' || part === 'prototype')) {
+          throw unavailable('unsupported_change_path', 'The canonical ledger contains an unsupported change path', availableFromSequence);
+        }
+        let owner = historical;
+        for (const part of path.slice(0, -1)) {
+          owner = owner?.[part];
+          if (!owner || typeof owner !== 'object' || Array.isArray(owner)) {
+            throw unavailable('incomplete_prior_state', 'The canonical ledger does not contain a complete prior state', availableFromSequence);
+          }
+        }
+        const key = path.at(-1);
+        const present = Object.hasOwn(owner, key);
+        if (present !== Object.hasOwn(change, 'new_value')
+          || (present && !valuesEqual(owner[key], change.new_value))) {
+          throw unavailable('state_mismatch', 'The canonical ledger differs from the saved world state', availableFromSequence);
+        }
+        if (Object.hasOwn(change, 'old_value')) owner[key] = clone(change.old_value);
+        else delete owner[key];
+      }
+      if (historical.world_revision !== mutation.before_revision) {
+        throw unavailable('incomplete_prior_revision', 'The canonical ledger does not contain a complete prior revision', availableFromSequence);
+      }
+      const previous = ledger[index - 1];
+      if (historical.world_revision === (previous?.after_revision ?? ledger[0]?.before_revision)) {
+        availableFromSequence = previous?.sequence ?? 0;
+      }
+    }
+    const atMutation = ledger.find(item => item.sequence === sequence) ?? null;
+    const expectedRevision = atMutation?.after_revision ?? ledger[0]?.before_revision ?? world.world_revision;
+    if (historical.world_revision !== expectedRevision) {
+      throw unavailable('target_revision_gap', 'The canonical ledger does not reach the requested revision', availableFromSequence);
+    }
+    const lastApplied = ledger.filter(item => item.sequence <= sequence && item.applied !== false).at(-1);
+    historical.updated_at = lastApplied?.committed_at ?? historical.created_at;
+    return {
+      world: historical,
+      sequence,
+      head_sequence: headSequence,
+      mutation: atMutation ? {
+        mutation_id: atMutation.mutation_id,
+        action: atMutation.action,
+        committed_at: atMutation.committed_at,
+        occurred_at: atMutation.occurred_at,
+        applied: atMutation.applied,
+      } : null,
+    };
   }
 
   function persistCommit(world, mutation, countedTurn = null) {
@@ -1939,6 +2134,10 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         && (event.source !== 'role-stage-engine' || adapter.roleStageInternal !== true)) {
         throw new PersistentWorldError(403,'role_stage_requires_server_adapter','采用或回退角色阶段只能由已核验原愿望与实际试做的服务端接口处理。');
       }
+      if (['install_slow_cognition','prepare_slow_cognition','claim_slow_cognition','resolve_slow_cognition'].includes(event.payload?.action)
+        && (event.source !== 'slow-cognition-engine' || adapter.maintenanceInternal !== true)) {
+        throw new PersistentWorldError(403,'slow_cognition_requires_server_adapter','慢认知只能由服务端生活引擎调用。');
+      }
       try { projection = applyExplicitMutation(world, event, now().toISOString()); }
       catch (error) {
         if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError || error instanceof PracticalRoleTrialError || error instanceof RoleStageError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
@@ -1974,13 +2173,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     // projection (for example, a stale weather sample).
     const observationAccepted = projection.details?.accepted !== false;
     if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settlePracticalTrials(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
-    const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
+    const next = canonicalJson(observationAccepted ? finalizeWorld(projection.next, now) : world);
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {
       change.source_layer = 'L3';
       change.layer = 'world';
     }
-    const mutation = {
+    const mutation = canonicalJson({
       schema: 'foundry.world-mutation-record.v0.1',
       mutation_id: `mutation-${eventId}`,
       sequence: nextSequence,
@@ -2017,7 +2216,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       logical_time_after: clone(next.logical_time),
       occurred_at: event.occurred_at ?? null,
       committed_at: now().toISOString(),
-    };
+    });
 
     persistCommit(next, mutation, countedTurn);
     worlds.set(next.world_id, next);
@@ -2026,6 +2225,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     mutationsById.set(mutation.mutation_id, mutation);
     if (countedTurn) countedTurns.set(countedTurn.turn_key, countedTurn);
     nextSequence += 1;
+
+    // Notify only after state and ledger persistence are complete.  Observer
+    // failures are isolated from canonical writes; each observer must enforce
+    // its own bounded queue/back-pressure policy.
+    for (const listener of [...mutationSubscribers]) {
+      try { listener(clone(mutation)); } catch { /* read-only observer failure */ }
+    }
 
     return {
       applied: true,
@@ -2072,7 +2278,11 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     get,
     ingest,
     listMutations,
+    subscribeMutations,
     listLifeFeed,
+    readLifeFeedPage,
+    readSnapshot,
+    readWorldAtSequence,
     syncWallClock,
     syncTasks,
   };
@@ -2080,7 +2290,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
 
 // Derived read model for map clients. It never becomes a second source of
 // truth: every value is rebuilt from the canonical snapshot on each request.
-export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) {
+export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID, projectionTime = new Date() } = {}) {
   if (!world || typeof world !== 'object') return null;
   const protagonist = world.protagonist || {};
   const currentLocationId = canonicalLocationId(protagonist.location_id);
@@ -2154,7 +2364,7 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
     world_revision: world.world_revision,
     logical_time: clone(world.logical_time),
     clock: clone(world.clock ?? { mode: 'simulation' }),
-    environment: getWorldEnvironment(world),
+    environment: getWorldEnvironment(world, { now: projectionTime }),
     living: livingReadModel(world),
     autonomy: autonomyReadModel(world),
     memory: memoryReadModel(world),

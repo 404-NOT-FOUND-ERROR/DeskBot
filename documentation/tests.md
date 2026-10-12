@@ -1,20 +1,20 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段及持续生活投影补强，2026-10-08。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
+**当前功能基线：v0.5 · 角色发展第 6 阶段及持续生活投影补强，2026-10-12。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 684 项通过（2026-10-08 本机复验，含持续生活与 Explorer 生命周期） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
+| DeskBot 服务完整回归 | 811 项通过（2026-10-12 本机复验，含行动反馈、历史完整性、M3/M4/M6/M7/M8 Asamana 迁移与语义边界专项） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
-| 3D 客户端 | 39 套、259 项通过 | 读模型、控制、样本、场景和组合几何；不替代浏览器像素检查 |
+| 3D 客户端 | 44 套、297 项通过（2026-10-12 本机复验；routes 并行采样曾超时，孤立专项已通过） | 读模型、控制、样本、场景、组合几何和生活 feed 连续性；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 均通过 | 类型一致性和可构建性 |
 | voice-sidecar 接口 | 16 项通过（2026-10-08 本机复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md) 和 [角色体验包路线](role-experience-roadmap-v1.md)。2026-10-08 在 Windows 工作站重新运行服务端 667 项、客户端类型检查与生产构建，全部通过。体验包合同、运行迁移、Chef 垂直样板、统一表现投影和 Explorer 路线扩展均有专项测试。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md) 和 [角色体验包路线](role-experience-roadmap-v1.md)。2026-10-12 本轮在 Windows 工作站重新运行服务端 811 项、客户端 297 项、类型检查和生产构建，全部通过；voice-sidecar 16 项与 Asamana 前端 140 项是既有测试结果，本轮未重跑。客户端并行路径的寻路采样专项曾受 5 秒测试门限制，已通过孤立复验且未改变寻路逻辑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 ## 当前自动覆盖
 
@@ -37,8 +37,11 @@
 | 表达一致性 | 当前双轴、历史不冒充当前、单方向与组合问答、屏幕/mock TTS/outbox 共用答语 | `role-stage-expression.test.mjs`、`role-wish-fact-guard.test.mjs`、`role-practical-expression.test.mjs` |
 | 身体与输出协议 | 登记能力、可信感知、未知壳、坐标、受限 yaw、ACK、失败、过期和重启 | `body-perception-domain.test.mjs`、`body-perception-http.test.mjs`、`body-device-config.test.mjs`、`websocket-bridge.test.mjs` |
 | 网络与配置 | provider 错误不泄露上游正文/密钥、天气缓存、配置重载、音频工件与 sidecar 合同 | `llm-http-error.test.mjs`、`weather-persistence.test.mjs`、`voice-sidecar-client.test.mjs`、`audio-artifacts.test.mjs` |
+| Asamana 迁移合同 | 阶段 trace、慢认知节拍、角色感知边界、行动回执、replay、observer 和历史完整性 | `runtime-contracts.test.mjs`、`cognition-cadence.test.mjs`、`actor-perception.test.mjs`、`action-feedback.test.mjs`、`replay-determinism.test.mjs`、`world-observer*.test.mjs`、`world-history.test.mjs` |
 
 历史研究回放、旧角色方向与世界候选也保留兼容测试。它们不能替代现版本的实际生活愿望与试做门槛。
+
+历史回放的完整性检查是严格的：新产生且可逆的序列应返回 200；真实迁移断层、重复 sequence、revision 分叉或未能从当前 canonical state 逆推的序列必须返回 `409 history_unavailable`，不能用放宽校验换取“看起来能回放”。提交边界会把内存状态规范化为 SQLite 的 JSON 表示，避免 `undefined` 字段造成运行态与重启态差异。
 
 ## 复现检查
 

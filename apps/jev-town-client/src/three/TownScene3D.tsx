@@ -26,8 +26,11 @@ import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
 import { sceneWorkAnchor, sceneWorkTarget } from './sceneWorkplace.ts';
 import {isProjectActivity,projectActivityView} from './projectScene.ts';
 import {shapingAppearanceKey,type ShapingAppearance} from './shapingAppearance.ts';
+import { createSnapshotRenderCompletion, renderSnapshotFrame } from './renderCompletion.ts';
 
 export interface TownScene3DProps {
+  snapshotId?: string;
+  onRenderComplete?: (snapshotId: string) => void;
   sceneLocations?: readonly DeskBotLocation[];
   environment?: DeskBotEnvironment;
   activities?: readonly SceneLifeActivity[];
@@ -204,7 +207,7 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
+  { snapshotId, onRenderComplete, citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
   // World revisions replace object identities frequently. Scene construction is
@@ -228,6 +231,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
   routePreviewRef.current = routePreview;
   const requestFrameRef = useRef<() => void>(() => {});
   const initialPositionsRef = useRef(positions);
+  const renderCompletionRef = useRef(createSnapshotRenderCompletion());
 
   useImperativeHandle(ref, () => ({
     zoomBy: (factor) => apiRef.current?.zoomBy(factor),
@@ -772,8 +776,9 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         scenery.updateDomesticLights?.(lighting.minute, lighting.night);
       }
 
-      renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
+      renderSnapshotFrame(renderCompletionRef.current,
+        () => renderer.render(scene, camera),
+        () => labelRenderer.render(scene, camera));
       if (cameraDirty || citizensMoving || tween) positionHotspots();
       cameraDirty = false;
 
@@ -818,12 +823,21 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       apiRef.current = null;
       entriesRef.current = null;
       requestFrameRef.current = () => {};
+      renderCompletionRef.current.cancel();
     };
   }, [citizenKey, labelKey, sceneryKey, onPlaceClick]);
 
   useEffect(()=>{if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);else if((focusRequest??0)>0)apiRef.current?.fitTown();},[focusLocationId,focusRequest,citizenKey,labelKey,sceneryKey]);
   // An expired observation or a minute change still updates a reduced-motion view.
   useEffect(()=>{requestFrameRef.current();const timer=setInterval(()=>requestFrameRef.current(),15000);return()=>clearInterval(timer);},[environment]);
+
+  // A complete world snapshot is acknowledged only after the next real WebGL
+  // and CSS2D render. The callback is intentionally frame-scoped so an older
+  // queued snapshot cannot acknowledge a newer one.
+  useEffect(() => {
+    renderCompletionRef.current.prepare(snapshotId, onRenderComplete);
+    requestFrameRef.current();
+  }, [snapshotId, onRenderComplete]);
 
   // The route preview is a separate, static overlay. Keeping it out of the
   // mount-only scene effect lets a selected destination update without

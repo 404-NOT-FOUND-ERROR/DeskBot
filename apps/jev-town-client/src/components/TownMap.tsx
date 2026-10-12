@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ACTIONS, ACTION_GLYPH, ACTION_LABEL, type Action } from "@shared/actions.ts";
 import { CITIZENS } from "@shared/citizens.ts";
 import { PLACES } from "@shared/town.ts";
@@ -13,8 +13,11 @@ import type {ShapingAppearance} from '../three/shapingAppearance.ts';
 import "./shaping-map.css";
 import { isWebglAvailable } from "../three/webgl.ts";
 import { CitizenSprite } from "./CitizenSprite.tsx";
+import { createSnapshotRenderCompletion } from '../three/renderCompletion.ts';
 
 export interface TownMapProps {
+  snapshotId?: string;
+  onRenderComplete?: (snapshotId: string) => void;
   sceneLocations?: readonly DeskBotLocation[];
   environment?: DeskBotEnvironment;
   activities?: readonly SceneLifeActivity[];
@@ -50,12 +53,23 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
+export function TownMap({ snapshotId, onRenderComplete, citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
   const sceneRef = useRef<TownScene3DHandle | null>(null);
   const hotspotsRef = useRef(new Map<number, HTMLButtonElement>());
+  const fallbackCompletionRef = useRef(createSnapshotRenderCompletion());
+
+  // React has committed the text fallback before this effect runs. A WebGL
+  // context failure must not hold the complete read-model queue indefinitely.
+  useEffect(() => {
+    if (!supportsWebgl) {
+      fallbackCompletionRef.current.prepare(snapshotId, onRenderComplete);
+      fallbackCompletionRef.current.complete();
+    }
+    return () => fallbackCompletionRef.current.cancel();
+  }, [supportsWebgl, snapshotId, onRenderComplete]);
 
   const registerHotspot = useCallback((citizenId: number, element: HTMLButtonElement | null) => {
     if (element) hotspotsRef.current.set(citizenId, element);
@@ -79,6 +93,8 @@ export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneL
           <Suspense fallback={<p className="town-map__loading">正在搭建小镇…</p>}>
             <TownScene3D
               ref={sceneRef}
+              snapshotId={snapshotId}
+              onRenderComplete={onRenderComplete}
               citizens={citizens}
               shapingAppearances={shapingAppearances}
               labels={labels}

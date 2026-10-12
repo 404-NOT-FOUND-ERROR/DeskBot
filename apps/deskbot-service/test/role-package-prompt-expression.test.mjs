@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { composePrompt, modelRoleExperienceContext, modelRoleStageContext } from '../src/prompt-composer.mjs';
+import { getRoleExperiencePackage } from '../src/role-experience-packages.mjs';
+
+const stableStringify = value => {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+};
+const digest = value => createHash('sha256').update(stableStringify(value)).digest('hex');
+function frozenChefWorld() {
+  const packageValue = getRoleExperiencePackage('chef');
+  packageValue.package_id = 'chef-original-v0';
+  packageValue.version = 'v0';
+  packageValue.expression.speech = '旧锅边的语态，先照顾那一口。';
+  packageValue.expression.catchphrases = ['让我先守着这口小锅。'];
+  const stage = { stage_id: 'stage-chef', actor_id: 'shaping-001', proposal_id: 'p', trial_id: 't', direction_id: 'chef', axis: 'vocation', status: 'accepted',
+    accepted_at: '2026-10-01T00:00:00.000Z', primary_root_ids: [], primary_days: [], frozen_wish_root_ids: [],
+    experience_freeze: { schema: 'deskbot.role-stage-experience-freeze.v1', direction_id: 'chef', package_id: packageValue.package_id,
+      package_version: packageValue.version, content_hash: digest(packageValue), package: packageValue } };
+  return { protagonist: { character_id: 'shaping-001' }, role_stages: { schema: 'deskbot.role-stages.v1', actors: { 'shaping-001': { axis_current: { form: null, vocation: 'stage-chef' }, versions: [stage] } } } };
+}
 
 test('accepted stage prompt context carries package-owned speech cues', () => {
   const world = {
@@ -60,5 +81,32 @@ test('fallback caller stages require accepted status or the legacy accepted role
   assert.equal(unknown.current[0].package_id, 'miaowu-baseline');
   const legacy = modelRoleExperienceContext({ currentRoleStages: [{ schema: 'deskbot.role-state.v1', direction_id: 'chef' }] });
   assert.equal(legacy.current[0].package_id, 'chef-v1');
+});
+
+test('canonical accepted stage prompt retains its original frozen speech after registry revisions', () => {
+  const world = frozenChefWorld(), before = structuredClone(world);
+  const stages = modelRoleStageContext(world);
+  assert.equal(stages[0].package_id, 'chef-original-v0');
+  assert.equal(stages[0].speech, '旧锅边的语态，先照顾那一口。');
+  const experience = modelRoleExperienceContext({ worldSnapshot: world });
+  assert.equal(experience.current[0].package_id, 'chef-original-v0');
+  assert.deepEqual(experience.current[0].catchphrases, ['让我先守着这口小锅。']);
+  assert.equal(experience.fallback_used, false);
+  assert.deepEqual(world, before, 'projection must not alter canonical package snapshot');
+});
+
+test('legacy caller frozen stages use their snapshot while invalid frozen stages avoid authored substitution', () => {
+  const world = frozenChefWorld(), stage = world.role_stages.actors['shaping-001'].versions[0];
+  const current = modelRoleExperienceContext({ currentRoleStages: [{ ...stage, current: true }] });
+  assert.equal(current.current[0].package_id, 'chef-original-v0');
+  stage.experience_freeze.package.expression.speech = 'CORRUPTED_FROZEN_SPEECH';
+  const invalid = modelRoleExperienceContext({ worldSnapshot: world });
+  assert.equal(invalid.fallback_used, true);
+  assert.equal(invalid.current[0].package_id, 'miaowu-baseline');
+  assert.deepEqual(modelRoleStageContext(world), []);
+  assert.doesNotMatch(JSON.stringify(invalid), /CORRUPTED_FROZEN_SPEECH|chef-v1/);
+  const composed = composePrompt({ userText: '陪我说两句。', worldSnapshot: world });
+  assert.match(composed.prompt, /固定表达资料暂不可读取/);
+  assert.doesNotMatch(composed.prompt, /当前两个轴都没有采用中的新方向|CORRUPTED_FROZEN_SPEECH/);
 });
 

@@ -31,9 +31,14 @@ const own=world=>world.autonomy.actors['shaping-001'];
 test('same cycle is atomic and idempotent after SQLite restart; reads cannot start tasks',t=>{
   const h=fixture(t);h.save(s=>{s.living.objects['garden-bed'].moisture=.2;});h.tick();
   const first=h.world.get(),task=first.tasks.find(t=>t.actor_id==='shaping-001');assert.equal(task.activity_id,'water-bed');assert.equal(first.living.objects['seedling-rack'].stock.water,9);
+  assert.equal(own(first).last_feedback.action_feedback.status,'running');
   h.restart();h.tick();assert.deepEqual(h.world.get(),first);getWorldMap(h.world.get());assert.deepEqual(h.world.get(),first);
   h.advance(5*M);h.tick();assert.equal(h.world.get().tasks.find(t=>t.task_id===task.task_id).status,'completed');assert.ok(h.world.get().living.objects['garden-bed'].moisture>.42);
-  h.restart();h.tick();assert.equal(h.world.get().living.objects['seedling-rack'].stock.water,9);
+  assert.equal(own(h.world.get()).last_feedback.action_feedback.outcome,'success');
+  const completed=h.world.get();
+  const settled=completed.autonomy.recent.find(note=>note.kind==='completed'&&note.task_id===task.task_id).action_feedback;
+  assert.equal(settled.basis,'canonical_task');assert.equal(settled.status,'completed');assert.equal(settled.cause_event_id,task.cause_event_id);
+  h.restart();h.tick();assert.deepEqual(h.world.get(),completed);assert.equal(h.world.get().living.objects['seedling-rack'].stock.water,9);
 });
 test('material chain travels, crafts and carries an actual tray to the nursery',t=>{
   const h=fixture(t);h.tick();assert.equal(own(h.world.get()).plan.goal,'tray');h.run(115);
@@ -72,11 +77,20 @@ test('user pause is preserved; cancelled autonomy waits before choosing again',t
 test('failed wetness predicate refunds, records feedback and chooses drainage',t=>{
   const h=fixture(t);h.save(s=>{s.living.objects['garden-bed'].moisture=.2;});h.tick();h.save(s=>{s.living.objects['garden-bed'].moisture=.99;});
   h.advance(5*M);h.tick();assert.equal(own(h.world.get()).plan.status,'failed');assert.equal(h.world.get().living.objects['seedling-rack'].stock.water,12);
+  assert.equal(own(h.world.get()).last_feedback.action_feedback.outcome,'failure');
+  assert.equal(own(h.world.get()).last_feedback.action_feedback.execution,'settled_failure');
   h.advance(M);h.tick();assert.equal(own(h.world.get()).plan.goal,'drain');assert.ok(h.world.get().autonomy.recent.some(r=>r.kind==='replan'));
 });
 test('failed construction step cannot partially consume reserved materials',t=>{
   const h=fixture(t,{location:'spare-parts-house'});h.save(s=>{s.tasks=Array.from({length:100},(_,i)=>({task_id:`fixture-${i}`,actor_id:`outside-${i}`,status:'paused',kind:'care'}));});h.tick();
   assert.equal(h.world.get().living.objects['parts-drawers'].stock.wood,8);assert.equal(h.world.get().living.objects['parts-drawers'].stock.fasteners,12);assert.equal(own(h.world.get()).plan.status,'failed');
+  const receipt=own(h.world.get()).last_feedback.action_feedback;
+  assert.equal(receipt.execution,'not_executed');assert.equal(receipt.occurred,false);assert.equal(receipt.task_id,null);
+});
+test('missing historical task cannot acquire a canonical completion receipt',t=>{
+  const h=fixture(t);h.save(s=>{const state=own(s);state.plan={plan_id:'lost-plan',goal:'lost',title:'lost task',status:'executing',task_id:'no-longer-retained',steps:[],index:0,created_at:h.now().toISOString()};});
+  h.tick();const receipt=own(h.world.get()).last_feedback.action_feedback;
+  assert.equal(receipt.basis,'life_planner');assert.equal(receipt.outcome,'failure');assert.equal(receipt.execution,'not_executed');assert.equal(receipt.occurred,false);
 });
 test('night rest recovers energy through actual elapsed time without stopping ecology',t=>{
   const h=fixture(t,{location:'shaping-field-desk'});h.advance(12*60*M);h.tick();assert.equal(own(h.world.get()).plan.goal,'rest');

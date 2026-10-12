@@ -7,6 +7,7 @@
  */
 
 import { findWorldPath, worldHopAccess } from './world-map-content.mjs';
+import { actorCognitionContext } from './actor-perception.mjs';
 
 const DECISION_NAMESPACE = 'life.npc-agent-decisions';
 const DECISION_SCHEMA = 'deskbot.npc-agent-decision.v0.1';
@@ -65,6 +66,28 @@ function candidate({
   };
 }
 
+function cognitionTopicForAction(actionName) {
+  if (/route|marker|puddle|tide|observe/.test(actionName ?? '')) return 'explore';
+  if (/shadow|light/.test(actionName ?? '')) return 'explore';
+  if (/voice|reply|message/.test(actionName ?? '')) return 'connection';
+  return null;
+}
+
+function influencePerception(candidates, perception) {
+  const topics = new Map();
+  for (const item of [...(perception?.same_place ?? []), ...(perception?.delivered ?? []), ...(perception?.public ?? [])]) {
+    if (!item.topic) continue;
+    const weight = item.visibility === 'observed' || item.visibility === 'witnessed' ? 3 : item.visibility === 'delivered' ? 2 : 1;
+    topics.set(item.topic, Math.max(topics.get(item.topic) ?? 0, weight));
+  }
+  return candidates.map(item => {
+    const topic = cognitionTopicForAction(item.action_name);
+    const bonus = topic ? Math.min(3, topics.get(topic) ?? 0) : 0;
+    return { ...item, priority: item.priority + bonus, cognition_bonus: bonus,
+      cognition_source_ids: bonus ? [...(perception?.witnessed_facts ?? []).filter(f => f.topic === topic).map(f => f.id).slice(0, 4)] : [] };
+  });
+}
+
 export function createNpcAgentLoop({
   now = () => new Date(),
   persistence = null,
@@ -106,7 +129,7 @@ export function createNpcAgentLoop({
       .map(clone);
   }
 
-  function legalCandidates({ world, npc, profile, routine, scene = null }) {
+  function legalCandidates({ world, npc, profile, routine, scene = null, perception = null }) {
     const legal = new Set(profile?.legal_actions ?? []);
     const result = [];
     const currentLocation = npc.location_id;
@@ -144,7 +167,10 @@ export function createNpcAgentLoop({
       }
     }
 
-    const sceneAction = scene?.npc_actions?.[npc.npc_id];
+    // Only an NPC actually present in the projected Scene can consider its
+    // authored action. Passing the observer's global Scene is insufficient.
+    const visibleScene = perception?.same_place?.some(item => item.id === scene?.scene_id);
+    const sceneAction = visibleScene ? scene?.npc_actions?.[npc.npc_id] : null;
     if (sceneAction && legal.has(sceneAction.action_name)) {
       result.push(candidate({
         id: `scene:${sceneAction.action_name}`,
@@ -165,7 +191,7 @@ export function createNpcAgentLoop({
       }));
     }
 
-    return result;
+    return influencePerception(result, perception);
   }
 
   function chooseCandidate(candidates, context) {
@@ -212,8 +238,9 @@ export function createNpcAgentLoop({
       return clone(existing);
     }
 
-    const context = { npc, slot_key: slotKey(world), world_revision: world.world_revision };
-    const candidates = legalCandidates({ world, npc, profile: profile ?? profiles[npc.npc_id], routine: routine ?? routines[npc.npc_id], scene });
+    const perception = actorCognitionContext(world, npc.npc_id, now().toISOString());
+    const context = { npc, slot_key: slotKey(world), world_revision: world.world_revision, perception };
+    const candidates = legalCandidates({ world, npc, profile: profile ?? profiles[npc.npc_id], routine: routine ?? routines[npc.npc_id], scene, perception });
     const selected = chooseCandidate(candidates, context);
     if (!selected) return null;
     const autonomous = selected.candidate_id.startsWith('adjacent:')
@@ -229,6 +256,7 @@ export function createNpcAgentLoop({
       world_revision: world.world_revision,
       location_id: npc.location_id,
       legal_candidates: candidates,
+      perception: clone(perception),
       selected: clone(selected),
       selection_mode: autonomous ? 'autonomous_exploration' : 'routine_or_scene',
       status: 'planned',

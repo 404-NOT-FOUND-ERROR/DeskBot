@@ -1,3 +1,5 @@
+import { safeReplayMetadata, createRuntimeTraceRecorder } from './runtime-contracts.mjs';
+
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_BACKOFF_MS = Object.freeze([60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000, 30 * 60 * 1000]);
 const RUN_NAMESPACE = 'input-runtime.runs';
@@ -105,7 +107,7 @@ export function createInputRuntime({
     return persistRun(run);
   }
 
-  function completeRun(run, { completedAt, result, error = null, status = 'completed', skipped = false } = {}) {
+  function completeRun(run, { completedAt, result, error = null, status = 'completed', skipped = false, trace = null, request = null } = {}) {
     if (!run) return null;
     return persistRun({
       ...run,
@@ -114,6 +116,11 @@ export function createInputRuntime({
       error: error ? { ...error } : null,
       status,
       ...(skipped ? { skipped: true } : {}),
+      ...(trace ? { trace, replay: safeReplayMetadata({
+        pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
+        inputEventIds: [], outputEventIds: resultEventIds(result),
+        inputs: request,
+      }) } : {}),
     });
   }
 
@@ -197,6 +204,7 @@ export function createInputRuntime({
         error: run.error ?? null,
         status: run.status,
         ...(run.skipped ? { skipped: true } : {}),
+        ...(run.trace ? { trace: structuredClone(run.trace), replay: structuredClone(run.replay) } : {}),
       })),
     };
   }
@@ -210,8 +218,14 @@ export function createInputRuntime({
   async function refreshSource(source, { force = false } = {}) {
     const startedAt = now();
     const run = startRun(source, startedAt);
+    const request = { source_id: source.source_id, force, provider: source.provider, ttl_ms: source.ttl_ms };
+    const recorder = createRuntimeTraceRecorder({
+      runId: run.run_id, pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
+      startedAt, now,
+    });
     if (!due(source, force)) {
-      completeRun(run, { completedAt: now(), status: 'skipped', skipped: true });
+      completeRun(run, { completedAt: now(), status: 'skipped', skipped: true,
+        trace: recorder.finish({ status: 'skipped' }), request });
       return { source_id: source.source_id, skipped: true, reason: 'not_due', run_id: run.run_id };
     }
     const attemptedAt = startedAt.toISOString();
@@ -221,8 +235,10 @@ export function createInputRuntime({
     persist(source);
     let result = null;
     try {
-      result = await source.refresh({ force });
-      if (source.ingest && result?.event) await source.ingest(result.event, result);
+      result = await recorder.observe('input', () => source.refresh({ force }));
+      if (source.ingest && result?.event) await recorder.observe('perception', () => source.ingest(result.event, result), {
+        references: { event_ids: resultEventIds(result) },
+      });
       const providerStatus = result?.connector ?? null;
       const successAt = providerStatus?.last_success_at ?? result?.fetched_at ?? attemptedAt;
       source.last_success_at = iso(successAt) ?? attemptedAt;
@@ -234,7 +250,8 @@ export function createInputRuntime({
       source.provider = providerStatus?.provider ?? source.provider;
       source.next_attempt_at = new Date(Date.parse(source.last_success_at) + source.ttl_ms).toISOString();
       persist(source);
-      completeRun(run, { completedAt: now(), result, status: 'completed' });
+      completeRun(run, { completedAt: now(), result, status: 'completed',
+        trace: recorder.finish({ resultEventIds: resultEventIds(result) }), request });
       return { source_id: source.source_id, skipped: false, result, status: publicSource(source), run_id: run.run_id };
     } catch (error) {
       const detail = errorDetail(error);
@@ -246,7 +263,8 @@ export function createInputRuntime({
       const delay = Math.max(1000, Number.parseInt(backoffMs[index], 10) || DEFAULT_BACKOFF_MS[DEFAULT_BACKOFF_MS.length - 1]);
       source.next_attempt_at = new Date(now().getTime() + delay).toISOString();
       persist(source);
-      completeRun(run, { completedAt: now(), result, error: detail, status: 'error' });
+      completeRun(run, { completedAt: now(), result, error: detail, status: 'error',
+        trace: recorder.finish({ status: 'error', error: detail, resultEventIds: resultEventIds(result) }), request });
       return { source_id: source.source_id, skipped: false, error: detail, status: publicSource(source), run_id: run.run_id };
     }
   }

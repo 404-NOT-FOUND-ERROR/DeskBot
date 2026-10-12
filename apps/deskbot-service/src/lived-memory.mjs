@@ -4,6 +4,7 @@ import { ACTIVITIES } from './living-resources.mjs';
 import { syncDevelopmentEvidence, developmentReadModel } from './development-evidence.mjs';
 import { activityTopic, developmentFacetsReadModel } from './development-facets.mjs';
 import { safePracticalTrialMetadata } from './role-practical-trials.mjs';
+import { rankMemoryEpisodes, MEMORY_RECALL_POLICY } from './memory-ranking.mjs';
 
 export const MEMORY_VERSION = 'deskbot.lived-memory.v1';
 export const TOPICS = { care:'照料', craft:'制作', repair:'修缮', cook:'做饭', explore:'观察小镇', connection:'与人相处' };
@@ -79,6 +80,11 @@ export function remember(w,record) {
 }
 export function syncLivedMemory(w,at) {
   if(!w.memory)return;
+  // Migration fixtures and older persisted worlds may have maintenance/planner
+  // state without the legacy actor-interest projection. Recreate the bounded
+  // projection before recording canonical task outcomes; this is a read-model
+  // compatibility repair, not a new source of facts.
+  w.memory.actors ??= {};
   // Install the common-root projection before adding views so legacy interest
   // counters remain an unchanged historical record after the stage-3 migration.
   syncDevelopmentEvidence(w,at);
@@ -180,11 +186,11 @@ export function modelDevelopmentContext(w,actorId=w?.protagonist?.character_id) 
       self_assessment:{status:t.self_assessment.status,basis:'rules'},
       wish:{status:'not_established',stable_interest:t.wish?.stable_interest===true}}))};
 }
-export function retrieveLivedMemory(w,{actorId=w.protagonist.character_id,query='',limit=8,at=w.clock?.synced_at??w.updated_at}={}) {
-  const tokens=String(query).match(/[a-z0-9_-]+|[\u4e00-\u9fff]{2,4}/gi)??[];
-  return (w.memory?.episodes??[]).filter(e=>e.actor_ids.includes(actorId)).map((e,index)=>({e,index,
-    score:tokens.reduce((n,t)=>n+(e.text.includes(t)||TOPICS[e.topic]?.includes(t)?5:0),0)+(e.kind==='world_fact'?2:0)}))
-    .sort((a,b)=>b.score-a.score||b.index-a.index).slice(0,limit).map(({e})=>({...structuredClone(e),expired:Boolean(e.expires_at&&e.expires_at<=at)}));
+export function explainLivedMemoryRecall(w,{actorId=w.protagonist.character_id,query='',limit=8,at=w.clock?.synced_at??w.updated_at,...options}={}) {
+  return rankMemoryEpisodes(w.memory?.episodes,{...options,actorId,query,limit,at,topicLabel:topic=>TOPICS[topic]??''});
+}
+export function retrieveLivedMemory(w,options={}) {
+  return explainLivedMemoryRecall(w,options).selected;
 }
 // Automatic external reasoning receives fictional town records and public news only.
 // Private user accounts and physical reports remain in the local read model.
@@ -192,13 +198,24 @@ export function retrieveModelMemory(w,options={}) {
   const actorId=options.actorId??w.protagonist.character_id;
   const safe={...w,memory:w.memory?{...w.memory,episodes:w.memory.episodes.filter(e=>e.model_safe===true||
     (e.kind==='hearsay'&&e.source.kind==='external'&&/^https:\/\/science\.nasa\.gov\//.test(e.source.url??'')))}:null};
-  return retrieveLivedMemory(safe,{...options,actorId}).map(e=>({id:e.id,kind:e.kind,at:e.at,text:e.model_text??e.text,
-    topic:e.topic,outcome:e.outcome,expired:e.expired,evidence_ids:e.evidence_ids??[],source_kind:e.source.kind}));
+  const recalled=explainLivedMemoryRecall(safe,{...options,actorId,textForRecall:e=>e.model_text??e.text});
+  const ids=new Map(recalled.diagnostics.filter(row=>!['future','invalid_time'].includes(row.dropped)).map(row=>[row.memory_id,
+    /^memory:[a-f0-9]{24}$/.test(row.memory_id)?row.memory_id:`memory:${digest(String(row.memory_id))}`]));
+  const sourceKinds=new Set(['canonical_task','resident_project','canonical_commitment','model_choice','reflection','external']);
+  const project=e=>({id:ids.get(e.id),kind:e.kind,at:e.at,text:e.model_text??e.text,
+    topic:Object.hasOwn(TOPICS,e.topic??'')?e.topic:null,outcome:e.outcome,expired:e.expired,
+    evidence_ids:[...new Set(e.evidence_ids??[])].filter(id=>ids.has(id)).map(id=>ids.get(id)),
+    source_kind:sourceKinds.has(e.source?.kind)?e.source.kind:'other',
+    memory_stream:e.memory_stream,event_anchor:`memory-root:${digest(String(e.event_anchor))}`,
+    linked_memory_ids:(e.linked_memory_ids??[]).filter(id=>ids.has(id)).map(id=>ids.get(id)),
+    factual_sources:(e.factual_sources??[]).map(f=>({id:ids.get(f.id),kind:'world_fact',memory_stream:'factual',
+      at:f.at,text:f.model_text??f.text,topic:Object.hasOwn(TOPICS,f.topic??'')?f.topic:null,outcome:f.outcome,expired:f.expired}))});
+  return recalled.selected.map(project);
 }
 export function memoryReadModel(w) {
   if(!w.memory)return null;
   const m=w.memory;
-  return {schema:m.schema,installed_at:m.installed_at,revision:m.revision,identity_preserved:true,owner_id:w.protagonist.character_id,
+  return {schema:m.schema,installed_at:m.installed_at,revision:m.revision,identity_preserved:true,owner_id:w.protagonist.character_id,recall_policy:MEMORY_RECALL_POLICY,
     development:developmentReadModel(w),
     counts:Object.fromEntries(['world_fact','personal_interpretation','hearsay'].map(kind=>[kind,m.episodes.filter(e=>e.kind===kind).length])),
     actors:Object.values(m.actors).map(a=>({...structuredClone(a),display_name:a.actor_id===w.protagonist.character_id?w.protagonist.display_name:w.npcs.find(n=>n.npc_id===a.actor_id)?.display_name})),

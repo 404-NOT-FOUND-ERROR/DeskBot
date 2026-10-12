@@ -226,6 +226,10 @@ function causalSceneConsumed(world, branch, eventIds, experienceIds) {
     && sameStrings([...(scene.cause_experience_ids ?? [])].sort(), [...experienceIds].sort()));
 }
 
+function causalSceneKey(branchKey, eventIds = [], experienceIds = []) {
+  return JSON.stringify([branchKey, [...eventIds].sort(), [...experienceIds].sort()]);
+}
+
 function causalCause(world, branch) {
   if (branch.experience) {
     const experience = [...(world.life?.recent_experiences ?? [])].reverse().find(item => item.npc_id === branch.experience.npc_id
@@ -242,7 +246,7 @@ function causalCause(world, branch) {
   return event ? { eventIds: [event.event_id], experienceIds: [] } : null;
 }
 
-function selectCausalScene(world, now, { roleStages = [] } = {}) {
+function selectCausalScene(world, now, { roleStages = [], committedCausalScenes = new Set() } = {}) {
   const locationId = world.protagonist.location_id;
   const slot = Math.floor(now.getTime() / SLOT_MS);
   for (const branch of CAUSAL_SCENE_BRANCHES) {
@@ -250,12 +254,19 @@ function selectCausalScene(world, now, { roleStages = [] } = {}) {
     if (!cause) continue;
     const current = world.life?.current_scene ?? null;
     const sameCurrent = current?.branch_key === branch.id
+      && current.location_id === locationId
+      && current.content_version === LIFE_CONTENT_VERSION
       && sameStrings([...(current.cause_event_ids ?? [])].sort(), [...cause.eventIds].sort())
       && sameStrings([...(current.cause_experience_ids ?? [])].sort(), [...cause.experienceIds].sort());
-    if (causalSceneConsumed(world, branch, cause.eventIds, cause.experienceIds) && !sameCurrent) continue;
+    const consumed = causalSceneConsumed(world, branch, cause.eventIds, cause.experienceIds)
+      || committedCausalScenes.has(causalSceneKey(branch.id, cause.eventIds, cause.experienceIds));
+    if (consumed && !sameCurrent) continue;
     const startSlot = sameCurrent && current.started_at ? Math.floor(Date.parse(current.started_at) / SLOT_MS) : slot;
     if (sameCurrent && slot > startSlot) continue;
     const participants = (world.npcs ?? []).filter(npc => npc.location_id === locationId && activeWorldTask(world, npc.npc_id)?.kind !== 'travel').map(npc => npc.npc_id).sort();
+    // A causal occurrence is immutable once shown. A departing participant is
+    // a new local scene, not a second rendering of the same cause event.
+    if (sameCurrent && !sameStrings([...(current.participants ?? [])].sort(), participants)) continue;
     const causeKey = [...cause.eventIds, ...cause.experienceIds].join(':');
     const contextSuffix = createHash('sha256').update(`${LIFE_CONTENT_VERSION}:${branch.id}:${causeKey}:${locationId}`).digest('hex').slice(0, 6);
     return {
@@ -298,11 +309,11 @@ function selectCausalScene(world, now, { roleStages = [] } = {}) {
   return null;
 }
 
-function selectScene(world, now, { roleStages = [] } = {}) {
+function selectScene(world, now, { roleStages = [], committedCausalScenes = new Set() } = {}) {
   const livedOptions = { roleStages, timeBand: timeBand(world.logical_time?.minute_of_day ?? 0) };
   const lived = selectLivedScene(world, now, { ...livedOptions, includeQuiet: false });
   if (lived) return lived;
-  const causal = selectCausalScene(world, now, { roleStages });
+  const causal = selectCausalScene(world, now, { roleStages, committedCausalScenes });
   if (causal) return causal;
   const quiet = selectLivedScene(world, now, livedOptions);
   if (quiet) return quiet;
@@ -475,10 +486,37 @@ export function createWorldLife({
     routines: NPC_ROUTINES,
     enabled,
   });
+  const committedCausalScenes = new Set();
+  let causalLedgerSequence = 0;
 
-  function roleContext(characterId = DEFAULT_CHARACTER_ID) {
+  function refreshCommittedCausalScenes() {
+    const remember = mutation => {
+      const scene = mutation.action === 'set_life_scene' ? mutation.details?.scene : null;
+      if (scene?.branch_key && scene.template_id === scene.branch_key) {
+        committedCausalScenes.add(causalSceneKey(scene.branch_key, scene.cause_event_ids, scene.cause_experience_ids));
+      }
+      causalLedgerSequence = Math.max(causalLedgerSequence, mutation.sequence ?? 0);
+    };
+    // recent_scenes is only a bounded presentation window. Consumption is a
+    // read-only index of the durable ledger, including scenes outside it.
+    if (typeof listMutations === 'function') {
+      while (true) {
+        const page = listMutations({ afterSequence: causalLedgerSequence, limit: 200 });
+        if (!page.length) break;
+        const previousSequence = causalLedgerSequence;
+        page.forEach(remember);
+        if (page.length < 200 || causalLedgerSequence <= previousSequence) break;
+      }
+    } else if (persistence?.list) {
+      for (const mutation of persistence.list('canonical-world.mutations')) {
+        if ((mutation.sequence ?? 0) > causalLedgerSequence) remember(mutation);
+      }
+    }
+  }
+
+  function roleContext(characterId = DEFAULT_CHARACTER_ID, worldOverride = null) {
     if (typeof roleStages !== 'function') return [];
-    const stages = roleStages(characterId);
+    const stages = roleStages(characterId, worldOverride);
     return Array.isArray(stages) ? structuredClone(stages) : [];
   }
 
@@ -505,10 +543,12 @@ export function createWorldLife({
     }
   }
 
-  function snapshot() {
-    const world = worldSnapshot();
+  function snapshot(worldOverride = null) {
+    // The observer passes the exact immutable canonical clone it read for its
+    // map/feed projection.  Normal callers retain the existing live read.
+    const world = worldOverride && typeof worldOverride === 'object' ? worldOverride : worldSnapshot();
     const currentLocationId = world.protagonist.location_id;
-    const stages = roleContext();
+    const stages = roleContext(DEFAULT_CHARACTER_ID, world);
     return {
       schema: 'deskbot.world-life.v0.3',
       enabled,
@@ -626,7 +666,8 @@ export function createWorldLife({
     let world = worldSnapshot();
     if (activeWorldTask(world)?.kind === 'travel') return snapshot();
     const effectiveNow = replayNow instanceof Date && !Number.isNaN(replayNow.getTime()) ? replayNow : now();
-    const selected = selectScene(world, effectiveNow, { roleStages: roleContext() });
+    refreshCommittedCausalScenes();
+    const selected = selectScene(world, effectiveNow, { roleStages: roleContext(), committedCausalScenes });
     const current = world.life?.current_scene;
     const sameParticipants = sameStrings([...(current?.participants ?? [])].sort(), selected.participants);
     const sameContext = current

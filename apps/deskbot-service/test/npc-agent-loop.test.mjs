@@ -80,6 +80,24 @@ test('agent never proposes a non-adjacent destination', () => {
   assert.ok(decision.legal_candidates.every((candidate) => candidate.location_id !== 'market'));
 });
 
+test('NPC cognition is location-bounded and does not turn dialogue into a fact', () => {
+  const current = {
+    ...worldAt(),
+    life: { current_scene: { scene_id: 'remote-scene', location_id: 'market',
+      title: '远处场景', npc_actions: { 'npc-1': { action_name: 'scene_action', status: '远处发生的动作' } } } },
+    memory: { episodes: [
+      { id: 'assistant', kind: 'personal_interpretation', actor_ids: ['npc-1'], model_safe: true,
+        source: { kind: 'reflection' }, topic: 'explore', at: '2026-10-12T00:00:00.000Z', model_text: '你应该去远处。' },
+    ] },
+  };
+  const profileWithScene = { ...profile, legal_actions: [...profile.legal_actions, 'scene_action'] };
+  const loop = createNpcAgentLoop({ profiles: { 'npc-1': profileWithScene }, routines: { 'npc-1': routine }, worldSnapshot: () => current });
+  const decision = loop.decide({ world: current, npc: current.npcs[0] });
+  assert.equal(decision.legal_candidates.some(candidate => candidate.action_name === 'scene_action'), false);
+  assert.equal(decision.perception.witnessed_facts.length, 0);
+  assert.doesNotMatch(JSON.stringify(decision.perception), /你应该去远处/);
+});
+
 test('autonomous exploration is stable and remains on an adjacent edge', () => {
   let selected = null;
   for (let minute = 0; minute < 1440 && !selected; minute += 120) {

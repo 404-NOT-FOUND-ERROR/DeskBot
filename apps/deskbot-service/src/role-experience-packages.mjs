@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * Versioned role experience packages are the authored source of truth for a
  * role direction.  A package describes how one direction is lived and
@@ -15,6 +17,18 @@ const unique = (values) => [...new Set((Array.isArray(values) ? values : [])
   .map((value) => value.trim()))];
 const text = (value, fallback = '') => typeof value === 'string' && value.trim() ? value.trim() : fallback;
 const clone = (value) => structuredClone(value);
+
+// Keep the freeze verification here rather than importing role-stages.mjs.
+// role-stages already depends on this registry, and a reverse import would
+// make the stage read model sensitive to module initialization order.
+const stableStringify = value => {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+const packageDigest = value => createHash('sha256').update(stableStringify(value)).digest('hex');
 
 function required(value, field, errors) {
   if (!text(value)) errors.push(`${field} must be a non-empty string`);
@@ -148,6 +162,63 @@ export function getRoleExperiencePackage(directionOrPackageId) {
   const value = ROLE_EXPERIENCE_PACKAGES[directionOrPackageId]
     ?? Object.values(ROLE_EXPERIENCE_PACKAGES).find(item => item.package_id === directionOrPackageId);
   return value ? clone(value) : null;
+}
+
+/**
+ * Resolve the authored experience bound to an accepted role stage.
+ *
+ * A stage is a historical decision: when it carries an immutable
+ * experience_freeze, that snapshot is the only source that may be used.  A
+ * malformed or tampered freeze deliberately resolves to null instead of
+ * silently reading the package currently in the authored registry.  The
+ * latter is reserved for legacy stages created before freezes existed (and
+ * for read-model projections explicitly marked legacy_fallback).
+ *
+ * The function accepts both canonical stage records (experience_freeze) and
+ * stage read-model projections (experience + asset_binding) so prompt and UI
+ * callers share exactly the same boundary.
+ */
+export function resolveStageRoleExperience(stage) {
+  if (!stage?.direction_id) return null;
+
+  const hasFreeze = Object.prototype.hasOwnProperty.call(stage, 'experience_freeze');
+  const freeze = stage.experience_freeze;
+  if (hasFreeze) {
+    if (!freeze || typeof freeze !== 'object' || freeze.schema !== 'deskbot.role-stage-experience-freeze.v1'
+      || freeze.direction_id !== stage.direction_id
+      || !freeze.package || typeof freeze.package !== 'object'
+      || freeze.package_id !== freeze.package.package_id
+      || freeze.package_version !== freeze.package.version
+      || typeof freeze.content_hash !== 'string'
+      || freeze.content_hash !== packageDigest(freeze.package)) return null;
+    const check = validateRoleExperiencePackage(freeze.package);
+    return check.valid && check.value.direction_id === stage.direction_id
+      && (!stage.axis || check.value.axis === stage.axis) ? clone(check.value) : null;
+  }
+
+  const binding = stage.asset_binding ?? stage.experience?.asset_binding
+    ?? (stage.experience?.source ? stage.experience : null);
+  if (binding?.source === 'invalid_freeze') return null;
+  if (binding?.source === 'frozen') {
+    const projected = stage.experience?.package ?? stage.experience;
+    if (!projected || projected.schema !== ROLE_EXPERIENCE_PACKAGE_SCHEMA
+      || projected.direction_id !== stage.direction_id
+      || binding.package_id !== projected.package_id
+      || binding.package_version !== projected.version
+      || typeof binding.content_hash !== 'string'
+      || binding.content_hash !== packageDigest(projected)) return null;
+    const check = validateRoleExperiencePackage(projected);
+    return check.valid && (!stage.axis || check.value.axis === stage.axis) ? clone(check.value) : null;
+  }
+
+  // A projection may carry the package with a legacy binding.  Validate it,
+  // but do not treat an arbitrary unbound package as a historical freeze.
+  if (binding?.source === 'legacy_fallback' && stage.experience) {
+    const check = validateRoleExperiencePackage(stage.experience?.package ?? stage.experience);
+    if (check.valid && check.value.direction_id === stage.direction_id
+      && (!stage.axis || check.value.axis === stage.axis)) return clone(check.value);
+  }
+  return getRoleExperiencePackage(stage.direction_id);
 }
 
 export function listRoleExperiencePackages({ status = null, axis = null } = {}) {

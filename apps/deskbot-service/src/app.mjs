@@ -6,6 +6,7 @@ import { createSharedLife } from './shared-life.mjs';
 import { createSharedLifeReports } from './shared-life-reports.mjs';
 import { createNpcGoals } from './npc-goals.mjs';
 import { createWorldLife } from './world-life.mjs';
+import { createWorldObserver } from './world-observer.mjs';
 import { RESIDENT_VERSION } from './resident-life.mjs';
 import { socialReadModel } from './social-life.mjs';
 import { REFRACTION_VERSION, LIFE_SUGGESTIONS, refractionReadModel } from './input-refraction.mjs';
@@ -19,6 +20,7 @@ import { createWorldContext } from './world-context.mjs';
 import { MEMORY_VERSION, memoryReadModel } from './lived-memory.mjs';
 import { DEVELOPMENT_VERSION, developmentReadModel } from './development-evidence.mjs';
 import { createLifeChoiceWorker } from './life-choice.mjs';
+import { createSlowCognitionWorker } from './slow-cognition.mjs';
 import { createFakeLlm, LlmProviderError } from './llm.mjs';
 import { createChatOrchestrator } from './chat-orchestrator.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
@@ -37,7 +39,7 @@ import { computeFantasyPull } from './fantasy-pull.mjs';
 import { createRoleProposalStore, RoleProposalError } from './role-proposals.mjs';
 import { createRoleEvolution } from './role-evolution.mjs';
 import { practicalTrialReadModel } from './role-practical-trials.mjs';
-import { roleStageReadModel } from './role-stages.mjs';
+import { roleStageReadModel, roleStagesReadModel } from './role-stages.mjs';
 import { createWorldCandidateStore, WorldCandidateError } from './world-candidates.mjs';
 import { listRoleExperiencePackages } from './role-experience-packages.mjs';
 import { roleExperiencePerformance } from './role-experience-performance.mjs';
@@ -178,6 +180,7 @@ export function createDeskBotServer({
   voiceIngress,
   websocket = true,
   websocketPath = '/ws',
+  worldStreamEnabled = true,
   worldLifeEnabled = false,
   autonomousLifeEnabled = false,
   residentLifeEnabled = false,
@@ -232,13 +235,14 @@ export function createDeskBotServer({
     listMutations: options => persistentWorld.listMutations(options),
     npcGoals,
     persistence,
-    roleStages: (characterId) => roleEvolution.currentStages({ characterId }),
+    roleStages: (characterId, worldOverride) => roleEvolution.currentStages({ characterId, worldOverride }),
     llm,
     enabled: worldLifeEnabled,
   });
   const reservedForLife=() => persistentWorld.get().npcs.filter(n => npcGoals.reserved(n.npc_id) || sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending','waiting','failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === n.npc_id))).map(n => n.npc_id);
   const autonomousLife = createAutonomousLife({ world: persistentWorld, now, enabled: autonomousLifeEnabled,reserved:reservedForLife });
   let lifeChoiceWorker;
+  let slowCognitionWorker;
   function tickAutonomousLife(options) {
     try { const result=autonomousLife.tick(options);void lifeChoiceWorker?.tick().catch(()=>{});return result; }
     catch (error) { console.error(`[autonomous-life] ${error.message}`); return { error: error.code ?? 'life_tick_failed' }; }
@@ -246,6 +250,7 @@ export function createDeskBotServer({
   lifeChoiceWorker=createLifeChoiceWorker({world:persistentWorld,llm,now,
     reserved:reservedForLife,
     wake:id=>autonomousLife.tick({wakeId:id})});
+  slowCognitionWorker=createSlowCognitionWorker({world:persistentWorld,llm,now,enabled:livedMemoryEnabled});
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -547,7 +552,24 @@ export function createDeskBotServer({
     }
   }
 
+  const worldObserver = createWorldObserver({
+    persistentWorld, worldLife, now,
+    mapReadModel: (world, options) => {
+      const map = getWorldMap(world, options);
+      if (map?.refraction) map.refraction = inputReadModel(world);
+      return map;
+    },
+    roleWishes: world => {
+      const characterId = world.protagonist.character_id;
+      return { world_revision: world.world_revision,
+        evolution: { schema: 'deskbot.role-evolution-public.v1',
+          wishes: roleEvolution.wishView({ characterId, worldOverride: world }),
+          role_stages: roleStagesReadModel(world, { actorId: characterId }) },
+        proposals: roleEvolution.wishProposals({ characterId, limit: 40, worldOverride: world }) };
+    },
+  });
   const server = createServer((request, response) => {
+    if (worldObserver.handleHttp(request, response)) return;
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (url.pathname === '/api/life/story-packages') {
       if (request.method === 'GET') { sendJson(response, 200, { schema: 'deskbot.story-package-list.v0.1', packages: listStoryPackages() }); return; }
@@ -658,24 +680,54 @@ export function createDeskBotServer({
       }
       const afterId = url.searchParams.get('after_id');
       const beforeId = url.searchParams.get('before_id');
+      const headRaw = url.searchParams.get('head_sequence');
+      const headSequence = headRaw === null ? null : Number(headRaw);
+      if (headRaw !== null && (headRaw.trim() === '' || !/^\d+$/.test(headRaw) || !Number.isSafeInteger(headSequence) || headSequence < 0)) {
+        throw new InputError(400, 'invalid_life_feed_cursor', 'Life feed head sequence must be a non-negative integer');
+      }
       const limit = Number(url.searchParams.get('limit') ?? 50);
       const kind = url.searchParams.get('kind') || null;
-      const entries = persistentWorld.listLifeFeed({ afterSequence, beforeSequence, afterId, beforeId, limit, kind });
-      const firstSequence = entries[0]?.provenance?.sequence ?? null;
-      const lastSequence = entries.at(-1)?.provenance?.sequence ?? null;
-      const firstId = entries[0]?.id ?? null;
-      const lastId = entries.at(-1)?.id ?? null;
-      const allBefore = firstId === null ? [] : persistentWorld.listLifeFeed({ beforeId: firstId, limit: 1, kind });
-      const allAfter = lastId === null ? [] : persistentWorld.listLifeFeed({ afterId: lastId, limit: 1, kind });
-      sendJson(response, 200, {
-        schema: 'deskbot.world-life-feed-response.v1',
-        world_id: persistentWorld.get()?.world_id ?? null,
-        world_revision: persistentWorld.get()?.world_revision ?? null,
-        entries,
-        cursor: { before_id: firstId, after_id: lastId, before_sequence: firstSequence, after_sequence: lastSequence, has_more_before: allBefore.length > 0, has_more_after: allAfter.length > 0 },
-      });
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
+        throw new InputError(400, 'invalid_life_feed_limit', 'Life feed limit must be an integer from 1 to 200');
+      }
+      const page = persistentWorld.readLifeFeedPage({ worldId: url.searchParams.get('world_id') ?? undefined,
+        afterSequence, beforeSequence, afterId, beforeId, headSequence, limit, kind });
+      sendJson(response, 200, page);
       } catch (error) {
         sendJson(response, error.statusCode ?? 500, { error: error.code ?? 'internal_error', message: error.message });
+      }
+      return;
+    }
+    if (url.pathname === '/api/world/history/at') {
+      if (request.method !== 'GET') {
+        sendJson(response, 405, { error: 'method_not_allowed' });
+        return;
+      }
+      try {
+        const rawSequence = url.searchParams.get('sequence');
+        const sequence = rawSequence === null || !/^(0|[1-9]\d*)$/.test(rawSequence) ? NaN : Number(rawSequence);
+        const history = persistentWorld.readWorldAtSequence({
+          worldId: url.searchParams.get('world_id') ?? undefined,
+          sequence,
+        });
+        const projectionTime = new Date(history.mutation?.committed_at ?? history.world.updated_at);
+        const map = getWorldMap(history.world, { projectionTime });
+        const result = {
+          schema: 'deskbot.world-history-at.v1',
+          world_id: history.world.world_id,
+          sequence: history.sequence,
+          head_sequence: history.head_sequence,
+          world_revision: history.world.world_revision,
+          mutation: history.mutation,
+          map,
+        };
+        if (Buffer.byteLength(JSON.stringify(result)) > 2 * 1024 * 1024) {
+          throw new PersistentWorldError(413, 'history_projection_too_large', 'History projection exceeds the response limit');
+        }
+        sendJson(response, 200, result);
+      } catch (error) {
+        sendJson(response, error.statusCode ?? 500, { error: error.code ?? 'history_read_failed', message: error.message,
+          ...(error.historyBoundary ? { history_boundary: error.historyBoundary } : {}) });
       }
       return;
     }
@@ -2115,7 +2167,6 @@ export function createDeskBotServer({
   const deviceBridge = websocket === false
     ? null
     : createWebSocketBridge({
-      server,
       path: websocketPath,
       now,
       deviceRegistry,
@@ -2189,12 +2240,24 @@ export function createDeskBotServer({
         }
         : null,
     });
+  // Route upgrades once. The firmware bridge rejects unknown paths itself,
+  // so two independent upgrade listeners would race and close world streams.
+  const worldUpgrade = (request, socket, head) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    if (worldStreamEnabled && worldObserver.handleUpgrade(request, socket, head)) return;
+    if (deviceBridge && url.pathname === websocketPath) { deviceBridge.handleUpgrade(request, socket, head); return; }
+    socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+  };
+  server.on('upgrade', worldUpgrade);
+  server.once('close', () => { worldObserver.close(); deviceBridge?.close(); server.off('upgrade', worldUpgrade); });
+  server.worldObserver = worldObserver;
   server.websocketBridge = deviceBridge;
   server.sharedLife = sharedLife;
   server.sharedLifeReports = sharedLifeReports;
   server.worldLife = worldLife;
   server.autonomousLife = autonomousLife;
   server.lifeChoiceWorker=lifeChoiceWorker;
+  server.slowCognitionWorker=slowCognitionWorker;
   server.inputRuntime = inputRuntime;
   server.roleEvolution = roleEvolution;
   server.worldCandidates = worldCandidates;
@@ -2239,6 +2302,7 @@ export function createDeskBotServer({
     }
     if(livedMemoryEnabled)tickAutonomousLife();
     void lifeChoiceWorker.tick().catch(()=>{});
+    void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] startup failed: ${error.message}`));
     worldLife.tick();
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
@@ -2264,6 +2328,7 @@ export function createDeskBotServer({
       sharedLife.tick();
       npcGoals.tick();
       tickAutonomousLife();
+      void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] scheduled failed: ${error.message}`));
       worldLife.tick();
     }, 60_000);
     timer.unref();
@@ -2272,6 +2337,7 @@ export function createDeskBotServer({
         persistentWorld.syncWallClock?.();
         const result = persistentWorld.syncTasks?.();
         if (result?.processed) { roleEvolution.syncAll(); sharedLife.tick(); npcGoals.tick(); tickAutonomousLife(); worldLife.tick(); }
+        void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] task reconciliation failed: ${error.message}`));
       }
       catch (error) { console.error(`[world-tasks] scheduled reconciliation failed: ${error.message}`); }
     }, timeMode === 'realtime' || persistentWorld.get().clock?.mode === 'real_time' ? 1000 : 60_000);
@@ -2279,7 +2345,7 @@ export function createDeskBotServer({
     server.once('close', () => {
       clearInterval(timer);
       clearInterval(taskTimer);
-      inputRuntime.stop();lifeChoiceWorker.stop();
+      inputRuntime.stop();lifeChoiceWorker.stop();slowCognitionWorker.stop();
     });
   });
   return server;

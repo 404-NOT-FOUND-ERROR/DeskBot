@@ -94,7 +94,9 @@ export function createOpenAiCompatibleLlm({
     async complete({ prompt, purpose }) {
       const promptText = requireText(prompt, 'prompt');
       const choosing=purpose==='life_choice';
-      const attempts = choosing?1:Math.max(0, Number(emptyResponseRetries)) + 1;
+      const reflecting=purpose==='slow_cognition';
+      const structured=choosing||reflecting;
+      const attempts = structured?1:Math.max(0, Number(emptyResponseRetries)) + 1;
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         let response;
@@ -111,9 +113,9 @@ export function createOpenAiCompatibleLlm({
               stream: false,
               temperature: samplingTemperature,
               ...(thinking ? { thinking: { type: thinking } } : {}),
-              ...(choosing ? {max_tokens:512,response_format:{type:'json_object'}} : max_tokens ? { max_tokens } : {}),
+              ...(structured ? {max_tokens:reflecting?1600:512,response_format:{type:'json_object'}} : max_tokens ? { max_tokens } : {}),
             }),
-            signal: AbortSignal.timeout(choosing?20_000:timeoutMs),
+            signal: AbortSignal.timeout(structured?Math.min(20_000,timeoutMs):timeoutMs),
           });
         } catch (error) {
           lastError = new LlmProviderError('llm_transport_error', 'LLM request failed before a provider response was received', {

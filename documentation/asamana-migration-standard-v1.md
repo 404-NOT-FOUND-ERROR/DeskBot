@@ -1,0 +1,68 @@
+# Asamana 迁移标准 v1
+
+状态：`adopted`（迁移标准）；具体能力按下表分别标记 `planned`、`implemented`、`automated verified` 或 `manual pending`。
+
+本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
+
+## 1. 迁移结论
+
+可以迁移的是工程机制，不是产品哲学：
+
+- 迁移“感知 → 动机 → 决策 → 行动 → 反馈”的阶段化编排，减少一个无限增长的 agent loop。
+- 迁移 typed JSON/结构化阶段合同、运行 trace 和回放元数据。
+- 迁移 SoulLayer/StateLayer 分离；在 DeskBot 现有 `world_fact`、`personal_interpretation`、`hearsay` 三类记录上增加只读的事实/解释/听闻 stream 投影、R/I/R（词法相关性/近期性/重要性）和 MMR 去重，不新增第二套 memory writer。
+- 迁移慢认知维护：衰减、压缩、反思、长期目标修订和关系演化。
+- 迁移 cadence gate，使自治频率由需要、情绪、压力和空闲超时共同决定。
+- 迁移受权限控制的 mutation channel、作者权限、观察依据、snapshot/replay/event sequence 和前端按序渲染；Asamana 的 mutation channel 不是其所有世界事实的唯一写入口，DeskBot 仍以 `persistentWorld.ingest` 作为唯一 canonical 写入口。
+- 迁移行动仲裁后的结构化反馈合同：计划、开始、资源转移、成功、真实执行失败、取消和未执行必须分开；回执为 `audit_only`，以 canonical task 为依据，不能授权写世界或从台词推断结果。
+
+明确不迁移：
+
+- Asamana 的“AI as a human”作为 DeskBot 的人格定义；喵呜仍是奇幻潮玩生命体，不被拉回完整拟人。
+- Asamana 的单主题、有限步数世界作为 DeskBot 的时钟。DeskBot 继续使用现实 1:1 时间，重启恢复已发生的事务但不补造停机期间未安排的生活。
+- Python 文件快照替换 DeskBot 的 SQLite canonical world。
+- 可直接修改世界的导演/`direct` 接口。DeskBot 的外部输入必须经过 evidence → candidate → preview → accept → `persistentWorld.ingest`。
+- 固定外观 SoulLayer。DeskBot 的外壳、职业和表达必须由已采用的 role stage 派生，且虚拟形态不等于真实外壳已经更换。
+
+## 2. 权威边界
+
+`persistentWorld.ingest` 是世界事实唯一写入口；proposal/trial/stage 是角色生命周期唯一状态机；客户端和 LLM 只能提交受限请求或合法候选。runtime trace 是 `audit_only`，不能反向成为 prompt、evidence、角色分数或世界事实。
+
+| 对象 | 唯一权威 | 允许的迁移影响 |
+| --- | --- | --- |
+| 世界事实、资源、任务、位置、revision | `persistent-world.mjs` / SQLite | 只能增加审计与回放元数据 |
+| 角色愿望、试做、阶段 | `role-proposals.mjs`、`role-practical-trials.mjs`、`role-stages.mjs` | 只能增加证据引用、trace 和投影 |
+| 记忆 | `lived-memory.mjs` | 改善只读召回，不因召回重复增加成长 |
+| 现实来源 | `input-runtime.mjs`、受信 adapter | 增加运行合同，不能授予来源写权限 |
+| 场景和客户端 | canonical read model | 增加序列门控，不能维护第二个可写世界 |
+
+## 3. 共同合同
+
+所有迁移模块必须满足：
+
+1. 事件、证据、决策和 mutation 使用稳定 ID；同一输入重放不得重复计数。
+2. 跨模块传递优先使用版本化 JSON 合同；自由文本只作为叙事呈现，不作为状态写入协议。
+3. trace 记录真实阶段，不凭空补造未执行阶段；模型“调用成功”与“结果解析/采纳成功”分开。
+4. preview 无副作用；accept 重新校验过期、预期 revision、权限和领域规则。
+5. 任何自动化都要能从 SQLite 重启恢复；恢复不重新计费、不重复写事实。
+6. 失败、未知、未执行、被拒绝和已完成必须可区分，且能按 run/event 追溯。
+7. 迁移不扩大外部输入、网页内容、设备输出或客户端的信任边界。
+
+## 4. 当前证据
+
+已在本地落地并验证：
+
+- `runtime-contracts.mjs`：阶段顺序、trace recorder、稳定输入指纹和 replay metadata；专项测试已通过。
+- `input-runtime.mjs`：真实 input/perception seam 的运行记录，保留 TTL、失败退避、SQLite 恢复和来源隔离。
+- `role-evolution.mjs`、`world-candidates.mjs`：增加审计型 replay 引用，不改原状态机和世界写权限。
+- `memory-ranking.mjs`、`lived-memory.mjs`：中文 bigram/英文 token 的词法 cosine 相关性，固定 `.7/.2/.1` 权重，近期半衰期 72h，三类记录衰减半衰期 336/168/72h，以及同锚点/高相似度 MMR 的只读召回投影。它不会压缩、删除、写回兴趣或增加证据；重要性使用存档值或规则默认值，未新增模型评分。
+- Jev Town 客户端生活 feed：优先按 canonical mutation sequence 排序，刷新重叠时不让旧响应回滚叙事。
+
+- `slow-cognition.mjs` / `cognition-cadence.mjs`：每日有来源的反思、有限目标与主观关系视图，以及需要/压力/真实反馈/最大空闲的决策调度。慢认知目标的 `activity_id` 只能绑定引用的同话题 canonical activity；`null` 只保留兴趣意图，其他同话题活动不能冒充目标成果。新理解不变成独立成长证据，也不直接写资源、角色阶段或关系数值。
+- `social-life.mjs`：只用有效、未过期且有双方共同事实支撑的主观关系视图影响同优先级合法来往的排序，偏好分数限制在 `-3..3`；信任、相遇和兑现计数仍只由实际见面、兑现或失败更新，并保留事务、任务和事件来源引用。
+- `actor-perception.mjs`、`world-message-transport.mjs`：区分亲历、同地观察、延迟投递、公开消息和未知；消息查询使用明确的 `at`，非法源日期隔离，送达后撤回保留原文与状态历史并标记 `historical_only`，不再产生行动偏好。全镇观察面板不赋予主角全知。
+- `world-observer.mjs`、`replay-tape.mjs` 与客户端历史面板：统一 live/read payload、序号与 render gate；历史读取核验 ledger，不执行行动、不重调模型、不改正式世界。历史分页冻结 `head_sequence`，同时报告 `current_sequence`，使用 before/after cursor 和同一提交内的 `item_index`；客户端保持有界窗口并支持回最近与 `after_sequence` 恢复。正式旧历史存在完整性不符时返回 `history_unavailable`。
+- `action-feedback.mjs`：以 `deskbot.action-feedback.v1` 固定 `authority=audit_only`，保存稳定回执 ID、因果事件、任务状态和失败分类；真实任务失败仍是一次发生过的尝试，而没有 canonical task 的“完成”文本只能是 `not_executed`。
+- 阶段体验包采用时冻结 version/snapshot/hash，已有阶段的生活、表达、TTS 意图与虚拟外观不会被新 registry 静默改写。
+
+以上为本分支的本地实现与验证记录。隔离两日 M8 回放及重启/重复规则已自动验证；新序列历史回放与真实迁移断层拒绝已自动验证。本轮浏览器已人工验收 DeskBot 页面加载、实时地图/居民、往事面板、向前/向后单条翻阅、加载更早记录、回到最近和恢复实时；Asamana 已人工验收示例世界、人物认知、叙事流、回放滑条和沉浸视图。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。

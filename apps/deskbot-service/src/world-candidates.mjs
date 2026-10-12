@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { previewWorldMutations } from './persistent-world.mjs';
+import { safeReplayMetadata, createRuntimeTraceRecorder } from './runtime-contracts.mjs';
 
 /**
  * World candidates are an approval boundary between an external observation
@@ -352,6 +353,8 @@ export function createWorldCandidateStore({
       accepted_at: candidate.accepted_at ?? timestamp,
       updated_at: timestamp,
       decision_id: decision.decision_id,
+      accepted_world_revision: decision.result?.world?.world_revision ?? candidate.accepted_world_revision ?? null,
+      replay: clone(decision.replay ?? decision.result?.replay ?? candidate.replay ?? null),
     };
     candidates.set(repaired.candidate_id, clone(repaired));
     persistence?.put?.(CANDIDATE_NAMESPACE, repaired.candidate_id, repaired);
@@ -362,6 +365,14 @@ export function createWorldCandidateStore({
 
   function saveCandidate(candidate) {
     const next = clone(candidate);
+    next.replay = safeReplayMetadata({
+      pipeline: 'world-candidates', ruleVersion: next.rule_version ?? RULE_VERSION,
+      inputEventIds: next.source_event_ids ?? [], evidenceIds: next.evidence_ids ?? [],
+      inputs: next.source_observation ?? null,
+      sourceFingerprint: next.action_fingerprint ?? null,
+      worldRevisionBefore: next.expected_world_revision ?? null,
+      worldRevisionAfter: next.accepted_world_revision ?? null,
+    });
     candidates.set(next.candidate_id, next);
     persistence?.put?.(CANDIDATE_NAMESPACE, next.candidate_id, next);
     while (candidates.size > boundedMax) {
@@ -411,11 +422,17 @@ export function createWorldCandidateStore({
     const candidateId = createCandidateId(event);
     const existing = candidates.get(candidateId);
     if (existing) return { ignored: false, reason: null, candidate: clone(expire(existing)), duplicate: true };
-    const actions = deriveActions(event, candidateId);
+    const recorder = createRuntimeTraceRecorder({
+      runId: `${candidateId}:observe`, pipeline: 'world-candidates', ruleVersion: RULE_VERSION,
+      actorId: event.character_id ?? null, worldId, inputEventIds: sourceEventIds(event), now,
+    });
+    const actions = recorder.observe('decision', () => deriveActions(event, candidateId), {
+      references: { event_ids: sourceEventIds(event) },
+    });
     if (!actions.length) return { ignored: true, reason: 'no_legal_world_action', candidate: null, duplicate: false };
     let preview;
     try {
-      preview = candidatePreview(snapshot, actions);
+      preview = recorder.observe('action', () => candidatePreview(snapshot, actions));
     } catch (error) {
       return { ignored: true, reason: error?.code ?? 'world_action_rejected', candidate: null, duplicate: false };
     }
@@ -448,6 +465,7 @@ export function createWorldCandidateStore({
       expires_at: new Date(now().getTime() + ttlMs).toISOString(),
       status: CANDIDATE_STATUSES.PENDING,
       rule_version: RULE_VERSION,
+      trace: recorder.finish(),
     };
     return { ignored: false, reason: null, candidate: saveCandidate(candidate), duplicate: false };
   }
@@ -528,6 +546,14 @@ export function createWorldCandidateStore({
   }
 
   function recordAcceptDecision(candidate, id, worldMutations, world) {
+    const replay = safeReplayMetadata({
+      pipeline: 'world-candidates', ruleVersion: RULE_VERSION,
+      inputEventIds: candidate.source_event_ids ?? [], evidenceIds: candidate.evidence_ids ?? [],
+      outputEventIds: worldMutations.map(item => item.mutation?.event_id).filter(Boolean),
+      inputs: candidate.source_observation ?? null, sourceFingerprint: candidate.action_fingerprint ?? null,
+      worldRevisionBefore: candidate.expected_world_revision,
+      worldRevisionAfter: world.world_revision,
+    });
     const result = {
       schema: 'deskbot.world-candidate-accept-result.v0.1',
       accepted: true,
@@ -535,6 +561,7 @@ export function createWorldCandidateStore({
       candidate_id: id,
       world_mutations: clone(worldMutations),
       world: clone(world),
+      replay,
     };
     const timestamp = now().toISOString();
     const decisionRecord = {
@@ -545,6 +572,7 @@ export function createWorldCandidateStore({
       result,
       decided_at: timestamp,
       rule_version: RULE_VERSION,
+      replay,
     };
     const candidateRecord = {
       ...candidate,
@@ -552,6 +580,8 @@ export function createWorldCandidateStore({
       accepted_at: candidate.accepted_at ?? timestamp,
       updated_at: timestamp,
       decision_id: decisionRecord.decision_id,
+      accepted_world_revision: world.world_revision,
+      replay,
     };
     const persist = () => {
       persistence?.put?.(DECISION_NAMESPACE, decisionRecord.decision_id, decisionRecord);

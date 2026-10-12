@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { createDeskBotServer } from '../src/app.mjs';
 import { createSqlitePersistence } from '../src/persistence.mjs';
 import { createPersistentWorld } from '../src/persistent-world.mjs';
+import { createInputStore, normalizeEvent } from '../src/input-store.mjs';
 import { createNpcGoals } from '../src/npc-goals.mjs';
 import { createWorldLife, NPC_ROUTINE_SLOT_MINUTES, NPC_ROUTINE_SLOT_MS, NPC_ROUTINES, SLOT_MS, WORLD_REPLAY_MAX_MINUTES } from '../src/world-life.mjs';
 import { loadMorrowmereContent } from '../src/content-packages.mjs';
@@ -151,6 +152,25 @@ test('life feed pagination does not lose multiple activities from the same canon
   assert.deepEqual(world.listLifeFeed({ limit: 20 }), feed);
 });
 
+test('bounded life-feed pages keep a captured head across later mutations and remain read-only', () => {
+  const { world, life } = fixture();
+  life.tick();
+  const first = world.readLifeFeedPage({ limit: 1 });
+  assert.ok(Number.isSafeInteger(first.head_sequence));
+  assert.equal(first.current_sequence, first.head_sequence);
+  const before = world.get();
+  world.ingest(mutation('feed-after-head', { action: 'advance_time', minutes: 20 }));
+  life.tick();
+  const live = world.get(), mutations = world.listMutations({ limit: 200 });
+  const older = world.readLifeFeedPage({ headSequence: first.head_sequence, beforeId: first.cursor.before_id, limit: 20 });
+  assert.ok(older.entries.every(entry => entry.provenance.sequence <= first.head_sequence));
+  assert.equal(older.current_sequence > older.head_sequence, true);
+  assert.deepEqual(world.get(), live);
+  assert.deepEqual(world.listMutations({ limit: 200 }), mutations);
+  assert.equal(world.readLifeFeedPage({ headSequence: first.head_sequence, limit: 200 }).entries.some(entry => entry.provenance.sequence > first.head_sequence), false);
+  assert.notDeepEqual(world.get(), before, 'the later mutation is visible to live reads, not to the captured page');
+});
+
 test('an older story NPC is upgraded without losing its location or status', () => {
   const { world, life } = fixture();
   world.ingest(mutation('legacy-pathfinder', {
@@ -205,6 +225,79 @@ test('a shared NPC experience can become a causal Scene branch', () => {
   assert.equal(selected.branch_key, 'tide-path-shared-route');
   assert.deepEqual(selected.cause_experience_ids, ['npc-interaction:pathfinder-001:shared-route']);
   assert.equal(selected.resolution_state, 'experienced');
+});
+
+test('a causal occurrence remains consumed beyond the scene window and after SQLite restart', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'deskbot-causal-scene-restart-'));
+  const filename = join(directory, 'world.sqlite');
+  let clock = new Date('2026-09-17T02:00:00.000Z');
+  const now = () => new Date(clock);
+  let persistence = createSqlitePersistence({ filename });
+  let world, inputStore, life;
+  const reload = () => {
+    world = createPersistentWorld({ now, persistence });
+    inputStore = createInputStore({ now, persistence });
+    life = createWorldLife({ now, persistence, worldSnapshot: () => world.get(),
+      listMutations: options => world.listMutations(options),
+      ingest: event => {
+        const saved = inputStore.save(normalizeEvent(event, { now }));
+        return world.ingest(saved.event);
+      } });
+  };
+  t.after(() => { persistence.close(); rmSync(directory, { recursive: true, force: true }); });
+  reload();
+  life.tick();
+  // The occurrence lies beyond the ledger's first page and later leaves the
+  // bounded Scene window while its source experience remains visible.
+  for (let index = 0; index < 205; index += 1) {
+    world.ingest(mutation(`causal-ledger-noise-${index}`, { action: 'advance_time', minutes: 1 }));
+  }
+  world.ingest(mutation('causal-join-pathfinder', { action: 'move_protagonist', location_id: 'tidal-old-road' }));
+  life.interact({ interaction_id: 'durable-shared-route', npc_id: 'pathfinder-001', intent: 'help' });
+  const original = life.tick().current_scene;
+  const originalEventId = `world-life-v2:scene:${original.scene_id}`;
+  const originalInput = inputStore.get(originalEventId);
+  const durableOriginalInput = JSON.parse(JSON.stringify(originalInput));
+  assert.equal(original.branch_key, 'tide-path-shared-route');
+  for (let index = 0; index < 14; index += 1) {
+    world.ingest(mutation(`causal-window-scene-${index}`, { action: 'set_life_scene', scene: {
+      scene_id: `window-scene-${index}`, template_id: 'window-scene', location_id: 'tidal-old-road',
+      title: '后来这里发生了另一件小事', slot_key: `window-${index}`, started_at: now().toISOString(),
+    } }));
+  }
+  assert.equal(world.get().life.recent_scenes.length, 12);
+  assert.ok(!world.get().life.recent_scenes.some(scene => scene.scene_id === original.scene_id));
+  assert.ok(world.get().life.recent_experiences.some(item => item.experience_id === original.cause_experience_ids[0]));
+  const originalMutation = world.listMutations({ eventId: originalEventId })[0];
+  const durableOriginalMutation = JSON.parse(JSON.stringify(originalMutation));
+  persistence.close();
+  clock = new Date('2026-10-11T02:00:00.000Z');
+  persistence = createSqlitePersistence({ filename });
+  reload();
+  assert.doesNotThrow(() => life.tick());
+  assert.notEqual(world.get().life.current_scene.branch_key, 'tide-path-shared-route');
+  assert.deepEqual(inputStore.get(originalEventId), durableOriginalInput);
+  assert.deepEqual(world.listMutations({ eventId: originalEventId }), [durableOriginalMutation]);
+  const revision = world.get().world_revision;
+  life.tick();
+  assert.equal(world.get().world_revision, revision, 'the repeated startup tick is a no-op');
+});
+
+test('a causal scene participant leaving does not rewrite the original occurrence', () => {
+  const { world, life } = fixture();
+  life.tick();
+  world.ingest(mutation('causal-encounter-road', { action: 'move_protagonist', location_id: 'tidal-old-road' }));
+  life.interact({ interaction_id: 'changing-encounter', npc_id: 'pathfinder-001', intent: 'help' });
+  const original = life.tick().current_scene;
+  assert.equal(original.branch_key, 'tide-path-shared-route');
+  const eventId = `world-life-v2:scene:${original.scene_id}`;
+  const originalMutation = world.listMutations({ eventId })[0];
+  world.ingest(mutation('causal-pathfinder-leaves', { action: 'npc_action', npc_id: 'pathfinder-001',
+    action_name: 'leave_after_chat', location_id: 'shaping-field-desk' }));
+  assert.doesNotThrow(() => life.tick());
+  assert.deepEqual(world.listMutations({ eventId }), [originalMutation]);
+  assert.notEqual(world.get().life.current_scene.scene_id, original.scene_id);
+  assert.ok(!world.get().life.current_scene.participants.includes('pathfinder-001'));
 });
 
 test('same-place interactions are bounded, idempotent and increase relationship state once', () => {

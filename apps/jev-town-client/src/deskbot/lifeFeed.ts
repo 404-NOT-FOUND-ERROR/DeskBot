@@ -1,11 +1,54 @@
 import type { DeskBotLifeWorld, DeskBotWorldMap } from "./types.ts";
 
-/** A user-facing event in the shared-life timeline. Backend provenance is kept
- * out of this read model so the main world view remains a story, not a debug
- * console. */
+/**
+ * Small lifecycle gate for overlapping read-model refreshes. It mirrors the
+ * world renderer's revision gate without coupling the feed to React: only the
+ * latest mounted generation may publish a response.
+ */
+export interface RefreshGenerationGate {
+  activate(): void;
+  begin(): number;
+  isCurrent(generation: number): boolean;
+  invalidate(): void;
+  run(read: (commit: (write: () => void) => boolean) => Promise<void>, failed: (error: unknown) => void): Promise<void>;
+}
+
+export function createRefreshGenerationGate(): RefreshGenerationGate {
+  let current = 0;
+  let mounted = true;
+  const gate: RefreshGenerationGate = {
+    activate: () => { mounted = true; current += 1; },
+    begin: () => ++current,
+    isCurrent: (generation: number) => mounted && generation === current,
+    invalidate: () => { mounted = false; current += 1; },
+    async run(read, failed) {
+      const generation = gate.begin();
+      try {
+        await read(write => {
+          if (!gate.isCurrent(generation)) return false;
+          write();
+          return true;
+        });
+      } catch (error) {
+        if (gate.isCurrent(generation)) failed(error);
+      }
+    },
+  };
+  return gate;
+}
+
+/** A user-facing event in the shared-life timeline. Backend provenance stays
+ * out of the read model except for the opaque sequence needed to preserve
+ * canonical story order; the main world view is not a debug console. */
 export interface DeskBotLifeFeedEvent {
   id: string;
   at: string;
+  /** Canonical mutation sequence, when the service provides it.  This is the
+   * ordering key used by the world ledger; timestamps remain a compatibility
+   * fallback for older services. */
+  sequence?: number;
+  /** Order inside one canonical commit; entry cursors must retain it. */
+  itemIndex?: number;
   kind: string;
   title: string;
   text: string;
@@ -64,8 +107,28 @@ export function buildLifeFeed(map: DeskBotWorldMap, life: DeskBotLifeWorld, limi
   for (const event of events) if (!unique.has(event.id)) unique.set(event.id, event);
   return [...unique.values()]
     .filter(event => validAt(event.at))
-    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .sort(compareFeedEvents)
     .slice(0, Math.max(1, limit));
+}
+
+/**
+ * Asamana's narrative feed is ordered by the runtime's emission sequence,
+ * rather than by wall-clock time.  DeskBot's canonical feed now exposes the
+ * same sequence through provenance.  Keep newest-first for the current UI,
+ * but make ordering deterministic when several mutations share a timestamp
+ * (or when a clock is replayed).
+ */
+function compareFeedEvents(a: DeskBotLifeFeedEvent, b: DeskBotLifeFeedEvent): number {
+  const aSequence = Number.isSafeInteger(a.sequence) ? a.sequence! : null;
+  const bSequence = Number.isSafeInteger(b.sequence) ? b.sequence! : null;
+  if (aSequence !== null && bSequence !== null && aSequence !== bSequence) return bSequence - aSequence;
+  if (aSequence !== null && bSequence !== null && Number.isSafeInteger(a.itemIndex) && Number.isSafeInteger(b.itemIndex)
+    && a.itemIndex !== b.itemIndex) return b.itemIndex! - a.itemIndex!;
+  if (aSequence !== null && bSequence === null) return -1;
+  if (aSequence === null && bSequence !== null) return 1;
+  const at = Date.parse(a.at);
+  const bt = Date.parse(b.at);
+  return bt - at || a.id.localeCompare(b.id);
 }
 
 /** The canonical feed endpoint is introduced by the service independently of
@@ -76,18 +139,31 @@ export async function fetchPersistentLifeFeed(baseUrl: string, limit = 12): Prom
   try {
     const response = await fetch(`${root}/api/life/world/feed?limit=${limit}`, {cache: "no-store"});
     if (!response.ok) return null;
-    const body = await response.json() as {schema?: unknown;entries?: unknown[]};
-    if (body.schema !== "deskbot.world-life-feed-response.v1") return null;
+    return readPersistentLifeFeed(await response.json(), limit);
+  } catch { /* service may be restarting or endpoint may not exist yet */ }
+  return null;
+}
+
+/** Both standalone and unified snapshots use the same canonical feed view. */
+export function readPersistentLifeFeed(input: unknown, limit = 12): DeskBotLifeFeedEvent[] | null {
+    if (!input || typeof input !== 'object') return null;
+    const body = input as {schema?: unknown;entries?: unknown[]};
+    if (body.schema !== "deskbot.world-life-feed-response.v1" || !Array.isArray(body.entries)) return null;
     const events: DeskBotLifeFeedEvent[] = [];
-    for (const event of body.entries ?? []) {
-      const value = event as {id?: unknown;at?: unknown;kind?: unknown;title?: unknown;text?: unknown;location_id?: unknown;actor_id?: unknown;actor_name?: unknown};
+    for (const event of body.entries) {
+      if (!event || typeof event !== 'object') continue;
+      const value = event as {id?: unknown;at?: unknown;kind?: unknown;title?: unknown;text?: unknown;location_id?: unknown;actor_id?: unknown;actor_name?: unknown;provenance?: unknown};
       if (typeof value.id !== "string" || !validAt(value.at) || typeof value.title !== "string" || typeof value.text !== "string") continue;
+      const provenance = value.provenance as {sequence?: unknown;item_index?: unknown} | undefined;
+      const sequence = typeof provenance?.sequence === "number" && Number.isSafeInteger(provenance.sequence)
+        ? provenance.sequence
+        : undefined;
       events.push({id:value.id,at:value.at,kind:typeof value.kind === "string" ? value.kind : "world",title:value.title,text:value.text,
+        ...(sequence === undefined ? {} : {sequence}),
+        ...(typeof provenance?.item_index === 'number' && Number.isSafeInteger(provenance.item_index) && provenance.item_index >= 0 ? {itemIndex:provenance.item_index} : {}),
         ...(typeof value.location_id === "string" ? {locationId:value.location_id} : {}),
         ...(typeof value.actor_id === "string" ? {actorId:value.actor_id} : {}),
         ...(typeof value.actor_name === "string" ? {actorName:value.actor_name} : {})});
     }
-    return events.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0, limit);
-  } catch { /* service may be restarting or endpoint may not exist yet */ }
-  return null;
+    return events.sort(compareFeedEvents).slice(0, limit);
 }
