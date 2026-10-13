@@ -11,6 +11,19 @@ const dateTime = (value: string) => new Date(value).toLocaleString('zh-CN', {
   timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 });
 
+/** Old ledger gaps are permanent; transport errors can be retried. Give the
+ * two situations different actions while leaving the narrative readable. */
+export function WorldHistoryMomentNotice({ error, onLive, onRetry }: {
+  error: Error; onLive: () => void; onRetry: () => void;
+}) {
+  return <p className="world-history__error" role="status">{error.message}
+    {error instanceof WorldHistoryReadError && error.code === 'history_unavailable'
+      ? <button type="button" className="world-history__retry" onClick={onLive}>返回实时小镇</button> : null}
+    {(!(error instanceof WorldHistoryReadError) || error.retryable)
+      ? <button type="button" className="world-history__retry" onClick={onRetry}>重试这一刻</button> : null}
+  </p>;
+}
+
 export function WorldHistoryPanel({ baseUrl, onClose, worldId: expectedWorldId, liveSequence }: {
   baseUrl: string; onClose: () => void; worldId?: string; liveSequence?: number;
 }) {
@@ -118,9 +131,8 @@ export function WorldHistoryPanel({ baseUrl, onClose, worldId: expectedWorldId, 
         <button type="button" aria-label="较近一条" disabled={selectedIndex === 0} onClick={() => setSelectedId(entries[selectedIndex - 1]?.id ?? null)}>›</button>
       </div>
       <div className="world-history__moment" aria-busy={loadingAt}>
-        {momentError ? <p className="world-history__error" role="status">{momentError.message}
-          {(!(momentError instanceof WorldHistoryReadError) || momentError.retryable) ? <button type="button" className="world-history__retry" onClick={() => setMomentRetry(value => value + 1)}>重试这一刻</button> : null}
-        </p> : null}
+        {momentError ? <WorldHistoryMomentNotice error={momentError} onLive={onClose}
+          onRetry={() => setMomentRetry(value => value + 1)} /> : null}
         {loadingAt ? <p role="status">正在还原这一刻…</p> : history && glance ? <>
           <div className="world-history__facts"><span>当时 · {glance.date} {glance.clock}</span><span>第 {history.revision} 次世界修订</span></div>
           <p>喵呜在<strong>{place?.name ?? '尚未标注的地方'}</strong>{residentsHere.length ? `，${residentsHere.map(item => item.display_name).join('、')}也在这里。` : '。'}</p>

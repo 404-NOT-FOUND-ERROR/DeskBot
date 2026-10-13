@@ -336,7 +336,8 @@ perception 只说明眼前、投递和公开信息；delivered/public 都是听�
 ${JSON.stringify({ date: r.date, authored_personality: personality, current_virtual_stages: stages,
     memories: r.memories, digests: r.digests, perception: r.perception ?? actorCognitionContext(w, r.actor_id, r.created_at),
     previous_intentions: r.previous_goals.map(item => ({ text: item.text, topic: item.topic, activity_id: item.activity_id ?? null,
-      status: item.expires_at && item.expires_at <= r.created_at ? 'expired' : 'active' })),
+      status: GOAL_ACTIVE.has(item.status ?? 'intended') && item.expires_at && item.expires_at <= r.created_at
+        ? 'expired' : item.status ?? 'intended' })),
     previous_views: r.previous_relations.map(item => ({ actor_id: item.actor_id, label: item.label, text: item.text,
       status: item.expires_at && item.expires_at <= r.created_at ? 'expired' : 'active' })) })}`;
 }

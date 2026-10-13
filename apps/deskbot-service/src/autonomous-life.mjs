@@ -102,7 +102,15 @@ function candidates(world, state, at) {
   const minute=localWorldDate(at,world.clock.time_zone).minute_of_day, result=[];
   function add(goal,title,reason,score,build) {
     if(Date.parse(state.cooldowns[goal]??'')>Date.parse(at))return;
-    try { result.push({goal,title,reason,score,steps:checkSupplyClaim(world,at,id,build()),available:true}); }
+    try {
+      const steps=checkSupplyClaim(world,at,id,build());
+      // The final authored recipe is this material plan's actual outcome;
+      // travel, preparation and deposits never impersonate its completion.
+      // Set its topic before cognition ranks otherwise unchanged legal choices.
+      const activityId=steps.filter(step=>step.kind==='activity').at(-1)?.activity_id;
+      result.push({goal,title,reason,score,steps,available:true,
+        ...(activityId?{activity_id:activityId,development_topic:activityTopic(activityId)}:{})});
+    }
     catch(error) { result.push({goal,title,reason,score,available:false,blocked_reason:error.message}); }
   }
   function activity(goal,id,reason,score){add(goal,ACTIVITIES.find(r=>r.activity_id===id).title,reason,score,()=>activitySteps(world,state.actor_id,id));
@@ -133,11 +141,23 @@ function candidates(world, state, at) {
   for(const [objectId,recipeId] of [['floating-frame','repair-frame'],['market-canopy','stitch-canopy'],['repair-bench','repair-bench'],['seedling-rack','repair-rack'],['trial-stove','repair-stove']]) {
     if(objects[objectId].condition<.55)activity(`repair:${objectId}`,recipeId,'设施磨损了，先把材料备齐再修。',profile.interests.includes('repair')||profile.interests.includes('craft')?82:52);
   }
-  if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
+  if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) {
+    add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
+    const candidate=result.find(c=>c.goal==='tray');
+    if(candidate)Object.assign(candidate,{activity_id:'craft-tray',development_topic:'craft'});
+  }
   const hungry=Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id)&&s.appetite>.6).length;
   const mealReserve=Math.min(10,Math.max(4,hungry+2));
-  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<mealReserve)
+  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<mealReserve) {
     add('cook','做一锅饭放到长桌','先看苗圃和林间实际采回的食材，做成一锅，再把每一份放到长桌。',hungry?90:65,()=>cookAndStoreSteps(world,id));
+    const candidate=result.find(c=>c.goal==='cook');
+    if(candidate) {
+      candidate.development_topic='cook';
+      // Cooking may need finite preparation first. Bind a slow-cognition goal
+      // only when its eventual authored recipe appears in this legal plan.
+      candidate.activity_id=candidate.steps?.find(step=>step.kind==='activity'&&activityTopic(step.activity_id)==='cook')?.activity_id??null;
+    }
+  }
   if(objects['light-fruit-bough']&&stock(world,'shared-table','rations')<mealReserve&&stock(world,'seedling-rack','light_fruit')<2) {
     if(carried(world,id,'light_fruit')>0)add('store-fruit','把光果带回共用育苗架','让厨房能看到已经采到的食材，回来的人也能取用。',88,()=>depositSteps(world,id,'seedling-rack','light_fruit'));
     else if(profile.interests.includes('care')||profile.interests.includes('explore')||profile.interests.includes('trade'))

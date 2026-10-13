@@ -90,6 +90,6 @@ npm.cmd run build:deskbot
 
 采用阶段改变的是虚拟外观和有限生活倾向，不代表换了实体外壳、增加自由度、获得现实职业资格或测得主观喜欢。当前形象是作者定义的闭集几何与配件；开放造型生成尚未交付。
 
-正式中文 ASR/TTS 尚未启用，小智固件尚未适配 DeskBot 身体协议。当前阶段的组件、几何与构建已验证，浏览器自动化初始化失败，尚未完成第 6 阶段截图验收。自然愿望形成、长期人物体验和连续 7–14 天现实生活仍需后续观察。开发进度见 [v0.5 路线图](../../research/development-roadmap-v0.5.md)。
+正式中文 ASR/TTS 尚未启用，小智固件尚未适配 DeskBot 身体协议。正式小镇与往事面板已完成基础浏览器检查，2026-10-13 效果图见 [仓库介绍](../../README.md)。这不等于第 6 阶段完整像素、长断线恢复或长期生活体验已经验收。自然愿望形成与连续 7–14 天现实生活仍需后续观察。开发进度见 [v0.5 路线图](../../research/development-roadmap-v0.5.md)。
 
 保留原作者与依赖归属，授权记录不自动改变第三方依赖许可证。原完整 README 已原样保存在 [UPSTREAM-README.md](UPSTREAM-README.md)，其中外部网站、上游 API key 和自动部署断言仅供历史参考；本项目当前能力、入口和配置以本文及 [主仓库介绍](../../README.md) 为准。[ARCHITECTURE.md](ARCHITECTURE.md) 继续保留上游设计资料，DeskBot 当前架构见 [主仓库架构说明](../../documentation/architecture.md)。

@@ -1679,7 +1679,33 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }
 
-  const storedMutations = persistence?.list('canonical-world.mutations') ?? [];
+  // Large old/new state diffs belong in SQLite, not in a process-wide Map.
+  // Retain only metadata and the small read-only life-feed projection. The
+  // full record is hydrated on a bounded page, duplicate or reverse-history
+  // read. Legacy/in-memory adapters retain their original behavior.
+  const streamedLedger = typeof persistence?.iterate === 'function' && typeof persistence?.get === 'function';
+  const storedMutations = [];
+  const scenesByWorld = new Map();
+  const feedProjection = [];
+  const mutationHeader = mutation => {
+    const { changes, details, ...header } = mutation;
+    return header;
+  };
+  const hydrateMutation = mutation => streamedLedger
+    ? persistence.get('canonical-world.mutations', mutation.mutation_id) : mutation;
+  const appendFeedProjection = mutation => {
+    if (!scenesByWorld.has(mutation.world_id)) scenesByWorld.set(mutation.world_id, new Map());
+    const scenes = scenesByWorld.get(mutation.world_id);
+    if (mutation.action === 'set_life_scene' && mutation.details?.scene?.scene_id) {
+      scenes.set(mutation.details.scene.scene_id, mutation.details.scene);
+    }
+    if (mutation.applied !== false) feedProjection.push(...lifeFeedItems(mutation, worlds.get(mutation.world_id), scenes)
+      .map(item => ({ world_id: mutation.world_id, item })));
+  };
+  for (const mutation of (streamedLedger ? persistence.iterate('canonical-world.mutations') : persistence?.list('canonical-world.mutations') ?? [])) {
+    appendFeedProjection(mutation);
+    storedMutations.push(streamedLedger ? mutationHeader(mutation) : mutation);
+  }
   const mutationsByEvent = new Map(storedMutations.map((mutation) => [mutation.event_id, mutation]));
   const mutationsById = new Map(storedMutations.map((mutation) => [mutation.mutation_id, mutation]));
   const countedTurns = new Map(
@@ -1700,15 +1726,23 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     return world ? clone(world) : null;
   }
 
-  function listMutations({ worldId = DEFAULT_WORLD_ID, afterSequence = 0, limit = 50, eventId = null } = {}) {
+  function listMutations({ worldId = DEFAULT_WORLD_ID, afterSequence = 0, limit = 50, eventId = null, action = null, includeChanges = true } = {}) {
     const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     const parsedAfter = Math.max(Number.parseInt(afterSequence, 10) || 0, 0);
     return storedMutations
       .filter((mutation) => mutation.world_id === worldId
         && mutation.sequence > parsedAfter
-        && (eventId === null || mutation.event_id === eventId))
+        && (eventId === null || mutation.event_id === eventId)
+        && (action === null || mutation.action === action))
       .slice(0, boundedLimit)
-      .map(clone);
+      .map(header => {
+        const mutation = hydrateMutation(header);
+        if (includeChanges !== false) return clone(mutation);
+        // Restoration indexes need small action details, not old/new world
+        // state copies. Drop each hydrated diff before constructing the page.
+        const { changes, ...record } = mutation;
+        return clone(record);
+      });
   }
 
   /**
@@ -1732,13 +1766,18 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 200);
     const parsedAfter = afterSequence === null || afterSequence === undefined ? null : Math.max(Number.parseInt(afterSequence, 10) || 0, 0);
     const parsedBefore = beforeSequence === null || beforeSequence === undefined ? null : Math.max(Number.parseInt(beforeSequence, 10) || 0, 0);
-    const scenes = new Map(storedMutations.filter(mutation => mutation.world_id === worldId && mutation.action === 'set_life_scene')
-      .map(mutation => [mutation.details.scene?.scene_id, mutation.details.scene]).filter(([id]) => id));
-    const projected = storedMutations
-      .filter((mutation) => mutation.world_id === worldId && mutation.applied !== false
-        && (headSequence === null || mutation.sequence <= headSequence))
-      .flatMap((mutation) => lifeFeedItems(mutation, worlds.get(worldId), scenes))
-      .map(clone);
+    const world = worlds.get(worldId);
+    const projected = feedProjection
+      .filter(entry => entry.world_id === worldId && (headSequence === null || entry.item.provenance.sequence <= headSequence))
+      .map(entry => entry.item)
+      .map(item => {
+        const person = item.actor_id === world?.protagonist?.character_id ? world.protagonist
+          : world?.npcs?.find(npc => npc.npc_id === item.actor_id);
+        const location = world?.locations?.find(place => place.location_id === item.location_id);
+        return clone({ ...item, actor_name: person?.display_name ?? item.actor_name,
+          actor: person?.display_name ?? item.actor, location_name: location?.name ?? item.location_name,
+          location: location?.name ?? item.location });
+      });
     const cursorIndex = id => {
       if (id === null || id === undefined) return null;
       const index = projected.findIndex(item => item.id === id);
@@ -1847,8 +1886,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     }
     const historical = clone(world);
     for (let index = ledger.length - 1; index >= 0; index -= 1) {
-      const mutation = ledger[index];
-      if (mutation.sequence <= sequence) break;
+      if (ledger[index].sequence <= sequence) break;
+      const mutation = hydrateMutation(ledger[index]);
       if (historical.world_revision !== mutation.after_revision) {
         throw unavailable('revision_gap', 'The canonical ledger cannot reconstruct this revision', availableFromSequence);
       }
@@ -2086,7 +2125,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         applied: false,
         duplicate: true,
         reason: 'event_already_applied',
-        mutation: clone(existingMutation),
+        mutation: clone(hydrateMutation(existingMutation)),
         world: get(),
       };
     }
@@ -2112,7 +2151,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
           applied: false,
           duplicate: true,
           reason: 'correlation_already_counted',
-          mutation: existingTurnMutation ? clone(existingTurnMutation) : null,
+          mutation: existingTurnMutation ? clone(hydrateMutation(existingTurnMutation)) : null,
           world: get(),
         };
       }
@@ -2220,9 +2259,11 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
 
     persistCommit(next, mutation, countedTurn);
     worlds.set(next.world_id, next);
-    storedMutations.push(mutation);
-    mutationsByEvent.set(eventId, mutation);
-    mutationsById.set(mutation.mutation_id, mutation);
+    appendFeedProjection(mutation);
+    const retainedMutation = streamedLedger ? mutationHeader(mutation) : mutation;
+    storedMutations.push(retainedMutation);
+    mutationsByEvent.set(eventId, retainedMutation);
+    mutationsById.set(mutation.mutation_id, retainedMutation);
     if (countedTurn) countedTurns.set(countedTurn.turn_key, countedTurn);
     nextSequence += 1;
 

@@ -70,6 +70,14 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
       .map((row) => JSON.parse(row.payload_json));
   }
 
+  // Stream large append-only namespaces one JSON record at a time. Callers
+  // must not retain the full payload when they only need its cursor/index.
+  function* iterate(namespace) {
+    for (const row of listStatement.iterate(requireName(namespace, 'namespace'))) {
+      yield JSON.parse(row.payload_json);
+    }
+  }
+
   function put(namespace, recordId, value) {
     putStatement.run(
       requireName(namespace, 'namespace'),
@@ -119,6 +127,7 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
     get,
     insert,
     kind: 'sqlite',
+    iterate,
     list,
     put,
     remove,

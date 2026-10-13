@@ -14,7 +14,7 @@
 | M5 | mutation channel 治理强化（DeskBot 原有能力；本轮增加 candidate replay 审计） | 非确定性/非受信观察先成为候选；preview 无 revision 变化；accept 只能写合法 mutation；受信天气 adapter 继续兼容 | `baseline implemented` / `automated verified` |
 | M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | `implemented` / `automated verified`；新序列可回放，真实迁移断层、重复 sequence 和 revision 分叉严格返回 `history_unavailable` |
 | M7 | 前端观察连续性 | 服务端统一 snapshot/WS、客户端 revision/sequence gate、重连和有界 render gate | `implemented` / `automated verified`；基础历史面板已接入，长期断线与历史浏览体验待验收 |
-| M8 | 长期共同生活回放 | 两个逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | `implemented` / `automated verified` / `manual pending`；隔离回放含 288 条事件、两上海日期实际试做，行动反馈与历史完整性已补回归 |
+| M8 | 长期共同生活回放 | 两个逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | 既有 288 事件隔离 fixture `automated verified`；新增自主追求验收 `inconclusive_goal_not_executed`，真实模型与人工体验 `pending` |
 
 ## 每阶段固定流程
 
@@ -27,7 +27,11 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 属于本分支的本地实现，本次将作为独立 GitHub 分支备份。2026-10-12 本轮复验服务端 811 项、客户端 44 套 297 项、typecheck/build 通过；voice-sidecar 16 项与 Asamana 独立前端 140 项为既有结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 属于本分支的实现，本次发布在 `codex/asamana-shared-life-v2`，保留 `main`。2026-10-13 复验服务端 819/819、客户端 44 套 301/301、typecheck/build 通过；voice-sidecar 16 项与 Asamana 独立前端 140 项为既有结果，本轮未重跑。自动样本不会污染正式世界。
+
+本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
+
+`scripts/review-asamana-migration.mjs` 新增零外部请求的跨日实际生活验收，首日完整意图→计划→任务→结果成立；次日真实实践与反思成立，但新目标在有限窗口没有执行，结论保留为 `inconclusive_goal_not_executed`。模型合法返回空目标也必须报告 inconclusive。来源幂等、SQLite 重启和世界候选门通过，不把该样本说成 M8 完整通过；真实模型模式尚未运行。
 
 历史完整性差异已定位并修复新序列的表示问题；当前应验收“小镇往事”的前端交互和真实旧断层提示，再做真实模型的多日慢认知及断线/长期浏览体验。其后扩展有规则后果的地方故事、居民项目和协作，再进行 7–14 天现实 1:1 观察；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
 
@@ -79,6 +83,8 @@ decay → compression → reflection → goal revision → relation evolution
 ### M6：回放门
 
 为输入运行、角色演化和 world candidate 提供统一 replay fixture：同一 SQLite、同一 event 序列、同一规则版本必须产生相同 canonical revision 和 mutation IDs；LLM 输出不作为重放确定性的假设。
+
+现有 replay tape 是已捕获 fixture 的隔离确定性输入重演；正式历史面板是只读 snapshot/ledger 观察。任意正式存档的完整 seed、provider response 与时钟自动导出入口尚待接入，不能把两者描述成已完成的生产归档器；该原有迁移目标保留在后续验收中。
 
 ### M8：人工体验
 

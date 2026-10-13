@@ -2,7 +2,7 @@
   "name": "deskbot",
   "version": "0.1.0",
   "private": true,
-  "description": "DeskBot / 聚形域：基于 Node.js + SQLite 的持续奇幻桌面潮玩生命体，融合现实多源输入、NPC 生活、长期记忆、角色阶段与 Jev Town 3D 世界。",
+  "description": "DeskBot · 聚形域：现实多源输入折射进奇幻持续世界，驱动潮玩生命体的生活、记忆、关系与形态/职业探索。Node.js + SQLite + React/Three.js，借鉴 Asamana 认知编排。",
   "engines": {
     "node": ">=24"
   },

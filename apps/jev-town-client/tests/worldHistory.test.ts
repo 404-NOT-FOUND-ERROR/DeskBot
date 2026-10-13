@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { fetchWorldHistoryAt, fetchWorldHistoryPage, mergeWorldHistoryWindow, WorldHistoryReadError } from '../src/deskbot/worldHistory.ts';
+import { WorldHistoryMomentNotice } from '../src/deskbot/WorldHistoryPanel.tsx';
 
 describe('read-only world history client', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -83,5 +86,33 @@ describe('read-only world history client', () => {
     await expect(fetchWorldHistoryAt('http://local', 3952)).rejects.toMatchObject({
       code: 'history_unavailable', retryable: false, availableFromSequence: 3953,
     } satisfies Partial<WorldHistoryReadError>);
+  });
+
+  it('offers a readable path around an old ledger gap without retrying unavailable history', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      error: 'history_unavailable', message: 'raw internal state mismatch', history_boundary: { available_from_sequence: 3953 },
+    }), { status: 409 })));
+    const error = await fetchWorldHistoryAt('http://local', 3952).catch(error => error);
+    const markup = renderToStaticMarkup(createElement(WorldHistoryMomentNotice,
+      { error, onLive() {}, onRetry() {} }));
+    expect(markup).toContain('旧存档缺少完整的变化记录');
+    expect(markup).toContain('返回实时小镇');
+    expect(markup).not.toContain('重试这一刻');
+    expect(markup).not.toContain('raw internal');
+    expect(markup).not.toContain('3953');
+  });
+
+  it('keeps transport failures retryable and ambiguous branches readable without a false recovery promise', () => {
+    const notice = (error: Error) => renderToStaticMarkup(createElement(WorldHistoryMomentNotice,
+      { error, onLive() {}, onRetry() {} }));
+    const disconnect = new WorldHistoryReadError('连接恢复后可以重试这一刻。', 'history_transport_failed', true);
+    expect(notice(disconnect)).toContain('重试这一刻');
+    expect(notice(disconnect)).not.toContain('返回实时小镇');
+    const ambiguous = new WorldHistoryReadError('无法准确还原当时的状态。', 'history_unavailable', false, null);
+    expect(notice(ambiguous)).not.toContain('重试这一刻');
+    expect(notice(ambiguous)).toContain('返回实时小镇');
+    const oldGap = new WorldHistoryReadError('旧存档缺少完整的变化记录。', 'history_unavailable', false, 3953);
+    expect(notice(oldGap)).toContain('返回实时小镇');
+    expect(notice(oldGap)).not.toContain('可还原的近况');
   });
 });

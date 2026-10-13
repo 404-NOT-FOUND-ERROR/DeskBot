@@ -501,14 +501,17 @@ export function createWorldLife({
     // read-only index of the durable ledger, including scenes outside it.
     if (typeof listMutations === 'function') {
       while (true) {
-        const page = listMutations({ afterSequence: causalLedgerSequence, limit: 200 });
+        const page = listMutations({ afterSequence: causalLedgerSequence, limit: 200,
+          action: 'set_life_scene', includeChanges: false });
         if (!page.length) break;
         const previousSequence = causalLedgerSequence;
         page.forEach(remember);
         if (page.length < 200 || causalLedgerSequence <= previousSequence) break;
       }
-    } else if (persistence?.list) {
-      for (const mutation of persistence.list('canonical-world.mutations')) {
+    } else if (persistence?.iterate || persistence?.list) {
+      const ledger = persistence.iterate?.('canonical-world.mutations')
+        ?? persistence.list('canonical-world.mutations');
+      for (const mutation of ledger) {
         if ((mutation.sequence ?? 0) > causalLedgerSequence) remember(mutation);
       }
     }

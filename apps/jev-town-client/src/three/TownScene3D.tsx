@@ -748,6 +748,15 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
 
     let rafId = 0;
     function render(now: number) {
+      try { renderFrame(now); }
+      catch {
+        // Scene updates happen inside RAF too. React cannot catch an invalid
+        // geometry/activity update here; its committed fallback can recover.
+        frameRequested = false;
+        callbacksRef.current.onContextLost();
+      }
+    }
+    function renderFrame(now: number) {
       frameRequested = false;
 
       if (tween) {
@@ -776,9 +785,13 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         scenery.updateDomesticLights?.(lighting.minute, lighting.night);
       }
 
-      renderSnapshotFrame(renderCompletionRef.current,
+      const frameComplete = renderSnapshotFrame(renderCompletionRef.current,
         () => renderer.render(scene, camera),
-        () => labelRenderer.render(scene, camera));
+        () => labelRenderer.render(scene, camera),
+        () => callbacksRef.current.onContextLost());
+      // RAF exceptions do not reach React error boundaries. Switch to the
+      // committed text view instead of abandoning a pending observer frame.
+      if (!frameComplete) return;
       if (cameraDirty || citizensMoving || tween) positionHotspots();
       cameraDirty = false;
 
@@ -837,7 +850,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
   useEffect(() => {
     renderCompletionRef.current.prepare(snapshotId, onRenderComplete);
     requestFrameRef.current();
-  }, [snapshotId, onRenderComplete]);
+  }, [snapshotId, onRenderComplete, citizenKey, labelKey, sceneryKey, onPlaceClick]);
 
   // The route preview is a separate, static overlay. Keeping it out of the
   // mount-only scene effect lets a selected destination update without

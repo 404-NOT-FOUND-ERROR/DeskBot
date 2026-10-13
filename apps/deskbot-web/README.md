@@ -35,4 +35,4 @@
 
 页面不负责固件烧录，也不能赋予实体移动、摄像头或新的转动自由度。虚拟角色阶段与现实单轴身体、外壳感知分开记录。
 
-第六阶段的回归、样本和截图验收限制见 [交付记录](../../research/milestones/role-development-stage6.md)。当前浏览器截图验收尚未完成，自动测试不能代替真实画面和长期生活感检查。完整现版本能力与后续步骤见 [仓库介绍](../../README.md) 和 [v0.5 路线](../../research/development-roadmap-v0.5.md)。
+第六阶段的回归、样本和截图验收限制见 [交付记录](../../research/milestones/role-development-stage6.md)。正式 3D 小镇与往事面板已完成基础浏览器检查并更新效果图，完整阶段像素、长断线恢复和长期生活感仍待验收。完整现版本能力与后续步骤见 [仓库介绍](../../README.md) 和 [v0.5 路线](../../research/development-roadmap-v0.5.md)。

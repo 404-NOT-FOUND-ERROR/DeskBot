@@ -21,8 +21,18 @@ export function renderSnapshotFrame(
   completion: ReturnType<typeof createSnapshotRenderCompletion>,
   renderWorld: () => void,
   renderLabels: () => void,
+  onFailure?: (error: Error) => void,
 ) {
-  renderWorld();
-  renderLabels();
+  try {
+    renderWorld();
+    renderLabels();
+  } catch (value) {
+    // A failed WebGL/CSS2D frame is never a render receipt. The owner can
+    // commit its real text fallback and acknowledge that view afterwards.
+    if (!onFailure) throw value;
+    onFailure(value instanceof Error ? value : new Error('小镇画面暂不可呈现'));
+    return false;
+  }
   completion.complete();
+  return true;
 }

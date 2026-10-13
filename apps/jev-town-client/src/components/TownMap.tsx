@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ACTIONS, ACTION_GLYPH, ACTION_LABEL, type Action } from "@shared/actions.ts";
 import { CITIZENS } from "@shared/citizens.ts";
 import { PLACES } from "@shared/town.ts";
@@ -41,16 +41,25 @@ export interface TownMapProps {
 // Three.js is most of the bundle; load it separately so the rest of the page paints immediately.
 const TownScene3D = lazy(() => import("../three/TownScene3D.tsx").then((m) => ({ default: m.TownScene3D })));
 
-function TownFallback() {
+function TownFallback({ deskbot = false }: { deskbot?: boolean }) {
   return (
-    <div className="town-map__fallback" role="group" aria-label="Town status, text view">
-      <p className="town-map__fallback-title">3D view unavailable</p>
+    <div className="town-map__fallback" role="group" aria-label={deskbot ? '小镇文字视图' : 'Town status, text view'}>
+      <p className="town-map__fallback-title">{deskbot ? '小镇画面暂不可用' : '3D view unavailable'}</p>
       <p className="town-map__fallback-copy">
-        This browser or device doesn&apos;t support WebGL, so the 3D town can&apos;t be shown. Broadcasting, scoring and
-        the reaction tallies still work normally.
+        {deskbot ? '已切换为文字查看。小镇仍在生活，居民近况、最近动静和往事会继续更新。重新打开页面可以再试画面。'
+          : <>This browser or device doesn&apos;t support WebGL, so the 3D town can&apos;t be shown. Broadcasting, scoring and the reaction tallies still work normally.</>}
       </p>
     </div>
   );
+}
+
+/** Chunk/setup failures arrive through React; RAF failures use onContextLost.
+ * Both paths publish the same committed fallback before issuing a receipt. */
+class TownSceneBoundary extends Component<{ children: ReactNode; onFailure: () => void; deskbot: boolean }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  override componentDidCatch() { this.props.onFailure(); }
+  override render() { return this.state.failed ? <TownFallback deskbot={this.props.deskbot} /> : this.props.children; }
 }
 
 export function TownMap({ snapshotId, onRenderComplete, citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
@@ -90,7 +99,7 @@ export function TownMap({ snapshotId, onRenderComplete, citizens = CITIZENS, sha
     <div className={`town-map${sceneLocations ? " town-map--shaping" : ""}`} role="group" aria-label={sceneLocations ? `聚形域 3D 地图，${citizens.length} 位光粒居民` : `Interactive 3D town map with ${citizens.length} citizens`}>
       {supportsWebgl ? (
         <div className="town-map__scene">
-          <Suspense fallback={<p className="town-map__loading">正在搭建小镇…</p>}>
+          <TownSceneBoundary onFailure={handleContextLost} deskbot={Boolean(sceneLocations)}><Suspense fallback={<p className="town-map__loading">正在搭建小镇…</p>}>
             <TownScene3D
               ref={sceneRef}
               snapshotId={snapshotId}
@@ -115,7 +124,7 @@ export function TownMap({ snapshotId, onRenderComplete, citizens = CITIZENS, sha
               onZoomChange={setZoom}
               onContextLost={handleContextLost}
             />
-          </Suspense>
+          </Suspense></TownSceneBoundary>
 
           <div className="town-map__citizens-layer">
             {citizens.map((citizen) => {
@@ -193,7 +202,7 @@ export function TownMap({ snapshotId, onRenderComplete, citizens = CITIZENS, sha
           </div>
         </div>
       ) : (
-        <TownFallback />
+        <TownFallback deskbot={Boolean(sceneLocations)} />
       )}
 
       <p className="sr-only">

@@ -41,6 +41,19 @@ function response(request, more = {}) {
 }
 const own = w => w.memory.maintenance.actors['shaping-001'];
 
+test('reflection retains settled goal outcomes and expires only unfinished intentions', t => {
+  const h = fixture(t), w = h.world.get(); fact(w); installSlowCognition(w, h.now().toISOString());
+  prepareSlowCognition(w, h.now().toISOString());
+  const r = own(w).request;
+  r.previous_goals = ['completed', 'failed', 'cancelled', 'withdrawn', 'intended', 'trying'].map(status => ({
+    text: '曾经想做的事', topic: 'care', activity_id: 'tend-bed', status,
+    expires_at: new Date(BASE - 1).toISOString(),
+  }));
+  const context = JSON.parse(slowCognitionPrompt(w, r).split('\n').at(-1));
+  assert.deepEqual(context.previous_intentions.map(goal => goal.status),
+    ['completed', 'failed', 'cancelled', 'withdrawn', 'expired', 'expired']);
+});
+
 test('daily source-preserving decay/compression/reflection cannot change resources, development, stage or identity', async t => {
   const h = fixture(t); h.save(w => { fact(w); syncDevelopmentEvidence(w, h.now().toISOString()); }); const before = h.world.get(); let calls = 0;
   const worker = h.worker({ id: 'fixture', complete: async ({ prompt, purpose }) => {

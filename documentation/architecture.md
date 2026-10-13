@@ -22,7 +22,7 @@ canonical task / travel / NPC activity
 
 ## 运行结构与状态归属
 
-### Asamana 参考迁移（2026-10-12，本分支本地验证）
+### Asamana 参考迁移（2026-10-13，独立分支验证）
 
 新增 `runtime-contracts.mjs` 为来源调度、角色演化和世界候选提供审计合同、内容指纹和 replay 引用，始终标记 `audit_only`；它不取代 SQLite 幂等账本、不重放模型，也不授予 mutation 权限。`memory-ranking.mjs` 接入现有记忆召回，以词法相关性、近期性和重要性排序、同源/相似内容去重，并把解释关联到已有事实；读取不增加成长或写入世界。Jev Town 生活流按 canonical mutation sequence 排序，通过刷新 generation 门控拦截过时响应。慢认知目标严格绑定同角色、同活动和同话题的 canonical `activity_id`；主题相同但活动不同的记录不能结算目标。
 
@@ -55,6 +55,8 @@ Jev Town 3D 生活客户端 :5173 / DeskBot Web 研究界面 :4322
 提供统一只读表现，始终把实体外壳变化标为未发生。
 
 `apps/deskbot-service` 使用 Node.js 24+ 与内置 `node:sqlite`。世界 mutation、结果和幂等账本在服务端事务中提交，客户端不能直接操作 SQLite。`apps/jev-town-client` 是基于 CeciliaW888/jev-town 的 React/Three.js 投影客户端；`apps/deskbot-web` 提供原生 Web 研究界面。两个客户端共用世界接口，不保存另一套可写世界。第三方来源与授权范围见 [Jev Town 接入说明](jev-town-adoption.md)。
+
+SQLite 恢复逐条扫描 mutation 账本，内存保留元数据索引和可重算 feed；完整 old/new diff 仍存于 SQLite，分页、幂等结果和历史逆推按需读取。世界生活的已消费场景索引只读取 `set_life_scene`，避免启动时再次载入全部大型 diff。客户端渲染失败后提交文字视图再回执，旧历史断层保留文字并允许返回实时；这些恢复机制不补造世界事实。
 
 Python 3.10+ `voice-sidecar` 提供无状态 ASR/TTS 边界，当前仍是无真实模型的测试基线，正式服务未启用真实中文声音。声音、设备报告与世界写入具有独立权限，音频播放不能直接改写角色阶段或任务结果。
 
