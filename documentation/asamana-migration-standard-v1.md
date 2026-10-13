@@ -2,7 +2,7 @@
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。
 
-本轮发布分支为 `codex/asamana-shared-life-v5`，本地已从 v4 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。
+本轮发布分支为 `codex/asamana-replay-journal-v6`，本地从 v5 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。v6 是 M6b operation journal 的增量发布，不等于全服务生产回放完成。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 

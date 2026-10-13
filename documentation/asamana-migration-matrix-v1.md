@@ -1,7 +1,7 @@
 # Asamana → DeskBot 正式迁移矩阵 v1
 
 核对日期：2026-10-13
-本轮发布分支：`codex/asamana-shared-life-v5`（本地已从 v4 基线创建；远端状态以 Git 交付核验为准）
+本轮发布分支：`codex/asamana-replay-journal-v6`（本地从 v5 基线创建；远端状态以 Git 交付核验为准）
 目标：把 Asamana 中有价值的“感知 → 动机 → 决策 → 行动 → 反馈 → 记忆/回放”机制迁移为 DeskBot 的长期共同生活能力，同时保持聚形域、喵呜、多源输入、受规则约束的世界事实和可逆角色阶段。
 
 本矩阵是 [迁移标准](asamana-migration-standard-v1.md) 与 [迁移管线](asamana-migration-pipeline-v1.md) 的状态权威。它不把上游 Asamana 当作 DeskBot 的运行时，也不把通过单元测试或受控样本误写成已经完成自然长期生活。
@@ -33,7 +33,7 @@
 | M4 自治 cadence | cold start、need、emotion、pressure、max idle gate；正在执行的角色不被重复决策 | `cognition-cadence.mjs`、`life-choice.mjs`、`autonomous-life.mjs` | 现实 1:1 时钟、任务状态、稳定 cadence key | 重复 tick/重启不重复决策；紧急需要直接处理；模型不可用回退规则生活；真实反馈唤起下次认知 | `implemented / automated verified`。正式世界长期开机稳定性属于 M8/P9 |
 | M5 行动仲裁与世界写入 | 计划、仲裁、执行、反馈分离；外部观察不能直接写世界 | `life-choice.mjs`、`life-planning.mjs`、`persistent-world.mjs`、`world-candidates.mjs`、`role-practical-trials.mjs` | 路线、容量、材料、权限、revision 乐观锁 | 预览无副作用；accept 重校验候选/版本/过期；只写合法 mutation；失败保留发生过的尝试 | `implemented / automated verified`。更丰富的世界事件需要新增合法 mutation 类型，不放宽写权限 |
 | M6a canonical replay | 保存 seed、canonical ingress、adapter、时钟、mutation hash，在隔离 SQLite 通过原写入口重演 | `replay-capture.mjs`、`replay-tape.mjs`、`persistent-world.mjs`、`scripts/replay-capture.mjs` | canonical mutation ledger、SQLite transaction、规则版本 | fresh/restart/replay 状态和 mutation hash 相等；重复事件/重复 accept 无增量；replay 不调 provider、不读密钥 | `implemented / automated verified`，范围是 `canonical_world_only` 与已验证 service-ingress seam |
-| M6b 全服务生产归档 | 将 input runtime、proposal/trial/candidate、HTTP chat/provider result 等操作统一捕获并按原业务入口重放 | 目前仅有 `persistence.mjs` write audit、`replay-capture.mjs` 部分 seam；缺统一 executable journal | M1 envelope、各 namespace beforeCommit/afterCommit、provider result registry、fresh service replay | 一份存档覆盖所有写 namespace；中途重启、重复、缺记录、篡改均可检测；重放不绕过原业务规则 | `baseline / gap`。这是当前最重要的迁移缺口；下一项应先列出 namespace 清单，再逐一接入捕获和重放 |
+| M6b 全服务生产归档 | 将 input runtime、proposal/trial/candidate、HTTP chat/provider result 等操作统一捕获并按原业务入口重放 | `replay-capture.mjs` 已增加 operation context、journal envelope 和 namespace fail-closed；当前仅 `ingestNonChatEvent` 接入，其他入口仍未统一捕获 | M1 envelope、各 namespace beforeCommit/afterCommit、provider result registry、fresh service replay | 一份存档覆盖所有写 namespace；中途重启、重复、缺记录、篡改均可检测；重放不绕过原业务规则 | `partial / contract verified`。v6 完成第一批 journal 基础设施，但全服务生产归档仍是 gap，需逐项接入并通过原业务入口回放 |
 | M6.1 行动反馈 | 区分计划、开始、进行中、成功、失败、取消、未执行，台词不等于结果 | `action-feedback.mjs`、`autonomous-life.mjs`、`persistent-world.mjs` | canonical task、稳定 receipt、任务结果 ledger | 没有 task 的完成文本只能是 `not_executed`；真实失败保留尝试；回执 `audit_only` 且不授予写权限 | `implemented / automated verified`。继续把反馈接入全服务 capture（M6b） |
 | M6.2 阶段体验/资产冻结 | 学习每个世界冻结资产的合同，避免旧阶段和回放静默套用今天的新包 | `role-stages.mjs`、`role-experience-packages.mjs`、`role-experience-performance.mjs`、`world-map-content.mjs` | 体验包 schema/version/hash、stage archive、canonical map catalog | 采用时冻结 snapshot/hash；篡改 freeze fail-closed；回退保留历史；虚拟表现与真实外壳区分 | `implemented / automated verified`（阶段体验包）。地图目录已有版本与持久安装，但尚无开放资产生成/任意历史资产仓库；需作为以后开放生成的门 |
 | M7 统一观察与渲染门 | live/replay 共用序列；前端重连、去重、等渲染完成再推进 | `world-observer.mjs`、`replay-tape.mjs`、客户端 `deskbot/worldObserver.ts`、`deskbot/DeskBotApp.tsx`、`three/renderCompletion.ts` | canonical revision/sequence、WebSocket、文字 fallback | 所有面板同 revision；旧快照不回滚；渲染失败不假 ACK；停机/重连恢复当前事实；客户端不能写 mutation | `implemented / automated verified`；真实 WebGL/CSS2D/RAF context loss 与长断线仍 `manual pending` |
@@ -60,7 +60,7 @@
 
 ## 当前复验与历史证据
 
-2026-10-13 本轮审计已在 v3 代码基线重跑服务端完整测试：**843/843**，退出码 0。源码未因本次矩阵审计改变，故该数字是当前回归证据；不是新增 843 项迁移验收，也不是最终生活目标已经完成。
+2026-10-14 v6 增量复验：服务端广套 **853/853**，M8 长时生活回放单独 **1/1**；operation-journal/replay/persistence 联合专项 **27/27**。该数字是当前回归证据，不是新增 854 项迁移验收，也不是最终生活目标已经完成。
 
 本轮发布检查也已重新运行客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇截图已按本轮 22:12 的实际页面更新。页面天气显示“等待新天气”，不能据此宣称天气 provider 本轮 fresh。Asamana 独立前端 140/140 是更早的上游部署结果，本轮未重跑。真实 context loss、长断线、完整阶段像素和长期体验仍不能由这些命令代替。
 

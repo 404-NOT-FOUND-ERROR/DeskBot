@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +14,13 @@ export const CAPTURE_RULES = 'deskbot.canonical-replay-capture-rules.v1';
 const SESSIONS = 'replay.capture-sessions';
 const OPERATIONS = 'replay.capture-operations';
 const INGRESSES = 'replay.capture-ingresses';
+const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
+// A capture id is a durable identity, but two live recorder objects on the
+// same persistence must not both subscribe to the same before-commit stream.
+// The lock is process-local; the persisted session/registry checks below are
+// still authoritative across a restart.
+const activeCaptureLocks = new WeakMap();
 const digest = value => canonicalDigest(value, { volatileKeys: NONE });
 const copy = value => JSON.parse(JSON.stringify(value));
 const fail = code => { throw Object.assign(new Error(code), { code }); };
@@ -87,26 +94,111 @@ function ingressResultDigest(result) {
  * and accepted world facts. Other namespace writers and candidate decisions
  * require their own operation journal before whole-service equality is claimed.
  */
-export function createCanonicalReplayCapture({ persistence, directory, now = () => new Date(), codeFingerprint = replayCodeFingerprint() } = {}) {
+export function createCanonicalReplayCapture({ persistence, directory, now = () => new Date(), codeFingerprint = replayCodeFingerprint(),
+  onJournalEnvelope = null, expectedNamespaces = null, requireOperationContext = false } = {}) {
   if (persistence?.kind !== 'sqlite' || !persistence.filename || !persistence.insert || !persistence.transaction) fail('replay_capture_requires_sqlite');
   if (typeof directory !== 'string' || !directory.trim()) fail('replay_capture_directory_required');
   const archive = resolve(directory), seedPath = join(archive, 'seed.sqlite');
   const captureId = `capture:${digest(archive).slice(0, 24)}`;
+  const namespaceRegistry = expectedNamespaces === null || expectedNamespaces === undefined
+    ? null : new Set(expectedNamespaces);
+  const namespaceRegistryList = namespaceRegistry ? [...namespaceRegistry].sort() : null;
+  const registryHash = digest({ namespaces: namespaceRegistryList, require_operation_context: Boolean(requireOperationContext) });
+  const lockMap = activeCaptureLocks.get(persistence) ?? new Map();
+  activeCaptureLocks.set(persistence, lockMap);
+  const lockToken = {};
   let initialized = false;
+  let closed = false;
+  const operationStorage = new AsyncLocalStorage();
+  const unsubscribeJournal = persistence.subscribeBeforeCommit?.(batch => {
+    if (!initialized || !batch?.operations?.length) return;
+    const session = persistence.get(SESSIONS, captureId);
+    if (!session) return;
+    const index = session.journal_count ?? 0;
+    const writes = batch.operations.map(operation => ({ ...operation }));
+    const context = operationStorage.getStore();
+    if (requireOperationContext && !context) fail('operation_context_required');
+    if (namespaceRegistry) {
+      const registry = namespaceRegistry;
+      const unknown = [...new Set(writes.map(operation => operation.namespace))]
+        .filter(namespace => !registry.has(namespace));
+      if (unknown.length) fail(`operation_namespace_not_registered:${unknown.join(',')}`);
+    }
+    const envelope = {
+      schema: 'deskbot.service-operation.v1',
+      capture_id: captureId,
+      index,
+      operation_id: context?.operation_id ?? `transaction:${batch.transaction_id}`,
+      operation_kind: context?.operation_kind ?? 'persistence_transaction',
+      source: context?.source ?? 'persistence',
+      request_hash: context?.request_hash ?? null,
+      result_ref: context?.result_ref ?? null,
+      transaction_id: batch.transaction_id,
+      started_at: context?.started_at ?? now().toISOString(),
+      committed_at: null,
+      observed_at: now().toISOString(),
+      writes,
+      coverage: 'persistence_transaction',
+    };
+    envelope.record_hash = digest(envelope);
+    if (typeof onJournalEnvelope === 'function') onJournalEnvelope(copy(envelope));
+    persistence.insert(JOURNAL, `${captureId}:${index}`, envelope);
+    persistence.put(SESSIONS, captureId, { ...session, journal_count: index + 1,
+      journal_state_digest: digest(namespaceDigests(persistence)) });
+  }) ?? (() => {});
   return {
     captureId,
     directory: archive,
+    close() {
+      if (closed) return;
+      closed = true;
+      unsubscribeJournal();
+      if (lockMap.get(captureId) === lockToken) lockMap.delete(captureId);
+    },
+    withOperation(context, callback) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      if (!context || typeof context !== 'object' || typeof callback !== 'function') {
+        throw new TypeError('withOperation requires an operation context and callback');
+      }
+      const operation_id = String(context.operation_id ?? '').trim();
+      if (!operation_id) throw new TypeError('operation_id must be a non-empty string');
+      const operation_kind = String(context.operation_kind ?? context.kind ?? '').trim();
+      if (!operation_kind) throw new TypeError('operation_kind must be a non-empty string');
+      const source = String(context.source ?? 'service').trim() || 'service';
+      const request_hash = context.request_hash ?? (context.request === undefined ? null : digest(context.request));
+      const normalized = Object.freeze({
+        schema: 'deskbot.service-operation-context.v1', operation_id, operation_kind, source,
+        request_hash, result_ref: context.result_ref ?? null,
+        started_at: context.started_at ?? now().toISOString(),
+      });
+      return operationStorage.run(normalized, callback);
+    },
     operationCount() {
       if (!initialized) fail('replay_capture_not_initialized');
       return persistence.get(SESSIONS, captureId).operation_count;
     },
+    journalCount() {
+      if (!initialized) fail('replay_capture_not_initialized');
+      return persistence.get(SESSIONS, captureId).journal_count ?? 0;
+    },
     initialize({ world, timeMode, timeZone }) {
+      if (closed) fail('replay_capture_closed');
+      const activeOwner = lockMap.get(captureId);
+      if (activeOwner && activeOwner !== lockToken) fail('replay_capture_already_active');
       const existing = persistence.get(SESSIONS, captureId);
       if (existing) {
         validateSession(existing, codeFingerprint);
         if (existing.source_database !== realpathSync(persistence.filename) || existing.archive_directory !== archive) fail('replay_capture_source_mismatch');
         if (!existsSync(seedPath) || replayFileDigest(seedPath) !== existing.seed_file_hash) fail('replay_capture_seed_mismatch');
         if (digest(world) !== existing.final_world_hash) fail('replay_capture_gap_detected');
+        if (existing.journal_registry_hash !== registryHash
+          || Boolean(existing.journal_require_operation_context) !== Boolean(requireOperationContext)) {
+          fail('replay_capture_registry_mismatch');
+        }
+        if (existing.journal_state_digest && digest(namespaceDigests(persistence)) !== existing.journal_state_digest) {
+          fail('replay_capture_gap_detected');
+        }
+        lockMap.set(captureId, lockToken);
         initialized = true;
         return;
       }
@@ -119,8 +211,14 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, final_chain_hash: null, coverage: 'canonical_world_only',
+        operation_count: 0, ingress_count: 0, journal_count: 0,
+        journal_namespace_registry: namespaceRegistryList,
+        journal_registry_hash: registryHash,
+        journal_require_operation_context: Boolean(requireOperationContext),
+        journal_state_digest: digest(namespaceDigests(persistence)),
+        final_chain_hash: null, coverage: 'canonical_world_only',
       });
+      lockMap.set(captureId, lockToken);
       initialized = true;
     },
     recordCommit({ event, adapter, received_at, before_world, mutation, world }) {
@@ -176,7 +274,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, namespace_digests;
+  let session, operations, ingresses, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -189,6 +287,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(operation => operation.capture_id === captureId && operation.index < session.operation_count);
     ingresses = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(INGRESSES)]
       .map(row => JSON.parse(row.payload_json)).filter(ingress => ingress.capture_id === captureId);
+    journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
+      .map(row => JSON.parse(row.payload_json)).filter(journal => journal.capture_id === captureId);
     const grouped = new Map();
     for (const row of database.prepare('SELECT namespace,record_id,payload_json FROM records ORDER BY rowid ASC').iterate()) {
       if (row.namespace.startsWith('replay.capture-')) continue;
@@ -198,14 +298,18 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
     }
     namespace_digests = Object.fromEntries([...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([namespace, record]) => [namespace, { count: record.count, digest: record.hash.digest('hex') }]));
+    if (session.journal_state_digest && digest(namespace_digests) !== session.journal_state_digest) {
+      fail('replay_capture_gap_detected');
+    }
     database.exec('COMMIT');
   } finally { database.close(); }
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
-  const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses };
+  const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
-  return { directory: archive, operation_count: operations.length, final_revision: session.final_revision, coverage: session.coverage };
+  return { directory: archive, operation_count: operations.length, journal_count: journals.length,
+    final_revision: session.final_revision, coverage: session.coverage };
 }
 
 function validateArchive(tape, codeFingerprint) {
@@ -214,6 +318,17 @@ function validateArchive(tape, codeFingerprint) {
   if (!Array.isArray(tape.operations) || tape.operations.length !== tape.session.operation_count) fail('replay_capture_incomplete');
   if (!Array.isArray(tape.ingresses)) fail('replay_capture_ingress_missing');
   if (tape.ingresses.length !== (tape.session.ingress_count ?? 0)) fail('replay_capture_ingress_incomplete');
+  if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
+  if (tape.journals.length !== (tape.session.journal_count ?? 0)) fail('replay_capture_journal_incomplete');
+  for (const [index, journal] of tape.journals.entries()) {
+    const { record_hash: hash, ...content } = journal;
+    if (journal.schema !== 'deskbot.service-operation.v1' || journal.capture_id !== tape.session.capture_id
+      || journal.index !== index || !journal.transaction_id || !journal.operation_id
+      || !journal.operation_kind || !journal.source
+      || (journal.request_hash !== null && typeof journal.request_hash !== 'string')
+      || !Number.isFinite(Date.parse(journal.observed_at)) || !Array.isArray(journal.writes)
+      || digest(content) !== hash) fail('replay_capture_journal_corrupt');
+  }
    let previousOperationEnd = 0;
    for (const [index, ingress] of tape.ingresses.entries()) {
     const { record_hash, ...content } = ingress;

@@ -353,79 +353,87 @@ export function createDeskBotServer({
   }
 
   function ingestNonChatEvent(eventInput, adapter = {}) {
-    const replayReceivedAt = replayCapture ? now().toISOString() : null;
-    const replayOperationStart = replayCapture?.operationCount?.() ?? null;
-    const trialAction = ['start_role_practical_trial', 'control_role_practical_trial'].includes(eventInput.payload?.action);
-    const stageAction = ['accept_role_stage', 'rollback_role_stage'].includes(eventInput.payload?.action);
-    if (eventInput.type === 'world.mutation' && (['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)
-      || (trialAction && adapter.rolePracticalInternal === true && !inputStore.get(eventInput.event_id))
-      || (stageAction && adapter.roleStageInternal === true && !inputStore.get(eventInput.event_id)))) {
-      persistentWorld.syncWallClock?.();
-      const recovery = persistentWorld.syncTasks?.();
-      if (recovery?.pending_due || recovery?.environment_pending) throw new PersistentWorldError(409, 'world_catching_up', '世界正在补算之前的事务，请稍后再试。');
-    }
-    const event = normalizeEvent(eventInput, { now });
-    const result = inputStore.save(event);
-    let worldMutation;
-    try {
-      worldMutation = persistentWorld.ingest(result.event,adapter);
-    } catch (error) {
-      if (!result.duplicate) inputStore.remove?.(result.event.event_id);
-      throw error;
-    }
-    const correlationAlreadyCounted = worldMutation.reason === 'correlation_already_counted';
-    const matchedConditions = result.duplicate || correlationAlreadyCounted ? [] : worldContext.observe(event);
-    const interactionDecision = interactionPolicy.evaluate({
-      event: result.event,
-      worldSnapshot: worldMutation.world,
-      worldConditions: matchedConditions,
-      runtimeContext: contextSources.snapshot(),
-    });
-    const stateResult = stateEngine.getResult(result.event.event_id)
-      ?? (worldMutation.reason === 'correlation_already_counted' && result.event.type === 'conversation.input'
-        ? stateEngine.snapshot(result.event.character_id ?? 'unbound')
-        : stateEngine.ingest(result.event));
-    const evidenceResult = correlationAlreadyCounted ? null : evidenceLedger.record({
-      event: result.event,
-      analysis: stateResult.analysis,
-      worldMatches: matchedConditions,
-    });
-    const outputRoute = outputRouter.enqueue({
-      source_event: result.event,
-      output_plan: stateResult.outputs,
-    });
-    const bodyObservation = worldMutation.mutation?.details?.body;
-    let bodyOutputRoute = null;
-    if (bodyObservation?.accepted && bodyObservation.output_plan?.length) {
-      bodyOutputRoute = outputRouter.enqueue({source_event:bodyObservation.source_event,output_plan:bodyObservation.output_plan});
-      const linked=persistentWorld.get().body?.turns.find(turn=>turn.turn_id===bodyObservation.turn_id)?.commands.length;
-      if(!linked)persistentWorld.ingest({event_id:`body-link:${bodyObservation.turn_id}`,type:'body.commands.linked',source:'body-output-router',
-        character_id:DEFAULT_CHARACTER_ID,occurred_at:bodyObservation.turn.received_at,
-        payload:{turn_id:bodyObservation.turn_id,commands:bodyOutputRoute.commands.map(command=>({...command,status:'queued',acknowledgment:null}))}},
-      {...adapter,bodyInternal:true,commandAttested:true});
-    }
-    const roleEvolutionResult = result.duplicate
-      ? null
-      : roleEvolution.observeEvent(result.event);
-    const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
-    const output = {
-      event: result.event,
-      duplicate: result.duplicate || worldMutation.duplicate,
-      worldMutation,
-      interactionDecision,
-      stateResult,
-      evidence: evidenceResult?.evidence ?? null,
-      outputRoute,
-      bodyOutputRoute,
-      roleEvolution: roleEvolutionResult,
-      worldCandidate: worldCandidateResult,
+    const run = () => {
+      const replayReceivedAt = replayCapture ? now().toISOString() : null;
+      const replayOperationStart = replayCapture?.operationCount?.() ?? null;
+      const trialAction = ['start_role_practical_trial', 'control_role_practical_trial'].includes(eventInput.payload?.action);
+      const stageAction = ['accept_role_stage', 'rollback_role_stage'].includes(eventInput.payload?.action);
+      if (eventInput.type === 'world.mutation' && (['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)
+        || (trialAction && adapter.rolePracticalInternal === true && !inputStore.get(eventInput.event_id))
+        || (stageAction && adapter.roleStageInternal === true && !inputStore.get(eventInput.event_id)))) {
+        persistentWorld.syncWallClock?.();
+        const recovery = persistentWorld.syncTasks?.();
+        if (recovery?.pending_due || recovery?.environment_pending) throw new PersistentWorldError(409, 'world_catching_up', '世界正在补算之前的事务，请稍后再试。');
+      }
+      const event = normalizeEvent(eventInput, { now });
+      const result = inputStore.save(event);
+      let worldMutation;
+      try {
+        worldMutation = persistentWorld.ingest(result.event,adapter);
+      } catch (error) {
+        if (!result.duplicate) inputStore.remove?.(result.event.event_id);
+        throw error;
+      }
+      const correlationAlreadyCounted = worldMutation.reason === 'correlation_already_counted';
+      const matchedConditions = result.duplicate || correlationAlreadyCounted ? [] : worldContext.observe(event);
+      const interactionDecision = interactionPolicy.evaluate({
+        event: result.event,
+        worldSnapshot: worldMutation.world,
+        worldConditions: matchedConditions,
+        runtimeContext: contextSources.snapshot(),
+      });
+      const stateResult = stateEngine.getResult(result.event.event_id)
+        ?? (worldMutation.reason === 'correlation_already_counted' && result.event.type === 'conversation.input'
+          ? stateEngine.snapshot(result.event.character_id ?? 'unbound')
+          : stateEngine.ingest(result.event));
+      const evidenceResult = correlationAlreadyCounted ? null : evidenceLedger.record({
+        event: result.event,
+        analysis: stateResult.analysis,
+        worldMatches: matchedConditions,
+      });
+      const outputRoute = outputRouter.enqueue({
+        source_event: result.event,
+        output_plan: stateResult.outputs,
+      });
+      const bodyObservation = worldMutation.mutation?.details?.body;
+      let bodyOutputRoute = null;
+      if (bodyObservation?.accepted && bodyObservation.output_plan?.length) {
+        bodyOutputRoute = outputRouter.enqueue({source_event:bodyObservation.source_event,output_plan:bodyObservation.output_plan});
+        const linked=persistentWorld.get().body?.turns.find(turn=>turn.turn_id===bodyObservation.turn_id)?.commands.length;
+        if(!linked)persistentWorld.ingest({event_id:`body-link:${bodyObservation.turn_id}`,type:'body.commands.linked',source:'body-output-router',
+          character_id:DEFAULT_CHARACTER_ID,occurred_at:bodyObservation.turn.received_at,
+          payload:{turn_id:bodyObservation.turn_id,commands:bodyOutputRoute.commands.map(command=>({...command,status:'queued',acknowledgment:null}))}},
+        {...adapter,bodyInternal:true,commandAttested:true});
+      }
+      const roleEvolutionResult = result.duplicate
+        ? null
+        : roleEvolution.observeEvent(result.event);
+      const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
+      const output = {
+        event: result.event,
+        duplicate: result.duplicate || worldMutation.duplicate,
+        worldMutation,
+        interactionDecision,
+        stateResult,
+        evidence: evidenceResult?.evidence ?? null,
+        outputRoute,
+        bodyOutputRoute,
+        roleEvolution: roleEvolutionResult,
+        worldCandidate: worldCandidateResult,
+      };
+      // This is an audit envelope only. The canonical world and all other
+      // domain stores have already committed through their normal handlers;
+      // replay adapters remain private and cannot be supplied by HTTP clients.
+      replayCapture?.recordIngress?.({ event: result.event, adapter, result: output, received_at: replayReceivedAt,
+        operation_start: replayOperationStart });
+      return output;
     };
-    // This is an audit envelope only. The canonical world and all other
-    // domain stores have already committed through their normal handlers;
-    // replay adapters remain private and cannot be supplied by HTTP clients.
-    replayCapture?.recordIngress?.({ event: result.event, adapter, result: output, received_at: replayReceivedAt,
-      operation_start: replayOperationStart });
-    return output;
+    if (replayCapture?.withOperation) {
+      return replayCapture.withOperation({ operation_id: `ingress:${eventInput.event_id}`, operation_kind: 'event_ingress',
+        source: eventInput.source ?? 'service', request: { event_id: eventInput.event_id, type: eventInput.type,
+          source: eventInput.source, payload: eventInput.payload ?? null } }, run);
+    }
+    return run();
   }
 
   function ingestWeatherEvent(event) {

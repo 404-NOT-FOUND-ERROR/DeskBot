@@ -27,7 +27,7 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮已在本地创建 `codex/asamana-shared-life-v5`，保留 `main` 和 v1–v4 分支；远端完成状态由交付核验确认。2026-10-13 本轮复验服务端 843/843、客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server），全部通过。Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮已在本地创建 `codex/asamana-replay-journal-v6`，保留 v5、`main` 和 v1–v4 分支；远端完成状态由交付核验确认。v6 只增加 M6b operation journal 的第一批服务入口接入，不把全服务生产归档写成已完成。2026-10-14 v6 复验服务端广套 853/853、M8 单独 1/1、operation-journal/replay/persistence 27/27；客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server）也通过。Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 

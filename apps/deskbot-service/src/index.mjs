@@ -67,7 +67,12 @@ server.listen(port, host, () => {
   }
 });
 
-server.once('close', () => persistence.close());
+server.once('close', () => {
+  // Release the journal subscription/recorder lock before the SQLite handle
+  // closes, so an in-process restart cannot retain a stale capture owner.
+  replayCapture?.close?.();
+  persistence.close();
+});
 
 function shutdown(signal) {
   console.log(`Received ${signal}; shutting down.`);

@@ -19,7 +19,7 @@ const CODE = 'test-controlled-rule-graph';
 
 function fixture(t, { seeded = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'deskbot-capture-')), databasePath = join(dir, 'source.sqlite'), directory = join(dir, 'archive');
-  let time = BASE, persistence = createSqlitePersistence({ filename: databasePath }), world;
+  let time = BASE, persistence = createSqlitePersistence({ filename: databasePath }), world, replayCapture;
   const now = () => new Date(time);
   if (seeded) {
     const seedWorld = createPersistentWorld({ persistence, now, timeMode: 'realtime' });
@@ -34,13 +34,16 @@ function fixture(t, { seeded = false } = {}) {
     persistence.put('canonical-world.states', seed.world_id, seed);
   }
   const reopen = () => {
+    replayCapture?.close?.();
+    replayCapture = createCanonicalReplayCapture({ persistence, directory, now, codeFingerprint: CODE });
     world = createPersistentWorld({ persistence, now, timeMode: 'realtime',
-      replayCapture: createCanonicalReplayCapture({ persistence, directory, now, codeFingerprint: CODE }) });
+      replayCapture });
   };
   reopen();
-  t.after(() => { persistence.close(); rmSync(dir, { recursive: true, force: true }); });
+  t.after(() => { replayCapture?.close?.(); persistence.close(); rmSync(dir, { recursive: true, force: true }); });
   return {
     dir, directory, databasePath, now, get world() { return world; }, get persistence() { return persistence; },
+    get capture() { return replayCapture; },
     restart() { persistence.close(); persistence = createSqlitePersistence({ filename: databasePath }); reopen(); },
     advance(ms) { time += ms; world.syncWallClock(); world.syncTasks(); },
     setAt(at) { time = Date.parse(at); world.syncWallClock(); world.syncTasks(); },
@@ -106,6 +109,7 @@ test('capture is absent by default and freezes one receipt timestamp per canonic
 
 test('operation journaling shares the canonical transaction and rolls back on capture failure', t => {
   const h = fixture(t), original = h.world.get();
+  h.capture.close();
   const recorder = createCanonicalReplayCapture({ persistence: h.persistence, directory: h.directory, now: h.now, codeFingerprint: CODE });
   const world = createPersistentWorld({ persistence: h.persistence, now: h.now, timeMode: 'realtime', replayCapture: {
     initialize: value => recorder.initialize(value),
@@ -145,6 +149,7 @@ test('a capture disabled between restarts detects the unrecorded world gap', t =
   unrecorded.ingest({ event_id: 'unrecorded-user-input', type: 'conversation.input', source: 'user', character_id: OWNER,
     occurred_at: h.now().toISOString(), payload: { text: '这次没开捕获', role: 'user' } });
   assert.throws(() => h.export(), /replay_capture_gap_detected/);
+  h.capture.close();
   assert.throws(() => createPersistentWorld({ persistence: h.persistence, now: h.now, timeMode: 'realtime',
     replayCapture: createCanonicalReplayCapture({ persistence: h.persistence, directory: h.directory, now: h.now, codeFingerprint: CODE }) }), /replay_capture_gap_detected/);
 });
@@ -177,6 +182,9 @@ test('service replay seam replays non-canonical ingress through original handler
   assert.equal(second.duplicate, false);
   time += 60_000;
   assert.equal(server.ingestNonChatEvent(event).duplicate, true);
+  const ingressJournals = persistence.list('replay.capture-journal');
+  assert.ok(ingressJournals.some(journal => journal.operation_id === 'ingress:service-capture-input'));
+  assert.ok(ingressJournals.some(journal => journal.operation_id === 'ingress:service-capture-input-next'));
   const exported = exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
   assert.equal(exported.coverage, 'canonical_world_with_service_ingress');
   const tape = JSON.parse(readFileSync(join(archive, 'capture.json'), 'utf8'));
