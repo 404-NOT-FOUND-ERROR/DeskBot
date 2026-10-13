@@ -30,6 +30,11 @@ venv/
 *.mp3
 *.ogg
 *-test-output.txt
+test-output*.txt
+/deskbot-desktop-latest.png
+/polito*.html
+/polito*.txt
+/search_dhu.html
 *.log
 
 # Research downloads, generated CAD and scratch output

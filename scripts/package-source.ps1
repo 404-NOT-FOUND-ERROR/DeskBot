@@ -28,7 +28,17 @@ $stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ('deskbot-source-' + [guid]:
 # Build from the working tree so the package is useful before the first commit.
 # Explicit exclusions are intentional: a public package must not depend on .gitignore being correct.
 $excludedDirectoryNames = @('.git', '.pnpm-store', 'node_modules', 'tmp', 'dist', 'dist-server', 'build', 'coverage', '__pycache__', '.venv', 'venv', '.vercel', 'models', 'model-cache', 'checkpoints')
-$excludedFileNames = @('config\llm_config.json', 'config\weather.env')
+$excludedFileNames = @(
+  'config\llm_config.json',
+  'config\weather.env',
+  'deskbot-desktop-latest.png',
+  'polito1.html',
+  'polito2.html',
+  'polito2.txt',
+  'search_dhu.html',
+  'test-output.txt',
+  'test-output-persona.txt'
+)
 $excludedExtensions = @('.sqlite', '.sqlite-shm', '.sqlite-wal', '.log', '.wav', '.mp3', '.ogg', '.pyc', '.bin', '.onnx', '.pt', '.pth', '.safetensors')
 
 function Test-PublicPackagePath([string]$RelativePath) {
@@ -38,6 +48,10 @@ function Test-PublicPackagePath([string]$RelativePath) {
   if ($excludedFileNames -contains $normalized) { return $false }
   if ($normalized -match '(^|\\)(\.env($|\.)|.*credentials.*\.json$|.*secrets.*\.json$)') { return $false }
   if ($normalized -match '(^|\\).*[-_]test-output\.txt$') { return $false }
+  # Root-level browser captures and ad-hoc test transcripts are local review
+  # artifacts, not source or reproducible evidence. Keep them out of public
+  # source archives even when they are not covered by .gitignore.
+  if ($normalized -match '(^|\\)(deskbot-desktop-latest\.png|polito[^\\]*\.(html|txt)|search_dhu\.html|test-output[^\\]*\.txt)$') { return $false }
   if ($excludedExtensions -contains ([IO.Path]::GetExtension($normalized).ToLowerInvariant())) { return $false }
   return $true
 }
