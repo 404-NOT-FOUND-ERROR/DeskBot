@@ -1,12 +1,17 @@
 # Asamana → DeskBot 迁移标准 v2
 
-状态：`draft-for-execution`（2026-10-14）
+状态：`active-for-execution`（2026-10-14）
 
 本文是“逐项迁移”工作的规范合同。它把 Asamana 当作工程机制参考，不把上游
 代码、人格设定或世界事实搬进 DeskBot。已有 v1 标准、目录和矩阵继续保留为历史
 证据；从本轮开始，新迁移以本文、[v2 管线](asamana-migration-pipeline-v2.md)
-和 [v2 作业单](asamana-migration-runbook-v2.md) 为执行入口。当前工作区只建立标准
-和验收记录，不代表所有迁移项已经完成。
+和 [v2 作业单](asamana-migration-runbook-v2.md) 为执行入口。标准已经冻结并进入逐项
+执行；目录中的 `partial`、`inconclusive` 和 `planned` 仍表示未完成，不能被本文件的
+启用状态误读为“全部迁移完成”。
+
+当前执行基线由目录 `release.branch`、`release.base_commit` 和每项证据中的
+`base_commit` 共同确定。历史发布分支、旧测试数字和旧证据只作为历史引用；若与当前
+目录不一致，必须标注为 stale，不能混用。
 
 ## 1. 目标与不变边界
 
@@ -143,7 +148,7 @@ planned → contract_drafted → implementation_in_progress
 
 ## 6. 本轮执行边界
 
-本轮只完成标准、管线和验收记录的落地；下一步按 v2 作业单逐项实现。任何
-`automated_verified` 是当前 v1 证据在本标准下的迁移基线，不自动等于 v2 已重新验收。
-未提交、未 push；完成每个 item 后才更新对应 catalog/matrix 记录，并由父任务决定
-何时形成独立 Git 备份。
+本轮从标准冻结进入逐项实现。已有 `automated_verified` 项只有在证据的
+`base_commit`、规则指纹、内容指纹和 required gates 仍匹配时才可复用；否则先降为
+`stale` 并重跑。每完成一个 item，必须先写入脱敏 evidence、更新 catalog/matrix，再
+进行本地验证或本地提交；当前执行批次不自动 push 到远端。

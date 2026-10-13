@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -375,4 +376,108 @@ test('chat replay fails closed before target creation when its provider fixture 
   writeFileSync(tapePath, JSON.stringify(restored));
   await assert.rejects(replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'tampered.sqlite'), runtimeFactory, codeFingerprint: CODE }), /replay_capture_provider_corrupt/);
   assert.equal(existsSync(join(dir, 'tampered.sqlite')), false);
+});
+
+test('chat replay preserves a successful TTS fixture and re-enters the original handler without a provider', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskbot-chat-tts-replay-'));
+  const source = join(dir, 'source.sqlite'), archive = join(dir, 'archive');
+  let time = BASE;
+  const now = () => new Date(time);
+  const persistence = createSqlitePersistence({ filename: source, now });
+  const capture = createCanonicalReplayCapture({ persistence, directory: archive, now, codeFingerprint: CODE });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'realtime', replayCapture: capture });
+  const bytes = Buffer.from('RIFF-chat-replay-audio');
+  const audio = {
+    format: { codec: 'wav', sample_rate_hz: 16_000, channels: 1 },
+    encoding: 'base64', data_base64: bytes.toString('base64'), byte_count: bytes.length,
+    duration_ms: 180, audio_id: 'audio-chat-replay-001',
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+  let llmCalls = 0, ttsCalls = 0;
+  const sourceServer = createDeskBotServer({ now, persistence, persistentWorld: world, replayCapture: capture,
+    llm: { id: 'chat-tts-source', complete: async () => {
+      llmCalls += 1; return { provider: 'chat-tts-source', model: 'fixture-v1', text: '喵呜。声音也收好了。' };
+    } },
+    voiceClient: { synthesize: async input => {
+      ttsCalls += 1; return { schema: 'voice.tts-result.v0.1', ok: true, request_id: input.request_id,
+        correlation_id: input.correlation_id, profile: input.profile, audio };
+    } },
+    websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false,
+    residentLifeEnabled: false, livedMemoryEnabled: false,
+  });
+  await new Promise((resolve, reject) => sourceServer.listen(0, '127.0.0.1', error => error ? reject(error) : resolve()));
+  const request = { event_id: 'chat-tts-replay-001', correlation_id: 'chat-tts-correlation-001', message: '请把这句说出来。' };
+  try {
+    const response = await fetch(`http://127.0.0.1:${sourceServer.address().port}/api/chat`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    });
+    assert.equal(response.status, 202);
+    const body = await response.json();
+    assert.equal(body.turn.voice.audio_id, audio.audio_id);
+    assert.equal(llmCalls, 1); assert.equal(ttsCalls, 1);
+    exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
+    const tape = JSON.parse(readFileSync(join(archive, 'capture.json'), 'utf8'));
+    const providers = tape.providers.filter(item => item.operation_id === `chat:${request.event_id}`);
+    assert.ok(providers.some(item => item.kind === 'llm'));
+    const ttsFixture = providers.find(item => item.kind === 'tts');
+    assert.equal(ttsFixture.ref.fixture.kind, 'tts.synthesize.v1');
+    assert.equal(ttsFixture.ref.fixture.audio.audio.audio_id, audio.audio_id);
+    const replayProviders = (await import('../src/replay-capture.mjs')).createReplayChatProviders({ tape });
+    const runtimeFactory = ({ persistence: targetPersistence, now: targetNow, replayProviders: providersForReplay }) => {
+      const targetWorld = createPersistentWorld({ persistence: targetPersistence, now: targetNow, timeMode: 'realtime',
+        timeZone: 'Asia/Shanghai', syncClockOnCreate: false });
+      const target = createDeskBotServer({ now: targetNow, persistence: targetPersistence, persistentWorld: targetWorld,
+        llm: { id: 'must-not-call', complete: async () => { throw Error('external_provider_called'); } },
+        replayProviders: providersForReplay, websocket: false, worldLifeEnabled: false,
+        autonomousLifeEnabled: false, residentLifeEnabled: false, livedMemoryEnabled: false,
+      });
+      return { chat: target.chat, replayWorker: target.replayWorker, persistentWorld: targetWorld,
+        providerCalls: providersForReplay.providerCalls, replayStartup: () => target.roleEvolution.syncAll(),
+        close: () => { try { target.close(); } catch {} targetPersistence.close(); } };
+    };
+    const replay = await replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'replay.sqlite'),
+      runtimeFactory, codeFingerprint: CODE });
+    const restarted = await replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'replay-restarted.sqlite'),
+      runtimeFactory, restartAt: 1, codeFingerprint: CODE });
+    assert.equal(replay.verified, true);
+    assert.equal(restarted.verified, true);
+    assert.equal(replay.provider_calls, 0);
+    assert.equal(restarted.provider_calls, 0);
+  } finally {
+    await new Promise(resolve => sourceServer.close(() => resolve()));
+    capture.close(); persistence.close(); rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('chat replay records TTS failure as an error fixture and preserves the non-voice chat path', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskbot-chat-tts-error-'));
+  const source = join(dir, 'source.sqlite'), archive = join(dir, 'archive');
+  const now = () => new Date(BASE);
+  const persistence = createSqlitePersistence({ filename: source, now });
+  const capture = createCanonicalReplayCapture({ persistence, directory: archive, now, codeFingerprint: CODE });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'realtime', replayCapture: capture });
+  const sourceServer = createDeskBotServer({ now, persistence, persistentWorld: world, replayCapture: capture,
+    llm: { id: 'chat-tts-error-source', complete: async () => ({ provider: 'chat-tts-error-source', model: 'v1', text: '喵呜。今天先用文字。' }) },
+    voiceClient: { synthesize: async () => { throw Object.assign(new Error('sidecar unavailable'), { code: 'sidecar_unavailable', retryable: true }); } },
+    websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false, residentLifeEnabled: false, livedMemoryEnabled: false,
+  });
+  await new Promise((resolve, reject) => sourceServer.listen(0, '127.0.0.1', error => error ? reject(error) : resolve()));
+  try {
+    const request = { event_id: 'chat-tts-error-001', message: '文字也可以。' };
+    const response = await fetch(`http://127.0.0.1:${sourceServer.address().port}/api/chat`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    });
+    assert.equal(response.status, 202);
+    const body = await response.json();
+    assert.equal(body.turn.voice, null);
+    assert.equal(body.turn.voice_error.code, 'sidecar_unavailable');
+    exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
+    const tape = JSON.parse(readFileSync(join(archive, 'capture.json'), 'utf8'));
+    const ttsFixture = tape.providers.find(item => item.operation_id === `chat:${request.event_id}` && item.kind === 'tts');
+    assert.equal(ttsFixture.ref.status, 'error');
+    assert.equal(ttsFixture.ref.error_code, 'sidecar_unavailable');
+  } finally {
+    await new Promise(resolve => sourceServer.close(() => resolve()));
+    capture.close(); persistence.close(); rmSync(dir, { recursive: true, force: true });
+  }
 });

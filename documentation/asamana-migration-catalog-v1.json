@@ -2,9 +2,9 @@
   "schema": "deskbot.asamana-migration-catalog.v1",
   "catalog_version": "1.0.0",
   "release": {
-    "branch": "codex/asamana-migration-program-v2-release-2026-10-14",
-    "base_commit": "ee81de9",
-    "status": "release-candidate",
+    "branch": "codex/asamana-m6b-r-worker-replay-2026-10-14",
+    "base_commit": "268e625",
+    "status": "active-local-migration",
     "updated_at": "2026-10-14",
     "push_policy": "user-approved-push"
   },
@@ -85,7 +85,7 @@
       "phase": "M0",
       "wave": "foundation",
       "upstream_refs": ["Asamana architecture and event contracts"],
-      "deskbot_modules": ["documentation/asamana-migration-standard-v1.md", "documentation/asamana-migration-pipeline-v1.md", "documentation/asamana-migration-runbook-v1.md"],
+      "deskbot_modules": ["documentation/asamana-migration-standard-v2.md", "documentation/asamana-migration-pipeline-v2.md", "documentation/asamana-migration-runbook-v2.md"],
       "authority_writer": "documentation",
       "namespaces": [],
       "contracts": ["deskbot.asamana-migration-catalog.v1", "G0-G7"],
@@ -98,7 +98,7 @@
       "required_gates": ["G0", "G7"],
       "evidence_refs": ["scripts/validate-migration-catalog.mjs", "apps/deskbot-service/test/migration-catalog.test.mjs"],
       "last_verified_at": "2026-10-14",
-      "base_commit": "ee81de9",
+      "base_commit": "268e625",
       "known_gaps": ["CI invocation and evidence artifact export remain delivery follow-up"]
     },
     {

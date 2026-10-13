@@ -342,6 +342,7 @@ export function createChatOrchestrator({
 
     let voice = null;
     let voiceError = null;
+    let ttsProviderResult = null;
     const replayVoiceEnabled = replayProviders?.voiceForEvent?.(userEvent) === true;
     if (voiceClient || replayVoiceEnabled) {
       try {
@@ -365,6 +366,10 @@ export function createChatOrchestrator({
         const tts = replayProviders?.resolve
           ? await replayProviders.resolve({ event: userEvent, kind: 'tts', request: ttsRequest })
           : await voiceClient.synthesize(ttsRequest);
+        // Keep the complete deterministic provider result for the private
+        // replay fixture. The public turn only exposes the stored artifact
+        // metadata and never the audio bytes.
+        ttsProviderResult = tts;
         if (!audioArtifacts) {
           throw new Error('audio artifact store is required when voiceClient is configured');
         }
@@ -403,22 +408,35 @@ export function createChatOrchestrator({
         if (voiceRequired) throw error;
       }
     }
-    onProviderResult?.({
-      schema: 'deskbot.provider-result-ref.v1',
-      purpose: 'chat',
-      status: 'success',
-      provider: rawCompletion.provider ?? llm.id ?? null,
-      model: rawCompletion.model ?? null,
-      result_hash: createHash('sha256').update(String(rawCompletion.text ?? '')).digest('hex'),
-      fixture: { kind: 'llm.complete.v1', text: String(rawCompletion.text ?? '') },
-      ...(voice ? {
-        tts: {
-          status: 'success',
-          audio_id: voice.audio_id,
-          sha256: voice.sha256,
-        },
-      } : voiceError ? { tts: { status: 'error', code: voiceError.code } } : {}),
-    });
+    // The chat operation can have two provider phases.  Keep the LLM fixture
+    // in its own `llm` record (created above), and record the TTS phase as a
+    // separate replay fixture.  Reusing the LLM fixture on the TTS record
+    // makes a successful voice chat impossible to replay: the replay adapter
+    // would look for `tts.synthesize.v1` but receive `llm.complete.v1`.
+    if (voice) {
+      onProviderResult?.({
+        schema: 'deskbot.provider-result-ref.v1',
+        purpose: 'chat',
+        status: 'success',
+        provider: voice.provider ?? 'chat-tts',
+        model: voice.model ?? null,
+        result_hash: createHash('sha256').update(JSON.stringify(voice)).digest('hex'),
+        tts: { status: 'success', audio_id: voice.audio_id, sha256: voice.sha256 },
+        fixture: { kind: 'tts.synthesize.v1', audio: ttsProviderResult },
+      });
+    } else if (voiceError) {
+      onProviderResult?.({
+        schema: 'deskbot.provider-result-ref.v1',
+        purpose: 'chat',
+        status: 'error',
+        provider: 'chat-tts',
+        model: null,
+        error_code: voiceError.code,
+        error_message: voiceError.message,
+        retryable: voiceError.retryable === true,
+        tts: { status: 'error', code: voiceError.code },
+      });
+    }
 
     const replyEvent = normalizeChat({
       event_id: `reply-${userEvent.event_id}`,
