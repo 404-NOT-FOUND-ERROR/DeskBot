@@ -11,7 +11,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - 迁移目录现在由 `scripts/validate-migration-catalog.mjs` 机器校验，运行时会先检查 18 个迁移项的唯一性、状态、依赖、证据和 freshness。
 - voice `transcribe/tts` 在受控 replay 模式下可从私有 fixture 完整重入原 route，fresh/restart、缺失、篡改和错误 fixture 会 fail closed；这不等同于真实语音模型或 ASR/cancel 的完整生产归档。
 - worker scheduler operation 已有稳定 operation ID、SQLite 重启恢复、原 worker 入口 replay 和 canonical mutation/role-run 去重验收；旧 archive/runtime 缺少 worker seam 时仍能安全消费只读 worker 记录。
-- route、worker、voice fixture、chat fixture replay 专项合计 **14/14 通过**；本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
+- route、worker、voice fixture、chat fixture replay 专项合计 **14/14 通过**；服务端全量回归 **874/874 通过**。本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
 - README、发布记录和运行截图与本分支一致；本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
 
 ### 本次迁移程序分支新增

@@ -17,9 +17,9 @@
 
 ## Verification
 
-Focused replay contract: **14/14 passed**.
+Focused replay contract: **14/14 passed**. Full DeskBot service suite: **874/874 passed**.
 
-Covered route, worker, voice fixture, chat fixture, fresh replay, restart replay, provider-zero replay, tamper fail-closed, idempotency and namespace digest checks. Full service regression remains a separate gate and must be reported from the exact local run; this release note does not turn focused replay evidence into a claim of full P4 completion.
+Covered route, worker, voice fixture, chat fixture, fresh replay, restart replay, provider-zero replay, tamper fail-closed, idempotency and namespace digest checks. The full suite result is a regression baseline, not a claim that P4 or long-life natural experience is complete.
 
 ## Visual evidence
 
