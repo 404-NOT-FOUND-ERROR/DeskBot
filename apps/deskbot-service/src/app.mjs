@@ -188,6 +188,7 @@ export function createDeskBotServer({
   bodyPerceptionEnabled = residentLifeEnabled,
   bodyDeviceProfiles = [],
   replayCapture = null,
+  replayProviders = null,
 } = {}) {
   const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
   function bodyContextForPeer(peer) {
@@ -284,6 +285,7 @@ export function createDeskBotServer({
       });
     },
     onProviderResult: resultRef => replayCapture?.setOperationResultRef?.(resultRef),
+    replayProviders,
     refreshWeather: weatherConnector
       ? async ({ force = false } = {}) => {
         const weather = await weatherConnector.refresh({ force });
@@ -2122,7 +2124,11 @@ export function createDeskBotServer({
             const runCapturedChat = async () => {
               try {
                 const result = await executeChat();
-                replayCapture.recordChat?.({ event: normalizedRequest, result,
+                // A duplicate retry has no new domain effect or provider
+                // fixture. Keep the replay tape canonical by recording only
+                // the first committed chat operation; duplicate behavior is
+                // already covered by the operation journal idempotency.
+                if (!result?.duplicate) replayCapture.recordChat?.({ event: normalizedRequest, result,
                   received_at: now().toISOString(), operation_start: operationStart,
                   operation_end: replayCapture.operationCount?.() ?? operationStart });
                 return result;

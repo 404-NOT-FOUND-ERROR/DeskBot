@@ -65,6 +65,7 @@ export function createChatOrchestrator({
   conversationHistoryAfter = null,
   recordRoleTrialObservation = null,
   onProviderResult = null,
+  replayProviders = null,
 }) {
   const turns = new Map(
     (persistence?.list('chat.turns') ?? []).map((turn) => [turn.turn_id, turn]),
@@ -258,7 +259,19 @@ export function createChatOrchestrator({
     // character with a collection of hard-coded question-and-answer handlers.
     let rawCompletion;
     try {
-      rawCompletion = await llm.complete({
+      rawCompletion = replayProviders?.resolve
+        ? await replayProviders.resolve({
+          event: userEvent,
+          kind: 'llm',
+          request: {
+            userText: userEvent.payload.text,
+            prompt: composed.prompt,
+            state: stateResult.state,
+            worldConditions,
+            worldSnapshot: currentWorldSnapshot(),
+          },
+        })
+        : await llm.complete({
         userText: userEvent.payload.text,
         prompt: composed.prompt,
         state: stateResult.state,
@@ -329,13 +342,14 @@ export function createChatOrchestrator({
 
     let voice = null;
     let voiceError = null;
-    if (voiceClient) {
+    const replayVoiceEnabled = replayProviders?.voiceForEvent?.(userEvent) === true;
+    if (voiceClient || replayVoiceEnabled) {
       try {
         // The firmware bridge carries stream IDs as UUID bytes. Derive the ID
         // from the immutable event ID so crash/retry replay remains stable;
         // a sidecar-friendly prefix must never reach the device wire.
         const requestedStreamId = stableStreamId(userEvent.event_id);
-        const tts = await voiceClient.synthesize({
+        const ttsRequest = {
           request_id: `tts-${userEvent.event_id}`,
           correlation_id: userEvent.correlation_id ?? userEvent.event_id,
           stream_id: requestedStreamId,
@@ -347,7 +361,10 @@ export function createChatOrchestrator({
           },
           expression_intent: expressionIntent,
           format: ttsFormat,
-        });
+        };
+        const tts = replayProviders?.resolve
+          ? await replayProviders.resolve({ event: userEvent, kind: 'tts', request: ttsRequest })
+          : await voiceClient.synthesize(ttsRequest);
         if (!audioArtifacts) {
           throw new Error('audio artifact store is required when voiceClient is configured');
         }

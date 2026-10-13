@@ -1,8 +1,8 @@
 # Asamana 迁移标准 v1
 
-状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。
+状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。逐项执行与证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
-本轮发布分支为 `codex/asamana-m6b-seam-v6-2`，本地从 v6.1 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。v6.2 是 M6b operation journal 的增量发布，不等于全服务生产回放完成。
+当前发布分支为 `codex/asamana-m6b-seam-v6-3`，从 v6.2 已验证基线继续推进；v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。v6.3 已收口受控的 chat 用户 handler LLM fixture-replay 接缝并通过专项/广套回归；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 
@@ -67,7 +67,7 @@
 - `action-feedback.mjs`：以 `deskbot.action-feedback.v1` 固定 `authority=audit_only`，保存稳定回执 ID、因果事件、任务状态和失败分类；真实任务失败仍是一次发生过的尝试，而没有 canonical task 的“完成”文本只能是 `not_executed`。
 - 阶段体验包采用时冻结 version/snapshot/hash，已有阶段的生活、表达、TTS 意图与虚拟外观不会被新 registry 静默改写。
 
-以上为 v6.2 分支的本地实现与验证记录。本轮发布复验服务端广套 857/857、M8 长时生活回放单独 1/1、operation-journal/replay/persistence 联合专项 27/27、input-runtime 专项 7/7、chat/replay-capture 专项 19/19、客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server），全部通过。隔离两日 M8 fixture 及重启/重复规则已自动验证，最新三日规则目标追求样本也已 `verified`；真实 DeepSeek 六次调用仍是 `inconclusive_reflection_failed`。新序列历史回放与真实迁移断层拒绝已自动验证。v6.2 发布前已人工验收 DeskBot 页面加载、实时地图/居民、往事面板、向前/向后单条翻阅、加载更早记录、回到最近和恢复实时；本轮再次核对正式实时小镇实际页面，天气为“等待新天气”。Asamana 示例世界、人物认知、叙事流、回放滑条和沉浸视图属于此前部署验收。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。逐项代码映射、依赖和验收门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。
+v6.2 分支的历史实现与验证记录保留：服务端广套 857/857、M8 长时生活回放 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19、客户端 44 套 301/301、voice-sidecar 16/16 和生产构建。v6.3 当前通过原 chat handler LLM fixture replay 10/10、服务端广套 859/859、客户端 typecheck/build、voice-sidecar 16/16 和生产构建；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务 replay 不在通过范围内。隔离两日 M8 fixture、重启/重复规则和真实 DeepSeek 六次调用的 `inconclusive_reflection_failed` 仍按历史证据保留。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。逐项代码映射、依赖和验收门见 [正式迁移矩阵](asamana-migration-matrix-v1.md) 与 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 ### M6 本地捕获范围
 
@@ -77,4 +77,4 @@ CLI 回放的验证范围仍是 `canonical_world_only`。同一捕获器另外�
 
 `persistence.mjs` 已提供默认关闭的 commit/before-commit write audit 与流式 namespace 读取，但 input-runtime 调度、独立 proposal/trial/candidate 决策、HTTP chat/provider 的可执行回放、wall-clock marker 和 worker/WebSocket 旁路尚未统一完成。因此 M6a 世界捕获已完成，M6b 全服务生产归档仍未完成。本轮不将入口 seam 测试替代该验收门；完整 namespace 边界、原子提交和七项完成门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。canonical 捕获缺口会在恢复或导出时拒绝；其他未捕获服务写入会由全 namespace 对比检出，但事后 digest 不能证明操作顺序、权限或失败分支已被捕获。
 
-v6.2 已把 `/api/chat` 的 `role=user` 分支收口为第一批 `chat.request` operation：请求先规范化、生成稳定事件 ID，再在 `chat:<event_id>` context 中运行；assistant/非 user 分支也进入公共 operation scope。operation journal 只保存摘要 hash 和脱敏的 `deskbot.provider-result-ref.v1`，不保存聊天正文；本地私有 replay tape 为了可重放可能保留事件和 provider fixture 原文，不得公开发布。它仍不是可执行的完整 chat replay：原 handler 重放、provider fixture 消费式回放和失败/重启边界尚未全部完成。M6b 的接缝合同、状态和下一阶段 input-runtime 验收门见 [M6b 服务操作接缝合同](asamana-m6b-seam-contract-v1.md)。
+v6.2 已把 `/api/chat` 的 `role=user` 分支收口为第一批 `chat.request` operation：请求先规范化、生成稳定事件 ID，再在 `chat:<event_id>` context 中运行；assistant/非 user 分支也进入公共 operation scope。operation journal 只保存摘要 hash 和脱敏的 `deskbot.provider-result-ref.v1`，不保存聊天正文；本地私有 replay tape 为了可重放可能保留事件和 provider fixture 原文，不得公开发布。v6.3 已通过受控 chat 用户 handler 的 LLM fixture replay 专项 10/10 与服务端广套 859/859；这只覆盖已声明的 LLM fixture 路径，不等于 success/error/TTS 全分支、assistant 分支或完整 chat replay 已通过。M6b 的接缝合同、状态和下一阶段 input-runtime 验收门见 [M6b 服务操作接缝合同](asamana-m6b-seam-contract-v1.md)，逐项执行见 [迁移作业单](asamana-migration-runbook-v1.md)。

@@ -190,7 +190,12 @@ test('service replay seam replays non-canonical ingress through original handler
   assert.deepEqual(tape.ingresses.map(item => item.index), [0, 1, 2]);
   assert.deepEqual(tape.ingresses.map(item => item.duplicate), [false, false, true]);
   const runtimeFactory = ({ persistence: targetPersistence, now: targetNow }) => {
-    const targetWorld = createPersistentWorld({ persistence: targetPersistence, now: targetNow, timeMode: 'realtime', syncClockOnCreate: false });
+    const targetWorld = createPersistentWorld({
+      persistence: targetPersistence,
+      now: targetNow,
+      timeMode: 'realtime',
+      syncClockOnCreate: false,
+    });
     const target = createDeskBotServer({ now: targetNow, persistence: targetPersistence, persistentWorld: targetWorld, llm: fake,
       websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false, residentLifeEnabled: false, livedMemoryEnabled: false });
     return { ingestNonChatEvent: target.ingestNonChatEvent, persistentWorld: targetWorld,
@@ -276,5 +281,98 @@ test('HTTP chat is journaled as one operation without retaining message text', a
   assert.equal(duplicateBody.duplicate, true);
   assert.equal(persistence.list('replay.capture-journal').length, journalsAfterFirst.length);
 });
-// Full service chat replay remains a documented next seam; fixture integration
-// is intentionally not enabled until runtimeFactory state aligns.
+test('original chat handler replays a captured LLM fixture with zero provider calls and restart', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskbot-chat-replay-'));
+  const source = join(dir, 'source.sqlite'), archive = join(dir, 'archive');
+  let time = BASE;
+  const now = () => new Date(time);
+  const persistence = createSqlitePersistence({ filename: source, now });
+  const capture = createCanonicalReplayCapture({ persistence, directory: archive, now, codeFingerprint: CODE });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'realtime', replayCapture: capture });
+  let sourceProviderCalls = 0;
+  const llm = {
+    id: 'chat-replay-source',
+    status: () => ({ configured: true, provider: 'chat-replay-source' }),
+    complete: async () => {
+      sourceProviderCalls++;
+      return { provider: 'chat-replay-source', model: 'fixture-v1', text: '喵呜。小镇把这句话收好了。' };
+    },
+  };
+  const server = createDeskBotServer({ now, persistence, persistentWorld: world, replayCapture: capture, llm,
+    websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false, residentLifeEnabled: false,
+    livedMemoryEnabled: false });
+  await new Promise((resolve, reject) => server.listen(0, '127.0.0.1', error => error ? reject(error) : resolve()));
+  t.after(async () => {
+    try { await new Promise(resolve => server.close(() => resolve())); } catch {}
+    capture.close(); persistence.close(); rmSync(dir, { recursive: true, force: true });
+  });
+  const request = { event_id: 'chat-replay-success-001', correlation_id: 'chat-replay-correlation-001', message: '把这句留在小镇里。' };
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+  });
+  assert.equal(response.status, 202);
+  assert.equal((await response.json()).duplicate, false);
+  assert.equal(sourceProviderCalls, 1);
+  const duplicate = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+  });
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).duplicate, true);
+  const summary = exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
+  const tape = JSON.parse(readFileSync(join(archive, 'capture.json'), 'utf8'));
+  assert.ok(tape.chats.some(item => item.event_id === request.event_id));
+  assert.ok(tape.providers.some(item => item.operation_id === `chat:${request.event_id}` && item.kind === 'llm'));
+  const runtimeFactory = ({ persistence: targetPersistence, now: targetNow, replayProviders }) => {
+    const targetWorld = createPersistentWorld({ persistence: targetPersistence, now: targetNow, timeMode: 'realtime', timeZone: 'Asia/Shanghai', syncClockOnCreate: false });
+    const target = createDeskBotServer({ now: targetNow, persistence: targetPersistence, persistentWorld: targetWorld,
+      llm: { id: 'must-not-call', complete: async () => { throw Error('external_provider_called'); } },
+      replayProviders, websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false,
+      residentLifeEnabled: false, livedMemoryEnabled: false });
+    // Mirror the non-network startup bootstrap performed by the source
+    // server's listen hook without opening a port or starting workers.
+    return { chat: target.chat, persistentWorld: targetWorld, providerCalls: replayProviders.providerCalls,
+      replayStartup: () => target.roleEvolution.syncAll(),
+      close: () => { try { target.close(); } catch {} targetPersistence.close(); } };
+  };
+  const fresh = await replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'fresh.sqlite'), runtimeFactory, codeFingerprint: CODE });
+  const restarted = await replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'restarted.sqlite'), runtimeFactory,
+    restartAt: Math.floor(summary.operation_count / 2), codeFingerprint: CODE });
+  assert.equal(fresh.verified, true);
+  assert.equal(fresh.chats, 1);
+  assert.equal(fresh.provider_calls, 0);
+  assert.deepEqual(restarted.namespace_digests, fresh.namespace_digests);
+});
+
+test('chat replay fails closed before target creation when its provider fixture is missing or tampered', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskbot-chat-replay-negative-'));
+  const source = join(dir, 'source.sqlite'), archive = join(dir, 'archive');
+  let time = BASE;
+  const now = () => new Date(time);
+  const persistence = createSqlitePersistence({ filename: source, now });
+  const capture = createCanonicalReplayCapture({ persistence, directory: archive, now, codeFingerprint: CODE });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'realtime', replayCapture: capture });
+  const server = createDeskBotServer({ now, persistence, persistentWorld: world, replayCapture: capture,
+    llm: { id: 'negative-source', status: () => ({ configured: true }), complete: async () => ({ provider: 'negative-source', model: 'v1', text: '喵呜。' }) },
+    websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false, residentLifeEnabled: false, livedMemoryEnabled: false });
+  await new Promise((resolve, reject) => server.listen(0, '127.0.0.1', error => error ? reject(error) : resolve()));
+  t.after(async () => { try { await new Promise(resolve => server.close(() => resolve())); } catch {}
+    capture.close(); persistence.close(); rmSync(dir, { recursive: true, force: true }); });
+  const request = { event_id: 'chat-replay-negative-001', message: '请留下痕迹。' };
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+  assert.equal(response.status, 202);
+  exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
+  const tapePath = join(archive, 'capture.json');
+  const original = readFileSync(tapePath, 'utf8');
+  const tape = JSON.parse(original);
+  tape.providers = [];
+  writeFileSync(tapePath, JSON.stringify(tape));
+  const runtimeFactory = () => { throw Error('runtime_must_not_start'); };
+  await assert.rejects(replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'missing.sqlite'), runtimeFactory, codeFingerprint: CODE }), /replay_provider_fixture_missing/);
+  assert.equal(existsSync(join(dir, 'missing.sqlite')), false);
+  writeFileSync(tapePath, original);
+  const restored = JSON.parse(original);
+  restored.providers[0].ref.fixture.text = '被篡改的 fixture';
+  writeFileSync(tapePath, JSON.stringify(restored));
+  await assert.rejects(replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'tampered.sqlite'), runtimeFactory, codeFingerprint: CODE }), /replay_capture_provider_corrupt/);
+  assert.equal(existsSync(join(dir, 'tampered.sqlite')), false);
+});
