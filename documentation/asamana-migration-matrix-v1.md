@@ -1,7 +1,7 @@
 # Asamana → DeskBot 正式迁移矩阵 v1
 
-核对日期：2026-10-13
-本轮发布分支：`codex/asamana-replay-journal-v6-1`（本地从 v6 基线创建；远端状态以 Git 交付核验为准）
+核对日期：2026-10-14
+本轮发布分支：`codex/asamana-m6b-seam-v6-2`（本地从 v6.1 基线创建；远端状态以 Git 交付核验为准）
 目标：把 Asamana 中有价值的“感知 → 动机 → 决策 → 行动 → 反馈 → 记忆/回放”机制迁移为 DeskBot 的长期共同生活能力，同时保持聚形域、喵呜、多源输入、受规则约束的世界事实和可逆角色阶段。
 
 本矩阵是 [迁移标准](asamana-migration-standard-v1.md) 与 [迁移管线](asamana-migration-pipeline-v1.md) 的状态权威。它不把上游 Asamana 当作 DeskBot 的运行时，也不把通过单元测试或受控样本误写成已经完成自然长期生活。
@@ -33,7 +33,9 @@
 | M4 自治 cadence | cold start、need、emotion、pressure、max idle gate；正在执行的角色不被重复决策 | `cognition-cadence.mjs`、`life-choice.mjs`、`autonomous-life.mjs` | 现实 1:1 时钟、任务状态、稳定 cadence key | 重复 tick/重启不重复决策；紧急需要直接处理；模型不可用回退规则生活；真实反馈唤起下次认知 | `implemented / automated verified`。正式世界长期开机稳定性属于 M8/P9 |
 | M5 行动仲裁与世界写入 | 计划、仲裁、执行、反馈分离；外部观察不能直接写世界 | `life-choice.mjs`、`life-planning.mjs`、`persistent-world.mjs`、`world-candidates.mjs`、`role-practical-trials.mjs` | 路线、容量、材料、权限、revision 乐观锁 | 预览无副作用；accept 重校验候选/版本/过期；只写合法 mutation；失败保留发生过的尝试 | `implemented / automated verified`。更丰富的世界事件需要新增合法 mutation 类型，不放宽写权限 |
 | M6a canonical replay | 保存 seed、canonical ingress、adapter、时钟、mutation hash，在隔离 SQLite 通过原写入口重演 | `replay-capture.mjs`、`replay-tape.mjs`、`persistent-world.mjs`、`scripts/replay-capture.mjs` | canonical mutation ledger、SQLite transaction、规则版本 | fresh/restart/replay 状态和 mutation hash 相等；重复事件/重复 accept 无增量；replay 不调 provider、不读密钥 | `implemented / automated verified`，范围是 `canonical_world_only` 与已验证 service-ingress seam |
-| M6b 全服务生产归档 | 将 input runtime、proposal/trial/candidate、HTTP chat/provider result 等操作统一捕获并按原业务入口重放 | `replay-capture.mjs` 已增加 operation context、journal envelope 和 namespace fail-closed；当前仅 `ingestNonChatEvent` 接入，其他入口仍未统一捕获 | M1 envelope、各 namespace beforeCommit/afterCommit、provider result registry、fresh service replay | 一份存档覆盖所有写 namespace；中途重启、重复、缺记录、篡改均可检测；重放不绕过原业务规则 | `partial / contract verified`。v6 完成第一批 journal 基础设施，但全服务生产归档仍是 gap，需逐项接入并通过原业务入口回放 |
+| M6b 全服务生产归档 | 将 input runtime、proposal/trial/candidate、HTTP chat/provider result 等操作统一捕获并按原业务入口重放 | `replay-capture.mjs` 的 operation context、journal envelope、namespace fail-closed；当前已接入 `/api/chat` 用户分支、assistant/generic event scope 和 input-runtime source run，其他入口仍未统一捕获 | M1 envelope、各 namespace beforeCommit/afterCommit、provider result registry、fresh service replay | 一份存档覆盖所有写 namespace；中途重启、重复、缺记录、篡改均可检测；重放不绕过原业务规则 | `partial / contract verified`。v6.2 已验证 chat/input-runtime operation 归属、摘要和脱敏引用边界，但全服务生产归档仍是 gap；按 [M6b 接缝合同](asamana-m6b-seam-contract-v1.md) 逐波次接入 |
+| M6b-C chat/provider 接缝 | 将聊天请求、provider/TTS 结果和输出路由作为可审计服务操作，不把台词当世界事实 | `app.mjs` `/api/chat` 用户分支、`chat-orchestrator.mjs` provider result ref、`replay-capture.mjs` journal | 稳定 `normalizeChat` event、脱敏 fixture registry、原 chat handler replay | success/error/TTS/duplicate/restart 均有稳定 operation；正文不进 archive；fixture replay 零 provider calls；缺 fixture/篡改 fail closed | `partial / contract verified`。用户分支的 operation/request hash/结果引用专项已通过；assistant 分支、durable fixture 和可执行 chat replay 尚是 gap |
+| M6b-I input-runtime 接缝 | 将 source refresh、TTL/backoff、provider result、ingest callback 和 run 完成作为可恢复服务操作 | `input-runtime.mjs` 已有 run/source 状态、trace、TTL、失败退避和 SQLite 恢复；当前已接 `input-runtime:<run_id>` operation scope 与脱敏 result ref；尚无 provider fixture replay | M1 envelope、source registry、脱敏 provider fixture、input/runtime replay factory | success/skip/error、多个 source 隔离、重启/重复/篡改、provider calls=0；网络等待在事务外，失败不留半状态 | `partial / contract verified`（I0–I3）。operation scope 与结果引用专项已通过；I4–I7 的重启/重复/缺 fixture/篡改回放仍是 gap |
 | M6.1 行动反馈 | 区分计划、开始、进行中、成功、失败、取消、未执行，台词不等于结果 | `action-feedback.mjs`、`autonomous-life.mjs`、`persistent-world.mjs` | canonical task、稳定 receipt、任务结果 ledger | 没有 task 的完成文本只能是 `not_executed`；真实失败保留尝试；回执 `audit_only` 且不授予写权限 | `implemented / automated verified`。继续把反馈接入全服务 capture（M6b） |
 | M6.2 阶段体验/资产冻结 | 学习每个世界冻结资产的合同，避免旧阶段和回放静默套用今天的新包 | `role-stages.mjs`、`role-experience-packages.mjs`、`role-experience-performance.mjs`、`world-map-content.mjs` | 体验包 schema/version/hash、stage archive、canonical map catalog | 采用时冻结 snapshot/hash；篡改 freeze fail-closed；回退保留历史；虚拟表现与真实外壳区分 | `implemented / automated verified`（阶段体验包）。地图目录已有版本与持久安装，但尚无开放资产生成/任意历史资产仓库；需作为以后开放生成的门 |
 | M7 统一观察与渲染门 | live/replay 共用序列；前端重连、去重、等渲染完成再推进 | `world-observer.mjs`、`replay-tape.mjs`、客户端 `deskbot/worldObserver.ts`、`deskbot/DeskBotApp.tsx`、`three/renderCompletion.ts` | canonical revision/sequence、WebSocket、文字 fallback | 所有面板同 revision；旧快照不回滚；渲染失败不假 ACK；停机/重连恢复当前事实；客户端不能写 mutation | `implemented / automated verified`；真实 WebGL/CSS2D/RAF context loss 与长断线仍 `manual pending` |
@@ -51,7 +53,7 @@
 
 按“对长期共同生活闭环的阻塞程度”排序，而不是按代码数量排序：
 
-1. **M6b 全服务生产归档**：当前 canonical-only replay 不能证明 input、proposal/trial、candidate、chat/provider 结果在生产存档中可完整恢复和重演。
+1. **M6b-C → M6b-I 全服务生产归档**：当前 canonical-only replay 和首批 chat journal 不能证明 assistant/provider fixture、input-runtime、proposal/trial、candidate 等操作在生产存档中可完整恢复和重演。
 2. **M8b 真实模型的多日目标追求**：需要在合法机会出现时证明目标会实际执行；`ungrounded_goal` 或未执行必须继续判为 inconclusive。
 3. **M8c 正式世界长观察**：需要 7–14 日现实 1:1 运行、断线/重启、Scene 连续性和人工陪伴感证据。
 4. **I2 多源输入折射为世界事件**：候选桥和权限门已存在，但可持续的事件内容包、来源适配器、事件后果和人工体验尚不完整。
@@ -60,7 +62,7 @@
 
 ## 当前复验与历史证据
 
-2026-10-14 v6.1 增量复验：服务端广套 **855/855**，M8 长时生活回放单独 **1/1**；operation-journal/replay/persistence 联合专项 **27/27**。该数字是当前回归证据，不是最终生活目标已经完成。
+2026-10-14 v6.2 增量复验：服务端广套 **857/857**，M8 长时生活回放单独 **1/1**；operation-journal/replay/persistence 联合专项 **27/27**、input-runtime **7/7**、chat/replay-capture **19/19**。该数字是当前回归证据，不是最终生活目标已经完成。
 
 本轮发布检查也已重新运行客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇截图已按本轮 22:12 的实际页面更新。页面天气显示“等待新天气”，不能据此宣称天气 provider 本轮 fresh。Asamana 独立前端 140/140 是更早的上游部署结果，本轮未重跑。真实 context loss、长断线、完整阶段像素和长期体验仍不能由这些命令代替。
 
@@ -75,9 +77,9 @@ M6b 的“全服务”不是“导出时对所有 namespace 算一次 hash”。
 | 事务内 canonical capture | `canonical-world.states`、`canonical-world.mutations`、`canonical-world.turns`；`replay.capture-*` 为捕获自身 | `persistent-world.persistCommit` 调用 `recordCommit`，同一 SQLite transaction；`replay-capture.test.mjs` 通过重启、重复、篡改和零 provider replay | `M6a implemented / automated verified`。这些是世界事实回放，不是全服务归档 |
 | canonical 但未纳入 operation tape | `canonical-world.wall-clock` 的 `persistWallClockMarker`；启动/定时 `syncWallClock` 还会单独写 marker | 代码有普通 `persistence.put`，不进入 `recordCommit` 的 operation/ingress 链 | `M6b gap`。需要记录时钟同步操作，或明确把 marker 作为可由已捕获 canonical event 完全重算的派生记录并验证 |
 | ingress 后副作用、仅被最终 namespace digest 检查 | `input.events`、`state.characters`、`state.results`、`world.active`、`world.matches`、`evidence.records`、`interaction.decisions/settings`、`output.commands/routes`、`devices.records`、`role.evolution-*`、`world.candidates`、`world.candidate-decisions`，以及部分 role/world 业务写入 | `app.ingestNonChatEvent` 在业务写完后调用 `recordIngress`；`replayServiceCapture` 能对已捕获 ingress 重走原入口并最终比较 namespace digest | `partial / not atomic`。捕获失败不能回滚此前已提交的这些写入；任何未从 ingress 触发的写入都没有可执行输入记录 |
-| chat/voice 路径不进入统一 ingress capture | `chat.turns`、`chat.correlations`、`audio.artifacts`；`POST /api/chat` 的 `orchestrator.run` 自己写入并调用 `persistentWorld.ingest`，绕过 `ingestNonChatEvent` 的 `recordIngress` | `app.mjs` `/api/chat` 分支直接调用 orchestrator；现有 service replay 测试只覆盖 `server.ingestNonChatEvent` | `M6b gap`。必须捕获规范化 chat request、provider result reference、output route 和重复语义；不能把 assistant 文本当世界事实 |
+| chat/voice 路径的分层接入 | `chat.turns`、`chat.correlations`、`audio.artifacts`；`POST /api/chat` 用户分支在 `chat:<event_id>` operation context 下运行，assistant/非 user 分支已有公共 `chat.reply` / `event_ingress` operation scope | `app.mjs` 规范化用户 chat、`chat-orchestrator.mjs` provider/TTS result ref、`operation-journal-contract.test.mjs`；现有 service replay 仍未通过原 `/api/chat` handler 回放 | `M6b-C partial / contract verified`。还需补原入口 replay、durable provider fixture 的消费式重放、output route 和 success/failure/TTS/restart 边界；不能把 assistant 文本当世界事实 |
 | 直接 HTTP role/life/research 路径 | `role.proposals`、`role.proposal-decisions`、`life.commitments`、`life.daily-summaries`、`life.memories`、`life.plans`、`life.memory-boundaries`、`research.sessions`、`l1b.probes` | `/api/roles/proposals` 的 choose/trial/observations/complete/archive、`/api/life/*` 和 `/api/research/*` 多数直接调用 domain store；只有部分 stage/practical actions 通过 `ingestNonChatEvent` | `M6b gap`。需要 route-level normalized operation envelope 和原 handler replay；只比较最终 hash不足以证明操作顺序/权限/失败分支 |
-| input runtime/provider 外部路径 | `input-runtime.sources`、`input-runtime.runs`、`external-connectors.v1`、`news-title-translations.v1`、`connector.weather` | `inputRuntime` 定时器和 connector refresh 直接写持久化；部分结果再经 `ingestWeatherEvent`，但 run/connector 状态不是 canonical operation | `M6b gap`。需捕获 schedule tick、原始已归一化 provider payload、TTL/backoff、缓存命中和失败分类；密钥不得进入归档 |
+| input runtime/provider 外部路径 | `input-runtime.sources`、`input-runtime.runs`、`external-connectors.v1`、`news-title-translations.v1`、`connector.weather` | `inputRuntime` 已持久化 run/source、TTL、失败退避、trace、归一化 event IDs，并由 `app.mjs` 传入 `replayCapture` operation scope；fixture registry/原入口 replay 尚未完成 | `M6b-I partial / contract verified`（I0–I3）。需继续捕获并回放 schedule、脱敏 provider result、TTL/backoff、缓存命中和失败分类；网络等待必须在事务外，密钥不得进入归档 |
 | worker / WebSocket / NPC 旁路 | `life.npc-goals`、`life.npc-agent-decisions`、`output.*` 及设备 ACK 状态；`sharedLife.tick`、`npcGoals.tick`、`worldLife.tick`、`slowCognitionWorker.tick`、WebSocket device path 可能在无 HTTP ingress 时写入 | `app` 启动/定时器/任务 timer 直接调用 worker；现有 replay seam 没有 scheduler tick envelope | `M6b gap`。需捕获 worker tick 的逻辑时刻、选择输入、provider fixture、设备回执以及实际 handler 结果；只重放状态快照不够 |
 
 ### M6b 现有实现的两个关键非原子点
@@ -97,7 +99,7 @@ M6b 的“全服务”不是“导出时对所有 namespace 算一次 hash”。
 6. **负向完整性**：删掉一个 envelope、篡改 adapter/请求/结果、插入未登记 writer、改变 rule/content fingerprint、在 capture 关闭期间写入，均应 fail closed，且目标库不得产生部分业务状态。
 7. **数据安全**：capture 默认关闭、仅本地显式开启、不开放 HTTP；密钥、音频原文和不可回放的用户敏感内容不得进入公开归档，provider 结果引用与脱敏策略可审计。
 
-当前 `replay-capture.test.mjs` 已证明 M6a 和一个 `ingestNonChatEvent` service seam 的多时间/重复/中途重启/篡改拒绝；它尚未证明上述七项的全服务生产覆盖，因此不能将 `service_ingress_namespaces_verified` 写成 M6b 完成。
+当前 `replay-capture.test.mjs` 与 operation-journal 专项已证明 M6a、一个 `ingestNonChatEvent` service seam，以及 `/api/chat` 用户分支的 operation 归属/摘要边界；它们尚未证明上述七项的全服务生产覆盖，因此不能将 `service_ingress_namespaces_verified` 写成 M6b 完成。Chat/provider 与 input-runtime 的逐项字段、负向门和停止条件见 [M6b 服务操作接缝合同](asamana-m6b-seam-contract-v1.md)。
 
 ## 可复核的验收证据入口
 
@@ -111,7 +113,7 @@ M6b 的“全服务”不是“导出时对所有 namespace 算一次 hash”。
 | M3.1/M3.4 | `actor-perception.test.mjs`、`world-message-transport.test.mjs` | 真实 NPC 对话中的知识边界和消息可读性 |
 | M3.3/M4 | `social-relation-preferences.test.mjs`、`social-life.test.mjs`、`cognition-cadence.test.mjs`、`cognition-cadence-integration.test.mjs` | 1:1 时间的自治频率、重复行为和社会生活质量 |
 | M5/M6.1 | `world-candidates.test.mjs`、`world-candidates-http.test.mjs`、`action-feedback.test.mjs`、`autonomous-life.test.mjs` | 更丰富事件与协作的合法内容包和人工效果 |
-| M6a/M6b | `replay-capture.test.mjs`、`replay-determinism.test.mjs`、`persistence-journal.test.mjs` | 全部 service operation 的 executable capture 与原业务入口 replay，而非 SQL 导入 |
+| M6a/M6b | `replay-capture.test.mjs`、`replay-determinism.test.mjs`、`persistence-journal.test.mjs`、`operation-journal-contract.test.mjs`、[M6b 接缝合同](asamana-m6b-seam-contract-v1.md) | `/api/chat`/input-runtime/全部 service operation 的 executable capture 与原业务入口 replay，而非 SQL 导入；当前 chat 用户分支仅完成 contract seam，input-runtime 尚待接入 |
 | M7/M7.1 | `world-observer*.test.mjs`、`world-history*.test.mjs`；客户端 `renderCompletion.test.ts`、`worldHistory.test.ts` | 浏览器真实 context loss/长断线、恢复之后 snapshot 继续到达，旧断层可返回实时 |
 | M8a/M8b/M8c | `m8-shared-life-replay.test.mjs`、`scripts/review-asamana-migration.mjs`、真实模式报告 | 真实模型成功样本、正式 7–14 日观测、中文叙事与陪伴人工结论 |
 

@@ -106,7 +106,6 @@ test('capture is absent by default and freezes one receipt timestamp per canonic
   assert.deepEqual(persistence.list('replay.capture-sessions'), []);
   assert.deepEqual(persistence.list('replay.capture-operations'), []);
 });
-
 test('operation journaling shares the canonical transaction and rolls back on capture failure', t => {
   const h = fixture(t), original = h.world.get();
   h.capture.close();
@@ -277,3 +276,5 @@ test('HTTP chat is journaled as one operation without retaining message text', a
   assert.equal(duplicateBody.duplicate, true);
   assert.equal(persistence.list('replay.capture-journal').length, journalsAfterFirst.length);
 });
+// Full service chat replay remains a documented next seam; fixture integration
+// is intentionally not enabled until runtimeFactory state aligns.

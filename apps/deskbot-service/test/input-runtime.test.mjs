@@ -6,6 +6,8 @@ import { test } from 'node:test';
 
 import { createInputRuntime, RUN_NAMESPACE, RUN_SCHEMA, RULE_VERSION } from '../src/input-runtime.mjs';
 import { createSqlitePersistence } from '../src/persistence.mjs';
+import { createCanonicalReplayCapture } from '../src/replay-capture.mjs';
+import { createPersistentWorld } from '../src/persistent-world.mjs';
 
 test('input runtime persists success, TTL scheduling, and skips work before due', async () => {
   let clock = new Date('2026-09-28T00:00:00.000Z');
@@ -151,4 +153,78 @@ test('input runtime ingests provider events through the supplied canonical callb
   assert.deepEqual(ingested, ['weather-runtime-1']);
   assert.deepEqual(runtime.status().runs[0].trace.stages.map(stage => stage.stage), ['input', 'perception']);
   assert.deepEqual(runtime.status().runs[0].trace.result_event_ids, ['weather-runtime-1']);
+});
+
+test('input runtime wraps each source run in one operation scope and only exposes a result reference', async () => {
+  const now = () => new Date('2026-09-28T00:00:00.000Z');
+  const operations = [];
+  const resultRefs = [];
+  const runtime = createInputRuntime({
+    now,
+    operationScope: {
+      withOperation(context, callback) {
+        operations.push(context);
+        return callback();
+      },
+      setOperationResultRef(reference) { resultRefs.push(structuredClone(reference)); },
+    },
+  });
+  runtime.registerSource({
+    sourceId: 'journal-weather',
+    provider: 'qweather',
+    refresh: async () => ({
+      event: { event_id: 'journal-weather-event' },
+      fetched_at: now().toISOString(),
+      connector: { provider: 'qweather', last_success_at: now().toISOString(), ttl_ms: 60_000 },
+      // This simulates connector-private content and must not be copied into
+      // the operation result reference.
+      private_payload: { api_key: 'secret', raw: 'provider response' },
+    }),
+  });
+  const result = await runtime.tick();
+
+  assert.equal(result[0].run_id, operations[0].operation_id);
+  assert.equal(operations[0].operation_kind, 'input-runtime.refresh');
+  assert.equal(operations[0].source, 'input-runtime:journal-weather');
+  assert.deepEqual(operations[0].request, {
+    source_id: 'journal-weather', force: false, provider: 'qweather', ttl_ms: 300000,
+  });
+  assert.deepEqual(resultRefs.at(-1), {
+    schema: 'deskbot.input-runtime-result-ref.v1', source_id: 'journal-weather',
+    run_id: result[0].run_id, status: 'completed', provider: 'qweather',
+    result_event_ids: ['journal-weather-event'], fetched_at: '2026-09-28T00:00:00.000Z',
+  });
+  assert.equal(JSON.stringify(resultRefs).includes('secret'), false);
+});
+
+test('input runtime run writes carry the operation journal context in SQLite', async t => {
+  const now = () => new Date('2026-09-28T00:00:00.000Z');
+  const directory = mkdtempSync(join(tmpdir(), 'deskbot-input-runtime-journal-'));
+  const persistence = createSqlitePersistence({ filename: join(directory, 'runtime.sqlite'), now });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'simulation', syncClockOnCreate: false });
+  const capture = createCanonicalReplayCapture({
+    persistence,
+    directory: join(directory, 'capture'),
+    now,
+    expectedNamespaces: ['input-runtime.sources', RUN_NAMESPACE],
+  });
+  capture.initialize({ world: world.get(), timeMode: 'simulation', timeZone: 'Asia/Shanghai' });
+  t.after(() => {
+    try { capture.close(); } catch {}
+    try { persistence.close(); } catch {}
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const runtime = createInputRuntime({ now, persistence, operationScope: capture, intervalMs: 60_000 });
+  runtime.registerSource({ sourceId: 'journal-source', refresh: async () => ({ event: { event_id: 'journal-event' } }) });
+  const [result] = await runtime.tick();
+  const journals = persistence.list('replay.capture-journal');
+  const runWrites = journals.filter(journal => journal.writes.some(write => write.namespace === RUN_NAMESPACE));
+
+  assert.ok(runWrites.length >= 2, 'run start and completion must be journaled');
+  assert.ok(runWrites.every(journal => journal.operation_id === result.run_id));
+  assert.ok(runWrites.every(journal => journal.operation_kind === 'input-runtime.refresh'));
+  assert.ok(runWrites.some(journal => journal.result_ref?.schema === 'deskbot.input-runtime-result-ref.v1'));
+  assert.equal(JSON.stringify(journals).includes('provider response'), false,
+    'provider payload is not journaled');
 });

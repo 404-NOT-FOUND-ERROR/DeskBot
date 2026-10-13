@@ -4,16 +4,16 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v6.1 发布快照。** 本版发布在 [`codex/asamana-replay-journal-v6-1`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-replay-journal-v6-1)，从 v6 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.1 在 v6 的迁移标准、共享生活和 canonical replay 基础上，补齐 HTTP chat 入口的 operation context、请求摘要哈希、provider/TTS 结果引用和重复请求幂等测试；它仍是 M6b 的增量发布，不宣称完整生产服务归档已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v6.2 M6b 接缝发布。** 本版发布在 [`codex/asamana-m6b-seam-v6-2`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-seam-v6-2)，从 v6.1 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.2 收口 Asamana 迁移的 M6b 服务操作接缝：输入运行源和事件入口开始使用统一 operation context，记录脱敏结果引用、请求摘要和 namespace 关联，并增加跨异步边界与 SQLite 恢复验证；它仍是增量发布，不宣称完整生产服务归档或任意入口回放已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
 
-### v6.1 本轮新增
+### v6.2 M6b 本轮新增
 
 - 为本地回放捕获增加版本化 `deskbot.service-operation.v1` journal envelope：记录 operation、来源、请求摘要、写入 namespace、事务边界和记录哈希，不把原始请求或密钥写入归档。
-- 为 `ingestNonChatEvent` 接入 `AsyncLocalStorage` operation context，事件入口与其 SQLite 写入可以关联到同一 operation id；捕获失败时保持 fail-closed。
-- 增加 operation-journal 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测和敏感请求不落盘。
-- 这是 M6b 的增量发布，不宣称全服务生产归档已完成；chat/provider、input-runtime、worker、WebSocket 和直接 HTTP domain route 仍按迁移矩阵逐项接入。
-- `/api/chat` 的本轮 journal 只保存规范化请求摘要和哈希，不保存聊天正文；provider 与 TTS 结果以脱敏引用进入 operation journal，失败也保留结构化错误摘要。
-- 本版效果图继续使用 2026-10-13 的正式实时小镇与往事面板截图：v6.1 主要增强服务端可核验回放，视觉布局和世界内容包没有伪装成新的 UI 改版。
+- 为 `/api/chat` 用户分支、`/api/event` 通用入口和 `input-runtime` source run 接入统一 operation context；输入运行记录使用 `input-runtime:<source>:<timestamp>:<sequence>` 标识，并保存脱敏 `deskbot.input-runtime-result-ref.v1`。
+- provider 与 TTS 结果以脱敏引用进入 operation journal；聊天正文、provider 原始响应、密钥和敏感 prompt 不进入公开回放归档。为支持本地确定性重放，私有 capture tape 可能保留事件与 provider fixture 原文，只能留在本机，不能提交或发布。
+- 增加 operation-journal、chat 和 input-runtime 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测、SQLite 重启恢复与敏感请求不落盘。
+- M6b 仍按迁移矩阵逐项推进：assistant 分支、durable provider fixture、原入口 replay、worker、WebSocket 和直接 HTTP domain route 仍是后续接缝，不把当前 partial 状态写成完整生产归档。
+- 视觉效果沿用已验收的雾灯镇实时小镇与往事面板；本版以 2026-10-14 本机运行页面重新核对状态，新增能力主要位于服务端 operation journal 和回放审计，不伪装成新的 UI 改版。
 
 ## 本版本更新
 
@@ -53,23 +53,23 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![v6.1 发布快照：实时小镇与小镇往事并排概览（2026-10-13；视觉沿用 v6，回放日志能力在后端增强）](documentation/images/current/release-v6-overview.jpg)
+![v6.2 M6b 发布快照：实时小镇与小镇往事并排概览（截图资产 2026-10-13；页面于 2026-10-14 复核；视觉沿用 v6，回放日志能力在后端增强）](documentation/images/current/release-v6-overview.jpg)
 
-![v6 发布快照的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
+![v6.2 M6b 本机运行效果：雾灯镇实时小镇、居民与生活侧栏（截图资产 2026-10-13；页面于 2026-10-14 复核）](documentation/images/current/live-town.jpg)
 
-![v6 发布快照的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
+![v6.2 M6b 本机运行效果：小镇往事、历史翻阅与世界回放（截图资产 2026-10-13；页面于 2026-10-14 复核）](documentation/images/current/world-history.jpg)
 
 ![十三位光粒居民的首批造型，独立陈列预览](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-总览图和接下来的两张是 2026-10-13 v6.1 发布分支本机正式运行截图：总览图并列展示实时小镇与历史回放，细节图分别展示喵呜与十二位居民（共十三位角色）的实时生活侧栏，以及只读的小镇往事/历史时间线；本版视觉没有改版，新增能力主要位于服务端 operation journal 和回放审计，因此继续复用同一运行基线。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+总览图和接下来的两张是 v6.2 M6b 的视觉验收证据：截图资产采集于 2026-10-13，2026-10-14 再次打开本机页面核对地图、居民侧栏和“小镇往事”入口；总览图并列展示实时小镇与历史回放，细节图分别展示喵呜与十二位居民（共十三位角色）的实时生活侧栏，以及只读的小镇往事/历史时间线。本版视觉没有改版，新增能力主要位于服务端 operation journal 和回放审计，因此继续复用已验收的世界内容与视觉基线。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
 ## 当前完成范围
 
 当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-14 Windows 本机复验：服务端广套 **855/855**，M8 长时生活回放单独 **1/1**；前端 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过。Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-14 Windows 本机复验：服务端广套 **857/857**，M8 长时生活回放单独 **1/1**；前端 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过。Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
 
 `node scripts/review-asamana-migration.mjs` 在临时 SQLite 运行受控三日链，不访问正式存档、默认不调用外部模型。规则样本已经 `verified`：第二日形成的具体目标，在第三日重启后通过原生活计划与真实任务完成，材料和每日实践上限保持有效。真实 DeepSeek 样本仍有缺少经历依据的目标被拒绝，结果为 `inconclusive_reflection_failed`；规则样本通过不代表真实模型或长期自然生活已验收。
 
@@ -80,7 +80,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-replay-journal-v6-1 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-seam-v6-2 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -92,7 +92,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-replay-journal-v6-1`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-seam-v6-2`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
@@ -138,7 +138,7 @@ flowchart LR
 | [当前设计与实现](documentation/design-implementation-map.md) | 已完成能力、实现对应和剩余工作 |
 | [架构](documentation/architecture.md) · [流程](documentation/flows.md) | 状态边界、生活与角色发展链路 |
 | [验证](documentation/tests.md) · [自动运行](documentation/automation.md) | 验证方法、连接器与服务运行 |
-| [Asamana 评估](documentation/asamana-review.md) · [v6.1 发布说明](documentation/asamana-replay-journal-v6-1.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
+| [Asamana 评估](documentation/asamana-review.md) · [v6.2 发布说明](documentation/asamana-replay-journal-v6-2.md) · [M6b 接缝合同](documentation/asamana-m6b-seam-contract-v1.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
 | [Asamana attribution](third-party/asamana/README.md) | 上游版本、Apache-2.0 许可证与迁移归属说明 |
 | [居民设计](research/npcs/resident-life-design-v1.md) · [地图目录](world-content/companion-world/map.v1.json) | 生活角色与地图内容 |
 | [阶段规则](research/world/role-stages-v1.md) · [身体协议](research/protocol/body-perception-v1.md) | 角色采用、回退与后续硬件适配 |

@@ -479,6 +479,7 @@ export function createDeskBotServer({
     now,
     persistence,
     intervalMs: inputRuntimeIntervalMs,
+    operationScope: replayCapture,
   });
   const sourceAdapters=new Map(refractionSources.map(s=>{
     if(!s||!['provider','agent'].includes(s.kind)||typeof s.sourceId!=='string'||typeof s.displayName!=='string')throw new TypeError('Refraction sources require a server-owned sourceId, displayName and provider/agent kind');
@@ -2086,7 +2087,7 @@ export function createDeskBotServer({
               const roleEvolutionResult = turn.duplicate
                 ? null
                 : roleEvolution.observeEvent(turn.input_event);
-              sendJson(response, turn.duplicate ? 200 : 202, {
+              const payload = {
                 accepted: true,
                 duplicate: turn.duplicate,
                 turn,
@@ -2103,7 +2104,9 @@ export function createDeskBotServer({
                   state_revision: turn.state?.state_revision ?? null,
                   outputs: turn.output_plan,
                 },
-              });
+              };
+              sendJson(response, turn.duplicate ? 200 : 202, payload);
+              return payload;
             });
             if (!replayCapture?.withOperation) return executeChat();
             const requestSummary = {
@@ -2115,18 +2118,35 @@ export function createDeskBotServer({
               role_revision: normalizedRequest.role_revision,
               metadata: normalizedRequest.payload.metadata ?? null,
             };
+            const operationStart = replayCapture.operationCount?.() ?? null;
+            const runCapturedChat = async () => {
+              try {
+                const result = await executeChat();
+                replayCapture.recordChat?.({ event: normalizedRequest, result,
+                  received_at: now().toISOString(), operation_start: operationStart,
+                  operation_end: replayCapture.operationCount?.() ?? operationStart });
+                return result;
+              } catch (error) {
+                replayCapture.recordChat?.({ event: normalizedRequest, error,
+                  received_at: now().toISOString(), operation_start: operationStart,
+                  operation_end: replayCapture.operationCount?.() ?? operationStart });
+                throw error;
+              }
+            };
             return replayCapture.withOperation({
               operation_id: `chat:${normalizedRequest.event_id}`,
               operation_kind: 'chat.request',
               source: 'http.chat',
               request_hash: createHash('sha256').update(JSON.stringify(requestSummary)).digest('hex'),
-            }, executeChat);
+            }, runCapturedChat);
           }
 
           const event = url.pathname === '/api/chat'
             ? normalizeChat(body, { now })
             : normalizePublicEvent(body);
+          const processEvent = () => {
           if (url.pathname === '/api/event') assertPublicEventWorldMutation(event);
+          const operationStart = replayCapture?.operationCount?.() ?? null;
           const result = inputStore.save(event);
           let worldMutation;
           try {
@@ -2168,7 +2188,7 @@ export function createDeskBotServer({
             ? null
             : roleEvolution.observeEvent(result.event);
           const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
-          sendInputAccepted(response, result.event, result.duplicate || worldMutation.duplicate, {
+           const accepted = {
             ...stateResult,
             outputs: stateResult.outputs,
             analysis: stateResult.analysis,
@@ -2180,7 +2200,29 @@ export function createDeskBotServer({
             interaction_decision: interactionDecision,
             roleEvolution: roleEvolutionResult,
             worldCandidate: worldCandidateResult,
-          });
+           };
+           replayCapture?.recordIngress?.({ event: result.event, result: {
+             ...accepted,
+             duplicate: result.duplicate || worldMutation.duplicate,
+             worldMutation,
+             roleEvolution: roleEvolutionResult,
+             worldCandidate: worldCandidateResult,
+             evidence: evidenceResult?.evidence ?? null,
+           }, received_at: now().toISOString(), operation_start: operationStart });
+           sendInputAccepted(response, result.event, result.duplicate || worldMutation.duplicate, accepted);
+           return accepted;
+          };
+          const operationContext = {
+            operation_id: `${url.pathname === '/api/chat' ? 'chat-reply' : 'ingress'}:${event.event_id}`,
+            operation_kind: url.pathname === '/api/chat' ? 'chat.reply' : 'event_ingress',
+            source: url.pathname === '/api/chat' ? 'http.chat' : 'http.event',
+            request: { event_id: event.event_id, type: event.type, source: event.source,
+              character_id: event.character_id, correlation_id: event.correlation_id,
+              role_revision: event.role_revision, metadata: event.payload?.metadata ?? null },
+          };
+          return replayCapture?.withOperation
+            ? replayCapture.withOperation(operationContext, processEvent)
+            : processEvent();
         })
         .catch((error) => {
           const expected = error instanceof InputError
@@ -2308,6 +2350,42 @@ export function createDeskBotServer({
   server.inputRuntime = inputRuntime;
   server.roleEvolution = roleEvolution;
   server.worldCandidates = worldCandidates;
+  // Private replay adapter: executes the original chat orchestrator without
+  // opening an HTTP response. Public callers still use POST /api/chat; the
+  // replay library receives this bound handler from a trusted runtimeFactory.
+  server.chat = async (input) => {
+    const message = input?.message ?? input?.text ?? input?.payload?.text;
+    const normalizedRequest = normalizeChat({
+      ...(input && typeof input === 'object' ? input : {}),
+      role: 'user',
+      source: 'deskbot-chat',
+      message,
+    }, { now });
+    const turn = await orchestrator.run({
+      ...(input && typeof input === 'object' ? input : {}),
+      role: 'user',
+      source: 'deskbot-chat',
+      event_id: normalizedRequest.event_id,
+      message: normalizedRequest.payload.text,
+    });
+    const roleEvolutionResult = turn.duplicate ? null : roleEvolution.observeEvent(turn.input_event);
+    return {
+      accepted: true,
+      duplicate: turn.duplicate,
+      turn,
+      event: turn.input_event,
+      analysis: turn.analysis,
+      state: turn.state,
+      canonical_world: turn.canonical_world,
+      role_evolution: roleEvolutionResult,
+      context: turn.state ? stateEngine.context(turn.state.character_id) : null,
+      pipeline: {
+        stages: ['input', 'world-context', 'state-engine', 'prompt-composer', 'llm', 'output-router'],
+        current: 'output-router', next: 'device-outbox',
+        state_revision: turn.state?.state_revision ?? null, outputs: turn.output_plan,
+      },
+    };
+  };
   // Test/in-process adapters use the same canonical path as trusted
   // connectors without weakening the public /api/event boundary.
   server.ingestNonChatEvent = ingestNonChatEvent;

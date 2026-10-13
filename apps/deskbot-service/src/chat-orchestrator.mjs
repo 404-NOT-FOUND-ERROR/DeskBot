@@ -272,6 +272,7 @@ export function createChatOrchestrator({
         provider: rawCompletion.provider ?? llm.id ?? null,
         model: rawCompletion.model ?? null,
         result_hash: createHash('sha256').update(String(rawCompletion.text ?? '')).digest('hex'),
+        fixture: { kind: 'llm.complete.v1', text: String(rawCompletion.text ?? '') },
       });
     } catch (error) {
       onProviderResult?.({
@@ -392,6 +393,7 @@ export function createChatOrchestrator({
       provider: rawCompletion.provider ?? llm.id ?? null,
       model: rawCompletion.model ?? null,
       result_hash: createHash('sha256').update(String(rawCompletion.text ?? '')).digest('hex'),
+      fixture: { kind: 'llm.complete.v1', text: String(rawCompletion.text ?? '') },
       ...(voice ? {
         tts: {
           status: 'success',

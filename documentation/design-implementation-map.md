@@ -1,6 +1,6 @@
 # 聚形域：现版本能力与设计对照
 
-**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 本轮本地分支为 `codex/asamana-replay-journal-v6-1`，从 v6 基线派生并保留 v6、v5、v4 与 `main`；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。
+**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 本轮本地分支为 `codex/asamana-m6b-seam-v6-2`，从 v6.1 基线派生并保留 v6.1、v6、v5、v4 与 `main`；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。
 
 DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活在伴生于现实的奇幻空间“聚形域”，现实输入影响它的处境与选择，实际行动留下资源、关系和记忆后果。兴趣逐渐发展；重要形态变化则经由有前提的角色愿望、真实试做和明确采用发生。
 
@@ -40,10 +40,10 @@ DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活
 
 ## 验证与当前边界
 
-- 2026-10-14 v6.1 增量复验服务端广套 855/855、M8 单独 1/1、operation-journal/replay/persistence 27/27；前端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server）通过。Asamana 独立前端 140 项为更早历史结果，本轮未重跑。当前代码已补齐角色时空感知边界、来源幂等慢认知、跨日目标续接和 operation journal 第一批入口；本轮发布分支为 `codex/asamana-replay-journal-v6-1`，`main` 保留。
+- 2026-10-14 v6.2 增量复验服务端广套 857/857、M8 单独 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19；前端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server）通过。Asamana 独立前端 140 项为更早历史结果，本轮未重跑。当前代码已补齐角色时空感知边界、来源幂等慢认知、跨日目标续接和 operation journal 第一批入口；本轮发布分支为 `codex/asamana-m6b-seam-v6-2`，`main` 保留。
 - 第 6 阶段九种隔离 SQLite 样本复用实际路线与配方，展示准备、一次结果、预览、采用、组合、普通生活、重启与两次回退。样本使用明确的受控初始条件，没有导入正式存档。
 - DeepSeek Flash 对三种公开虚构有限状态摘要完成真实调用，范围是未采用、已采用与部分回退；不是完整连续聊天或真实 TTS 验收。
-- v6 发布前已完成基础浏览器验收并保存 2026-10-13 的实时小镇与往事面板截图；正式服务重启前可能仍显示旧 observer bound 提示，重启后使用压缩后的只读投影。完整阶段像素、真实 context loss、长断线和真实模型多日体验仍待验收。2026-10-05 美术截图是独立场景预览，与正式运行截图分别标明，不充当第 6 阶段的完整验收。本地捕获器已能导出/重演 canonical world 和已接入的 service-ingress seam，但独立调度/决策/chat/provider 操作尚未统一捕获，完整生产服务归档仍有缺口。
+- v6 发布前已完成基础浏览器验收并保存 2026-10-13 的实时小镇与往事面板截图，页面于 2026-10-14 再次复核；正式服务重启前可能仍显示旧 observer bound 提示，重启后使用压缩后的只读投影。完整阶段像素、真实 context loss、长断线和真实模型多日体验仍待验收。2026-10-05 美术截图是独立场景预览，与正式运行截图分别标明，不充当第 6 阶段的完整验收。本地捕获器已能导出/重演 canonical world 和已接入的 service-ingress seam，但独立调度/决策、原入口 chat/provider replay 尚未统一捕获和验证，完整生产服务归档仍有缺口。
 - 最新三日规则目标追求样本 `verified`：次日原目标在第三日重启后的下一合法机会通过实际任务完成，未赠送材料或重置期限；六次真实 DeepSeek 调用仍为 `inconclusive_reflection_failed`，Day2 `ungrounded_goal` 被拒绝。规则样本通过不能替代真实模型与 7–14 天自然生活验收。
 - 尚待真实中文 ASR/TTS、ESP 喵伴与旋转底座适配、实体外壳映射，以及 7–14 天自然连续生活观察。地图、职业、居民和世界规则将根据这些观察继续扩展。
 - 本分支新增的持续生活专项覆盖：实际任务 Scene 的进行/暂停/完成/失败、同地点居民与旅行隔离、十地点本地描述、跨时间槽延续、SQLite 重启幂等、canonical feed 分页/噪声过滤，以及 Explorer 从试做至阶段采用的真实生命周期。专项通过不等于自然长期生活已经验收。

@@ -1,20 +1,22 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 本轮发布分支为 `codex/asamana-replay-journal-v6-1`（本地从 v6 代码基线创建，远端状态以交付核验为准）。本文件区分本轮复验和更早历史证据；测试数量不代表迁移完整完成。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
+**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 本轮发布分支为 `codex/asamana-m6b-seam-v6-2`（本地从 v6.1 代码基线创建，远端状态以交付核验为准）。本文件区分本轮复验和更早历史证据；测试数量不代表迁移完整完成。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 广套 855/855 通过；M8 长时生活回放单独 1/1（2026-10-14）。operation-journal/replay/persistence 联合专项 27/27 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归基线；M8 单测约 135 秒，完整 suite 受单测试 180 秒默认门限制，故单独复验 |
+| DeskBot 服务完整回归 | 广套 857/857 通过；M8 长时生活回放单独 1/1（2026-10-14）。operation-journal/replay/persistence 联合专项 27/27；input-runtime 专项 7/7；chat/replay-capture 专项 19/19 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归基线；M8 单测约 135 秒，完整 suite 受单测试 180 秒默认门限制，故单独复验 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
 | 3D 客户端 | 44 套、301/301 通过（2026-10-14 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 本轮生产构建通过（含 typecheck/client/server） | 类型一致性和可构建性 |
 | voice-sidecar 接口 | 16 项通过（2026-10-14 本轮发布复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
+| M6b chat operation 合同 | operation-journal / replay-capture 专项通过（覆盖用户 chat operation 归属、request hash 不落正文、provider/TTS 结果引用、重复 chat 幂等） | 证明首批 `/api/chat` 用户分支的审计边界；不证明 assistant 分支、durable provider fixture 或原 `/api/chat` handler replay |
+| M6b input-runtime operation 合同 | `input-runtime.test.mjs` operation-scope 专项通过（source run ID/kind/source/request、脱敏 result reference、success/skip/error 兼容） | 证明 I0–I3 的 operation scope 与结果引用；不证明 I4–I7 的 fixture replay、原子回滚或全服务恢复 |
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md) 和 [正式迁移矩阵](asamana-migration-matrix-v1.md)。2026-10-14 本轮在 Windows 工作站重新运行服务端广套 855 项、M8 长时生活回放单独 1 项、operation-journal/replay/persistence 联合专项 27 项、客户端 301 项、voice-sidecar 16 项、生产构建（含 typecheck/client/server），全部通过。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md) 和 [正式迁移矩阵](asamana-migration-matrix-v1.md)。2026-10-14 本轮在 Windows 工作站重新运行服务端广套 857 项、M8 长时生活回放单独 1 项、operation-journal/replay/persistence 联合专项 27 项、input-runtime 专项 7 项、chat/replay-capture 专项 19 项、客户端 301 项、voice-sidecar 16 项、生产构建（含 typecheck/client/server），全部通过。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 本次新增 `slow-cognition-action-integration.test.mjs`：托盘、做饭与光果供给从合法候选进入实际任务，由同配方真实结果结算目标；旅行、缺材料及重复结算不形成完成进度。`persistent-world-restart.test.mjs` 验证账本流式恢复、过滤后有限 hydration、feed/历史一致性与跨世界 Scene 隔离；默认账本接口仍保留完整 diff。`slow-cognition.test.mjs` 保留已完成、失败、取消和撤回意图的真实状态。
 
@@ -41,7 +43,7 @@
 | 表达一致性 | 当前双轴、历史不冒充当前、单方向与组合问答、屏幕/mock TTS/outbox 共用答语 | `role-stage-expression.test.mjs`、`role-wish-fact-guard.test.mjs`、`role-practical-expression.test.mjs` |
 | 身体与输出协议 | 登记能力、可信感知、未知壳、坐标、受限 yaw、ACK、失败、过期和重启 | `body-perception-domain.test.mjs`、`body-perception-http.test.mjs`、`body-device-config.test.mjs`、`websocket-bridge.test.mjs` |
 | 网络与配置 | provider 错误不泄露上游正文/密钥、天气缓存、配置重载、音频工件与 sidecar 合同 | `llm-http-error.test.mjs`、`weather-persistence.test.mjs`、`voice-sidecar-client.test.mjs`、`audio-artifacts.test.mjs` |
-| Asamana 迁移合同 | 阶段 trace、慢认知节拍、角色感知边界、行动回执、replay、observer 和历史完整性 | `runtime-contracts.test.mjs`、`cognition-cadence.test.mjs`、`actor-perception.test.mjs`、`action-feedback.test.mjs`、`replay-determinism.test.mjs`、`world-observer*.test.mjs`、`world-history.test.mjs` |
+| Asamana 迁移合同 | 阶段 trace、慢认知节拍、角色感知边界、行动回执、replay、observer、历史完整性与首批 operation journal | `runtime-contracts.test.mjs`、`cognition-cadence.test.mjs`、`actor-perception.test.mjs`、`action-feedback.test.mjs`、`replay-determinism.test.mjs`、`replay-capture.test.mjs`、`operation-journal-contract.test.mjs`、`world-observer*.test.mjs`、`world-history.test.mjs` |
 
 历史研究回放、旧角色方向与世界候选也保留兼容测试。它们不能替代现版本的实际生活愿望与试做门槛。
 
@@ -95,12 +97,15 @@ node scripts/review-asamana-migration.mjs
 
 此前供给阶段完成十四日加速规则实验，发展维度阶段完成三日隔离实验；它们证明有限规则在指定条件下运作，不等于正式世界自然经过这些天。早期普通循环实验也有未达到多情境稳定兴趣、未形成愿望的结果。不能只展示成功样本就宣称人格或愿望已自然涌现。
 
-第 6 阶段完整像素验收仍待完成。2026-10-13 正式小镇与往事图片是基础页面检查，2026-10-05 场景图片是独立美术预览。有限真实模型状态摘要没有发送完整存档、个人记忆或真实对话，也不能证明长期表达质量。
+第 6 阶段完整像素验收仍待完成。2026-10-13 正式小镇与往事图片是基础页面检查，页面于 2026-10-14 再次复核；2026-10-05 场景图片是独立美术预览。有限真实模型状态摘要没有发送完整存档、个人记忆或真实对话，也不能证明长期表达质量。
 
 ## 后续验收
 
 | 工作 | 需要形成的证据 |
 | --- | --- |
+| M6b-C chat/provider 接缝 | assistant/非 user chat operation、provider fixture registry、success/error/TTS/duplicate/restart 的原 `/api/chat` handler replay；`provider_calls=0`，缺 fixture/篡改 fail closed |
+| M6b-I input-runtime 接缝 | `input-runtime:<run_id>` operation scope 覆盖 start/skip/success/error、TTL/backoff、多个 source、ingest callback、SQLite 重启/重复与 provider fixture replay；网络等待在事务外且不留半状态 |
+| M6b-R 其余服务入口 | role/life/research/candidate、worker、WebSocket/device ACK 的覆盖注册表、原入口回放和失败分支；完成前不打开全局 `requireOperationContext` |
 | 第 7 阶段真实声音 | 中文 ASR/TTS 连通、同一答语、人工试听、延迟、一次回合与播放失败恢复 |
 | 第 8 阶段真实身体 | 小智固件适配后的触摸、触屏、双麦方向、地磁、屏幕和受限单轴动作；回执与实测分别记录 |
 | 第 9 阶段长期观察 | 正式 1:1 时间连续 7–14 天的供给、关系、兴趣、愿望、反复行为和模型开销；据实际结果拓展地图、职业和居民 |

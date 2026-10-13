@@ -46,6 +46,12 @@ export function createInputRuntime({
   persistence = null,
   intervalMs = DEFAULT_INTERVAL_MS,
   backoffMs = DEFAULT_BACKOFF_MS,
+  // Optional service-operation journal seam.  The runtime deliberately keeps
+  // this dependency structural so standalone tests and existing connectors do
+  // not need to know about replay capture.  When supplied, every source run
+  // (including its start/complete records and source state writes) executes
+  // under one stable operation context.
+  operationScope = null,
 } = {}) {
   const interval = Math.max(1000, Number.parseInt(intervalMs, 10) || DEFAULT_INTERVAL_MS);
   const sources = new Map();
@@ -105,6 +111,23 @@ export function createInputRuntime({
       status: 'running',
     };
     return persistRun(run);
+  }
+
+  function withOperation(runId, source, request, callback) {
+    if (typeof operationScope?.withOperation !== 'function') return callback();
+    return operationScope.withOperation({
+      operation_id: runId,
+      operation_kind: 'input-runtime.refresh',
+      source: `input-runtime:${source.source_id}`,
+      request,
+    }, callback);
+  }
+
+  function setOperationResultRef(reference) {
+    // Result references are intentionally a digest/summary boundary.  The
+    // provider payload itself belongs to the connector and must not leak into
+    // a public replay journal.
+    try { operationScope?.setOperationResultRef?.(reference); } catch { /* audit-only */ }
   }
 
   function completeRun(run, { completedAt, result, error = null, status = 'completed', skipped = false, trace = null, request = null } = {}) {
@@ -217,56 +240,72 @@ export function createInputRuntime({
 
   async function refreshSource(source, { force = false } = {}) {
     const startedAt = now();
-    const run = startRun(source, startedAt);
+    // Derive the id before entering the scope so the journal can name the
+    // transaction that creates the persisted `running` record.  Incrementing
+    // remains inside the callback, preserving the existing sequence semantics
+    // when multiple sources are refreshed concurrently.
+    const runId = `input-runtime:${source.source_id}:${startedAt.toISOString()}:${runSequence + 1}`;
     const request = { source_id: source.source_id, force, provider: source.provider, ttl_ms: source.ttl_ms };
-    const recorder = createRuntimeTraceRecorder({
-      runId: run.run_id, pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
-      startedAt, now,
-    });
-    if (!due(source, force)) {
-      completeRun(run, { completedAt: now(), status: 'skipped', skipped: true,
-        trace: recorder.finish({ status: 'skipped' }), request });
-      return { source_id: source.source_id, skipped: true, reason: 'not_due', run_id: run.run_id };
-    }
-    const attemptedAt = startedAt.toISOString();
-    source.last_attempt_at = attemptedAt;
-    source.status = 'refreshing';
-    source.last_error = null;
-    persist(source);
-    let result = null;
-    try {
-      result = await recorder.observe('input', () => source.refresh({ force }));
-      if (source.ingest && result?.event) await recorder.observe('perception', () => source.ingest(result.event, result), {
-        references: { event_ids: resultEventIds(result) },
+    return withOperation(runId, source, request, async () => {
+      const run = startRun(source, startedAt);
+      const recorder = createRuntimeTraceRecorder({
+        runId: run.run_id, pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
+        startedAt, now,
       });
-      const providerStatus = result?.connector ?? null;
-      const successAt = providerStatus?.last_success_at ?? result?.fetched_at ?? attemptedAt;
-      source.last_success_at = iso(successAt) ?? attemptedAt;
-      source.consecutive_failures = 0;
+      if (!due(source, force)) {
+        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
+          run_id: run.run_id, status: 'skipped', result_event_ids: [] });
+        completeRun(run, { completedAt: now(), status: 'skipped', skipped: true,
+          trace: recorder.finish({ status: 'skipped' }), request });
+        return { source_id: source.source_id, skipped: true, reason: 'not_due', run_id: run.run_id };
+      }
+      const attemptedAt = startedAt.toISOString();
+      source.last_attempt_at = attemptedAt;
+      source.status = 'refreshing';
       source.last_error = null;
-      source.status = 'fresh';
-      source.freshness = 'fresh';
-      source.ttl_ms = Number.parseInt(providerStatus?.ttl_ms, 10) || source.ttl_ms;
-      source.provider = providerStatus?.provider ?? source.provider;
-      source.next_attempt_at = new Date(Date.parse(source.last_success_at) + source.ttl_ms).toISOString();
       persist(source);
-      completeRun(run, { completedAt: now(), result, status: 'completed',
-        trace: recorder.finish({ resultEventIds: resultEventIds(result) }), request });
-      return { source_id: source.source_id, skipped: false, result, status: publicSource(source), run_id: run.run_id };
-    } catch (error) {
-      const detail = errorDetail(error);
-      source.consecutive_failures += 1;
-      source.last_error = detail;
-      source.status = 'error';
-      source.freshness = source.last_success_at ? 'stale' : 'unavailable';
-      const index = Math.min(source.consecutive_failures - 1, backoffMs.length - 1);
-      const delay = Math.max(1000, Number.parseInt(backoffMs[index], 10) || DEFAULT_BACKOFF_MS[DEFAULT_BACKOFF_MS.length - 1]);
-      source.next_attempt_at = new Date(now().getTime() + delay).toISOString();
-      persist(source);
-      completeRun(run, { completedAt: now(), result, error: detail, status: 'error',
-        trace: recorder.finish({ status: 'error', error: detail, resultEventIds: resultEventIds(result) }), request });
-      return { source_id: source.source_id, skipped: false, error: detail, status: publicSource(source), run_id: run.run_id };
-    }
+      let result = null;
+      try {
+        result = await recorder.observe('input', () => source.refresh({ force }));
+        if (source.ingest && result?.event) await recorder.observe('perception', () => source.ingest(result.event, result), {
+          references: { event_ids: resultEventIds(result) },
+        });
+        const providerStatus = result?.connector ?? null;
+        const outputEventIds = resultEventIds(result);
+        const successAt = providerStatus?.last_success_at ?? result?.fetched_at ?? attemptedAt;
+        source.last_success_at = iso(successAt) ?? attemptedAt;
+        source.consecutive_failures = 0;
+        source.last_error = null;
+        source.status = 'fresh';
+        source.freshness = 'fresh';
+        source.ttl_ms = Number.parseInt(providerStatus?.ttl_ms, 10) || source.ttl_ms;
+        source.provider = providerStatus?.provider ?? source.provider;
+        source.next_attempt_at = new Date(Date.parse(source.last_success_at) + source.ttl_ms).toISOString();
+        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
+          run_id: run.run_id, status: 'completed', provider: source.provider, result_event_ids: outputEventIds,
+          fetched_at: iso(result?.fetched_at) });
+        persist(source);
+        completeRun(run, { completedAt: now(), result, status: 'completed',
+          trace: recorder.finish({ resultEventIds: outputEventIds }), request });
+        return { source_id: source.source_id, skipped: false, result, status: publicSource(source), run_id: run.run_id };
+      } catch (error) {
+        const detail = errorDetail(error);
+        source.consecutive_failures += 1;
+        source.last_error = detail;
+        source.status = 'error';
+        source.freshness = source.last_success_at ? 'stale' : 'unavailable';
+        const index = Math.min(source.consecutive_failures - 1, backoffMs.length - 1);
+        const delay = Math.max(1000, Number.parseInt(backoffMs[index], 10) || DEFAULT_BACKOFF_MS[DEFAULT_BACKOFF_MS.length - 1]);
+        source.next_attempt_at = new Date(now().getTime() + delay).toISOString();
+        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
+          run_id: run.run_id, status: 'error', provider: source.provider, result_event_ids: resultEventIds(result),
+          error: detail });
+        persist(source);
+        completeRun(run, { completedAt: now(), result, error: detail, status: 'error',
+          trace: recorder.finish({ status: 'error', error: detail, resultEventIds: resultEventIds(result) }), request });
+        return { source_id: source.source_id, skipped: false, error: detail, status: publicSource(source), run_id: run.run_id };
+      }
+    });
   }
 
   async function tick({ force = false, sourceIds = null } = {}) {

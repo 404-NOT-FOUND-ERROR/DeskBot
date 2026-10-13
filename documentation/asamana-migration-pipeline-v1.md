@@ -27,13 +27,27 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮已在本地创建 `codex/asamana-replay-journal-v6-1`，保留 v6、v5、`main` 和 v1–v4 分支；远端完成状态由交付核验确认。v6.1 增加 M6b operation journal 的 chat/provider 第一批服务入口接入，不把全服务生产归档写成已完成。2026-10-14 v6.1 复验服务端广套 855/855、M8 单独 1/1、operation-journal/replay/persistence 27/27；客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server）也通过。Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮已在本地创建 `codex/asamana-m6b-seam-v6-2`，保留 v6.1、v6、v5、`main` 和 v1–v4 分支；远端完成状态由交付核验确认。v6.2 增加 M6b operation journal 的 chat/provider 与 input-runtime 第一批服务入口接入，不把全服务生产归档写成已完成。2026-10-14 v6.2 复验服务端广套 857/857、M8 单独 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19；客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server）也通过。Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
 `scripts/review-asamana-migration.mjs` 新增零外部请求的三日实际生活验收，首日完整意图→计划→任务→结果成立；次日真实实践与反思成立，原具体目标等待下一次合法机会，第三日重启后通过原计划和真实任务完成。最新报告 `tmp/asamana-migration-review-lsN0DX/report.json` 为 `verified`，原资源、每日实践上限和期限保持有效。模型合法返回空目标仍必须报告 inconclusive。来源幂等、SQLite 重启和世界候选门通过，但该受控样本不等于 M8 自然长期生活通过。真实 DeepSeek 模式已使用 Clash 执行最多六次调用；报告 `tmp/asamana-migration-review-btgixK/report.json` 为 `inconclusive_reflection_failed`，Day2 `ungrounded_goal` 被拒绝，未放宽 validator。
 
-历史完整性差异已定位并修复新序列的表示问题，“小镇往事”的基础前端交互和真实旧断层提示已有人工证据。下一批顺序为：M6b 全服务生产归档 → M8b 真实模型多日目标追求 → M7 真实渲染异常/长断线 → I2 规则世界事件内容包 → M8c 7–14 天现实 1:1 观察。无需重复实现已通过的 M1/M2/M3/M4 基线；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
+历史完整性差异已定位并修复新序列的表示问题，“小镇往事”的基础前端交互和真实旧断层提示已有人工证据。下一批顺序为：M6b-C chat/provider 接缝 → M6b-I input-runtime 接缝 → M6b 其余直接路由与 worker → M8b 真实模型多日目标追求 → M7 真实渲染异常/长断线 → I2 规则世界事件内容包 → M8c 7–14 天现实 1:1 观察。无需重复实现已通过的 M1/M2/M3/M4 基线；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
+
+### M6b 分波次迁移管线
+
+M6b 不以“导出时所有 namespace 的 hash 相同”为完成条件，而按可执行接缝逐波次推进。每波次都必须先冻结 operation 合同、再写正/负测试、再接入原业务入口，最后在隔离 SQLite 中 replay；provider 只能使用脱敏 fixture，重放 `provider_calls` 必须为 0。
+
+| 波次 | 接缝 | 本波次交付 | 进入下一波次的验收门 |
+| --- | --- | --- | --- |
+| M6b-C0/C1 | `/api/chat` 用户/assistant分支、provider/TTS 结果 | 稳定 chat operation、request hash、结果引用与失败分类；不保存聊天正文 | success/error/TTS/duplicate 均可归属；缺 fixture/篡改 fail closed |
+| M6b-C2/C3 | chat 原入口回放 | 原 `/api/chat` handler 在 fresh/restart/duplicate 下重放，固定 fixture 零联网 | turn/correlation/output/world 等 namespace 顺序与 semantic hash 相等；不能由台词伪造事实 |
+| M6b-I0/I3 | input-runtime source refresh | 已接入 `input-runtime:<run_id>` operation scope，覆盖 schedule、source 状态、TTL、backoff、脱敏 result reference 和 ingest callback；专项合同通过 | success/skip/error、多个 source 隔离、网络等待在事务外且捕获失败不留半状态；I4–I7 fixture/replay 仍待完成 |
+| M6b-I4/I7 | input-runtime replay 与安全边界 | 重启/重复/缺 fixture/篡改/过期回放；脱敏 provider fixture registry | run/source/事件 IDs/错误分类和 namespace hash 一致，`provider_calls=0` |
+| M6b-R | role/life/research route、world candidate、worker/WebSocket/device | 直接 HTTP、定时 worker 和设备回执统一封套 | 覆盖注册表冻结；全服务原入口 replay 通过后才允许开启 `requireOperationContext` |
+
+详细字段、接缝状态和逐项验收清单见 [M6b 服务操作接缝合同](asamana-m6b-seam-contract-v1.md)。
 
 ## 原迁移合同与持续验收门
 
@@ -44,6 +58,7 @@ M0–M8 的代码底座属于 v4 基线，但不等于每个迁移项或最终�
 | M3 | `world.memory.maintenance` 保存每日每角色准备/调用/完成记录；事实压缩保留原记录及来源；反思只写个人理解，有限目标与关系标签仅影响后续偏好 | 同日最多一次、无新来源不重复反思；模型错误/非法来源无虚构理解；重启不重复调用；世界资源/身份/关系数值不被反思改写 |
 | M4 | `world.memory.cognition_cadence` 仅门控新模型请求；冷启动/真实反馈/需要/压力/空闲使用稳定键，既有模型额度继续适用 | 在途任务照常结算、紧急需要直接执行、重复 tick/重启不重复决策；真实反馈可唤起下次认知，失败仍有规则生活 |
 | M6 | 捕获版本化 seed、原事件、adapter、时钟与已获得模型响应；隔离 SQLite 重放，相同事实 ledger/revision/state 哈希；源存档只读 | 原运行、重启运行和新存档重放相等；重复事件/重复接受无增量；不重新调用真实模型、不导入外部写权限 |
+| M6b-C/I | 按接缝捕获 HTTP chat/provider 与 input-runtime 的规范化操作、结果引用、source 状态和提交边界；provider 结果使用脱敏 fixture | chat 与 input-runtime 的原业务入口可重放；success/error/skip/duplicate/restart/缺 fixture/篡改均有明确结果；replay 不联网且不产生半提交 |
 | M6.1 | 行动反馈以 `deskbot.action-feedback.v1` 记录 canonical task 的真实状态，区分未执行、进行中、成功、失败和取消 | 台词不能伪造完成；失败尝试保留发生过的事实；回执稳定、可 JSON 恢复且不授予世界写权限 |
 | M7 | 服务端一次捕获 canonical world 投影 map/Scene/NPC/feed/role；只读 world stream，按 revision/sequence 门控、断线重连与有界播放 | 不同面板同 revision；旧快照不回滚；地图完成呈现才推进下一帧；停机/重连能恢复当前事实，客户端无法写 mutation |
 | M8 | 两上海日期隔离实际生活样本，加来源、实践、愿望、试做、采用、回退、世界候选、重启/重复回放 | 跨模块一致而不重复计证据；前端可见生活过程；普通表达不泄露审计字段；人工体验与自动化证据分别报告 |

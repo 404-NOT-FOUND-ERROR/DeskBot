@@ -4,7 +4,7 @@
 
 ## 本轮已发布
 
-- `/api/chat` 在进入编排器前生成稳定的规范化事件摘要，并在 `chat:<event_id>` operation context 下执行，重复请求不会重复创建 journal 或业务事实。
+- `/api/chat` 的用户消息分支在进入编排器前生成稳定的规范化事件摘要，并在 `chat:<event_id>` operation context 下执行，重复请求不会重复创建 journal 或业务事实；assistant/非 user 分支仍未完成同等级接入。
 - operation journal 记录 `deskbot.service-operation.v1` envelope、请求摘要哈希和脱敏的 provider/TTS 结果引用；聊天正文、密钥和原始音频不会进入公开回放归档。
 - provider 成功、provider 失败和 TTS 失败都保留结构化结果引用，方便后续把 chat/provider seam 接入可执行服务回放。
 - 更新本版本 README、迁移评估、架构与测试说明；效果图继续使用正式运行的小镇和往事面板截图，并明确说明本版视觉沿用 v6、增量主要在服务端回放审计。
@@ -16,7 +16,7 @@
 
 ## 明确未完成
 
-v6.1 仍是 M6b 的增量发布，不把“chat 已有 journal”写成“全服务生产回放已完成”。以下入口仍需逐项接入并通过原业务入口回放：
+v6.1 仍是 M6b 的增量发布，不把“chat 用户分支已有 journal”写成“全服务生产回放已完成”。接缝字段和验收顺序见 [M6b 服务操作接缝合同](asamana-m6b-seam-contract-v1.md)。以下入口仍需逐项接入并通过原业务入口回放：
 
 - assistant-role `/api/chat` 与通用 `/api/event` 分支；
 - input-runtime source refresh、TTL/backoff 和 connector result；

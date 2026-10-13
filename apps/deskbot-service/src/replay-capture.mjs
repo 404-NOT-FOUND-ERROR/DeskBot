@@ -14,6 +14,8 @@ export const CAPTURE_RULES = 'deskbot.canonical-replay-capture-rules.v1';
 const SESSIONS = 'replay.capture-sessions';
 const OPERATIONS = 'replay.capture-operations';
 const INGRESSES = 'replay.capture-ingresses';
+const CHATS = 'replay.capture-chats';
+const PROVIDERS = 'replay.capture-provider-results';
 const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
 // A capture id is a durable identity, but two live recorder objects on the
@@ -84,6 +86,22 @@ function ingressResultDigest(result) {
     evidence: result?.evidence ?? null });
 }
 
+// Chat responses are intentionally represented by digests in the replay
+// envelope.  The private provider fixture registry below may retain the
+// deterministic fixture text, but the operation journal never does.
+function chatResultDigest(result) {
+  const turn = result?.turn ?? result ?? null;
+  const error = result?.error ?? null;
+  return digest({
+    duplicate: Boolean(result?.duplicate),
+    turn_id: turn?.turn_id ?? null,
+    reply_hash: typeof turn?.reply === 'string' ? digest(turn.reply) : null,
+    world_revision: turn?.canonical_world?.snapshot?.world_revision ?? result?.canonical_world?.world?.world_revision ?? null,
+    output_route: turn?.output_route?.route_id ?? result?.output_route?.route_id ?? null,
+    error: error ? { code: error.code ?? null, status: error.statusCode ?? error.status ?? null } : null,
+  });
+}
+
 /** Opt-in, private canonical ingress recorder. initialize runs after migration
  * and before startup clock/task/worker writes. Each record is in the SAME
  * SQLite transaction as its canonical fact, so a crash cannot leave a committed
@@ -146,7 +164,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
     persistence.put(SESSIONS, captureId, { ...session, journal_count: index + 1,
       journal_state_digest: digest(namespaceDigests(persistence)) });
   }) ?? (() => {});
-  return {
+  const api = {
     captureId,
     directory: archive,
     close() {
@@ -176,8 +194,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
     setOperationResultRef(resultRef) {
       const context = operationStorage.getStore();
       if (!context) fail('operation_context_required');
-      context.result_ref = resultRef === null || resultRef === undefined ? null : copy(resultRef);
-      return context.result_ref;
+      return api.recordProviderResult(resultRef);
     },
     operationCount() {
       if (!initialized) fail('replay_capture_not_initialized');
@@ -217,7 +234,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, journal_count: 0,
+        operation_count: 0, ingress_count: 0, chat_count: 0, provider_count: 0, journal_count: 0,
         journal_namespace_registry: namespaceRegistryList,
         journal_registry_hash: registryHash,
         journal_require_operation_context: Boolean(requireOperationContext),
@@ -251,6 +268,8 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       const session = persistence.get(SESSIONS, captureId);
       const id = String(event?.event_id ?? '').trim();
       if (!id) fail('replay_capture_event_id_required');
+      const previous = persistence.list(CHATS).find(item => item.capture_id === captureId && item.event_id === id);
+      if (previous) return copy(previous);
       const record = {
         schema: 'deskbot.replay-capture-ingress.v1', capture_id: captureId, event_id: id, index: session.ingress_count ?? 0,
          event: copy(event), adapter: copy(adapter), received_at,
@@ -272,7 +291,66 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       });
       return record;
     },
+    /** Record an HTTP chat attempt in the private replay archive. The event is
+     * replay input; it is intentionally not copied into service-operation
+     * journal envelopes (which only retain request hashes). */
+    recordChat({ event, result = null, error = null, received_at = now().toISOString(), operation_start = null,
+      operation_end = null } = {}) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const session = persistence.get(SESSIONS, captureId);
+      const id = String(event?.event_id ?? '').trim();
+      if (!id) fail('replay_capture_event_id_required');
+      const provider = persistence.get(PROVIDERS, `${captureId}:chat:${id}`);
+      const record = {
+        schema: 'deskbot.replay-capture-chat.v1', capture_id: captureId,
+        event: copy(event), event_id: id, index: session.chat_count ?? 0,
+        received_at, duplicate: Boolean(result?.duplicate),
+        status: error ? 'error' : 'success',
+        operation_start: operation_start ?? session.operation_count,
+        operation_end: operation_end ?? session.operation_count,
+        result_digest: chatResultDigest(result),
+        error: error ? { code: error.code ?? 'chat_failed', status: error.statusCode ?? error.status ?? null,
+          retryable: error.retryable === true } : null,
+        provider_ref: provider?.ref ?? null,
+      };
+      record.record_hash = digest(record);
+      persistence.insert(CHATS, `${captureId}:${record.index}`, record);
+      persistence.put(SESSIONS, captureId, { ...session, chat_count: record.index + 1,
+        coverage: 'canonical_world_with_service_chat' });
+      return record;
+    },
+    /** Store deterministic provider fixtures separately from operation
+     * journals. This namespace is exported only into the private replay tape
+     * and is excluded from canonical namespace digests. */
+    recordProviderResult(resultRef = null) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      const ref = resultRef === null || resultRef === undefined ? null : copy(resultRef);
+      const record = {
+        schema: 'deskbot.replay-provider-result.v1', capture_id: captureId,
+        operation_id: context.operation_id, ref, recorded_at: now().toISOString(),
+      };
+      const session = persistence.get(SESSIONS, captureId);
+      const providerKey = `${captureId}:${context.operation_id}`;
+      const existed = persistence.get(PROVIDERS, providerKey) !== null;
+      persistence.put(PROVIDERS, providerKey, record);
+      // The registry is keyed by operation, so repeated LLM/TTS updates for
+      // one chat replace a single fixture rather than growing the archive.
+      persistence.put(SESSIONS, captureId, { ...session, provider_count: existed ? (session.provider_count ?? 0) : (session.provider_count ?? 0) + 1 });
+      // A fixture may contain private deterministic output needed by a local
+      // replay. Keep that payload in the provider registry, while exposing
+      // only the attested reference in operation journals.
+      const publicRef = ref && typeof ref === 'object' ? { ...ref } : ref;
+      if (publicRef && typeof publicRef === 'object') delete publicRef.fixture;
+      context.result_ref = publicRef;
+      return publicRef;
+    },
+    getOperationResultRef() {
+      return operationStorage.getStore()?.result_ref ?? null;
+    },
   };
+  return api;
 }
 
 /** Local export can run while the source service lives. A read transaction
@@ -280,7 +358,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, journals, namespace_digests;
+  let session, operations, ingresses, chats, providers, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -293,6 +371,10 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(operation => operation.capture_id === captureId && operation.index < session.operation_count);
     ingresses = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(INGRESSES)]
       .map(row => JSON.parse(row.payload_json)).filter(ingress => ingress.capture_id === captureId);
+    chats = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(CHATS)]
+      .map(row => JSON.parse(row.payload_json)).filter(chat => chat.capture_id === captureId);
+    providers = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(PROVIDERS)]
+      .map(row => JSON.parse(row.payload_json)).filter(provider => provider.capture_id === captureId);
     journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
       .map(row => JSON.parse(row.payload_json)).filter(journal => journal.capture_id === captureId);
     const grouped = new Map();
@@ -311,7 +393,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
   } finally { database.close(); }
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
-  const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses, journals };
+  const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses,
+    chats, providers, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
   return { directory: archive, operation_count: operations.length, journal_count: journals.length,
@@ -324,6 +407,10 @@ function validateArchive(tape, codeFingerprint) {
   if (!Array.isArray(tape.operations) || tape.operations.length !== tape.session.operation_count) fail('replay_capture_incomplete');
   if (!Array.isArray(tape.ingresses)) fail('replay_capture_ingress_missing');
   if (tape.ingresses.length !== (tape.session.ingress_count ?? 0)) fail('replay_capture_ingress_incomplete');
+  if (!Array.isArray(tape.chats)) tape.chats = [];
+  if (tape.chats.length !== (tape.session.chat_count ?? 0)) fail('replay_capture_chat_incomplete');
+  if (!Array.isArray(tape.providers)) tape.providers = [];
+  if (tape.providers.length !== (tape.session.provider_count ?? 0)) fail('replay_capture_provider_incomplete');
   if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
   if (tape.journals.length !== (tape.session.journal_count ?? 0)) fail('replay_capture_journal_incomplete');
   for (const [index, journal] of tape.journals.entries()) {
@@ -334,6 +421,21 @@ function validateArchive(tape, codeFingerprint) {
       || (journal.request_hash !== null && typeof journal.request_hash !== 'string')
       || !Number.isFinite(Date.parse(journal.observed_at)) || !Array.isArray(journal.writes)
       || digest(content) !== hash) fail('replay_capture_journal_corrupt');
+  }
+  for (const [index, chat] of tape.chats.entries()) {
+    const { record_hash: hash, ...content } = chat;
+    if (chat.schema !== 'deskbot.replay-capture-chat.v1' || chat.capture_id !== tape.session.capture_id
+      || chat.index !== index || !chat.event_id || !chat.event || !Number.isFinite(Date.parse(chat.received_at))
+      || !['success', 'error'].includes(chat.status) || !Number.isSafeInteger(chat.operation_start)
+      || !Number.isSafeInteger(chat.operation_end) || chat.operation_start < 0
+      || chat.operation_end < chat.operation_start || chat.operation_end > tape.operations.length
+      || digest(content) !== hash) fail('replay_capture_chat_corrupt');
+  }
+  for (const provider of tape.providers) {
+    if (provider.schema !== 'deskbot.replay-provider-result.v1' || provider.capture_id !== tape.session.capture_id
+      || !provider.operation_id || !Object.hasOwn(provider, 'ref') || !Number.isFinite(Date.parse(provider.recorded_at))) {
+      fail('replay_capture_provider_corrupt');
+    }
   }
    let previousOperationEnd = 0;
    for (const [index, ingress] of tape.ingresses.entries()) {
@@ -425,7 +527,13 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
   validateArchive(tape, codeFingerprint);
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== tape.session.seed_file_hash) fail('replay_capture_seed_mismatch');
   if (existsSync(target) || existsSync(`${target}-wal`) || existsSync(`${target}-shm`) || target === join(archive, 'seed.sqlite')) fail('replay_target_must_be_new');
-  if (restartAt !== null && (!Number.isSafeInteger(restartAt) || restartAt < 0 || restartAt > tape.ingresses.length)) fail('replay_restart_range_invalid');
+  const records = [
+    ...tape.ingresses.map(item => ({ kind: 'ingress', item })),
+    ...tape.chats.map(item => ({ kind: 'chat', item })),
+  ].sort((a, b) => (a.item.operation_start - b.item.operation_start)
+    || String(a.item.received_at).localeCompare(String(b.item.received_at))
+    || (a.item.index - b.item.index));
+  if (restartAt !== null && (!Number.isSafeInteger(restartAt) || restartAt < 0 || restartAt > records.length)) fail('replay_restart_range_invalid');
   mkdirSync(dirname(target), { recursive: true }); copyFileSync(join(archive, 'seed.sqlite'), target);
    let runtime = null, persistence = null, time = tape.session.started_at, nextOperation = 0;
   const open = async (receivedAt) => {
@@ -433,7 +541,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
      time = receivedAt;
      persistence = createSqlitePersistence({ filename: target, now: () => new Date(time) });
      runtime = await runtimeFactory({ persistence, tape, now: () => new Date(time), mode: 'replay' });
-    if (!runtime?.ingestNonChatEvent) fail('replay_runtime_ingress_missing');
+    if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat) fail('replay_runtime_ingress_missing');
   };
    const world = () => runtime.persistentWorld;
    const replayStandaloneOperations = end => {
@@ -451,20 +559,39 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
    };
   try {
     await open(tape.session.started_at);
-    for (const [index, ingress] of tape.ingresses.entries()) {
-       replayStandaloneOperations(ingress.operation_start);
-       time = ingress.received_at;
-      if (restartAt === index) await open(ingress.received_at);
-      const result = await runtime.ingestNonChatEvent(copy(ingress.event), copy(ingress.adapter));
-      if (Boolean(result?.duplicate) !== ingress.duplicate) fail(`replay_service_duplicate_mismatch:${index}`);
-       if (ingressResultDigest(result) !== ingress.result_digest) fail(`replay_service_ingress_result_mismatch:${index}`);
-       nextOperation = ingress.operation_end;
+    for (const [index, record] of records.entries()) {
+       const item = record.item;
+       replayStandaloneOperations(item.operation_start);
+       time = item.received_at;
+      if (restartAt === index) await open(item.received_at);
+      let result;
+      if (record.kind === 'chat') {
+        const chat = runtime.chat ?? runtime.handleChat;
+        if (typeof chat !== 'function') fail('replay_runtime_chat_missing');
+        if (item.status === 'error') {
+          try {
+            await chat(copy(item.event), copy(item), { tape });
+            fail(`replay_service_chat_error_missing:${index}`);
+          } catch (error) {
+            if (error?.code !== item.error?.code) fail(`replay_service_chat_error_mismatch:${index}`);
+            result = { error };
+          }
+        } else {
+          result = await chat(copy(item.event), copy(item), { tape });
+        }
+        if (chatResultDigest(result) !== item.result_digest) fail(`replay_service_chat_result_mismatch:${index}`);
+      } else {
+        result = await runtime.ingestNonChatEvent(copy(item.event), copy(item.adapter));
+        if (Boolean(result?.duplicate) !== item.duplicate) fail(`replay_service_duplicate_mismatch:${index}`);
+        if (ingressResultDigest(result) !== item.result_digest) fail(`replay_service_ingress_result_mismatch:${index}`);
+      }
+       nextOperation = item.operation_end;
        if (world()?.get && nextOperation && digest(world().get()) !== tape.operations[nextOperation - 1].world_hash) {
          fail(`replay_service_ingress_world_mismatch:${index}`);
        }
     }
      replayStandaloneOperations(tape.operations.length);
-     if (restartAt === tape.ingresses.length) await open(time);
+     if (restartAt === records.length) await open(time);
     const actual = namespaceDigests(persistence);
     const expected = tape.session.namespace_digests ?? null;
      if (!expected || digest(actual) !== digest(expected)) {
@@ -473,6 +600,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
        throw Object.assign(new Error('replay_service_namespace_mismatch'), { code: 'replay_service_namespace_mismatch', namespaces });
      }
     return { schema: 'deskbot.service-replay-result.v1', coverage: 'service_ingress_namespaces_verified', ingresses: tape.ingresses.length,
+      chats: tape.chats.length,
       namespace_digests: actual, provider_calls: 0, verified: true, target_database: target, restart_at: restartAt };
   } finally { if (runtime?.close) await runtime.close(); else persistence?.close(); }
 }

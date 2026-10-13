@@ -26,7 +26,7 @@ providers：LLM、embedding、向量存储、人物存储、snapshot
 
 ## 2026-10-14 DeskBot 分支收口
 
-当前已发布代码基线为 `codex/asamana-shared-life-v5`，本轮增量分支为 `codex/asamana-replay-journal-v6-1`，仍不修改 `main`。v6.1 复验服务端广套 855/855、M8 1/1、operation-journal/replay/persistence 27/27、客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇实际页面再次捕获，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v4/v5 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；v6.1 不引入第二套世界引擎。
+当前已发布代码基线为 `codex/asamana-shared-life-v5`，本轮增量分支为 `codex/asamana-m6b-seam-v6-2`，仍不修改 `main`。v6.2 复验服务端广套 857/857、M8 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19、客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇实际页面再次核对，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v4/v5 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；v6.2 不引入第二套世界引擎。
 
 新增跨日验收脚本默认零外部请求，三日受控样本已 `verified`：首日完整目标执行链成立，次日真实实践形成的原具体目标在第三日重启后的下一合法机会执行并完成，没有重置期限或补赠材料。真实 DeepSeek 模式已用 Clash 执行六次调用，Day2 缺少经历依据的目标被拒绝，结果仍为 `inconclusive_reflection_failed`。真实模型多日生活、完整阶段视觉、真实渲染 context loss 与长断线仍待验收。现有 replay tape 是隔离输入 fixture 的确定性重演，任意生产存档的完整捕获导出尚未接入；长期共同生活和全部迁移目标不能据此宣称完成。
 
@@ -80,7 +80,7 @@ Asamana 能让一个主题下的冲突更丰富，但开放行动和模型叙事
 
 ## 本轮实际交付与验证
 
-- DeskBot 服务端广套本轮重新运行 855/855，M8 长时生活回放单独 1/1，operation-journal/replay/persistence 联合专项 27/27，退出码 0。Jev Town 客户端 44 套 301/301、生产构建（含 typecheck/client/server）和 voice-sidecar 16/16 同轮重跑通过；Asamana 前端 140/140 为更早历史结果，本轮未重跑。
+- DeskBot 服务端广套本轮重新运行 857/857，M8 长时生活回放单独 1/1，operation-journal/replay/persistence 联合专项 27/27、input-runtime 7/7、chat/replay-capture 19/19，退出码 0。Jev Town 客户端 44 套 301/301、生产构建（含 typecheck/client/server）和 voice-sidecar 16/16 同轮重跑通过；Asamana 前端 140/140 为更早历史结果，本轮未重跑。
 - Jev Town 客户端：生活 feed/刷新 race 9/9；typecheck 和生产 build 通过。构建通过不是长期沉浸体验完成。
 - Asamana 前端：17 个测试文件、140/140 通过；本地 API 能读取长安和现代都市两种地图。
 - M3/M4 与 M6a/M7 的模块能力已接入并自动验证，M8a 受控 fixture 已通过；这不等于 M6b 全服务归档或 M8b/M8c 已完成。进一步语义复核已收紧目标为具体合法 activity、NPC 候选输入脱敏、按查询时刻过滤来信、撤回邀请只保留不可行动的历史，并隔离非法来源时间戳；以上均有专项测试。v6.1 发布前已完成基础浏览器验收并保存 DeskBot/Asamana 画面证据；完整阶段像素验收、长断线与长期历史浏览、真实模型多日慢认知、生成式世界事件和真实中文 TTS 仍待验收。
