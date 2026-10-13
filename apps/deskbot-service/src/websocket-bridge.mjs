@@ -804,6 +804,7 @@ export function createWebSocketBridge({
   onCommandSent = null,
   onCommandFailure = null,
   getRoleRevision = 0,
+  operationScope = null,
 } = {}) {
   if (typeof path !== 'string' || !path.startsWith('/')) throw new TypeError('path must start with /');
   if (!Number.isInteger(heartbeatIntervalMs) || heartbeatIntervalMs < 0) throw new TypeError('heartbeatIntervalMs must be a non-negative integer');
@@ -817,6 +818,11 @@ export function createWebSocketBridge({
   const roleRevisionResolver = defaultRoleRevision(getRoleRevision);
   let attachedServer = null;
   let upgradeHandler = null;
+
+  const runBridgeOperation = (operationId, operationKind, request, callback) => operationScope?.withOperation
+    ? operationScope.withOperation({ operation_id: operationId, operation_kind: operationKind, route_id: `device.${operationKind}`,
+      source: 'websocket.device', request, logic_time: now().toISOString() }, callback)
+    : callback();
 
   function sendError(peer, error, { fatal = false, correlationId = null } = {}) {
     if (!peer || peer.closed) return;
@@ -930,6 +936,8 @@ export function createWebSocketBridge({
   }
 
   async function handleHello(peer, message) {
+    const helloPreview = message?.device_id ?? message?.correlation_id ?? 'unknown';
+    return runBridgeOperation(`device.hello:${helloPreview}:${message?.correlation_id ?? 'none'}`, 'hello', message, async () => {
     const { hello, selected, registered } = normalizeAndRegisterHello(message);
     const previous = peersByDevice.get(hello.device_id);
     if (previous && previous !== peer) previous.ws.close(1000, 'replaced by reconnect');
@@ -960,6 +968,7 @@ export function createWebSocketBridge({
     }
     await onHello?.({ hello: clone(hello), welcome: clone(welcome), device: clone(registered), peer });
     await pollOutbox(peer);
+    });
   }
 
   async function handleAudioStart(peer, message) {
@@ -1061,6 +1070,7 @@ export function createWebSocketBridge({
   }
 
   async function handleEvent(peer, message) {
+    return runBridgeOperation(`device.event:${message?.event_id ?? message?.correlation_id ?? randomUUID()}`, 'event', message, async () => {
     normalizeEnvelope(message, {
       expectedType: 'device.event',
       expectedSchema: 'deskbot.device-event.v0.1',
@@ -1083,10 +1093,12 @@ export function createWebSocketBridge({
       duplicate: result?.duplicate === true,
     });
     return result;
+    });
   }
 
   async function handleAck(peer, message) {
     const ack = normalizeAckMessage(message, peer);
+    return runBridgeOperation(`device.ack:${peer.deviceId}:${ack.command_id}:${ack.status}`, 'ack', ack, async () => {
     peer.lastCorrelationId = ack.correlation_id;
     let command;
     try {
@@ -1164,6 +1176,7 @@ export function createWebSocketBridge({
       status: ack.status,
     });
     return result;
+    });
   }
 
   async function handleControl(peer, message) {

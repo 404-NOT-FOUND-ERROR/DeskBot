@@ -4,11 +4,12 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v6.4 M6b-C2/C3/I4/I7 公开发布候选。** 本版发布在 [`codex/asamana-m6b-v6-4-public-release`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-v6-4-public-release)，从已验证的 v6.4 replay seam 基线派生，保留 `main`、v6.4 release 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.4 在 chat handler fixture replay 之上，补齐 `input-runtime` source run 的 success/skip/error、TTL/backoff、重启/重复与 fail-closed 回放门；回放期间 provider 调用数必须为零。provider/TTS 引用仍按阶段记录，但独立 TTS 成功 fixture 尚不作为本版通过条件。它仍是增量公开发布，不宣称完整生产服务归档或任意入口回放已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v6.4 M6b-R seam preview。** 本版发布在 [`codex/asamana-m6b-r-public-release`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-r-public-release)，从已验证的 v6.4 replay seam 基线派生，保留 `main`、v6.4 release 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本轮进一步把 HTTP 写路由、worker 和慢认知接入统一 operation context 的第一批骨架。M6b-R 当前是公开的接缝预览：`input-runtime` 与 chat 的受控 fixture replay 已验证，role/life/world-candidate 等其余入口仍按合同逐波次收口，不能宣称完整生产归档或任意入口回放已经完成。provider/TTS、真实设备 ACK 与外壳机械实现不属于本版完成条件。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
 
-### v6.4 M6b-C2/C3/I4/I7 本轮新增
+### v6.4 M6b-R 本轮新增
 
 - 为本地回放捕获增加版本化 `deskbot.service-operation.v1` journal envelope：记录 operation、来源、请求摘要、写入 namespace、事务边界和记录哈希，不把原始请求或密钥写入归档。
+- 增加 `runServiceOperation` / `runWorkerOperation` 接缝，把已覆盖的 HTTP route、life-choice、slow-cognition 和调度入口绑定到稳定 operation ID、logic time、route ID、规则版本与来源事件引用；未覆盖入口继续保持显式 `partial`。
 - 为 `/api/chat` 用户分支、`/api/event` 通用入口和 `input-runtime` source run 接入统一 operation context；输入运行记录使用 `input-runtime:<source>:<timestamp>:<sequence>` 标识，并保存脱敏 `deskbot.input-runtime-result-ref.v1`。
 - provider 与 TTS 结果以脱敏引用进入 operation journal；聊天正文、provider 原始响应、密钥和敏感 prompt 不进入公开回放归档。v6.4 的可执行回放使用脱敏 LLM/input-runtime fixture；私有 capture tape 可能保留事件与 provider fixture 原文，只能留在本机，不能提交或发布。
 - 增加 operation-journal、chat 和 input-runtime 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测、SQLite 重启恢复与敏感请求不落盘。
@@ -59,6 +60,8 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 ![v6.4 M6b-C2/C3/I4/I7 本机发布快照：实时小镇与小镇往事面板（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town-history.jpg)
 
+![v6.4 M6b-R 本机运行效果：雾灯镇实时小镇、居民面板与生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-m6b-r/deskbot-world-npc-panel.png)
+
 ![v6.4 M6b-C2/C3/I4/I7 本机运行效果：雾灯镇实时小镇、居民与生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town.jpg)
 
 ![既有视觉基线：小镇往事、历史翻阅与世界回放](documentation/images/current/world-history.jpg)
@@ -67,13 +70,13 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-第一张和第二张是 v6.4 M6b-C2/C3/I4/I7 的实际运行截图：2026-10-14 在本机重新打开页面，核对地图、居民侧栏和“小镇往事”入口；第三张保留既有历史面板视觉基线。v6.4 没有改版视觉布局，新增能力主要位于服务端 chat/input-runtime replay、operation journal 和回放审计。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+第一张是 M6b-R 接缝预览的实际运行截图：地图、居民面板、共同经历和聊天入口同时可见；后续图片保留 v6.4 的小镇与历史面板基线。M6b-R 没有把接缝骨架包装成新的视觉改版，新增能力主要位于服务端 route/worker operation context、chat/input-runtime replay 和回放审计。截图是当前可体验效果的证据，不等于长期自然生活或全入口回放已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md) 以及 [M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md)。
 
 ## 当前完成范围
 
 当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-14 Windows 本机复验：服务端广套 **861/861**，M8 长时生活回放单独 **1/1**，chat fixture replay 专项 **10/10**，input-runtime replay 专项 **2/2**（operation-journal 合同合计 **30/30**）；前端既有基线 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过。Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。v6.4 基线的 Windows 本机复验与 M6b-R 接缝审计结果见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md)、[M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md) 与 [迁移矩阵](documentation/asamana-migration-matrix-v1.md)。M6b-R 公开分支只把已验证的受控 replay 与当前 operation 接缝骨架写入发布说明；服务端全量回归、voice/device/connector route replay 和 R0–R8 完整验收仍是后续门槛。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。
 
 `node scripts/review-asamana-migration.mjs` 在临时 SQLite 运行受控三日链，不访问正式存档、默认不调用外部模型。规则样本已经 `verified`：第二日形成的具体目标，在第三日重启后通过原生活计划与真实任务完成，材料和每日实践上限保持有效。真实 DeepSeek 样本仍有缺少经历依据的目标被拒绝，结果为 `inconclusive_reflection_failed`；规则样本通过不代表真实模型或长期自然生活已验收。
 
@@ -84,7 +87,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-m6b-v6-4-public-release https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-r-public-release https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -96,7 +99,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-v6-4-public-release`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-r-public-release`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |

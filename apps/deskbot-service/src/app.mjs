@@ -251,8 +251,8 @@ export function createDeskBotServer({
   }
   lifeChoiceWorker=createLifeChoiceWorker({world:persistentWorld,llm,now,
     reserved:reservedForLife,
-    wake:id=>autonomousLife.tick({wakeId:id})});
-  slowCognitionWorker=createSlowCognitionWorker({world:persistentWorld,llm,now,enabled:livedMemoryEnabled});
+     wake:id=>autonomousLife.tick({wakeId:id}), operationScope: replayCapture});
+  slowCognitionWorker=createSlowCognitionWorker({world:persistentWorld,llm,now,enabled:livedMemoryEnabled,operationScope: replayCapture});
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -353,6 +353,27 @@ export function createDeskBotServer({
       error: expected ? error.code : 'internal_error',
       message: expected ? error.message : 'research session operation failed',
     });
+  }
+
+  // All side-effecting service entry points use this helper so a replay can
+  // re-enter the same domain handler with a stable business operation id.
+  // The wrapper is deliberately a no-op when capture is disabled; production
+  // behavior therefore does not depend on the local replay archive.
+  function stableOperationSuffix(value) {
+    if (value === undefined || value === null || value === '') return 'default';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 24);
+  }
+
+  function runServiceOperation({ operationId, operationKind, routeId = null, source = 'service', request = null,
+    logicTime = now().toISOString(), sourceEventIds = [], adapterRef = null, callback }) {
+    if (typeof callback !== 'function') throw new TypeError('runServiceOperation callback is required');
+    if (!replayCapture?.withOperation) return callback();
+    return replayCapture.withOperation({
+      operation_id: String(operationId), operation_kind: String(operationKind), route_id: routeId,
+      source, request, logic_time: logicTime, source_event_ids: sourceEventIds,
+      adapter_ref: adapterRef,
+    }, callback);
   }
 
   function ingestNonChatEvent(eventInput, adapter = {}) {
@@ -571,7 +592,20 @@ export function createDeskBotServer({
           },
         });
       }
+
     }
+  }
+
+  function workerOperationId(worker, suffix = null) {
+    const logical = persistentWorld.get()?.logical_time ?? {};
+    const slot = suffix ?? `${logical.date ?? 'unknown'}:${logical.minute_of_day ?? logical.tick ?? 'unknown'}`;
+    return `scheduler:${worker}:${slot}`;
+  }
+
+  function runWorkerOperation(worker, callback, { suffix = null, request = null } = {}) {
+    return runServiceOperation({ operationId: workerOperationId(worker, suffix), operationKind: `scheduler.${worker}`,
+      routeId: `scheduler.${worker}`, source: 'scheduler', request: request ?? { worker, suffix },
+      logicTime: persistentWorld.get()?.clock?.synced_at ?? now().toISOString(), callback });
   }
 
   const worldObserver = createWorldObserver({
@@ -597,11 +631,19 @@ export function createDeskBotServer({
       if (request.method === 'GET') { sendJson(response, 200, { schema: 'deskbot.story-package-list.v0.1', packages: listStoryPackages() }); return; }
       if (request.method === 'POST') {
         readJson(request).then(body => {
-          const options = { now: now(), plans: sharedLife.plans(), world: persistentWorld.get() };
-          const result = body.operation === 'preview'
-            ? previewStoryPackage(body.package_id, options)
-            : body.operation === 'install' ? installStoryPackage(body.package_id, { ...options, schedule: sharedLife.schedule })
-              : (() => { throw new InputError(400, 'invalid_story_package_operation', 'Use preview or install'); })();
+          const operation = body.operation;
+          const packageId = requiredRoleText(body.package_id, 'package_id');
+          const result = runServiceOperation({
+            operationId: `life.story-package.${operation}:${stableOperationSuffix(body.idempotency_key ?? packageId)}`,
+            operationKind: `life.story-package.${operation}`, routeId: `life.story-package.${operation}`, source: 'http.life', request: body,
+            callback: () => {
+              const options = { now: now(), plans: sharedLife.plans(), world: persistentWorld.get() };
+              return operation === 'preview'
+                ? previewStoryPackage(packageId, options)
+                : operation === 'install' ? installStoryPackage(packageId, { ...options, schedule: sharedLife.schedule })
+                  : (() => { throw new InputError(400, 'invalid_story_package_operation', 'Use preview or install'); })();
+            },
+          });
           sendJson(response, 200, result);
         }).catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
           { error: error.code ?? 'internal_error', message: error.message ?? 'Story package failed' }));
@@ -626,7 +668,13 @@ export function createDeskBotServer({
     if (url.pathname === '/api/life/npc-goals') {
       if (request.method === 'GET') { sendJson(response, 200, { goals: npcGoals.list() }); return; }
       if (request.method === 'POST') {
-        readJson(request).then(body => sendJson(response, 200, body.operation ? npcGoals.control(body.id, body.operation) : npcGoals.add(body)))
+        readJson(request).then(body => {
+          const operation = body.operation ? 'control' : 'add';
+          const goalId = body.id ?? body.goal_id ?? body.idempotency_key ?? stableOperationSuffix(body);
+          return runServiceOperation({ operationId: `life.npc-goal.${operation}:${stableOperationSuffix(goalId)}`,
+            operationKind: `life.npc-goal.${operation}`, routeId: 'life.npc-goal', source: 'http.life', request: body,
+            callback: () => body.operation ? npcGoals.control(body.id, body.operation) : npcGoals.add(body) });
+        }).then(result => sendJson(response, 200, result))
           .catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
             { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'Internal error' }));
         return;
@@ -648,7 +696,7 @@ export function createDeskBotServer({
         if(!persistentWorld.get().refraction)throw new InputError(409,'refraction_not_installed','现实输入参考尚未启用。');
         if(!Object.hasOwn(LIFE_SUGGESTIONS,body.suggestion))throw new InputError(400,'invalid_life_suggestion','请选择一个具体的生活建议。');
         const id=body.event_id??`life-suggestion-${randomUUID()}`;
-        const result=ingestNonChatEvent({event_id:id,type:'user.preference.life',source:'life-suggestion-interface',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{suggestion:body.suggestion,text:LIFE_SUGGESTIONS[body.suggestion].title}},{attestedKind:'user',sourceLabel:'用户建议'});
+        const result=runServiceOperation({operationId:`life.input:${id}`,operationKind:'life.input',routeId:'life.input',source:'http.life',request:body,sourceEventIds:[id],callback:()=>ingestNonChatEvent({event_id:id,type:'user.preference.life',source:'life-suggestion-interface',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{suggestion:body.suggestion,text:LIFE_SUGGESTIONS[body.suggestion].title}},{attestedKind:'user',sourceLabel:'用户建议'})});
         sendJson(response,result.duplicate?200:202,{accepted:true,duplicate:result.duplicate,inputs:refractionReadModel(persistentWorld.get(),{now:now()}),world_revision:result.worldMutation.world.world_revision});
       }).catch(error=>sendJson(response,error.statusCode??400,{error:error.code??'invalid_life_suggestion',message:error.message}));return;}
     }
@@ -657,7 +705,7 @@ export function createDeskBotServer({
       if(request.method==='POST'){readJson(request).then(body=>{
         if(!['join','decline','withdraw'].includes(body.operation)||typeof body.invitation_id!=='string')throw new InputError(400,'invalid_social_response','请选择具体约定与参加、不参加或退出。');
         const id=body.event_id??`social-response-${randomUUID()}`;
-        const result=ingestNonChatEvent({event_id:id,type:'world.mutation',source:'social-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{action:'respond_social_invitation',invitation_id:body.invitation_id,operation:body.operation}});
+        const result=runServiceOperation({operationId:`life.social:${id}`,operationKind:'life.social',routeId:'life.social',source:'http.life',request:body,sourceEventIds:[id],callback:()=>ingestNonChatEvent({event_id:id,type:'world.mutation',source:'social-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(id)?.occurred_at??now().toISOString(),payload:{action:'respond_social_invitation',invitation_id:body.invitation_id,operation:body.operation}})});
         sendJson(response,200,{accepted:true,social:socialReadModel(persistentWorld.get()),world_revision:result.worldMutation.world.world_revision});
       }).catch(error=>sendJson(response,error.statusCode??500,{error:error.code??'internal_error',message:error.message}));return;}
     }
@@ -667,7 +715,7 @@ export function createDeskBotServer({
         readJson(request).then(body => {
           if (!['pause','resume'].includes(body.operation)) throw new InputError(400,'invalid_autonomy_operation','Use pause or resume');
           const controlId=body.event_id??`life-control-${randomUUID()}`;
-          const result=ingestNonChatEvent({event_id:controlId,type:'world.mutation',source:'world-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(controlId)?.occurred_at??now().toISOString(),payload:{action:'control_autonomy',operation:body.operation}});
+          const result=runServiceOperation({operationId:`life.autonomy:${controlId}`,operationKind:'life.autonomy',routeId:'life.autonomy',source:'http.life',request:body,sourceEventIds:[controlId],callback:()=>ingestNonChatEvent({event_id:controlId,type:'world.mutation',source:'world-life-control',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:inputStore.get(controlId)?.occurred_at??now().toISOString(),payload:{action:'control_autonomy',operation:body.operation}})});
           sendJson(response,200,{accepted:true,autonomy:autonomousLife.snapshot(),world_revision:result.worldMutation.world.world_revision});
         }).catch(error=>sendJson(response,error.statusCode??500,{error:error.code??'internal_error',message:error.message}));
         return;
@@ -755,7 +803,9 @@ export function createDeskBotServer({
     }
     if (url.pathname === '/api/life/world/replay' && request.method === 'POST') {
       readJson(request)
-        .then(body => worldLife.replay(body))
+        .then(body => runServiceOperation({ operationId: `life.world.replay:${stableOperationSuffix(body.event_id ?? body.idempotency_key ?? body.sequence ?? body)}`,
+          operationKind: 'life.world.replay', routeId: 'life.world.replay', source: 'http.life', request: body,
+          callback: () => worldLife.replay(body) }))
         .then(result => sendJson(response, 200, result))
         .catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500, {
           error: error.code ?? 'internal_error',
@@ -769,7 +819,9 @@ export function createDeskBotServer({
     }
     if (url.pathname === '/api/life/npc-interactions' && request.method === 'POST') {
       readJson(request)
-        .then((body) => worldLife.interactWithAgent(body))
+        .then((body) => runServiceOperation({ operationId: `life.npc-interaction:${stableOperationSuffix(body.interaction_id ?? body.event_id ?? body.idempotency_key ?? body)}`,
+          operationKind: 'life.npc-interaction', routeId: 'life.npc-interaction', source: 'http.life', request: body,
+          callback: () => worldLife.interactWithAgent(body) }))
         .then((result) => sendJson(response, 200, result))
         .catch((error) => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
           { error: error.code ?? 'internal_error', message: error instanceof InputError || error instanceof PersistentWorldError ? error.message : 'NPC interaction failed' }));
@@ -785,9 +837,11 @@ export function createDeskBotServer({
       }
       if (request.method === 'POST') {
         readJson(request)
-          .then(body => body.operation === 'resolve' || body.operation === 'cancel'
-            ? sharedLifeReports.updateCommitment(body)
-            : sharedLifeReports.createCommitment(body))
+          .then(body => runServiceOperation({ operationId: `life.commitment.${body.operation ?? 'create'}:${stableOperationSuffix(body.commitment_id ?? body.id ?? body.event_id ?? body.idempotency_key ?? body)}`,
+            operationKind: `life.commitment.${body.operation ?? 'create'}`, routeId: 'life.commitment', source: 'http.life', request: body,
+            callback: () => body.operation === 'resolve' || body.operation === 'cancel'
+              ? sharedLifeReports.updateCommitment(body)
+              : sharedLifeReports.createCommitment(body) }))
           .then(result => sendJson(response, 200, result))
           .catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500, {
             error: error instanceof InputError ? error.code : 'internal_error',
@@ -815,9 +869,11 @@ export function createDeskBotServer({
       }
       if (request.method === 'POST') {
         readJson(request)
-          .then(body => body.operation === 'preview'
-            ? sharedLifeReports.previewDailySummary(body)
-            : sharedLifeReports.materializeDailySummary(body))
+          .then(body => runServiceOperation({ operationId: `life.daily-summary.${body.operation ?? 'materialize'}:${stableOperationSuffix(body.day ?? body.idempotency_key ?? body)}`,
+            operationKind: `life.daily-summary.${body.operation ?? 'materialize'}`, routeId: 'life.daily-summary', source: 'http.life', request: body,
+            callback: () => body.operation === 'preview'
+              ? sharedLifeReports.previewDailySummary(body)
+              : sharedLifeReports.materializeDailySummary(body) }))
           .then(summary => sendJson(response, 200, { summary }))
           .catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500, {
             error: error instanceof InputError ? error.code : 'internal_error',
@@ -847,10 +903,13 @@ export function createDeskBotServer({
       }
       if (request.method === 'POST') {
         readJson(request).then(body => {
-          const result = isMemory
-            ? body.operation === 'forget'
-              ? { removed: sharedLife.forget(body.id) } : sharedLife.remember(body)
-            : body.operation === 'cancel' ? sharedLife.cancel(body.id) : sharedLife.schedule(body);
+          return runServiceOperation({ operationId: `life.${isMemory ? 'memory' : 'plan'}.${body.operation ?? 'create'}:${stableOperationSuffix(body.id ?? body.memory_id ?? body.plan_id ?? body.event_id ?? body.idempotency_key ?? body)}`,
+            operationKind: `life.${isMemory ? 'memory' : 'plan'}.${body.operation ?? 'create'}`, routeId: `life.${isMemory ? 'memory' : 'plan'}`, source: 'http.life', request: body,
+            callback: () => isMemory
+              ? body.operation === 'forget'
+                ? { removed: sharedLife.forget(body.id) } : sharedLife.remember(body)
+              : body.operation === 'cancel' ? sharedLife.cancel(body.id) : sharedLife.schedule(body) });
+        }).then(result => {
           sendJson(response, 200, result);
         }).catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500,
           { error: error instanceof InputError ? error.code : 'internal_error', message: error instanceof InputError ? error.message : 'Internal error' }));
@@ -1183,9 +1242,11 @@ export function createDeskBotServer({
         return;
       }
       readJson(request, 64 * 1024, { allowEmpty: true })
-        .then((body) => weatherConnector.refresh({ force: body.force === true }))
+        .then((body) => runServiceOperation({ operationId: `weather.refresh:${stableOperationSuffix(body.idempotency_key ?? body.event_id ?? { force: body.force === true })}`,
+          operationKind: 'weather.refresh', routeId: 'weather.refresh', source: 'http.connector', request: body,
+          callback: () => weatherConnector.refresh({ force: body.force === true }) }))
         .then(({ connector, event, snapshot, cached }) => {
-          const result = ingestWeatherEvent(event);
+          const result = runServiceOperation({ operationId: `weather.ingest:${event.event_id}`, operationKind: 'weather.ingest', routeId: 'weather.ingest', source: 'http.connector', request: { event_id: event.event_id }, sourceEventIds: [event.event_id], callback: () => ingestWeatherEvent(event) });
           sendJson(response, result.duplicate ? 200 : 202, {
             schema: 'foundry.weather-refresh-accepted.v0.1',
             accepted: true,
@@ -1233,7 +1294,9 @@ export function createDeskBotServer({
         return;
       }
       readJson(request, 64 * 1024, { allowEmpty: true })
-        .then((body) => weatherConnector.forecast({ force: body.force === true, kinds: body.kinds ?? body.kind ?? 'all' }))
+        .then((body) => runServiceOperation({ operationId: `weather.forecast:${stableOperationSuffix(body.idempotency_key ?? body.event_id ?? { force: body.force === true, kinds: body.kinds ?? body.kind ?? 'all' })}`,
+          operationKind: 'weather.forecast', routeId: 'weather.forecast', source: 'http.connector', request: body,
+          callback: () => weatherConnector.forecast({ force: body.force === true, kinds: body.kinds ?? body.kind ?? 'all' }) }))
         .then((result) => {
           const allCached = Object.values(result.cached ?? {}).every((value) => value === true);
           sendJson(response, allCached ? 200 : 202, {
@@ -1294,12 +1357,14 @@ export function createDeskBotServer({
       const eventId = decodeURIComponent(candidateActionMatch[1]);
       readJson(request, 64 * 1024)
         .then((body) => {
-          const candidate = interactionPolicy.resolveCandidate(eventId, {
-            characterId: body.character_id ?? null,
-            action: body.action,
-            deferredUntil: body.deferred_until ?? null,
-            reason: body.reason ?? null,
-          });
+          const candidate = runServiceOperation({ operationId: `interaction.candidate:${eventId}`,
+            operationKind: 'interaction.candidate', routeId: 'interaction.candidate', source: 'http.interaction', request: body,
+            callback: () => interactionPolicy.resolveCandidate(eventId, {
+              characterId: body.character_id ?? null,
+              action: body.action,
+              deferredUntil: body.deferred_until ?? null,
+              reason: body.reason ?? null,
+            }) });
           sendJson(response, 200, {
             schema: 'foundry.interaction-candidate-action.v0.1',
             accepted: true,
@@ -1331,11 +1396,13 @@ export function createDeskBotServer({
             if (body.character_id === undefined && body.characterId === undefined) {
               throw new InputError(400, 'character_id_required', 'character_id is required');
             }
-            const settings = interactionPolicy.updateSettings({
-              characterId: body.character_id ?? body.characterId,
-              proactiveEnabled: body.proactive_enabled ?? body.proactiveEnabled,
-              quietUntil: body.quiet_until === undefined ? body.quietUntil : body.quiet_until,
-            });
+            const settings = runServiceOperation({ operationId: `interaction.settings:${stableOperationSuffix(body.idempotency_key ?? body.character_id ?? body.characterId)}`,
+              operationKind: 'interaction.settings', routeId: 'interaction.settings', source: 'http.interaction', request: body,
+              callback: () => interactionPolicy.updateSettings({
+                characterId: body.character_id ?? body.characterId,
+                proactiveEnabled: body.proactive_enabled ?? body.proactiveEnabled,
+                quietUntil: body.quiet_until === undefined ? body.quietUntil : body.quiet_until,
+              }) });
             sendJson(response, 200, {
               schema: 'foundry.interaction-settings-response.v0.1',
               accepted: true,
@@ -1393,10 +1460,16 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && ['/api/roles/evolution/sync', '/api/role-evolution/run'].includes(url.pathname)) {
       readJson(request, 64 * 1024, { allowEmpty: true })
-        .then((body) => roleEvolution.sync({
-          characterId: body.character_id ?? body.characterId ?? undefined,
-          limit: body.limit ?? 200,
-        }))
+        .then((body) => {
+          const characterId = body.character_id ?? body.characterId ?? undefined;
+          const limit = body.limit ?? 200;
+          const routeId = url.pathname === '/api/role-evolution/run' ? 'role.evolution.run' : 'role.evolution.sync';
+          return runServiceOperation({
+            operationId: `${routeId}:${stableOperationSuffix(body.idempotency_key ?? body.operation_id ?? { characterId: characterId ?? null, limit })}`,
+            operationKind: routeId, routeId, source: 'http.role', request: body,
+            callback: () => roleEvolution.sync({ characterId, limit }),
+          });
+        })
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
           accepted: true,
           ...result,
@@ -1449,21 +1522,27 @@ export function createDeskBotServer({
           const characterId = requiredRoleText(body.character_id, 'character_id');
           const directionId = requiredRoleText(body.direction_id, 'direction_id');
           const requestedProposalId = optionalRoleText(body.proposal_id, 'proposal_id');
-          if (persistentWorld.get()?.memory?.development?.facets) return roleEvolution.proposeWish({ characterId, directionId, proposalId: requestedProposalId });
-          const pulls = rolePulls({ characterId });
-          const pull = directionId
-            ? pulls.find((item) => item.direction_id === directionId)
-            : pulls.find((item) => item.status === 'candidate');
-          if (!pull || pull.status !== 'candidate') {
-            throw new RoleProposalError(409, 'role_direction_not_candidate', 'direction must currently be a candidate');
-          }
-          const existing = requestedProposalId
-            ? roles.get(requestedProposalId)
-            : roles.list({ characterId }).reverse().find((item) => item.direction_id === directionId
-              && ['proposed', 'deferred', 'trying'].includes(item.status));
-          if (existing) return { duplicate: true, proposal: existing };
-          const proposal = roles.propose(pull, { proposalId: requestedProposalId, characterId });
-          return { duplicate: Boolean(existing), proposal };
+          return runServiceOperation({
+            operationId: `role.proposal.create:${stableOperationSuffix(requestedProposalId ?? body.idempotency_key ?? { characterId, directionId })}`,
+            operationKind: 'role.proposal.create', routeId: 'role.proposal.create', source: 'http.role', request: body,
+            callback: () => {
+              if (persistentWorld.get()?.memory?.development?.facets) return roleEvolution.proposeWish({ characterId, directionId, proposalId: requestedProposalId });
+              const pulls = rolePulls({ characterId });
+              const pull = directionId
+                ? pulls.find((item) => item.direction_id === directionId)
+                : pulls.find((item) => item.status === 'candidate');
+              if (!pull || pull.status !== 'candidate') {
+                throw new RoleProposalError(409, 'role_direction_not_candidate', 'direction must currently be a candidate');
+              }
+              const existing = requestedProposalId
+                ? roles.get(requestedProposalId)
+                : roles.list({ characterId }).reverse().find((item) => item.direction_id === directionId
+                  && ['proposed', 'deferred', 'trying'].includes(item.status));
+              if (existing) return { duplicate: true, proposal: existing };
+              const proposal = roles.propose(pull, { proposalId: requestedProposalId, characterId });
+              return { duplicate: Boolean(existing), proposal };
+            },
+          });
         })
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, { schema: 'deskbot.role-proposal-accepted.v0.1', accepted: true, ...result }))
         .catch((error) => sendRoleError(response, error));
@@ -1483,38 +1562,44 @@ export function createDeskBotServer({
     if (request.method === 'POST' && roleStageActionMatch) {
       const proposalId = decodeURIComponent(roleStageActionMatch[1]), operation = roleStageActionMatch[2];
       readJson(request, 16 * 1024, { allowEmpty: false }).then(body => {
-        const allowedKeys = operation === 'accept' ? ['event_id', 'reason', 'preview_fingerprint'] : ['event_id', 'reason', 'stage_id'];
-        if (Object.keys(body).some(key => !allowedKeys.includes(key))) throw new InputError(400, 'invalid_role_stage_request', '阶段操作只接受已登记的预览或当前阶段编号，不能提交形象、技能、经历或结果。');
-        const proposal = roles.get(proposalId);
-        if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
-        if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'role_stage_requires_lived_wish', '新的生活阶段需要已经保存的生活愿望和实际试做，旧聊天反馈不能替代。');
-        const world = persistentWorld.get(), stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
-        const previewFingerprint = operation === 'accept' ? requiredRoleText(body.preview_fingerprint, 'preview_fingerprint') : null;
-        const stageId = operation === 'rollback' ? requiredRoleText(body.stage_id, 'stage_id') : null;
-        const eventId = optionalRoleText(body.event_id, 'event_id') ?? `role-stage:${operation}:${operation === 'accept' ? proposalId : stageId}`;
-        const savedEvent = inputStore.get(eventId);
-        const sameReplay = savedEvent?.source === 'role-stage-engine' && savedEvent.type === 'world.mutation'
-          && (operation === 'accept' ? savedEvent.payload?.action === 'accept_role_stage' && savedEvent.payload?.proposal_id === proposalId
-            : savedEvent.payload?.action === 'rollback_role_stage' && savedEvent.payload?.stage_id === stageId);
-        if (operation === 'accept' && !sameReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
-          throw new RoleProposalError(409, 'role_stage_requires_prepared_wish', '采用生活阶段需要原先已支持的准备愿望与实际结果。');
-        }
-        if (operation === 'rollback' && (!stage || stage.stage_id !== stageId || !sameReplay && (stage.status !== 'accepted' || stage.current !== true))) {
-          throw new RoleProposalError(409, 'role_stage_not_current', '只有当前轴上采用的这份阶段可以回退，请重新读取阶段卡。');
-        }
-        const reason = optionalRoleText(body.reason, 'reason');
-        const payload = operation === 'accept' ? { action: 'accept_role_stage', proposal_id: proposalId,
-          actor_id: proposal.character_id, direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
-          preview_fingerprint: previewFingerprint, ...(reason ? { reason } : {}) }
-          : { action: 'rollback_role_stage', stage_id: stageId, ...(reason ? { reason } : {}) };
-        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-stage-engine',
-          source_kind: 'world_engine', character_id: world.protagonist.character_id,
-          occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { roleStageInternal: true });
-        roleEvolution.reconcileRoleStage(proposalId);
-        return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
-          proposal: roleEvolution.wishProposal(proposalId), role_stage: roleStageReadModel(persistentWorld.get(), { proposalId,
-            actorId: proposal.character_id, at: now().toISOString() }), role_stages: roleEvolution.snapshot({ characterId: proposal.character_id }).role_stages,
-          world_mutation: result.worldMutation };
+        const eventId = optionalRoleText(body.event_id, 'event_id') ?? `role-stage:${operation}:${proposalId}`;
+        return runServiceOperation({
+          operationId: `role.stage.${operation}:${stableOperationSuffix(eventId)}`,
+          operationKind: `role.stage.${operation}`, routeId: `role.stage.${operation}`, source: 'http.role', request: body,
+          sourceEventIds: [eventId], callback: () => {
+            const allowedKeys = operation === 'accept' ? ['event_id', 'reason', 'preview_fingerprint'] : ['event_id', 'reason', 'stage_id'];
+            if (Object.keys(body).some(key => !allowedKeys.includes(key))) throw new InputError(400, 'invalid_role_stage_request', '阶段操作只接受已登记的预览或当前阶段编号，不能提交形象、技能、经历或结果。');
+            const proposal = roles.get(proposalId);
+            if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
+            if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'role_stage_requires_lived_wish', '新的生活阶段需要已经保存的生活愿望和实际试做，旧聊天反馈不能替代。');
+            const world = persistentWorld.get(), stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+            const previewFingerprint = operation === 'accept' ? requiredRoleText(body.preview_fingerprint, 'preview_fingerprint') : null;
+            const stageId = operation === 'rollback' ? requiredRoleText(body.stage_id, 'stage_id') : null;
+            const savedEvent = inputStore.get(eventId);
+            const sameReplay = savedEvent?.source === 'role-stage-engine' && savedEvent.type === 'world.mutation'
+              && (operation === 'accept' ? savedEvent.payload?.action === 'accept_role_stage' && savedEvent.payload?.proposal_id === proposalId
+                : savedEvent.payload?.action === 'rollback_role_stage' && savedEvent.payload?.stage_id === stageId);
+            if (operation === 'accept' && !sameReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
+              throw new RoleProposalError(409, 'role_stage_requires_prepared_wish', '采用生活阶段需要原先已支持的准备愿望与实际结果。');
+            }
+            if (operation === 'rollback' && (!stage || stage.stage_id !== stageId || !sameReplay && (stage.status !== 'accepted' || stage.current !== true))) {
+              throw new RoleProposalError(409, 'role_stage_not_current', '只有当前轴上采用的这份阶段可以回退，请重新读取阶段卡。');
+            }
+            const reason = optionalRoleText(body.reason, 'reason');
+            const payload = operation === 'accept' ? { action: 'accept_role_stage', proposal_id: proposalId,
+              actor_id: proposal.character_id, direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
+              preview_fingerprint: previewFingerprint, ...(reason ? { reason } : {}) }
+              : { action: 'rollback_role_stage', stage_id: stageId, ...(reason ? { reason } : {}) };
+            const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-stage-engine',
+              source_kind: 'world_engine', character_id: world.protagonist.character_id,
+              occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { roleStageInternal: true });
+            roleEvolution.reconcileRoleStage(proposalId);
+            return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
+              proposal: roleEvolution.wishProposal(proposalId), role_stage: roleStageReadModel(persistentWorld.get(), { proposalId,
+                actorId: proposal.character_id, at: now().toISOString() }), role_stages: roleEvolution.snapshot({ characterId: proposal.character_id }).role_stages,
+              world_mutation: result.worldMutation };
+          },
+        });
       }).then(result => sendJson(response, result.duplicate ? 200 : 202, {
         schema: 'deskbot.role-stage-action-response.v1', accepted: true, ...result,
       })).catch(error => sendRoleError(response, error));
@@ -1627,11 +1712,17 @@ export function createDeskBotServer({
       const action = worldCandidateActionMatch[2];
       readJson(request, 64 * 1024, { allowEmpty: true })
         .then((body) => {
-          if (action === 'preview') return worldCandidates.preview(candidateId);
-          if (action === 'accept') return worldCandidates.accept(candidateId, {
-            expectedWorldRevision: body.expected_world_revision ?? body.expectedWorldRevision,
+          return runServiceOperation({
+            operationId: `world.candidate.${action}:${candidateId}`,
+            operationKind: `world.candidate.${action}`, routeId: `world.candidate.${action}`, source: 'http.world-candidate', request: body,
+            callback: () => {
+              if (action === 'preview') return worldCandidates.preview(candidateId);
+              if (action === 'accept') return worldCandidates.accept(candidateId, {
+                expectedWorldRevision: body.expected_world_revision ?? body.expectedWorldRevision,
+              });
+              return worldCandidates.dismiss(candidateId, { reason: body.reason ?? null });
+            },
           });
-          return worldCandidates.dismiss(candidateId, { reason: body.reason ?? null });
         })
         .then((result) => sendJson(response, result.duplicate ? 200 : (action === 'accept' ? 202 : 200), {
           schema: `deskbot.world-candidate-${action}-response.v0.1`,
@@ -1649,7 +1740,11 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && url.pathname === '/api/research/scenarios/run') {
       readJson(request)
-        .then((body) => runResearchScenario(body.scenario_id))
+        .then((body) => runServiceOperation({
+          operationId: `research.scenario.run:${stableOperationSuffix(body.idempotency_key ?? body.scenario_id)}`,
+          operationKind: 'research.scenario.run', routeId: 'research.scenario.run', source: 'http.research', request: body,
+          callback: () => runResearchScenario(body.scenario_id),
+        }))
         .then((report) => sendJson(response, 200, report))
         .catch((error) => {
           const expected = error instanceof InputError || error instanceof ResearchScenarioError;
@@ -1713,7 +1808,9 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && url.pathname === '/api/research/sessions') {
       readJson(request)
-        .then((body) => sessionStore.start(body))
+        .then((body) => runServiceOperation({ operationId: `research.session.start:${stableOperationSuffix(body.session_id ?? body.idempotency_key ?? body)}`,
+          operationKind: 'research.session.start', routeId: 'research.session.start', source: 'http.research', request: body,
+          callback: () => sessionStore.start(body) }))
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
           schema: 'foundry.research-session-accepted.v0.1',
           accepted: true,
@@ -1729,10 +1826,14 @@ export function createDeskBotServer({
       const action = sessionActionMatch[2];
       readJson(request)
         .then((body) => {
-          if (action === 'turns') return sessionStore.attachTurn(sessionId, body);
-          if (action === 'probes') return sessionStore.attachProbe(sessionId, body);
-          if (action === 'notes') return sessionStore.addNote(sessionId, body);
-          return sessionStore.complete(sessionId, body);
+          return runServiceOperation({ operationId: `research.session.${action}:${stableOperationSuffix(body.idempotency_key ?? body.turn_id ?? body.probe_id ?? body.note_id ?? sessionId)}`,
+            operationKind: `research.session.${action}`, routeId: `research.session.${action}`, source: 'http.research', request: body,
+            callback: () => {
+              if (action === 'turns') return sessionStore.attachTurn(sessionId, body);
+              if (action === 'probes') return sessionStore.attachProbe(sessionId, body);
+              if (action === 'notes') return sessionStore.addNote(sessionId, body);
+              return sessionStore.complete(sessionId, body);
+            } });
         })
         .then((result) => sendJson(response, result.duplicate ? 200 : 202, {
           schema: 'foundry.research-session-accepted.v0.1',
@@ -1745,7 +1846,9 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && url.pathname === '/api/research/probe-observations') {
       readJson(request)
-        .then((body) => l1bProbeStore.record(body))
+        .then((body) => runServiceOperation({ operationId: `research.probe-observation:${stableOperationSuffix(body.observation_id ?? body.idempotency_key ?? body)}`,
+          operationKind: 'research.probe-observation', routeId: 'research.probe-observation', source: 'http.research', request: body,
+          callback: () => l1bProbeStore.record(body) }))
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
           schema: 'foundry.l1b-probe-observation-accepted.v0.1',
           accepted: true,
@@ -1852,9 +1955,9 @@ export function createDeskBotServer({
     if (request.method === 'POST' && url.pathname === '/api/world/resources/transfer') {
       readJson(request, 64 * 1024).then(body => {
         const eventId = body.event_id ?? `transfer-${randomUUID()}`, existing = inputStore.get(eventId);
-        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-resource-interface', character_id: DEFAULT_CHARACTER_ID,
-          occurred_at: existing?.occurred_at ?? now().toISOString(), payload: { action: 'transfer_resource', actor_id: DEFAULT_CHARACTER_ID,
-            object_id: body.object_id, resource: body.resource, count: body.count, operation: body.operation } });
+         const result = runServiceOperation({ operationId: `world.resource.transfer:${eventId}`, operationKind: 'world.resource.transfer', routeId: 'world.resource.transfer', source: 'http.world', request: body, sourceEventIds: [eventId], callback: () => ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-resource-interface', character_id: DEFAULT_CHARACTER_ID,
+           occurred_at: existing?.occurred_at ?? now().toISOString(), payload: { action: 'transfer_resource', actor_id: DEFAULT_CHARACTER_ID,
+             object_id: body.object_id, resource: body.resource, count: body.count, operation: body.operation } }) });
         sendJson(response, result.duplicate ? 200 : 202, { accepted: true, duplicate: result.duplicate, world_mutation: result.worldMutation });
       }).catch(error => sendJson(response, error instanceof InputError || error instanceof PersistentWorldError ? error.statusCode : 500,
         { error: error.code ?? 'internal_error', message: error.message ?? 'resource transfer failed' }));
@@ -1870,8 +1973,9 @@ export function createDeskBotServer({
           : { action: 'start_activity', task_id: body.task_id ?? `activity-${eventId}`, kind: body.kind,
             title: body.title, duration_seconds: body.duration_seconds, activity_id: body.activity_id,
             actor_id: DEFAULT_CHARACTER_ID };
-        const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-task-interface',
-          character_id: DEFAULT_CHARACTER_ID, occurred_at: existing?.occurred_at ?? now().toISOString(), payload });
+         const result = runServiceOperation({ operationId: `world.task:${eventId}`, operationKind: 'world.task', routeId: 'world.task', source: 'http.world', request: body, sourceEventIds: [eventId], callback: () => ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'deskbot-task-interface',
+          character_id: DEFAULT_CHARACTER_ID, occurred_at: existing?.occurred_at ?? now().toISOString(), payload })
+          });
         sendJson(response, result.duplicate ? 200 : 202, { accepted: result.worldMutation.applied || result.duplicate,
           duplicate: result.duplicate, world_mutation: result.worldMutation, tasks: worldTaskReadModel(persistentWorld.get(), now().toISOString()) });
       }).catch(error => {
@@ -1888,9 +1992,9 @@ export function createDeskBotServer({
           if (typeof locationId !== 'string' || locationId.trim() === '') {
             throw new InputError(400, 'invalid_travel_request', 'location_id is required');
           }
-          const eventId = typeof body.event_id === 'string' && body.event_id.trim() !== ''
-            ? body.event_id.trim()
-            : `travel-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+           const eventId = typeof body.event_id === 'string' && body.event_id.trim() !== ''
+             ? body.event_id.trim()
+             : `travel-${randomUUID()}`;
           const existing = inputStore.get(eventId);
           if (!existing && body.expected_world_revision !== undefined) {
             if (!Number.isInteger(body.expected_world_revision) || body.expected_world_revision < 0) {
@@ -1927,8 +2031,8 @@ export function createDeskBotServer({
               ...(body.reason !== undefined ? { reason: body.reason } : {}),
             },
           };
-          const result = ingestNonChatEvent(event);
-          worldLife.tick({ force: true });
+           const result = runServiceOperation({ operationId: `world.travel:${eventId}`, operationKind: 'world.travel', routeId: 'world.travel', source: 'http.world', request: body, sourceEventIds: [eventId], callback: () => ingestNonChatEvent(event) });
+           runServiceOperation({ operationId: `scheduler:world-life:${eventId}`, operationKind: 'scheduler.world-life', routeId: 'scheduler.world-life', source: 'scheduler', request: { trigger: 'travel', event_id: eventId }, callback: () => worldLife.tick({ force: true }) });
           const refreshedWorld = persistentWorld.get();
           sendJson(response, result.duplicate ? 200 : (result.worldMutation.applied ? 202 : 409), {
             schema: 'deskbot.world-travel-response.v0.1',
@@ -1994,7 +2098,9 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && url.pathname === '/api/devices/hello') {
       readJson(request)
-        .then((body) => deviceRegistry.register(body))
+        .then((body) => runServiceOperation({ operationId: `device.hello:${stableOperationSuffix(body.device_id ?? body.correlation_id ?? body.idempotency_key ?? body)}`,
+          operationKind: 'device.hello', routeId: 'device.hello', source: 'http.device', request: body,
+          callback: () => deviceRegistry.register(body) }))
         .then((result) => sendJson(response, result.duplicate ? 200 : 201, {
           schema: 'foundry.device-hello-accepted.v0.1',
           accepted: true,
@@ -2035,7 +2141,9 @@ export function createDeskBotServer({
           if(outputRouter.get(commandId)?.source_event_id?.startsWith('body-perception:')) {
             throw new OutputRouterError(403,'body_ack_requires_device_bridge','身体动作回执必须来自绑定设备的 WebSocket 连接。');
           }
-          return outputRouter.ack({ ...body, command_id: commandId });
+          return runServiceOperation({ operationId: `device.ack:${stableOperationSuffix(body.device_id ?? 'unknown')}:${commandId}:${stableOperationSuffix(body.status ?? 'unknown')}`,
+            operationKind: 'device.ack', routeId: 'device.ack', source: 'http.device', request: body,
+            callback: () => outputRouter.ack({ ...body, command_id: commandId }) });
         })
         .then((result) => sendJson(response, 200, {
           schema: 'foundry.device-command-ack.v0.1',
@@ -2402,18 +2510,18 @@ export function createDeskBotServer({
   server.interactionPolicy = interactionPolicy;
   server.once('listening', () => {
     try {
-      persistentWorld.syncWallClock?.();
-      persistentWorld.syncTasks?.();
+      runWorkerOperation('world-clock', () => persistentWorld.syncWallClock?.(), { suffix: 'startup' });
+      runWorkerOperation('tasks', () => persistentWorld.syncTasks?.(), { suffix: 'startup' });
     } catch (error) {
       console.error(`[world-clock] startup catch-up failed: ${error.message}`);
     }
-    sharedLife.tick();
-    npcGoals.tick();
+    runWorkerOperation('shared-life', () => sharedLife.tick(), { suffix: 'startup' });
+    runWorkerOperation('npc-goals', () => npcGoals.tick(), { suffix: 'startup' });
     if (autonomousLifeEnabled) worldLife.seedNpcs();
     if(residentLifeEnabled && persistentWorld.get().resident_life?.version!==RESIDENT_VERSION) {
       ingestNonChatEvent({event_id:`resident-install:${RESIDENT_VERSION}`,type:'world.mutation',source:'resident-life-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_resident_life'}});
     }
-    if(!livedMemoryEnabled)tickAutonomousLife();
+    if(!livedMemoryEnabled)runWorkerOperation('autonomous-life', () => tickAutonomousLife(), { suffix: 'startup' });
     if(residentLifeEnabled && !persistentWorld.get().refraction) {
       ingestNonChatEvent({event_id:`refraction-install:${REFRACTION_VERSION}`,type:'world.mutation',source:'input-refraction-engine',source_kind:'world_engine',character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_input_refraction'}});
     }
@@ -2429,14 +2537,14 @@ export function createDeskBotServer({
         character_id:DEFAULT_CHARACTER_ID,occurred_at:now().toISOString(),payload:{action:'install_body_perception'}});
     }
     try {
-      roleEvolution.syncAll();
+      runWorkerOperation('role-evolution', () => roleEvolution.syncAll(), { suffix: 'startup' });
     } catch (error) {
       console.error(`[role-evolution] startup sync failed: ${error.message}`);
     }
-    if(livedMemoryEnabled)tickAutonomousLife();
-    void lifeChoiceWorker.tick().catch(()=>{});
-    void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] startup failed: ${error.message}`));
-    worldLife.tick();
+    if(livedMemoryEnabled)runWorkerOperation('autonomous-life', () => tickAutonomousLife(), { suffix: 'startup' });
+    void runWorkerOperation('life-choice', () => lifeChoiceWorker.tick(), { suffix: 'startup' }).catch(()=>{});
+    void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick(), { suffix: 'startup' }).catch(error=>console.error(`[slow-cognition] startup failed: ${error.message}`));
+    runWorkerOperation('world-life', () => worldLife.tick(), { suffix: 'startup' });
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
     if (externalIds.length) void inputRuntime.tick({ sourceIds: externalIds });
@@ -2448,29 +2556,29 @@ export function createDeskBotServer({
     }
     const timer = setInterval(() => {
       try {
-        persistentWorld.syncWallClock?.();
-        persistentWorld.syncTasks?.();
+        runWorkerOperation('world-clock', () => persistentWorld.syncWallClock?.());
+        runWorkerOperation('tasks', () => persistentWorld.syncTasks?.());
       } catch (error) {
         console.error(`[world-clock] scheduled catch-up failed: ${error.message}`);
       }
       try {
-        roleEvolution.syncAll();
+        runWorkerOperation('role-evolution', () => roleEvolution.syncAll());
       } catch (error) {
         console.error(`[role-evolution] scheduled sync failed: ${error.message}`);
       }
-      sharedLife.tick();
-      npcGoals.tick();
-      tickAutonomousLife();
-      void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] scheduled failed: ${error.message}`));
-      worldLife.tick();
+      runWorkerOperation('shared-life', () => sharedLife.tick());
+      runWorkerOperation('npc-goals', () => npcGoals.tick());
+      runWorkerOperation('autonomous-life', () => tickAutonomousLife());
+      void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick()).catch(error=>console.error(`[slow-cognition] scheduled failed: ${error.message}`));
+      runWorkerOperation('world-life', () => worldLife.tick());
     }, 60_000);
     timer.unref();
     const taskTimer = setInterval(() => {
       try {
-        persistentWorld.syncWallClock?.();
-        const result = persistentWorld.syncTasks?.();
-        if (result?.processed) { roleEvolution.syncAll(); sharedLife.tick(); npcGoals.tick(); tickAutonomousLife(); worldLife.tick(); }
-        void slowCognitionWorker.tick().catch(error=>console.error(`[slow-cognition] task reconciliation failed: ${error.message}`));
+        runWorkerOperation('world-clock', () => persistentWorld.syncWallClock?.());
+        const result = runWorkerOperation('tasks', () => persistentWorld.syncTasks?.());
+        if (result?.processed) { runWorkerOperation('role-evolution', () => roleEvolution.syncAll()); runWorkerOperation('shared-life', () => sharedLife.tick()); runWorkerOperation('npc-goals', () => npcGoals.tick()); runWorkerOperation('autonomous-life', () => tickAutonomousLife()); runWorkerOperation('world-life', () => worldLife.tick()); }
+        void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick()).catch(error=>console.error(`[slow-cognition] task reconciliation failed: ${error.message}`));
       }
       catch (error) { console.error(`[world-tasks] scheduled reconciliation failed: ${error.message}`); }
     }, timeMode === 'realtime' || persistentWorld.get().clock?.mode === 'real_time' ? 1000 : 60_000);

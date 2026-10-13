@@ -155,14 +155,30 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       capture_id: captureId,
       index,
       operation_id: context?.operation_id ?? `transaction:${batch.transaction_id}`,
+      parent_operation_id: context?.parent_operation_id ?? null,
       operation_kind: context?.operation_kind ?? 'persistence_transaction',
+      route_id: context?.route_id ?? null,
       source: context?.source ?? 'persistence',
+      status: context?.status ?? 'executing',
+      logic_time: context?.logic_time ?? null,
+      rule_version: context?.rule_version ?? CAPTURE_RULES,
+      content_fingerprint: context?.content_fingerprint ?? null,
+      adapter_ref: context?.adapter_ref ?? null,
       request_hash: context?.request_hash ?? null,
       result_ref: context?.result_ref ?? null,
+      source_event_ids: context?.source_event_ids ?? [],
+      result_ref_ids: context?.result_ref_ids ?? [],
       transaction_id: batch.transaction_id,
       started_at: context?.started_at ?? now().toISOString(),
       committed_at: null,
       observed_at: now().toISOString(),
+      // The before-commit hook runs after SQLite has applied the transaction's
+      // statements but before COMMIT. We therefore cannot claim a true
+      // before-digest here; completion metadata is added by a later seam.
+      before_namespace_digest: context?.before_namespace_digest ?? null,
+      after_namespace_digest: null,
+      canonical_revision_before: context?.canonical_revision_before ?? null,
+      canonical_revision_after: context?.canonical_revision_after ?? null,
       writes,
       coverage: 'persistence_transaction',
     };
@@ -194,15 +210,43 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       const request_hash = context.request_hash ?? (context.request === undefined ? null : digest(context.request));
       const normalized = {
         schema: 'deskbot.service-operation-context.v1', operation_id, operation_kind, source,
+        parent_operation_id: context.parent_operation_id ?? operationStorage.getStore()?.operation_id ?? null,
+        route_id: context.route_id ?? null,
+        status: context.status ?? 'executing',
+        logic_time: context.logic_time ?? null,
+        rule_version: context.rule_version ?? CAPTURE_RULES,
+        content_fingerprint: context.content_fingerprint ?? null,
+        adapter_ref: context.adapter_ref ?? null,
         request_hash, result_ref: context.result_ref ?? null,
+        source_event_ids: Array.isArray(context.source_event_ids) ? [...context.source_event_ids] : [],
+        result_ref_ids: Array.isArray(context.result_ref_ids) ? [...context.result_ref_ids] : [],
+        canonical_revision_before: context.canonical_revision_before ?? null,
+        canonical_revision_after: context.canonical_revision_after ?? null,
         started_at: context.started_at ?? now().toISOString(),
       };
       return operationStorage.run(normalized, callback);
     },
+    setOperationMetadata(metadata = {}) {
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      if (!metadata || typeof metadata !== 'object') throw new TypeError('operation metadata must be an object');
+      for (const key of ['status', 'logic_time', 'route_id', 'rule_version', 'content_fingerprint',
+        'adapter_ref', 'canonical_revision_before', 'canonical_revision_after']) {
+        if (Object.hasOwn(metadata, key)) context[key] = metadata[key];
+      }
+      if (Object.hasOwn(metadata, 'source_event_ids')) context.source_event_ids = Array.isArray(metadata.source_event_ids) ? [...metadata.source_event_ids] : [];
+      if (Object.hasOwn(metadata, 'result_ref_ids')) context.result_ref_ids = Array.isArray(metadata.result_ref_ids) ? [...metadata.result_ref_ids] : [];
+      return context;
+    },
     setOperationResultRef(resultRef) {
       const context = operationStorage.getStore();
       if (!context) fail('operation_context_required');
-      return api.recordProviderResult(resultRef);
+      const publicRef = api.recordProviderResult(resultRef);
+      if (publicRef && typeof publicRef === 'object') {
+        const refId = publicRef.result_id ?? publicRef.request_id ?? publicRef.kind ?? null;
+        if (refId && !context.result_ref_ids.includes(refId)) context.result_ref_ids.push(refId);
+      }
+      return publicRef;
     },
     operationCount() {
       if (!initialized) fail('replay_capture_not_initialized');
@@ -477,7 +521,19 @@ function validateArchive(tape, codeFingerprint) {
     if (journal.schema !== 'deskbot.service-operation.v1' || journal.capture_id !== tape.session.capture_id
       || journal.index !== index || !journal.transaction_id || !journal.operation_id
       || !journal.operation_kind || !journal.source
+      || (journal.route_id !== null && typeof journal.route_id !== 'string')
+      || !['received', 'validated', 'executing', 'awaiting_result', 'committed', 'skipped', 'failed', 'duplicate', 'rejected'].includes(journal.status ?? 'executing')
+      || (journal.logic_time !== null && !Number.isFinite(Date.parse(journal.logic_time)))
+      || typeof journal.rule_version !== 'string'
+      || (journal.content_fingerprint !== null && typeof journal.content_fingerprint !== 'string')
+      || (journal.adapter_ref !== null && typeof journal.adapter_ref !== 'object')
       || (journal.request_hash !== null && typeof journal.request_hash !== 'string')
+      || (journal.source_event_ids !== undefined && !Array.isArray(journal.source_event_ids))
+      || (journal.result_ref_ids !== undefined && !Array.isArray(journal.result_ref_ids))
+      || (journal.before_namespace_digest !== null && journal.before_namespace_digest !== undefined && typeof journal.before_namespace_digest !== 'string')
+      || (journal.after_namespace_digest !== null && journal.after_namespace_digest !== undefined && typeof journal.after_namespace_digest !== 'string')
+      || (journal.canonical_revision_before !== null && journal.canonical_revision_before !== undefined && !Number.isSafeInteger(journal.canonical_revision_before))
+      || (journal.canonical_revision_after !== null && journal.canonical_revision_after !== undefined && !Number.isSafeInteger(journal.canonical_revision_after))
       || !Number.isFinite(Date.parse(journal.observed_at)) || !Array.isArray(journal.writes)
       || digest(content) !== hash) fail('replay_capture_journal_corrupt');
   }

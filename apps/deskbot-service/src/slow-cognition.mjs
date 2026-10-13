@@ -385,11 +385,16 @@ ${JSON.stringify({ date: r.date, authored_personality: personality, current_virt
 }
 
 export function createSlowCognitionWorker({ world, llm, now = () => new Date(), enabled = true,
-  timeoutMs = 20000, maxPerTick = 2, onComplete = () => {} } = {}) {
+  timeoutMs = 20000, maxPerTick = 2, onComplete = () => {}, operationScope = null } = {}) {
   let running = null, stopped = false;
   const mutate = (action, suffix, more = {}) => world.ingest({ event_id: `maintenance:${action}:${suffix}`,
     type: 'world.mutation', source: 'slow-cognition-engine', source_kind: 'world_engine',
     character_id: world.get().protagonist.character_id, occurred_at: now().toISOString(), payload: { action, ...more } }, { maintenanceInternal: true });
+  const scoped = (request, callback) => operationScope?.withOperation
+    ? operationScope.withOperation({ operation_id: `slow-cognition:${request.id}`, operation_kind: 'slow-cognition',
+      route_id: 'worker.slow-cognition', source: 'worker.slow-cognition', request: { request_id: request.id, actor_id: request.actor_id },
+      logic_time: now().toISOString() }, callback)
+    : callback();
   return { stop() { stopped = true; }, tick() {
     if (stopped || !enabled) return Promise.resolve({ stopped, enabled });
     if (running) return running;
@@ -407,25 +412,33 @@ export function createSlowCognitionWorker({ world, llm, now = () => new Date(), 
       let processed = 0;
       for (const request of requests.slice(0, maxPerTick)) {
         if (stopped) break;
-        if (request.status === 'calling') { mutate('resolve_slow_cognition', request.id, { request_id: request.id, error: 'interrupted' }); processed++; continue; }
-        const claimed = mutate('claim_slow_cognition', request.id, { request_id: request.id });
-        if (!claimed.mutation?.details?.claimed) continue;
-        const trace = createRuntimeTraceRecorder({ runId: request.id, pipeline: 'slow-cognition', ruleVersion: SLOW_COGNITION_RULES,
-          actorId: request.actor_id, worldId: initial.world_id, now });
-        let timer, result, failure;
-        try {
-          if (llm?.status?.().configured === false || llm?.id === 'fake-llm-v0.1') throw Error('provider_unavailable');
-          result = await trace.observe('reflection', () => Promise.race([
-            Promise.resolve().then(() => llm.complete({ prompt: slowCognitionPrompt(world.get(), request), purpose: 'slow_cognition' }))
-              .catch(() => { throw Error('provider_unavailable'); }),
-            new Promise((_, reject) => { timer = setTimeout(() => reject(Error('timeout')), timeoutMs); })]));
-        } catch (e) { failure = e?.message === 'timeout' ? 'timeout' : 'provider_unavailable'; }
-        finally { clearTimeout(timer); }
-        if (!stopped) {
-          const resolved = mutate('resolve_slow_cognition', request.id, { request_id: request.id,
-            ...(failure ? { error: failure } : { text: result?.text, model: result?.model }), trace: trace.finish({ status: failure ? 'error' : 'completed' }) });
-          processed++; onComplete(resolved);
-        }
+        await scoped(request, async () => {
+          if (request.status === 'calling') { mutate('resolve_slow_cognition', request.id, { request_id: request.id, error: 'interrupted' }); processed++; return; }
+          const claimed = mutate('claim_slow_cognition', request.id, { request_id: request.id });
+          if (!claimed.mutation?.details?.claimed) return;
+          const trace = createRuntimeTraceRecorder({ runId: request.id, pipeline: 'slow-cognition', ruleVersion: SLOW_COGNITION_RULES,
+            actorId: request.actor_id, worldId: initial.world_id, now });
+          let timer, result, failure;
+          try {
+            if (llm?.status?.().configured === false || llm?.id === 'fake-llm-v0.1') throw Error('provider_unavailable');
+            result = await trace.observe('reflection', () => Promise.race([
+              Promise.resolve().then(() => llm.complete({ prompt: slowCognitionPrompt(world.get(), request), purpose: 'slow_cognition' }))
+                .catch(() => { throw Error('provider_unavailable'); }),
+              new Promise((_, reject) => { timer = setTimeout(() => reject(Error('timeout')), timeoutMs); })]));
+            operationScope?.setOperationResultRef?.({ purpose: 'slow-cognition', request_id: request.id, model: result?.model ?? null,
+              status: 'success', result_hash: createHash('sha256').update(String(result?.text ?? '')).digest('hex'),
+              fixture: { kind: 'deskbot.slow-cognition-fixture.v1', text: String(result?.text ?? '') } });
+          } catch (e) {
+            failure = e?.message === 'timeout' ? 'timeout' : 'provider_unavailable';
+            operationScope?.setOperationResultRef?.({ purpose: 'slow-cognition', request_id: request.id, model: null, status: 'error', error_code: failure });
+          }
+          finally { clearTimeout(timer); }
+          if (!stopped) {
+            const resolved = mutate('resolve_slow_cognition', request.id, { request_id: request.id,
+              ...(failure ? { error: failure } : { text: result?.text, model: result?.model }), trace: trace.finish({ status: failure ? 'error' : 'completed' }) });
+            processed++; onComplete(resolved);
+          }
+        });
       }
       return { enabled: true, processed, pending: requests.length - processed };
     })().finally(() => { running = null; });

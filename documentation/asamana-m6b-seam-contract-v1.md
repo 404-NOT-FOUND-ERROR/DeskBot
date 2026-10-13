@@ -8,6 +8,7 @@
 - [迁移管线](asamana-migration-pipeline-v1.md)
 - [正式迁移矩阵](asamana-migration-matrix-v1.md)
 - [v6.2 发布说明](asamana-replay-journal-v6-2.md)
+- [M6b-R 路由/Worker/设备合同](asamana-m6b-route-worker-device-replay-v1.md)
 
 ## 1. 统一操作封套
 
@@ -48,8 +49,9 @@
 | `/api/chat` assistant/非 user 分支 | 已进入公共 `chat.reply` / `event_ingress` operation scope；专用原 `/api/chat` handler replay 尚未验证 | `partial` | assistant path 的成功、provider failure、TTS failure 和输出 route 均可原入口重放 |
 | `/api/event` | 已有 `ingestNonChatEvent` seam 的 ingress/operation 证据，但不是所有直接 HTTP 路由的统一封套 | `partial` | 通用 event、role/life/research route 逐一登记并在原 handler 重放 |
 | provider result | 成功/失败/TTS 失败已保存 `deskbot.provider-result-ref.v1` 摘要，并可登记/导出本地 durable fixture；原业务入口消费式 fixture replay 尚未完成 | `partial` | fixture schema、脱敏策略、hash、provider/model/result/error 分支、缺失/篡改 fail closed |
-| `input-runtime` | 已有 `foundry.input-runtime-run.v0.1`，SQLite 恢复、TTL、跳过、失败退避、结果 event IDs 和 trace；当前 `refreshSource` 已在 `input-runtime:<run_id>` scope 内运行，并写入脱敏 result reference | `partial / contract verified` | 补齐 fixture registry、原 runtime replay、重启/重复/篡改和 source/namespace 原子提交；I4–I7 仍未通过 |
-| worker / WebSocket / device ACK | 仍存在不经统一 operation context 的旁路 | `gap` | scheduler tick、设备回执和失败分支均有可执行捕获与重放 |
+| `input-runtime` | 已有 `foundry.input-runtime-run.v0.1`，SQLite 恢复、TTL、跳过、失败退避、结果 event IDs 和 trace；当前 `refreshSource` 已在 `input-runtime:<run_id>` scope 内运行，并写入脱敏 result reference | `implemented / automated verified`（受控 fixture） | 继续扩大到真实 connector 长期观察；不能把 fixture replay 等同真实 provider 稳定性 |
+| role/world-candidate/research HTTP route | 本轮新增 `runServiceOperation` 接缝，role sync/proposal/stage、world candidate action、research scenario 已进入稳定 operation scope | `partial` | 为每个 route 增加原 handler replay、restart/duplicate/fail-closed 专项；其余 life/device/voice/connector route 仍待接入 |
+| worker / WebSocket / device ACK | life-choice、slow-cognition worker 已进入 request-level operation scope；scheduler、NPC decision、WebSocket/device ACK 仍有旁路 | `partial / gap` | scheduler tick、NPC、设备回执和失败分支均有可执行捕获与重放 |
 
 ## 3. Chat/provider 接缝验收门（M6b-C）
 
@@ -79,7 +81,7 @@
 - 回放过程中断在 provider 前后、业务 commit 前后，目标库均不留下半个聊天操作。
 - 只带 assistant 文本而没有对应 canonical task/event 的输入，不能产生“已完成”或世界 mutation。
 
-## 4. Input-runtime 接缝合同（M6b-I，下一阶段）
+## 4. Input-runtime 接缝合同（M6b-I）
 
 ### 4.1 现有 run 合同
 
@@ -91,7 +93,7 @@
 - 成功/跳过/失败 trace 与 replay metadata；
 - source 的 TTL、`next_attempt_at`、连续失败数和 freshness。
 
-这些字段证明调度状态可恢复；当前 operation scope 还只完成了 run/source/result-reference 接缝合同，不足以证明整个 source refresh 已可在隔离服务中原入口回放。
+这些字段证明调度状态可恢复；受控 fixture 的 run/source/result-reference 接缝已经通过 I0–I7，但真实 connector 长期稳定性与全服务归档仍需后续门。
 
 ### 4.2 目标 operation 形状
 
@@ -133,9 +135,9 @@ provider 网络等待必须在 SQLite transaction 外完成；成功后以固定
 
 1. C0/C1：补齐 assistant chat operation 和 provider fixture registry。
 2. C2/C3：用原 `/api/chat` handler 做 success/failure/TTS/duplicate/restart replay。
-3. I0–I3：已接入 `createInputRuntime` 的可选 operation scope；复核网络等待仍留在 transaction 外。
-4. I4–I7：补 input-runtime 重启、重复、缺 fixture、篡改和 source 隔离回放。
-5. 再迁移 role proposal/trial/stage、world candidate、life/research route 和 worker/WebSocket。
+3. I0–I7：已完成受控 fixture 的启停、success/skip/error、重启/重复、缺 fixture/篡改和 source 隔离回放。
+4. 接入 role proposal/trial/stage、world candidate、life/research route，并为每个入口增加原 handler replay。
+5. 接入 worker/WebSocket/device，再执行 M6b-R 的 R0–R8 完整门。
 
 任一门失败时保留失败报告，状态维持 `partial` 或 `gap`；不得用最终 namespace digest、一次成功聊天或受控 fixture 将 M6b 升级为完成。全部接缝通过后，才开启全局 `requireOperationContext = true`，并进行一次覆盖注册表和全服务回放验收。
 

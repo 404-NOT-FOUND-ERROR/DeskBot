@@ -2,7 +2,7 @@
   "name": "deskbot",
   "version": "0.1.0",
   "private": true,
-  "description": "DeskBot · 聚形域：多源现实输入驱动持续奇幻小镇中的潮玩生命体，共同生活、记忆、关系与形态/职业探索。Node.js + SQLite + React/Three.js；Asamana-inspired 感知、慢认知、跨日目标、可核验回放与迁移验收矩阵。",
+  "description": "DeskBot · 聚形域：多源现实输入驱动持续奇幻小镇中的潮玩生命体，共同生活、记忆、关系与形态/职业探索。Node.js + SQLite + React/Three.js；Asamana-inspired 感知、慢认知、跨日目标、统一 operation context、可核验回放与迁移验收矩阵。",
   "engines": {
     "node": ">=24"
   },

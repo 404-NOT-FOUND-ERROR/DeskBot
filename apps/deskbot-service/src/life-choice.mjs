@@ -178,9 +178,12 @@ ${JSON.stringify({time:w.clock.synced_at,actor_id:r.actor_id,current_location:lo
   current_role_stages:own?Object.values(roleStagesReadModel(w).current).filter(Boolean).map(stage=>({axis:stage.axis,direction:stage.label,choice_basis:'rule_based_choice',physical_shell_changed:false,qualification_proven:false,liking_proven:false})):[],
   relationships:r.relationships.map(x=>({actors:x.actors,trust:x.trust,kept:x.kept,missed:x.missed,encounters:x.encounters}))})}`;
 }
-export function createLifeChoiceWorker({world,llm,now=()=>new Date(),wake=()=>{},reserved=()=>[],requestTimeoutMs=25_000}={}) {
+export function createLifeChoiceWorker({world,llm,now=()=>new Date(),wake=()=>{},reserved=()=>[],requestTimeoutMs=25_000,operationScope=null}={}) {
   let running=null,closed=false;
   const mutate=(action,r,more={})=>world.ingest({event_id:`${action}:${r.id}`,type:'world.mutation',source:'life-choice-engine',source_kind:'world_engine',character_id:world.get().protagonist.character_id,occurred_at:now().toISOString(),payload:{action,actor_id:r.actor_id,request_id:r.id,reserved_actors:reserved(),...more}});
+  const scoped=(r,callback)=>operationScope?.withOperation
+    ? operationScope.withOperation({operation_id:`life-choice:${r.id}`,operation_kind:'life-choice',route_id:'worker.life-choice',source:'worker.life-choice',request:{request_id:r.id,actor_id:r.actor_id,key:r.key},logic_time:now().toISOString()},callback)
+    : callback();
   return {stop(){closed=true;},tick(){
     if(closed)return Promise.resolve({stopped:true});if(running)return running;
     running=(async()=>{
@@ -190,26 +193,35 @@ export function createLifeChoiceWorker({world,llm,now=()=>new Date(),wake=()=>{}
       // One request at a time; abandoned in-flight requests after restart fall back rather than bill twice.
       for(const r of requests.slice(0,6)) {
         if(closed)break;
-        if(r.status==='calling'){mutate('resolve_life_choice',r,{error:'interrupted_request'});wake(r.id);continue;}
-        const claimed=mutate('claim_life_choice',r);if(!claimed.mutation?.details?.claimed){wake(r.id);continue;}
-        let result,timer;
-        const trace=createRuntimeTraceRecorder({runId:`life-choice-model:${r.id}`,pipeline:'life-choice',ruleVersion:'bounded-model-choice-cadence-v1',
-          actorId:r.actor_id,worldId:snapshot.world_id,now});
-        try {const status=llm.status?.();if(status?.configured===false||llm.id==='fake-llm-v0.1')throw Error('not_configured');
-          const prompt=trace.observe('perception',()=>lifeChoicePrompt(world.get(),r),{references:{decision_ids:[r.id],evidence_ids:(r.memories??[]).map(item=>item.id)}});
-          const timeoutMs=Math.max(1,Math.min(Math.max(1,Number(requestTimeoutMs)||25_000),Date.parse(r.expires_at)-now().getTime()));
-          result=await trace.observe('decision',()=>Promise.race([
-            Promise.resolve().then(()=>llm.complete({prompt,purpose:'life_choice'})).catch(()=>{
-              // Provider exceptions may contain response prose or credentials.
-              // Trace records only a bounded operational classification.
-              const failure=Error('模型暂时不可用。');failure.code='provider_unavailable';throw failure;
-            }),
-            new Promise((_,reject)=>{timer=setTimeout(()=>{const timeout=Error('provider_timeout');timeout.code='provider_timeout';reject(timeout);},timeoutMs);}),
-          ]),{references:{decision_ids:[r.id]}});
-          if(closed)break;mutate('resolve_life_choice',r,{text:result.text,model:result.model,runtime_trace:trace.finish()});
-        }catch(error){if(!closed)mutate('resolve_life_choice',r,{error:error?.code==='provider_timeout'?'provider_timeout':'provider_unavailable',runtime_trace:trace.finish({status:'error'})});}
-        finally{if(timer)clearTimeout(timer);}
-        if(!closed)wake(r.id);
+        await scoped(r,async()=>{
+          if(r.status==='calling'){mutate('resolve_life_choice',r,{error:'interrupted_request'});wake(r.id);return;}
+          const claimed=mutate('claim_life_choice',r);if(!claimed.mutation?.details?.claimed){wake(r.id);return;}
+          let result,timer;
+          const trace=createRuntimeTraceRecorder({runId:`life-choice-model:${r.id}`,pipeline:'life-choice',ruleVersion:'bounded-model-choice-cadence-v1',
+            actorId:r.actor_id,worldId:snapshot.world_id,now});
+          try {const status=llm.status?.();if(status?.configured===false||llm.id==='fake-llm-v0.1')throw Error('not_configured');
+            const prompt=trace.observe('perception',()=>lifeChoicePrompt(world.get(),r),{references:{decision_ids:[r.id],evidence_ids:(r.memories??[]).map(item=>item.id)}});
+            const timeoutMs=Math.max(1,Math.min(Math.max(1,Number(requestTimeoutMs)||25_000),Date.parse(r.expires_at)-now().getTime()));
+            result=await trace.observe('decision',()=>Promise.race([
+              Promise.resolve().then(()=>llm.complete({prompt,purpose:'life_choice'})).catch(()=>{
+                // Provider exceptions may contain response prose or credentials.
+                // Trace records only a bounded operational classification.
+                const failure=Error('模型暂时不可用。');failure.code='provider_unavailable';throw failure;
+              }),
+              new Promise((_,reject)=>{timer=setTimeout(()=>{const timeout=Error('provider_timeout');timeout.code='provider_timeout';reject(timeout);},timeoutMs);}),
+            ]),{references:{decision_ids:[r.id]}});
+            operationScope?.setOperationResultRef?.({ purpose: 'life-choice', request_id: r.id, model: result?.model ?? null,
+              status: 'success', result_hash: createHash('sha256').update(String(result?.text ?? '')).digest('hex'),
+              fixture: { kind: 'deskbot.life-choice-fixture.v1', text: String(result?.text ?? '') } });
+            if(closed)return;mutate('resolve_life_choice',r,{text:result.text,model:result.model,runtime_trace:trace.finish()});
+          }catch(error){
+            const code=error?.code==='provider_timeout'?'provider_timeout':'provider_unavailable';
+            operationScope?.setOperationResultRef?.({ purpose: 'life-choice', request_id: r.id, model: null, status: 'error', error_code: code });
+            if(!closed)mutate('resolve_life_choice',r,{error:code,runtime_trace:trace.finish({status:'error'})});
+          }
+          finally{if(timer)clearTimeout(timer);}
+          if(!closed)wake(r.id);
+        });
       }
       return {processed:requests.slice(0,6).length};
     })().finally(()=>{running=null;});return running;
