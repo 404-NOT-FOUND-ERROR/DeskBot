@@ -1049,7 +1049,13 @@ export function createWebSocketBridge({
       peer,
     };
     try {
-      await onAudioStream?.(result);
+      await runBridgeOperation(
+        `device.asr:${peer.deviceId}:${stream.stream_id}`,
+        'asr',
+        { device_id: peer.deviceId, stream_id: stream.stream_id, utterance_id: stream.utterance_id,
+          correlation_id: stream.correlation_id, byte_count: buffer.length, role_revision: stream.roleRevision },
+        () => onAudioStream?.(result),
+      );
     } catch (error) {
       peer.phase = 'idle';
       throw error;
@@ -1226,6 +1232,12 @@ export function createWebSocketBridge({
   }
 
   async function markLocalCommandFailure(peer, command, code, message) {
+    return runBridgeOperation(
+      `device.fail:${peer.deviceId}:${command.command_id}`,
+      'fail',
+      { device_id: peer.deviceId, command_id: command.command_id, command_type: command.type,
+        code, target: command.target ?? target },
+      async () => {
     peer.sentCommandIds.add(command.command_id);
     if (!outputRouter?.ack) return;
     try {
@@ -1259,6 +1271,8 @@ export function createWebSocketBridge({
         });
       }
     }
+      },
+    );
   }
 
 function prepareDownlink(peer, command) {
@@ -1348,6 +1362,17 @@ function sendPreparedDownlink(peer, prepared) {
   }
 
   async function deliverCommand(peer, command) {
+    if (!command || typeof command.command_id !== 'string') return;
+    return runBridgeOperation(
+      `device.send:${peer.deviceId}:${command.command_id}`,
+      'send',
+      { device_id: peer.deviceId, command_id: command.command_id, command_type: command.type,
+        target: command.target ?? target, source_event_id: command.source_event_id ?? null },
+      () => deliverCommandBody(peer, command),
+    );
+  }
+
+  async function deliverCommandBody(peer, command) {
     if (!command || typeof command.command_id !== 'string') return;
     if (peer.sentCommandIds.has(command.command_id)) return;
     // A connection is bound to one device and this bridge serves one target.

@@ -1034,7 +1034,15 @@ export function createDeskBotServer({
 
     if (request.method === 'POST' && url.pathname === '/api/voice/asr') {
       readJson(request, 20 * 1024 * 1024)
-        .then((body) => ingress.ingest(body))
+        .then((body) => runServiceOperation({
+          operationId: `voice.asr:${stableOperationSuffix(body.request_id ?? body.event_id ?? body.utterance_id ?? body.correlation_id ?? body)}`,
+          operationKind: 'voice.asr',
+          routeId: 'voice.asr',
+          source: 'http.voice',
+          request: body,
+          sourceEventIds: [body.event_id].filter(Boolean),
+          callback: () => ingress.ingest(body),
+        }))
         .then((result) => sendJson(response, result.duplicate ? 200 : 202, result))
         .catch((error) => {
           const expected = error instanceof VoiceIngressError || error instanceof InputError;
@@ -1060,7 +1068,25 @@ export function createDeskBotServer({
       }
       readJson(request, 20 * 1024 * 1024)
         .then(async (body) => {
+          const operationId = `voice.transcribe:${stableOperationSuffix(body.request_id ?? body.utterance_id ?? body.correlation_id ?? body.event_id ?? body)}`;
+          return runServiceOperation({
+            operationId,
+            operationKind: 'voice.transcribe',
+            routeId: 'voice.transcribe',
+            source: 'http.voice',
+            request: body,
+            sourceEventIds: [body.event_id].filter(Boolean),
+            callback: async () => {
           const sidecarResult = await voiceClient.transcribe(body);
+          replayCapture?.setOperationResultRef?.({
+            schema: 'deskbot.provider-result-ref.v1',
+            purpose: 'voice.transcribe',
+            status: 'success',
+            provider: sidecarResult.provider ?? sidecarResult.engine ?? null,
+            model: sidecarResult.model ?? null,
+            result_hash: createHash('sha256').update(JSON.stringify(sidecarResult)).digest('hex'),
+            fixture: { kind: 'voice.transcribe.v1', result: sidecarResult },
+          });
           const resultList = Array.isArray(sidecarResult.results) ? sidecarResult.results : null;
           // An explicit empty result list means the recognizer observed no
           // segment. Do not manufacture a voice event from the normalized
@@ -1105,6 +1131,8 @@ export function createDeskBotServer({
             }));
           }
           return { schema: 'foundry.voice-transcription.v0.1', accepted: true, sidecar: sidecarResult, ingested };
+            },
+          });
         })
         .then((result) => sendJson(response, result.ingested.some((item) => item.duplicate) ? 200 : 202, result))
         .catch((error) => {
@@ -1133,7 +1161,24 @@ export function createDeskBotServer({
       }
       readJson(request, 2 * 1024 * 1024)
         .then(async (body) => {
+          return runServiceOperation({
+            operationId: `voice.tts:${stableOperationSuffix(body.request_id ?? body.utterance_id ?? body.correlation_id ?? body.event_id ?? body)}`,
+            operationKind: 'voice.tts',
+            routeId: 'voice.tts',
+            source: 'http.voice',
+            request: body,
+            sourceEventIds: [body.event_id].filter(Boolean),
+            callback: async () => {
           const tts = await voiceClient.synthesize(body);
+          replayCapture?.setOperationResultRef?.({
+            schema: 'deskbot.provider-result-ref.v1',
+            purpose: 'voice.tts',
+            status: 'success',
+            provider: tts.provider ?? tts.engine ?? null,
+            model: tts.model ?? null,
+            result_hash: createHash('sha256').update(JSON.stringify(tts)).digest('hex'),
+            fixture: { kind: 'voice.tts.v1', result: tts },
+          });
           const stored = audioArtifacts.put({
             ...tts.audio,
             audio_id: tts.audio.audio_id ?? tts.request_id,
@@ -1151,6 +1196,8 @@ export function createDeskBotServer({
             profile: tts.profile,
             audio: { ...audio, audio_ref: `/api/audio/${encodeURIComponent(audio.audio_id)}` },
           };
+            },
+          });
         })
         .then((result) => sendJson(response, result.duplicate ? 200 : 202, result))
         .catch((error) => {
@@ -1176,7 +1223,15 @@ export function createDeskBotServer({
         return;
       }
       readJson(request)
-        .then((body) => voiceClient.cancel(body))
+        .then((body) => runServiceOperation({
+          operationId: `voice.cancel:${stableOperationSuffix(body.request_id ?? body.command_id ?? body.correlation_id ?? body.event_id ?? body)}`,
+          operationKind: 'voice.cancel',
+          routeId: 'voice.cancel',
+          source: 'http.voice',
+          request: body,
+          sourceEventIds: [body.event_id].filter(Boolean),
+          callback: () => voiceClient.cancel(body),
+        }))
         .then((result) => sendJson(response, 200, result))
         .catch((error) => {
           const expected = error instanceof VoiceSidecarError;
@@ -2443,6 +2498,7 @@ export function createDeskBotServer({
           return { ingested_count: ingestedCount, final_count: finalCount };
         }
         : null,
+      operationScope: replayCapture,
     });
   // Route upgrades once. The firmware bridge rejects unknown paths itself,
   // so two independent upgrade listeners would race and close world streams.

@@ -1,10 +1,10 @@
 # Asamana 迁移标准 v1
 
-> v6.4 增量（2026-10-14）：`codex/asamana-m6b-v6-4-public-release` 已完成 input-runtime I4/I7 受控 fixture replay（2/2），服务端广套 861/861；M6b 全服务仍为 `partial`。
+> M6b-R 增量（2026-10-14）：`codex/asamana-m6b-r-release-2026-10-14` 已完成受控 input-runtime/chat replay 接缝，并把 voice/device operation context 纳入第一批接缝；服务端广套和其余 route/worker/device 覆盖以本分支证据为准，M6b 全服务仍为 `partial`。
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。逐项执行与证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
-当前公开发布分支为 `codex/asamana-m6b-v6-4-public-release`，从 v6.4 replay seam 基线继续推进；`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。v6.4 已收口受控的 chat 用户 handler LLM fixture-replay 与 input-runtime source run replay 接缝并通过专项/广套回归；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
+当前公开发布分支为 `codex/asamana-m6b-r-release-2026-10-14`，从 v6.4 replay seam 基线继续推进；`codex/asamana-m6b-r-public-release` 作为上一版 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。当前分支已收口受控的 chat/input-runtime replay 接缝，并把 voice/device operation context 接入第一批 route/worker/device seam；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 
@@ -51,6 +51,54 @@
 5. 任何自动化都要能从 SQLite 重启恢复；恢复不重新计费、不重复写事实。
 6. 失败、未知、未执行、被拒绝和已完成必须可区分，且能按 run/event 追溯。
 7. 迁移不扩大外部输入、网页内容、设备输出或客户端的信任边界。
+
+### 3.1 统一迁移目录与 Gate Crosswalk（设计）
+
+为了让“逐项迁移”可审计、可调度，后续以一个机器可读的迁移目录（建议
+`documentation/asamana-migration-catalog-v1.json`）作为矩阵、管线和 M6b
+registry 的共同来源。目录不替代本标准的叙述性边界，而是冻结每个迁移项的
+唯一身份、依赖、责任和证据关系。每条记录至少包含：
+
+```json
+{
+  "item_id": "M6b-R-device-ack-replay",
+  "phase": "M6b-R",
+  "wave": "R7",
+  "upstream_refs": ["asamana:engine/event_seq.py"],
+  "deskbot_modules": ["apps/deskbot-service/src/websocket-bridge.mjs"],
+  "authority_writer": "devices.records",
+  "contracts": ["deskbot.service-operation.v1"],
+  "dependencies": ["M1", "M6b-R-registry"],
+  "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G7", "R0", "R1", "R2", "R3", "R4", "R6", "R7", "R8"],
+  "status": "partial",
+  "evidence_refs": [],
+  "known_gaps": ["real firmware ACK"],
+  "last_verified": null
+}
+```
+
+目录规则：`item_id`、`authority_writer` 和 `required_gates` 必须唯一且不能为空；
+新增 side-effect writer 先登记再实现；没有目录记录的 writer 在 CI/回放模式中视为
+`unknown_writer` 并 fail closed。状态更新必须同时写入 evidence reference、base
+commit、rule/content fingerprint 和原因；代码、合同、fixture 或规则指纹变化后，
+旧证据自动标记 `stale`，不能继续支撑 `automated_verified` 或 `accepted`。
+
+统一 Gate Crosswalk 将各阶段子门映射到通用门：
+
+| 通用门 | 含义 | M6b 子门示例 | 其他阶段示例 |
+| --- | --- | --- | --- |
+| G0 | 合同、权威写入口、信任边界冻结 | R0、C0、I0 | M0/M1 |
+| G1 | 正向成功、skip 和必要结果 | R1、C1、I1/I2 | M3/M4/M5 |
+| G2 | 负向、安全和 fail-closed | R4、C3、I6 | M5、I1 |
+| G3 | 幂等、重复和冲突 | R1/R2、C0/C2、I4 | M3.2、M6a |
+| G4 | 重启、恢复、提交边界 | R2、I4/I5 | M4、M7 |
+| G5 | 原业务入口隔离回放 | R3、C2、I5 | M6a/M6b |
+| G6 | 页面、声音、设备或长期观察 | R7（模拟 ACK 仍不等于实机） | M7/M8/P7/P8 |
+| G7 | 交付、安全文件和可复核证据 | R8 前的发布检查 | 所有公开发布项 |
+
+每个目录项都要为每个 `required_gate` 记录 `pass`、`fail` 或 `na` 及理由；
+`na` 不能静默填写，必须说明为什么该门不适用。只有所有必需门为 `pass`、依赖项
+已接受、无未豁免 critical gap 且证据未过期时，迁移项才可进入 `accepted`。
 
 ## 4. 当前证据
 

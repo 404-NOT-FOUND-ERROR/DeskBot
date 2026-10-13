@@ -1,6 +1,6 @@
 # 聚形域：现版本能力与设计对照
 
-**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 当前公开发布分支为 `codex/asamana-m6b-v6-4-public-release`，`codex/asamana-m6b-v6-4-release`、v6.2/v6.3 作为历史基线保留；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。v6.4 已通过 input-runtime I4/I7 受控 replay（2/2），服务端广套 861/861；完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)，逐项执行和证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
+**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 当前公开发布分支为 `codex/asamana-m6b-r-release-2026-10-14`，`codex/asamana-m6b-r-public-release` 作为上一版 M6b-R 基线保留，`codex/asamana-m6b-v6-4-public-release`（历史 v6.4）、`codex/asamana-m6b-v6-4-release`、v6.2/v6.3 作为历史基线保留；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。当前分支的受控 replay 和 M6b-R 接缝状态以迁移矩阵为准；完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)，逐项执行和证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活在伴生于现实的奇幻空间“聚形域”，现实输入影响它的处境与选择，实际行动留下资源、关系和记忆后果。兴趣逐渐发展；重要形态变化则经由有前提的角色愿望、真实试做和明确采用发生。
 

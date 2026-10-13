@@ -29,7 +29,7 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮公开发布分支为 `codex/asamana-m6b-v6-4-public-release`，`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮公开发布分支为 `codex/asamana-m6b-r-release-2026-10-14`，`codex/asamana-m6b-r-public-release` 作为上一版 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`（历史 v6.4）、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。当前分支的受控 chat/input-runtime replay、服务端回归、客户端 typecheck/build、voice-sidecar 和 `git diff --check` 证据以对应报告为准；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。历史服务端、客户端和生产构建数字见各自发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
@@ -110,6 +110,15 @@ decay → compression → reflection → goal revision → relation evolution
 使用临时 SQLite：注入对话/天气/NPC 多源观察，跨两个逻辑日观察 Scene、feed、NPC 面板、喵呜主动提案和 stage 投影；重复注入、重启、preview/accept 各做一次。普通聊天不得泄露 score、rule_version、evidence 或后台 trace。
 
 ## 可观测性与回滚
+
+### 统一目录和门映射（执行约束）
+
+每个波次必须从统一迁移目录读取 `item_id`、依赖、责任模块、权威 writer 和
+`required_gates`；矩阵只呈现目录的状态投影，不能出现目录外的“隐形迁移项”。
+通用 G0–G7 门与 M6b 的 C/I/R 子门映射见[迁移标准](asamana-migration-standard-v1.md#31-统一迁移目录与-gate-crosswalk设计)。
+执行器需为每个 required gate 写入 `pass|fail|na`、理由、artifact hash 和 base commit。
+代码、规则、合同或 fixture 指纹变化会使旧证据变为 `stale`，相关项回到
+`contract_verified` 或 `partial`，不得沿用旧的 `automated_verified`。
 
 每个 run 至少关联 `run_id`、`rule_version`、`source/event IDs`、`evidence IDs` 和 world revision 前后值。迁移失败时只停止新迁移 worker，保留已有世界、角色阶段和任务；不得删除或重写历史 canonical ledger。若新召回或节拍导致生活质量下降，回滚到原 `retrieveLivedMemory`/规则 cadence，trace 和 replay metadata 可以保留为审计数据。
 

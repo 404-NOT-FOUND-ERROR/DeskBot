@@ -2,7 +2,7 @@
 
 > 状态：`planned / partial`（2026-10-14）
 >
-> 本文件冻结 M6b-R 的迁移标准和验收门。它不宣称当前服务已经覆盖全部入口；当前已验证的是 input-runtime 与 chat 的受控 fixture replay，其余入口按本合同逐波次接入。
+> 本文件冻结 M6b-R 的迁移标准和验收门。它不宣称当前服务已经覆盖全部入口；当前已验证的是 input-runtime 与 chat 的受控 fixture replay，voice/device 已接入第一批 operation scope 但完整原入口 replay 仍按本合同逐波次接入。
 
 ## 1. 目标与边界
 
@@ -58,6 +58,8 @@ terminal 状态不可变。重试使用相同 `operation_id` 和幂等键；重�
 - `http.chat` / `http.event`：通过 `ingestNonChatEvent` 或 chat handler；
 - `input-runtime.source-run`：success/skip/error、TTL/backoff、重启/重复和 fail-closed fixture replay；
 - `role/world-candidate/research` 的首批 route：已进入统一 scope，但原入口 replay 尚未完成，状态仍为 `partial`。
+- `voice.asr`、`voice.transcribe`、`voice.tts`、`voice.cancel`：已进入稳定 operation scope，公开 journal 只保留脱敏请求摘要；真实 provider/TTS replay 尚未完成。
+- WebSocket `device.hello`、`device.event`、audio stream、command ACK 和本地 failure：已进入 bridge operation scope；完整 ACK/failure/restart/replay 门仍为 `partial`。
 
 ### 待接入的高价值 route
 
@@ -66,8 +68,7 @@ terminal 状态不可变。重试使用相同 `operation_id` 和幂等键；重�
 - `life.autonomy`、`life.npc-goals`、`life.npc-interactions`、memory/plan；
 - `research.scenario.run`、session/turn/probe/note/complete；
 - `world.resources.transfer`、task、travel；
-- `device.hello`、outbox ACK；
-- voice ASR/TTS、weather/forecast refresh 和外部 connector。
+- weather/forecast refresh 和外部 connector。
 
 GET-only read model route 不需要 operation，但只要隐含写入、materialize、refresh、ack 或 install，就必须登记。
 
