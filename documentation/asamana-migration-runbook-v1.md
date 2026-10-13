@@ -1,6 +1,6 @@
 # Asamana → DeskBot 迁移作业单 v1
 
-状态：`active`。当前工作分支为 `codex/asamana-m6b-seam-v6-3`；v6.2 记录保留为历史基线。本文是每一项迁移的执行与验收标准；能力状态仍以[正式迁移矩阵](asamana-migration-matrix-v1.md)为唯一事实源。它不把上游代码直接复制进 DeskBot，也不把受控 fixture 的通过结果写成自然长期生活。关联标准、管线与接缝合同见 [迁移标准](asamana-migration-standard-v1.md)、[迁移管线](asamana-migration-pipeline-v1.md) 和 [M6b 接缝合同](asamana-m6b-seam-contract-v1.md)。
+状态：`active`。当前工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`；v6.3/v6.2 记录保留为历史基线。本文是每一项迁移的执行与验收标准；能力状态仍以[正式迁移矩阵](asamana-migration-matrix-v1.md)为唯一事实源。它不把上游代码直接复制进 DeskBot，也不把受控 fixture 的通过结果写成自然长期生活。关联标准、管线与接缝合同见 [迁移标准](asamana-migration-standard-v1.md)、[迁移管线](asamana-migration-pipeline-v1.md) 和 [M6b 接缝合同](asamana-m6b-seam-contract-v1.md)。
 
 ## 1. 迁移单元
 
@@ -73,8 +73,8 @@ planned
 | --- | --- | --- | --- |
 | G0 | `migration-program-standard` | M0–M6a 已有合同 | 本文、矩阵、管线和证据模板冻结 |
 | C | `M6b-C0/C1` | operation journal | `partial / contract verified` |
-| C | `M6b-C2/C3-chat-handler-replay` | C0/C1 | v6.3 受控用户 handler LLM fixture replay 已通过专项 10/10 与服务端广套 859/859；独立 TTS fixture、assistant 分支和全服务 replay 仍未完成；缺/篡改 fixture 必须 fail closed |
-| I | `M6b-I4/I7-input-runtime-replay` | C2 的 fixture/replay harness | 尚未开始 |
+| C | `M6b-C2/C3-chat-handler-replay` | C0/C1 | v6.3/v6.4 受控用户 handler LLM fixture replay 已通过专项 10/10 与服务端广套 861/861；独立 TTS fixture、assistant 分支和全服务 replay 仍未完成；缺/篡改 fixture 必须 fail closed |
+| I | `M6b-I4/I7-input-runtime-replay` | C2 的 fixture/replay harness | `implemented / automated verified`：success/skip/error、重复 source 结果、重启、provider calls=0、缺失/篡改/未登记 source 负向门；真实 provider 长期观察仍待 M8 |
 | R | `M6b-R-route-worker-device` | I4/I7 | 直接 HTTP、worker、WebSocket、设备 ACK |
 | L | `M8b-grounded-live-model` | M3/M4/M6、Clash | 真实模型跨日目标追求 |
 | W | `I2-world-event-content` | I1、M5、候选审核 | 多源输入生成合法世界事件 |
@@ -116,4 +116,4 @@ status:
 known_gaps:
 ```
 
-本文的第一项执行对象是 `M6b-C2/C3-chat-handler-replay`。v6.3 已形成受控用户 handler LLM fixture replay 10/10 与服务端广套 859/859 的 scoped 证据；独立 TTS fixture、assistant 分支、success/error/TTS 全组合和全服务 replay 仍未完成，状态保持 `partial`，不能把 M6b 写成全服务完成。
+本文的第一项执行对象是 `M6b-C2/C3-chat-handler-replay`；第二项已完成 `M6b-I4/I7-input-runtime-replay`。I 项的专项证据见 [input-runtime 回放验收记录](asamana-input-runtime-replay-v1.md)，通过的是受控本地 fixture 原入口回放，不等于真实 provider 长期运行。v6.4 的 chat 用户 handler LLM fixture replay 与 input-runtime replay 均为 scoped 证据；独立 TTS fixture、assistant 分支、直接 route/worker/WebSocket/device ACK 和全服务生产归档仍未完成，M6b 总体保持 `partial`，不能写成全服务完成。

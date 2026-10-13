@@ -1,23 +1,23 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 当前工作分支为 `codex/asamana-m6b-seam-v6-3`；v6.2 从 v6.1 复验的数字作为历史基线保留。本文件区分历史复验、当前专项和更早证据；测试数量不代表迁移完整完成。逐项证据字段与回滚要求见 [迁移作业单](asamana-migration-runbook-v1.md)。
+**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 当前工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`；v6.3/v6.2 从 v6.1 复验的数字作为历史基线保留。本文件区分历史复验、当前专项和更早证据；测试数量不代表迁移完整完成。逐项证据字段与回滚要求见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归（v6.3） | 广套 859/859 通过；原 chat handler LLM fixture replay 10/10；M8 长时生活回放单独 1/1（2026-10-14）。v6.2 的 operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19 作为历史基线保留 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归；独立 TTS fixture、assistant/provider 全分支和全服务 replay 仍未完成 |
+| DeskBot 服务完整回归（v6.3） | 广套 861/861 通过；原 chat handler LLM fixture replay 10/10；input-runtime replay 2/2；M8 长时生活回放单独 1/1（2026-10-14）。v6.2 的 operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19 作为历史基线保留 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归；独立 TTS fixture、assistant/provider 全分支和全服务 replay 仍未完成 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
 | 3D 客户端 | 44 套、301/301 通过（2026-10-14 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 本轮生产构建通过（含 typecheck/client/server） | 类型一致性和可构建性 |
 | voice-sidecar 接口 | 16 项通过（2026-10-14 本轮发布复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
 | M6b chat operation 合同（v6.2 历史基线） | operation-journal / replay-capture 专项通过（覆盖用户 chat operation 归属、request hash 不落正文、provider/TTS 结果引用、重复 chat 幂等） | 证明首批 `/api/chat` 用户分支的审计边界；不证明 assistant 分支、durable provider fixture 或原 `/api/chat` handler replay |
-| M6b-C2/C3 原 chat handler 回放（v6.3） | `node --test test/replay-capture.test.mjs` 10/10；服务端全量 `npm.cmd test` 859/859 | LLM fixture fresh/restart/duplicate、缺失/篡改 fail closed、`provider_calls=0`；独立 TTS fixture、assistant 分支和全服务 replay 仍未纳入 |
-| M6b input-runtime operation 合同 | `input-runtime.test.mjs` operation-scope 专项通过（source run ID/kind/source/request、脱敏 result reference、success/skip/error 兼容） | 证明 I0–I3 的 operation scope 与结果引用；不证明 I4–I7 的 fixture replay、原子回滚或全服务恢复 |
+| M6b-C2/C3 原 chat handler 回放（v6.3/v6.4） | `node --test test/replay-capture.test.mjs` 10/10；服务端全量 `npm.cmd test` 861/861 | LLM fixture fresh/restart/duplicate、缺失/篡改 fail closed、`provider_calls=0`；独立 TTS fixture、assistant 分支和全服务 replay 仍未纳入 |
+| M6b input-runtime operation 合同 | `input-runtime.test.mjs` operation-scope 专项通过；`input-runtime-replay.test.mjs` 2/2（source run、TTL skip、error/backoff、重启/重复和 fail-closed 负向门） | 证明 I0–I7 的 operation scope、结果引用与受控 fixture replay；不证明真实 provider 长期运行、原子回滚覆盖所有旁路或全服务恢复 |
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md)、[正式迁移矩阵](asamana-migration-matrix-v1.md) 和 [迁移作业单](asamana-migration-runbook-v1.md)。2026-10-14 v6.2 历史基线在 Windows 工作站通过服务端广套 857 项、M8 长时生活回放 1 项、operation-journal/replay/persistence 27 项、input-runtime 7 项、chat/replay-capture 19 项、客户端 301 项、voice-sidecar 16 项和生产构建。v6.3 当前通过原 chat handler LLM fixture replay 10/10、服务端广套 859/859、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant 分支和全服务 replay 仍未完成。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md)、[正式迁移矩阵](asamana-migration-matrix-v1.md) 和 [迁移作业单](asamana-migration-runbook-v1.md)。2026-10-14 v6.2 历史基线在 Windows 工作站通过服务端广套 857 项、M8 长时生活回放 1 项、operation-journal/replay/persistence 27 项、input-runtime 7 项、chat/replay-capture 19 项、客户端 301 项、voice-sidecar 16 项和生产构建。v6.3 当前通过原 chat handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant 分支和全服务 replay 仍未完成。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 本次新增 `slow-cognition-action-integration.test.mjs`：托盘、做饭与光果供给从合法候选进入实际任务，由同配方真实结果结算目标；旅行、缺材料及重复结算不形成完成进度。`persistent-world-restart.test.mjs` 验证账本流式恢复、过滤后有限 hydration、feed/历史一致性与跨世界 Scene 隔离；默认账本接口仍保留完整 diff。`slow-cognition.test.mjs` 保留已完成、失败、取消和撤回意图的真实状态。
 

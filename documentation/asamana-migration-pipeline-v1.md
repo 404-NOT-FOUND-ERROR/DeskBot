@@ -1,5 +1,7 @@
 # Asamana 迁移管线 v1
 
+> v6.4 增量（2026-10-14）：本轮完成 input-runtime I4/I7 原业务入口 replay（2/2），服务端广套 861/861；下一波次为其余直接 route/worker 接缝，不能将本轮受控 fixture 结果写成 M6b 全服务完成。
+
 目标：把 Asamana 已验证的编排和可观察性机制，迁移到 DeskBot 的“长期共同生活的桌面潮玩生命体”闭环，同时保留聚形域、喵呜、多源输入、角色阶段和受控世界事实边界。逐项的目标、代码映射、依赖、验收门和状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准；执行字段和回滚证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 ## 阶段门
@@ -12,7 +14,7 @@
 | M3 | 慢认知维护 | 只在 cadence 到期时执行 decay → compression → reflection → goal/relation revision；失败不阻塞生活 | `implemented` / `automated verified` |
 | M4 | 自治 cadence gate | 主角和居民按需要、压力、情绪和空闲阈值安排认知；跨日重启后频率连续 | `implemented` / `automated verified` |
 | M5 | mutation channel 治理强化（DeskBot 原有能力；本轮增加 candidate replay 审计） | 非确定性/非受信观察先成为候选；preview 无 revision 变化；accept 只能写合法 mutation；受信天气 adapter 继续兼容 | `baseline implemented` / `automated verified` |
-| M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | M6a `canonical capture implemented` / `automated verified`；M6b 仍 `partial`。v6.3 的受控 chat 用户 handler LLM fixture replay 已通过专项 10/10 与服务端广套 859/859；input-runtime、worker、proposal/trial/candidate、独立 TTS、assistant/provider 全分支、wall-clock 等操作仍未统一完成。详细 namespace 边界见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；历史断层仍严格返回 `history_unavailable` |
+| M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | M6a `canonical capture implemented` / `automated verified`；M6b 仍 `partial`。v6.4 的受控 chat 用户 handler LLM fixture replay 10/10、input-runtime replay 2/2 和服务端广套 861/861 已通过；worker、proposal/trial/candidate、独立 TTS、assistant/provider 全分支、wall-clock 等操作仍未统一完成。详细 namespace 边界见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；历史断层仍严格返回 `history_unavailable` |
 | M7 | 前端观察连续性 | 服务端统一 snapshot/WS、客户端 revision/sequence gate、重连和有界 render gate | `implemented` / `automated verified`；基础历史面板已接入，长期断线与历史浏览体验待验收 |
 | M8 | 长期共同生活回放 | 两个以上逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | 既有 288 事件隔离 fixture `automated verified`；三日受控目标追求样本 `verified`；真实模型为 `inconclusive_reflection_failed`，人工长期体验仍 `pending` |
 
@@ -27,13 +29,13 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮工作分支为 `codex/asamana-m6b-seam-v6-3`，v6.2 的发布记录与远端分支仍保留为历史基线。v6.3 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、服务端广套 859/859、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`，v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
 `scripts/review-asamana-migration.mjs` 新增零外部请求的三日实际生活验收，首日完整意图→计划→任务→结果成立；次日真实实践与反思成立，原具体目标等待下一次合法机会，第三日重启后通过原计划和真实任务完成。最新报告 `tmp/asamana-migration-review-lsN0DX/report.json` 为 `verified`，原资源、每日实践上限和期限保持有效。模型合法返回空目标仍必须报告 inconclusive。来源幂等、SQLite 重启和世界候选门通过，但该受控样本不等于 M8 自然长期生活通过。真实 DeepSeek 模式已使用 Clash 执行最多六次调用；报告 `tmp/asamana-migration-review-btgixK/report.json` 为 `inconclusive_reflection_failed`，Day2 `ungrounded_goal` 被拒绝，未放宽 validator。
 
-历史完整性差异已定位并修复新序列的表示问题，“小镇往事”的基础前端交互和真实旧断层提示已有人工证据。v6.3 已完成 M6b-C2/C3 的受控 LLM fixture replay 专项与服务端广套回归（10/10、859/859）；进入 input-runtime 前仍需完成 success/error/TTS 组合、assistant 分支和全服务覆盖门，不能把当前 scoped 结果当作 M6b 完成。后续顺序为：M6b-I input-runtime 接缝 → M6b 其余直接路由与 worker → M8b 真实模型多日目标追求 → M7 真实渲染异常/长断线 → I2 规则世界事件内容包 → M8c 7–14 天现实 1:1 观察。无需重复实现已通过的 M1/M2/M3/M4 基线；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
+历史完整性差异已定位并修复新序列的表示问题，“小镇往事”的基础前端交互和真实旧断层提示已有人工证据。v6.4 已完成 M6b-C2/C3/I4/I7 的受控 fixture replay 专项与服务端广套回归（10/10、2/2、861/861）；success/error/TTS 全组合、assistant 分支、全服务覆盖门仍未完成，不能把当前 scoped 结果当作 M6b 完成。后续顺序为：M6b 其余直接路由与 worker → M8b 真实模型多日目标追求 → M7 真实渲染异常/长断线 → I2 规则世界事件内容包 → M8c 7–14 天现实 1:1 观察。无需重复实现已通过的 M1/M2/M3/M4 基线；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
 
 ### M6b 分波次迁移管线
 

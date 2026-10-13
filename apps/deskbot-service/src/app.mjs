@@ -482,6 +482,7 @@ export function createDeskBotServer({
     persistence,
     intervalMs: inputRuntimeIntervalMs,
     operationScope: replayCapture,
+    replayProviders,
   });
   const sourceAdapters=new Map(refractionSources.map(s=>{
     if(!s||!['provider','agent'].includes(s.kind)||typeof s.sourceId!=='string'||typeof s.displayName!=='string')throw new TypeError('Refraction sources require a server-owned sourceId, displayName and provider/agent kind');
@@ -2354,6 +2355,7 @@ export function createDeskBotServer({
   server.lifeChoiceWorker=lifeChoiceWorker;
   server.slowCognitionWorker=slowCognitionWorker;
   server.inputRuntime = inputRuntime;
+  server.replayInputRun = inputRuntime.replayRun;
   server.roleEvolution = roleEvolution;
   server.worldCandidates = worldCandidates;
   // Private replay adapter: executes the original chat orchestrator without

@@ -15,6 +15,7 @@ const SESSIONS = 'replay.capture-sessions';
 const OPERATIONS = 'replay.capture-operations';
 const INGRESSES = 'replay.capture-ingresses';
 const CHATS = 'replay.capture-chats';
+const INPUT_RUNS = 'replay.capture-input-runs';
 const PROVIDERS = 'replay.capture-provider-results';
 const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
@@ -104,6 +105,7 @@ function chatResultDigest(result) {
 
 function providerFixtureKind(ref) {
   if (ref?.tts && typeof ref.tts === 'object') return 'tts';
+  if (ref?.purpose === 'input-runtime') return 'input-runtime';
   if (ref?.purpose === 'chat') return 'llm';
   return String(ref?.purpose ?? 'provider');
 }
@@ -240,7 +242,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, chat_count: 0, provider_count: 0, journal_count: 0,
+        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, journal_count: 0,
         journal_namespace_registry: namespaceRegistryList,
         journal_registry_hash: registryHash,
         journal_require_operation_context: Boolean(requireOperationContext),
@@ -328,6 +330,48 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         coverage: 'canonical_world_with_service_chat' });
       return record;
     },
+    /** Record one input-runtime source run and its private deterministic
+     * provider fixture.  The public journal only receives resultRef; the
+     * fixture is exported into the local replay tape and never into the
+     * canonical namespace digest. */
+    recordInputRuntimeRun({ run, request = null, fixture = null, resultRef = null, operation_start = null,
+      operation_end = null } = {}) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      const session = persistence.get(SESSIONS, captureId);
+      const runId = String(run?.run_id ?? '').trim();
+      if (!runId || run?.schema !== 'foundry.input-runtime-run.v0.1') fail('replay_input_run_invalid');
+      const existing = persistence.list(INPUT_RUNS).find(item => item.capture_id === captureId && item.run_id === runId);
+      if (existing) return copy(existing);
+      const ref = {
+        schema: 'deskbot.input-runtime-fixture-ref.v1', purpose: 'input-runtime',
+        source_id: run.source_id, run_id: runId, status: run.status,
+        provider: run.provider ?? null, error: run.error ?? null,
+        fixture: fixture === null || fixture === undefined ? null : {
+          kind: 'deskbot.input-runtime-fixture.v1', result: copy(fixture),
+        },
+      };
+      const publicRef = api.recordProviderResult(ref);
+      const record = {
+        schema: 'deskbot.replay-capture-input-runtime.v1', capture_id: captureId,
+        run_id: runId, source_id: run.source_id, index: session.input_run_count ?? 0,
+        run: copy(run), request: request ? copy(request) : (run.request ? copy(run.request) : null),
+        received_at: run.started_at, duplicate: false,
+        operation_start: operation_start ?? session.operation_count,
+        operation_end: operation_end ?? session.operation_count,
+        provider_ref: publicRef,
+        result_digest: digest({ status: run.status, result_event_ids: run.result_event_ids ?? [], error: run.error ?? null }),
+      };
+      record.record_hash = digest(record);
+      persistence.transaction(() => {
+        persistence.insert(INPUT_RUNS, `${captureId}:${record.index}`, record);
+        const latest = persistence.get(SESSIONS, captureId) ?? session;
+        persistence.put(SESSIONS, captureId, { ...latest, input_run_count: record.index + 1,
+          coverage: 'canonical_world_with_input_runtime' });
+      });
+      return record;
+    },
     /** Store deterministic provider fixtures separately from operation
      * journals. This namespace is exported only into the private replay tape
      * and is excluded from canonical namespace digests. */
@@ -369,7 +413,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, chats, providers, journals, namespace_digests;
+  let session, operations, ingresses, chats, input_runs, providers, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -384,6 +428,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(ingress => ingress.capture_id === captureId);
     chats = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(CHATS)]
       .map(row => JSON.parse(row.payload_json)).filter(chat => chat.capture_id === captureId);
+    input_runs = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(INPUT_RUNS)]
+      .map(row => JSON.parse(row.payload_json)).filter(run => run.capture_id === captureId);
     providers = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(PROVIDERS)]
       .map(row => JSON.parse(row.payload_json)).filter(provider => provider.capture_id === captureId);
     journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
@@ -405,7 +451,7 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
   const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses,
-    chats, providers, journals };
+    chats, input_runs, providers, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
   return { directory: archive, operation_count: operations.length, journal_count: journals.length,
@@ -420,6 +466,8 @@ function validateArchive(tape, codeFingerprint) {
   if (tape.ingresses.length !== (tape.session.ingress_count ?? 0)) fail('replay_capture_ingress_incomplete');
   if (!Array.isArray(tape.chats)) tape.chats = [];
   if (tape.chats.length !== (tape.session.chat_count ?? 0)) fail('replay_capture_chat_incomplete');
+  if (!Array.isArray(tape.input_runs)) tape.input_runs = [];
+  if (tape.input_runs.length !== (tape.session.input_run_count ?? 0)) fail('replay_capture_input_run_incomplete');
   if (!Array.isArray(tape.providers)) tape.providers = [];
   if (tape.providers.length !== (tape.session.provider_count ?? 0)) fail('replay_provider_fixture_missing');
   if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
@@ -441,6 +489,19 @@ function validateArchive(tape, codeFingerprint) {
       || !Number.isSafeInteger(chat.operation_end) || chat.operation_start < 0
       || chat.operation_end < chat.operation_start || chat.operation_end > tape.operations.length
       || digest(content) !== hash) fail('replay_capture_chat_corrupt');
+  }
+  for (const [index, inputRun] of tape.input_runs.entries()) {
+    const { record_hash: hash, ...content } = inputRun;
+    if (inputRun.schema !== 'deskbot.replay-capture-input-runtime.v1'
+      || inputRun.capture_id !== tape.session.capture_id || inputRun.index !== index
+      || !inputRun.run_id || !inputRun.source_id || !inputRun.run
+      || inputRun.run.run_id !== inputRun.run_id || inputRun.run.source_id !== inputRun.source_id
+      || !Number.isFinite(Date.parse(inputRun.received_at))
+      || !Number.isSafeInteger(inputRun.operation_start) || !Number.isSafeInteger(inputRun.operation_end)
+      || inputRun.operation_start < 0 || inputRun.operation_end < inputRun.operation_start
+      || inputRun.operation_end > tape.operations.length || !hash || digest(content) !== hash) {
+      fail('replay_capture_input_run_corrupt');
+    }
   }
   for (const provider of tape.providers) {
     const { record_hash: providerHash, ...providerContent } = provider;
@@ -516,11 +577,34 @@ export function createReplayChatProviders({ tape, onFixtureCall = null } = {}) {
     }
     fail(`replay_provider_kind_unsupported:${kind}`);
   };
+  const inputRecords = (tape.input_runs ?? []).map(item => {
+    const provider = records.find(record => record.operation_id === item.run_id && record.kind === 'input-runtime');
+    if (!provider) fail(`replay_provider_fixture_missing:${item.run_id}:input-runtime`);
+    return { item, provider };
+  });
+  const resolveInput = async ({ run_id, source_id } = {}) => {
+    const match = inputRecords.find(({ item }) => item.run_id === run_id && item.source_id === source_id);
+    if (!match) fail(`replay_provider_fixture_missing:${run_id}:input-runtime`);
+    const ref = match.provider.ref;
+    if (!ref || ref.purpose !== 'input-runtime' || ref.source_id !== source_id || ref.run_id !== run_id) {
+      fail(`replay_provider_fixture_invalid:${run_id}:input-runtime`);
+    }
+    if (ref.status === 'error') throw Object.assign(new Error(ref.error?.message ?? 'input replay fixture failed'), {
+      code: ref.error?.code ?? 'input_replay_fixture_error', retryable: ref.error?.retryable === true,
+    });
+    if (ref.status === 'skipped') return null;
+    if (ref.fixture?.kind !== 'deskbot.input-runtime-fixture.v1' || !ref.fixture.result
+      || typeof ref.fixture.result !== 'object') fail(`replay_provider_fixture_invalid:${run_id}:input-runtime`);
+    onFixtureCall?.({ operation_id: run_id, kind: 'input-runtime' });
+    return copy(ref.fixture.result);
+  };
   return {
     resolve,
     voiceForEvent: event => records.some(item => item.operation_id === `chat:${String(event?.event_id ?? '').trim()}` && item.kind === 'tts'),
     providerCalls: () => 0,
     fixtureCalls: () => fixtureCalls,
+    inputRuntimeFixtureCalls: () => inputRecords.length,
+    resolveInput,
     llm: { id: 'deskbot-replay-fixture', status: () => ({ configured: true, mode: 'replay', provider: 'fixture' }) },
     request: request => resolve(request),
   };
@@ -601,14 +685,17 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
   validateArchive(tape, codeFingerprint);
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== tape.session.seed_file_hash) fail('replay_capture_seed_mismatch');
   if (existsSync(target) || existsSync(`${target}-wal`) || existsSync(`${target}-shm`) || target === join(archive, 'seed.sqlite')) fail('replay_target_must_be_new');
+  const inputEventIds = new Set((tape.input_runs ?? []).flatMap(item => item.run?.result_event_ids ?? []));
   const records = [
-    ...tape.ingresses.map(item => ({ kind: 'ingress', item })),
+    ...(tape.input_runs ?? []).map(item => ({ kind: 'input-runtime', item })),
+    ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id)).map(item => ({ kind: 'ingress', item })),
     ...tape.chats.map(item => ({ kind: 'chat', item })),
   ].sort((a, b) => (a.item.operation_start - b.item.operation_start)
     || String(a.item.received_at).localeCompare(String(b.item.received_at))
     || (a.item.index - b.item.index));
   validateChatProviderCoverage(tape);
-  const replayProviders = tape.chats.length ? createReplayChatProviders({ tape }) : null;
+  const replayProviders = (tape.chats.length || (tape.input_runs ?? []).length)
+    ? createReplayChatProviders({ tape }) : null;
   if (restartAt !== null && (!Number.isSafeInteger(restartAt) || restartAt < 0 || restartAt > records.length)) fail('replay_restart_range_invalid');
   mkdirSync(dirname(target), { recursive: true }); copyFileSync(join(archive, 'seed.sqlite'), target);
    let runtime = null, persistence = null, time = tape.session.started_at, nextOperation = 0, startupPending = false;
@@ -617,7 +704,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
      time = receivedAt;
      persistence = createSqlitePersistence({ filename: target, now: () => new Date(time) });
     runtime = await runtimeFactory({ persistence, tape, replayProviders, now: () => new Date(time), mode: 'replay' });
-    if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat) fail('replay_runtime_ingress_missing');
+    if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat && !runtime?.replayInputRun) fail('replay_runtime_ingress_missing');
     startupPending = typeof runtime.replayStartup === 'function';
   };
    const world = () => runtime.persistentWorld;
@@ -650,7 +737,15 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
         startupPending = false;
       }
       let result;
-      if (record.kind === 'chat') {
+      if (record.kind === 'input-runtime') {
+        const replayInput = runtime.replayInputRun;
+        if (typeof replayInput !== 'function') fail('replay_runtime_input_runtime_missing');
+        // Let the original runtime validate source registration before asking
+        // the fixture registry to resolve a provider result.  This keeps an
+        // unregistered source distinguishable from a missing/tampered fixture.
+        result = await replayInput(copy(item));
+        if (!result?.run || result.run.run_id !== item.run_id) fail(`replay_service_input_run_mismatch:${index}`);
+      } else if (record.kind === 'chat') {
         const chat = runtime.chat ?? runtime.handleChat;
         if (typeof chat !== 'function') fail('replay_runtime_chat_missing');
         if (item.status === 'error') {

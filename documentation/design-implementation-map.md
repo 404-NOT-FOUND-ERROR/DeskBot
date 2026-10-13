@@ -1,6 +1,6 @@
 # 聚形域：现版本能力与设计对照
 
-**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 当前工作分支为 `codex/asamana-m6b-seam-v6-3`，v6.2 作为历史基线保留；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)，逐项执行和证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
+**当前功能基线：v0.5 · 角色发展第 1–6 阶段，外加持续生活投影与 Asamana 迁移补强，2026-10-14。** 当前工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`，v6.2/v6.3 作为历史基线保留；远端完成状态以交付核验为准。v0.5 是开发路线编号；各软件包保留自身版本号。v6.4 已通过 input-runtime I4/I7 受控 replay（2/2），服务端广套 861/861；完整路线见 [开发管线](../research/development-roadmap-v0.5.md)，具体迁移门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)，逐项执行和证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活在伴生于现实的奇幻空间“聚形域”，现实输入影响它的处境与选择，实际行动留下资源、关系和记忆后果。兴趣逐渐发展；重要形态变化则经由有前提的角色愿望、真实试做和明确采用发生。
 
@@ -40,10 +40,10 @@ DeskBot 的目标是让同一个桌边个体拥有持续的生活。喵呜生活
 
 ## 验证与当前边界
 
-- 2026-10-14 v6.2 的 857/857、M8 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19 与客户端 301/301 是历史基线。当前 v6.3 分支已通过原 chat handler LLM fixture replay 10/10、服务端广套 859/859、客户端 typecheck/build、voice-sidecar 16/16 和生产构建；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务 replay 仍是 gap，`main` 保留。
+- 2026-10-14 v6.2 的 857/857、M8 1/1、operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19 与客户端 301/301 是历史基线。当前 v6.4 分支已通过原 chat handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和生产构建；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务 replay 仍是 gap，`main` 保留。
 - 第 6 阶段九种隔离 SQLite 样本复用实际路线与配方，展示准备、一次结果、预览、采用、组合、普通生活、重启与两次回退。样本使用明确的受控初始条件，没有导入正式存档。
 - DeepSeek Flash 对三种公开虚构有限状态摘要完成真实调用，范围是未采用、已采用与部分回退；不是完整连续聊天或真实 TTS 验收。
-- v6 发布前已完成基础浏览器验收并保存 2026-10-13 的实时小镇与往事面板截图，页面于 2026-10-14 再次复核；正式服务重启前可能仍显示旧 observer bound 提示，重启后使用压缩后的只读投影。完整阶段像素、真实 context loss、长断线和真实模型多日体验仍待验收。本地捕获器已能导出/重演 canonical world 和已接入的 service-ingress seam；v6.3 的受控 chat 用户 handler LLM fixture replay 已通过 10/10 与 859/859 广套回归，独立调度/决策、assistant/provider 全分支和其他原入口仍未统一验证，完整生产服务归档仍有缺口。
+- v6 发布前已完成基础浏览器验收并保存 2026-10-13 的实时小镇与往事面板截图，页面于 2026-10-14 再次复核；正式服务重启前可能仍显示旧 observer bound 提示，重启后使用压缩后的只读投影。完整阶段像素、真实 context loss、长断线和真实模型多日体验仍待验收。本地捕获器已能导出/重演 canonical world 和已接入的 service-ingress seam；v6.4 的受控 chat/input-runtime fixture replay 已通过 10/10、2/2 与 861/861 广套回归，独立调度/决策、assistant/provider 全分支和其他原入口仍未统一验证，完整生产服务归档仍有缺口。
 - 最新三日规则目标追求样本 `verified`：次日原目标在第三日重启后的下一合法机会通过实际任务完成，未赠送材料或重置期限；六次真实 DeepSeek 调用仍为 `inconclusive_reflection_failed`，Day2 `ungrounded_goal` 被拒绝。规则样本通过不能替代真实模型与 7–14 天自然生活验收。
 - 尚待真实中文 ASR/TTS、ESP 喵伴与旋转底座适配、实体外壳映射，以及 7–14 天自然连续生活观察。地图、职业、居民和世界规则将根据这些观察继续扩展。
 - 本分支新增的持续生活专项覆盖：实际任务 Scene 的进行/暂停/完成/失败、同地点居民与旅行隔离、十地点本地描述、跨时间槽延续、SQLite 重启幂等、canonical feed 分页/噪声过滤，以及 Explorer 从试做至阶段采用的真实生命周期。专项通过不等于自然长期生活已经验收。

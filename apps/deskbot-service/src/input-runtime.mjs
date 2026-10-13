@@ -41,6 +41,46 @@ function resultEventIds(result) {
   return [...ids];
 }
 
+// Only this deterministic, connector-facing envelope is eligible for a
+// private replay fixture.  Raw provider responses and credentials are never
+// copied into the operation journal.  A source may opt into a richer,
+// already-sanitized `replay_fixture` when its ingest callback needs it.
+function replayFixture(result) {
+  if (result === null || result === undefined) return null;
+  if (result.replay_fixture && typeof result.replay_fixture === 'object') {
+    return structuredClone(result.replay_fixture);
+  }
+  const fixture = {};
+  for (const key of ['event', 'events', 'fetched_at', 'connector', 'result_event_ids']) {
+    if (Object.hasOwn(result, key)) fixture[key] = structuredClone(result[key]);
+  }
+  return fixture;
+}
+
+function replayFixtureError(detail) {
+  const error = new Error(detail?.message ?? 'input replay fixture failed');
+  error.code = detail?.code ?? 'replay_input_fixture_error';
+  error.retryable = detail?.retryable === true;
+  return error;
+}
+
+function comparableRun(run) {
+  const copy = structuredClone(run);
+  if (copy?.trace) {
+    delete copy.trace.duration_ms;
+    for (const stage of copy.trace.stages ?? []) delete stage.duration_ms;
+  }
+  return copy;
+}
+
+function stableTrace(trace) {
+  if (!trace) return trace;
+  const copy = structuredClone(trace);
+  copy.duration_ms = 0;
+  for (const stage of copy.stages ?? []) stage.duration_ms = 0;
+  return copy;
+}
+
 export function createInputRuntime({
   now = () => new Date(),
   persistence = null,
@@ -52,6 +92,9 @@ export function createInputRuntime({
   // (including its start/complete records and source state writes) executes
   // under one stable operation context.
   operationScope = null,
+  // Trusted local replay only. When present, source.refresh is bypassed and
+  // the registered source is resolved from an attested fixture.
+  replayProviders = null,
 } = {}) {
   const interval = Math.max(1000, Number.parseInt(intervalMs, 10) || DEFAULT_INTERVAL_MS);
   const sources = new Map();
@@ -96,14 +139,21 @@ export function createInputRuntime({
     return next;
   }
 
-  function startRun(source, startedAt) {
+  function startRun(source, startedAt, request = null, runIdOverride = null) {
     runSequence += 1;
     const timestamp = startedAt.toISOString();
     const run = {
       schema: RUN_SCHEMA,
       rule_version: RULE_VERSION,
-      run_id: `input-runtime:${source.source_id}:${timestamp}:${runSequence}`,
+      run_id: runIdOverride ?? `input-runtime:${source.source_id}:${timestamp}:${runSequence}`,
       source_id: source.source_id,
+      provider: source.provider ?? null,
+      request: request ? {
+        source_id: source.source_id,
+        force: request.force === true,
+        provider: source.provider ?? null,
+        ttl_ms: source.ttl_ms,
+      } : null,
       started_at: timestamp,
       completed_at: null,
       result_event_ids: [],
@@ -130,21 +180,40 @@ export function createInputRuntime({
     try { operationScope?.setOperationResultRef?.(reference); } catch { /* audit-only */ }
   }
 
-  function completeRun(run, { completedAt, result, error = null, status = 'completed', skipped = false, trace = null, request = null } = {}) {
+  function operationCount() {
+    try { return operationScope?.operationCount?.() ?? null; } catch { return null; }
+  }
+
+  function completeRun(run, { completedAt, result, error = null, status = 'completed', skipped = false, trace = null,
+    request = null, operationStart = null } = {}) {
     if (!run) return null;
-    return persistRun({
+    const resultRef = { schema: 'deskbot.input-runtime-result-ref.v1', source_id: run.source_id,
+      run_id: run.run_id, status, provider: run.provider ?? null, result_event_ids: resultEventIds(result),
+      fetched_at: iso(result?.fetched_at), ...(error ? { error: { ...error } } : {}) };
+    // Put the public reference in the operation context before the run write;
+    // recordInputRuntimeRun replaces the same provider phase with the private
+    // fixture after the run has been persisted.
+    if (typeof operationScope?.recordInputRuntimeRun === 'function') setOperationResultRef({ ...resultRef, purpose: 'input-runtime' });
+    const persisted = persistRun({
       ...run,
       completed_at: iso(completedAt) ?? now().toISOString(),
       result_event_ids: resultEventIds(result),
       error: error ? { ...error } : null,
       status,
       ...(skipped ? { skipped: true } : {}),
-      ...(trace ? { trace, replay: safeReplayMetadata({
+      ...(trace ? { trace: stableTrace(trace), replay: safeReplayMetadata({
         pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
         inputEventIds: [], outputEventIds: resultEventIds(result),
         inputs: request,
       }) } : {}),
     });
+    if (typeof operationScope?.recordInputRuntimeRun === 'function') {
+      operationScope.recordInputRuntimeRun({ run: persisted, request, fixture: replayFixture(result), resultRef,
+        operation_start: operationStart, operation_end: operationCount() });
+    } else {
+      setOperationResultRef(resultRef);
+    }
+    return persisted;
   }
 
   function registerSource({
@@ -158,6 +227,7 @@ export function createInputRuntime({
     ingest = null,
     provider = null,
     provenance = null,
+    replayFixture = null,
   } = {}) {
     const id = requireSourceId(sourceId ?? source_id);
     if (typeof refresh !== 'function') throw new TypeError(`source ${id} must provide refresh()`);
@@ -177,6 +247,7 @@ export function createInputRuntime({
       ttl_ms: Math.max(1000, Number.parseInt(ttlMs, 10) || interval),
       provider: provider ?? previous.provider ?? null,
       provenance: provenance ?? previous.provenance ?? null,
+      replayFixture: typeof replayFixture === 'function' ? replayFixture : null,
       refresh,
       ingest,
     };
@@ -238,25 +309,24 @@ export function createInputRuntime({
     return now().getTime() >= Date.parse(source.next_attempt_at);
   }
 
-  async function refreshSource(source, { force = false } = {}) {
-    const startedAt = now();
+  async function refreshSource(source, { force = false, replay = null } = {}) {
+    const startedAt = replay?.run?.started_at ? new Date(replay.run.started_at) : now();
     // Derive the id before entering the scope so the journal can name the
     // transaction that creates the persisted `running` record.  Incrementing
     // remains inside the callback, preserving the existing sequence semantics
     // when multiple sources are refreshed concurrently.
-    const runId = `input-runtime:${source.source_id}:${startedAt.toISOString()}:${runSequence + 1}`;
-    const request = { source_id: source.source_id, force, provider: source.provider, ttl_ms: source.ttl_ms };
+    const runId = replay?.run?.run_id ?? `input-runtime:${source.source_id}:${startedAt.toISOString()}:${runSequence + 1}`;
+    const request = replay?.request ?? replay?.run?.request ?? { source_id: source.source_id, force, provider: source.provider, ttl_ms: source.ttl_ms };
+    const operationStart = replay?.operation_start ?? operationCount();
     return withOperation(runId, source, request, async () => {
-      const run = startRun(source, startedAt);
+      const run = startRun(source, startedAt, request, replay?.run?.run_id ?? null);
       const recorder = createRuntimeTraceRecorder({
         runId: run.run_id, pipeline: 'input-runtime', ruleVersion: RULE_VERSION,
         startedAt, now,
       });
-      if (!due(source, force)) {
-        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
-          run_id: run.run_id, status: 'skipped', result_event_ids: [] });
+      if (replay?.run?.status === 'skipped' || !due(source, force)) {
         completeRun(run, { completedAt: now(), status: 'skipped', skipped: true,
-          trace: recorder.finish({ status: 'skipped' }), request });
+          trace: recorder.finish({ status: 'skipped' }), request, operationStart });
         return { source_id: source.source_id, skipped: true, reason: 'not_due', run_id: run.run_id };
       }
       const attemptedAt = startedAt.toISOString();
@@ -266,7 +336,14 @@ export function createInputRuntime({
       persist(source);
       let result = null;
       try {
-        result = await recorder.observe('input', () => source.refresh({ force }));
+        result = await recorder.observe('input', () => replay
+          ? (replay.fixture !== null && replay.fixture !== undefined
+            ? replay.fixture
+            : source.replayFixture
+              ? source.replayFixture(replay)
+            : replayProviders?.resolveInput?.({ source_id: source.source_id, run_id: run.run_id, record: replay }))
+          : source.refresh({ force }));
+        if (replay && result === undefined) throw replayFixtureError({ code: 'replay_input_fixture_missing', message: `missing fixture for ${run.run_id}` });
         if (source.ingest && result?.event) await recorder.observe('perception', () => source.ingest(result.event, result), {
           references: { event_ids: resultEventIds(result) },
         });
@@ -281,12 +358,9 @@ export function createInputRuntime({
         source.ttl_ms = Number.parseInt(providerStatus?.ttl_ms, 10) || source.ttl_ms;
         source.provider = providerStatus?.provider ?? source.provider;
         source.next_attempt_at = new Date(Date.parse(source.last_success_at) + source.ttl_ms).toISOString();
-        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
-          run_id: run.run_id, status: 'completed', provider: source.provider, result_event_ids: outputEventIds,
-          fetched_at: iso(result?.fetched_at) });
         persist(source);
         completeRun(run, { completedAt: now(), result, status: 'completed',
-          trace: recorder.finish({ resultEventIds: outputEventIds }), request });
+          trace: recorder.finish({ resultEventIds: outputEventIds }), request, operationStart });
         return { source_id: source.source_id, skipped: false, result, status: publicSource(source), run_id: run.run_id };
       } catch (error) {
         const detail = errorDetail(error);
@@ -297,15 +371,28 @@ export function createInputRuntime({
         const index = Math.min(source.consecutive_failures - 1, backoffMs.length - 1);
         const delay = Math.max(1000, Number.parseInt(backoffMs[index], 10) || DEFAULT_BACKOFF_MS[DEFAULT_BACKOFF_MS.length - 1]);
         source.next_attempt_at = new Date(now().getTime() + delay).toISOString();
-        setOperationResultRef({ schema: 'deskbot.input-runtime-result-ref.v1', source_id: source.source_id,
-          run_id: run.run_id, status: 'error', provider: source.provider, result_event_ids: resultEventIds(result),
-          error: detail });
         persist(source);
         completeRun(run, { completedAt: now(), result, error: detail, status: 'error',
-          trace: recorder.finish({ status: 'error', error: detail, resultEventIds: resultEventIds(result) }), request });
+          trace: recorder.finish({ status: 'error', error: detail, resultEventIds: resultEventIds(result) }), request, operationStart });
         return { source_id: source.source_id, skipped: false, error: detail, status: publicSource(source), run_id: run.run_id };
       }
     });
+  }
+
+  async function replayRun(record, { fixture = null } = {}) {
+    if (!record || typeof record !== 'object' || !record.run) throw new TypeError('input replay record is required');
+    const source = sources.get(record.source_id ?? record.run.source_id);
+    if (!source) throw Object.assign(new Error(`replay_input_source_missing: ${record.source_id ?? record.run.source_id}`), { code: 'replay_input_source_missing' });
+    const result = await refreshSource(source, { force: true, replay: { ...record, fixture } });
+    const actual = runs.get(record.run.run_id);
+    if (!actual || JSON.stringify(comparableRun(actual)) !== JSON.stringify(comparableRun(record.run))) {
+      const error = new Error(`replay input run mismatch: ${record.run.run_id}`);
+      error.code = 'replay_input_run_mismatch';
+      error.actual = actual;
+      error.expected = record.run;
+      throw error;
+    }
+    return { ...result, run: actual };
   }
 
   async function tick({ force = false, sourceIds = null } = {}) {
@@ -345,7 +432,7 @@ export function createInputRuntime({
     return status();
   }
 
-  return { registerSource, status, start, stop, tick };
+  return { registerSource, status, start, stop, tick, replayRun, operationCount };
 }
 
 export {
