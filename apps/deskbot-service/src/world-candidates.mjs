@@ -128,10 +128,13 @@ function safeWorldEvent(item, fallbackEventId, source) {
     event_id: optionalText(value.event_id, 'event.event_id') ?? fallbackEventId,
     title: title ?? summary,
   };
-  for (const key of ['summary', 'daily_consequence', 'opportunity', 'unresolved_hook', 'arc_id', 'status', 'outcome', 'occurred_at']) {
+  for (const key of ['summary', 'daily_consequence', 'opportunity', 'unresolved_hook', 'arc_id', 'status', 'outcome', 'occurred_at', 'content_package_id', 'source_event_id']) {
     if (value[key] !== undefined && value[key] !== null) {
       event[key] = key === 'occurred_at' ? iso(value[key], `event.${key}`) : optionalText(value[key], `event.${key}`);
     }
+  }
+  if (value.content_package_version !== undefined && value.content_package_version !== null) {
+    event.content_package_version = integer(value.content_package_version, 'event.content_package_version', 1, 1000000);
   }
   event.source = optionalText(value.source, 'event.source') ?? source;
   return event;
@@ -415,7 +418,7 @@ export function createWorldCandidateStore({
       .map(clone);
   }
 
-  function observe(event, { world = null } = {}) {
+  function observe(event, { world = null, ttlMs: requestedTtlMs = ttlMs } = {}) {
     if (isSuppressedObservation(event)) return { ignored: true, reason: 'ineligible_observation', candidate: null, duplicate: false };
     const snapshot = world ?? worldSnapshot();
     if (!snapshot || snapshot.world_id !== worldId) return { ignored: true, reason: 'world_not_found', candidate: null, duplicate: false };
@@ -436,6 +439,7 @@ export function createWorldCandidateStore({
     } catch (error) {
       return { ignored: true, reason: error?.code ?? 'world_action_rejected', candidate: null, duplicate: false };
     }
+    const effectiveTtlMs = Number.isInteger(requestedTtlMs) && requestedTtlMs > 0 ? requestedTtlMs : ttlMs;
     const timestamp = now().toISOString();
     const candidate = {
       schema: 'deskbot.world-candidate.v0.1',
@@ -462,7 +466,7 @@ export function createWorldCandidateStore({
       expected_world_revision: snapshot.world_revision,
       created_at: timestamp,
       updated_at: timestamp,
-      expires_at: new Date(now().getTime() + ttlMs).toISOString(),
+      expires_at: new Date(now().getTime() + effectiveTtlMs).toISOString(),
       status: CANDIDATE_STATUSES.PENDING,
       rule_version: RULE_VERSION,
       trace: recorder.finish(),

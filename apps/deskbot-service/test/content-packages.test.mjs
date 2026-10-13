@@ -13,6 +13,8 @@ test('Morrowmere compiler returns one canonical, auditable content package', () 
   assert.equal(compiled.npcs.length, 3);
   assert.equal(compiled.schedules.schedules.length, 3);
   assert.equal(compiled.stories.story_packages[0].id, 'morrowmere-first-day-v1');
+  assert.equal(compiled.worldEvents.packages[0].package_id, 'morrowmere-lamp-drift-event-v1');
+  assert.equal(compiled.worldEvents.packages[0].actions[0].action, 'apply_world_line_event');
   assert.equal(listContentPackages()[0].id, DEFAULT_SETTLEMENT.settlement_id);
   assert.equal(listContentPackages()[0].source, 'world-content/settlements/morrowmere');
 });

@@ -4,7 +4,7 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v6.4 M6b-R replay-hardening release（2026-10-14）。** 本版发布在 [`codex/asamana-m6b-r-public-release-2026-10-14`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-r-public-release-2026-10-14)，从已验证的 operation-context preview 基线派生，保留 `main`、v6.4 release 和此前的 M6b-R 分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本轮补齐迁移目录机器校验、voice transcribe/tts 私有 fixture 的原入口 fresh/restart replay 和 worker operation 验收。M6b-R 仍是公开的接缝预览：`input-runtime`、chat、voice transcribe/tts 受控回放已验证，role/life/world-candidate/worker/device、voice ASR/cancel 的全入口生产回放仍按合同逐波次收口，不能宣称完整生产归档或任意入口回放已经完成。真实 TTS、真实设备 ACK 与外壳机械实现不属于本版完成条件。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.6 · Asamana migration program v2 preview（P4 foundation，2026-10-14）。** 本版发布在 [`codex/asamana-migration-program-v2-release-2026-10-14`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-migration-program-v2-release-2026-10-14)，从已发布的 M6b-R operation-context preview 基线派生，保留 `main`、v6.4 release 和此前的 M6b-R 分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本轮把迁移标准 v2、第一批 HTTP route operation replay 和受限 authored world-event candidate 桥接纳入同一条可核验管线。该分支是迁移开发快照，不代表 P4 或长期自然共同生活已经完成：仍有未覆盖的 role/life/world 全入口、worker、device、voice ASR/cancel、真实模型跨日目标追求和 7–14 日人工观察门。真实 TTS、真实设备 ACK 与外壳机械实现不属于本版完成条件；各软件包版本和接口版本独立管理。
 
 ### 本版发布亮点
 
@@ -13,7 +13,14 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - worker scheduler operation 已有稳定 operation ID、SQLite 重启恢复和 canonical mutation/role-run 去重验收。
 - README、发布记录和运行截图与本分支一致；本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
 
-### v6.4 M6b-R 本轮新增
+### 本次迁移程序分支新增
+
+- 迁移标准、管线、作业单和 evidence schema v2：每个 Asamana 机制按合同、权限、正/负向、幂等、重启、原入口回放和交付复核逐项升级，不把邻近模块或 fixture 的通过结果写成全部迁移完成。
+- 第一批 HTTP route 已接入 `deskbot.service-operation.v1` operation context：`role.evolution.run`、`world.candidate.preview/accept/dismiss` 和研究场景入口可做 fresh/restart/replay 验收，重演使用独立 SQLite 且不调用 provider。
+- 增加受限 authored world-event package：现实观察先匹配雾灯镇（Morrowmere）内容包，再生成合法 world candidate，经 preview/accept 后才由 `persistentWorld.ingest` 写入 canonical world；内容包不能提交任意地点、资源或 mutation。
+- 这批能力是服务端与验收层更新，地图、居民面板和生活侧栏沿用已验收的真实运行截图；截图不会被用来宣称 P4 全量或 7–14 日自然生活。
+
+### 已继承的 M6b-R 基线能力
 
 - 为本地回放捕获增加版本化 `deskbot.service-operation.v1` journal envelope：记录 operation、来源、请求摘要、写入 namespace、事务边界和记录哈希，不把原始请求或密钥写入归档。
 - 增加 `runServiceOperation` / `runWorkerOperation` 接缝，把已覆盖的 HTTP route、life-choice、slow-cognition 和调度入口绑定到稳定 operation ID、logic time、route ID、规则版本与来源事件引用；未覆盖入口继续保持显式 `partial`。
@@ -21,7 +28,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - provider 与 TTS 结果以脱敏引用进入 operation journal；聊天正文、provider 原始响应、密钥和敏感 prompt 不进入公开回放归档。v6.4 的可执行回放使用脱敏 LLM/input-runtime fixture；私有 capture tape 可能保留事件与 provider fixture 原文，只能留在本机，不能提交或发布。
 - 增加 operation-journal、chat 和 input-runtime 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测、SQLite 重启恢复与敏感请求不落盘。
 - 将 voice ASR、transcribe、TTS、cancel 路由和 WebSocket device bridge 纳入 operation scope 第一批接缝，使用稳定 `voice.*` / `device.*` operation ID；其中 transcribe/tts 已有私有 archive/replay 原入口闭环，这不表示真实语音模型或固件已接入。
-- M6b 仍按迁移矩阵逐项推进：input-runtime 的受控 fixture replay 已完成 I0–I7 验收（见 [I4/I7 记录](documentation/asamana-input-runtime-replay-v1.md)）；assistant 分支、worker、WebSocket、直接 HTTP domain route 和完整生产归档仍是后续接缝，不把当前 partial 状态写成完整生产归档。
+- M6b 仍按迁移矩阵逐项推进：input-runtime 的受控 fixture replay 已完成 I0–I7 验收（见 [I4/I7 记录](documentation/asamana-input-runtime-replay-v1.md)）；本迁移程序分支只新增第一批直接 HTTP domain route 接缝，完整 assistant 分支、worker、WebSocket 和生产归档仍按目录逐项收口，不把当前 partial 状态写成完整生产归档。
 - 视觉效果沿用已验收的雾灯镇实时小镇与往事面板；本版再次核对 2026-10-14 本机运行页面，新增能力主要位于服务端 chat/input-runtime replay 和回放审计，不伪装成新的 UI 改版。
 
 ## 本版本更新
@@ -34,7 +41,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - 慢认知持久记录已经处理的来源，来源窗口缩小、排序变化和重启不会重复计费；关系理解仅引用共同亲历的事实，失败原因使用服务端分类。
 - 角色上下文按请求时间过滤：未来事实和非法时间不会提前泄露，远方事件作为消息，同地事件作为观察；公告经实际消息运输后才到达远方角色。
 - 增加默认关闭的本地 canonical 回放捕获和受控 service-ingress 重演。捕获目录不提交，重演使用独立 SQLite、原规则和零 provider 调用；完整服务操作归档仍待完成。
-- 增加 [Asamana → DeskBot 正式迁移矩阵](documentation/asamana-migration-matrix-v1.md)，逐项记录上游机制、DeskBot 映射、验收门、当前状态、拒绝迁移边界与下一步；矩阵不把受控样本或单元测试写成自然长期生活。
+- 增加 [Asamana → DeskBot 正式迁移矩阵](documentation/asamana-migration-matrix-v1.md)，并以 [迁移标准 v2](documentation/asamana-migration-standard-v2.md)、[迁移管线 v2](documentation/asamana-migration-pipeline-v2.md) 和 [迁移作业单 v2](documentation/asamana-migration-runbook-v2.md) 细化逐项合同、验收门、证据和回滚边界；这些资料不把受控样本或单元测试写成自然长期生活。
 
 慢认知可以把实际经历整理成自己的理解、有限目标和来往偏好；目标仍需通过真实任务、路线、材料和时间实现。前端往事浏览与隔离输入重演分别验证，当前输入重演工具还不是任意正式存档的完整导出器。验证结果和人工待验收项见下文与 [验证文档](documentation/tests.md)。
 
@@ -62,7 +69,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![M6b-R 公开发布本机运行快照：雾灯镇地图、往事面板与喵呜生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-m6b-r-release-2026-10-14/live-town-public-release.png)
+![Asamana migration program 本机运行快照：雾灯镇地图、往事面板与喵呜生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-m6b-r-release-2026-10-14/live-town-public-release.png)
 
 > 这张图是本机 `5173` 客户端连接 `4311` DeskBot 服务的实际运行快照：地图、居民、往事回放、生活侧栏和聊天入口同时可见。它用于说明当前可体验的产品形态，不把一张截图当作 7–14 天自然长期生活的替代验收。
 
@@ -78,24 +85,24 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-第一张是本版 M6b-R replay-hardening 的实际运行截图：地图、居民面板、共同经历和聊天入口同时可见。视觉效果没有被后端验收改动，截图因此仍是当前可体验产品形态的真实证据；它不等于长期自然生活或全入口回放已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)、[M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md) 和 [本版发布记录](documentation/asamana-m6b-r-release-2026-10-14.md)。
+第一张是本迁移程序分支沿用的最新实际运行截图：地图、居民面板、共同经历和聊天入口同时可见。P4 foundation 本轮主要改动服务端 replay 接缝与 authored world-event candidate 治理，没有伪造一张“新 UI”图片；因此这张图仍是当前可体验产品形态的真实证据，但不等于 P4 全量、长期自然生活或全入口回放已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)、[M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md)、[迁移管线 v2](documentation/asamana-migration-pipeline-v2.md) 和 [世界事件内容包](documentation/asamana-authored-world-event-package-v1.md)。
 
 ## 当前完成范围
 
 当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。v6.4 基线的 Windows 本机复验与 M6b-R 接缝审计结果见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md)、[M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md) 与 [迁移矩阵](documentation/asamana-migration-matrix-v1.md)。M6b-R 公开分支只把已验证的受控 replay 与当前 operation 接缝骨架写入发布说明；服务端全量回归、voice/device/connector route replay 和 R0–R8 完整验收仍是后续门槛。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。v6.4 基线的 Windows 本机复验与 M6b-R 接缝审计结果见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md)、[M6b-R 接缝合同](documentation/asamana-m6b-route-worker-device-replay-v1.md) 与 [迁移矩阵](documentation/asamana-migration-matrix-v1.md)。本迁移程序分支只把已验证的受控 replay、第一批 operation 接缝和 authored world-event candidate 骨架写入发布说明；服务端全量 route/voice/worker/device 回放、真实模型跨日目标追求和 R0–R8 完整验收仍是后续门槛。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。
 
 `node scripts/review-asamana-migration.mjs` 在临时 SQLite 运行受控三日链，不访问正式存档、默认不调用外部模型。规则样本已经 `verified`：第二日形成的具体目标，在第三日重启后通过原生活计划与真实任务完成，材料和每日实践上限保持有效。真实 DeepSeek 样本仍有缺少经历依据的目标被拒绝，结果为 `inconclusive_reflection_failed`；规则样本通过不代表真实模型或长期自然生活已验收。
 
-当前先收口真实模型慢认知、行动目标、历史与断线恢复体验，再扩展地方故事和居民协作，并开展连续 7–14 天观察。真实中文声音与身体联调沿 [v0.5 开发路线](research/development-roadmap-v0.5.md) 后续阶段推进；本分支的具体验收顺序见 [迁移管线](documentation/asamana-migration-pipeline-v1.md)。
+当前先收口真实模型慢认知、行动目标、历史与断线恢复体验，再扩展地方故事和居民协作，并开展连续 7–14 天观察。真实中文声音与身体联调沿 [v0.5 开发路线](research/development-roadmap-v0.5.md) 后续阶段推进；本分支的具体验收顺序见 [迁移管线 v2](documentation/asamana-migration-pipeline-v2.md)。
 
 ## 本地运行
 
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-m6b-r-public-release-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-migration-program-v2-release-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -107,7 +114,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-r-public-release-2026-10-14`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-migration-program-v2-release-2026-10-14`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
@@ -153,7 +160,7 @@ flowchart LR
 | [当前设计与实现](documentation/design-implementation-map.md) | 已完成能力、实现对应和剩余工作 |
 | [架构](documentation/architecture.md) · [流程](documentation/flows.md) | 状态边界、生活与角色发展链路 |
 | [验证](documentation/tests.md) · [自动运行](documentation/automation.md) | 验证方法、连接器与服务运行 |
-| [Asamana 评估](documentation/asamana-review.md) · [v6.4 发布说明](documentation/asamana-replay-journal-v6-4.md) · [v6.3 发布说明](documentation/asamana-replay-journal-v6-3.md) · [input-runtime 回放验收](documentation/asamana-input-runtime-replay-v1.md) · [v6.2 发布说明](documentation/asamana-replay-journal-v6-2.md) · [M6b 接缝合同](documentation/asamana-m6b-seam-contract-v1.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
+| [Asamana 评估](documentation/asamana-review.md) · [v6.4 发布说明](documentation/asamana-replay-journal-v6-4.md) · [v6.3 发布说明](documentation/asamana-replay-journal-v6-3.md) · [input-runtime 回放验收](documentation/asamana-input-runtime-replay-v1.md) · [v6.2 发布说明](documentation/asamana-replay-journal-v6-2.md) · [M6b 接缝合同](documentation/asamana-m6b-seam-contract-v1.md) · [迁移标准 v1](documentation/asamana-migration-standard-v1.md) · [迁移标准 v2](documentation/asamana-migration-standard-v2.md) · [迁移管线 v1](documentation/asamana-migration-pipeline-v1.md) · [迁移管线 v2](documentation/asamana-migration-pipeline-v2.md) · [迁移作业单 v2](documentation/asamana-migration-runbook-v2.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) · [世界事件内容包](documentation/asamana-authored-world-event-package-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
 | [Asamana attribution](third-party/asamana/README.md) | 上游版本、Apache-2.0 许可证与迁移归属说明 |
 | [居民设计](research/npcs/resident-life-design-v1.md) · [地图目录](world-content/companion-world/map.v1.json) | 生活角色与地图内容 |
 | [阶段规则](research/world/role-stages-v1.md) · [身体协议](research/protocol/body-perception-v1.md) | 角色采用、回退与后续硬件适配 |

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deskbot.asamana-migration-evidence.v2",
+  "title": "DeskBot Asamana migration evidence v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "item_id",
+    "run_id",
+    "base_commit",
+    "rule_version",
+    "commands",
+    "database_path",
+    "logic_time",
+    "provider_mode",
+    "provider_calls",
+    "namespace_coverage",
+    "positive",
+    "negative",
+    "restart_idempotency",
+    "manual_artifacts",
+    "status",
+    "known_gaps"
+  ],
+  "properties": {
+    "schema": { "const": "deskbot.migration-evidence.v2" },
+    "item_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "base_commit": { "type": "string", "pattern": "^[0-9a-fA-F]{7,64}$" },
+    "rule_version": { "type": "string", "minLength": 1 },
+    "content_version": { "type": "string" },
+    "commands": { "type": "array", "items": { "type": "string" } },
+    "database_path": { "type": "string", "minLength": 1 },
+    "logic_time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "timezone"],
+      "properties": {
+        "start": { "type": "string", "minLength": 1 },
+        "end": { "type": "string", "minLength": 1 },
+        "timezone": { "type": "string", "minLength": 1 }
+      }
+    },
+    "provider_mode": { "enum": ["none", "fixture", "live"] },
+    "provider_calls": { "type": "integer", "minimum": 0 },
+    "namespace_coverage": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "positive": { "$ref": "#/$defs/checks" },
+    "negative": { "$ref": "#/$defs/checks" },
+    "restart_idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fresh", "restart", "duplicate"],
+      "properties": {
+        "fresh": { "$ref": "#/$defs/result" },
+        "restart": { "$ref": "#/$defs/result" },
+        "duplicate": { "$ref": "#/$defs/result" },
+        "replay": { "$ref": "#/$defs/result" }
+      }
+    },
+    "manual_artifacts": { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "enum": ["contract_verified", "automated_verified", "manual_pending", "accepted", "partial", "inconclusive", "gap", "blocked", "rolled_back", "stale"]
+    },
+    "known_gaps": { "type": "array", "items": { "type": "string" } },
+    "rollback_result": { "type": "string" },
+    "artifact_hash": { "type": "string" },
+    "na_reasons": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "$defs": {
+    "result": { "enum": ["pass", "fail", "na", "inconclusive"] },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case", "result"],
+      "properties": {
+        "case": { "type": "string", "minLength": 1 },
+        "result": { "$ref": "#/$defs/result" },
+        "detail": { "type": "string" },
+        "artifact": { "type": "string" }
+      }
+    },
+    "checks": { "type": "array", "items": { "$ref": "#/$defs/check" } }
+  }
+}

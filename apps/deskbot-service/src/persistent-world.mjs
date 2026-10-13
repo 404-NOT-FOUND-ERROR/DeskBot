@@ -1091,6 +1091,10 @@ function normalizeWorldLineEvent(value) {
     outcome: optionalText(item.outcome, 'payload.event.outcome', null),
     source: optionalText(item.source, 'payload.event.source', 'world-engine'),
     occurred_at: optionalDateTime(item.occurred_at, 'payload.event.occurred_at', null),
+    content_package_id: optionalText(item.content_package_id, 'payload.event.content_package_id', null),
+    content_package_version: item.content_package_version === undefined || item.content_package_version === null
+      ? null : boundedNumber(item.content_package_version, 'payload.event.content_package_version', 1, 1000000),
+    source_event_id: optionalText(item.source_event_id, 'payload.event.source_event_id', null),
     ...normalizePerceptionScope(item),
   };
 }

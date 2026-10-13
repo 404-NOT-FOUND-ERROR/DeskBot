@@ -18,6 +18,7 @@ const CHATS = 'replay.capture-chats';
 const INPUT_RUNS = 'replay.capture-input-runs';
 const PROVIDERS = 'replay.capture-provider-results';
 const VOICES = 'replay.capture-voices';
+const ROUTES = 'replay.capture-routes';
 const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
 // A capture id is a durable identity, but two live recorder objects on the
@@ -110,6 +111,38 @@ function chatResultDigest(result) {
 // operation journal while still making the original route replayable.
 function voiceResultDigest(result) {
   return digest(result ?? null);
+}
+
+function routeResultDigest(result, routeId = null) {
+  // Direct route read models include receipt timestamps that are derived from
+  // the replay clock while canonical mutation hashes already verify the exact
+  // durable write. Exclude only those presentation timestamps here; retain
+  // IDs, revisions, statuses and payloads for semantic equality.
+  const volatileKeys = new Set(['duration_ms', 'trace', 'audit_errors', 'audit_error',
+    'created_at', 'updated_at', 'accepted_at', 'decided_at', 'started_at', 'completed_at',
+    'received_at', 'committed_at', 'observed_at', 'generated_at']);
+  if (routeId === 'world.candidate.accept' && result && typeof result === 'object') {
+    return canonicalDigest({
+      schema: result.schema, accepted: result.accepted, duplicate: result.duplicate,
+      candidate_id: result.candidate_id,
+      world_revision: result.world?.world_revision ?? null,
+      world_mutations: (result.world_mutations ?? []).map(item => ({
+        applied: item.applied, duplicate: item.duplicate,
+        mutation: item.mutation ? {
+          mutation_id: item.mutation.mutation_id, event_id: item.mutation.event_id,
+          sequence: item.mutation.sequence, before_revision: item.mutation.before_revision,
+          after_revision: item.mutation.after_revision,
+        } : null,
+      })),
+      // The mutation ledger and world revision are the authoritative result;
+      // replay metadata is audited separately in the canonical journal and is
+      // intentionally omitted here because its source/target capture context
+      // can differ while the legal write is identical.
+      decision: result.decision ? { decision_id: result.decision.decision_id, candidate_id: result.decision.candidate_id,
+        action: result.decision.action, rule_version: result.decision.rule_version } : null,
+    }, { volatileKeys });
+  }
+  return canonicalDigest(result ?? null, { volatileKeys });
 }
 
 function providerFixtureKind(ref) {
@@ -295,7 +328,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, voice_count: 0, journal_count: 0,
+        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, voice_count: 0, route_count: 0, journal_count: 0,
         journal_namespace_registry: namespaceRegistryList,
         journal_registry_hash: registryHash,
         journal_require_operation_context: Boolean(requireOperationContext),
@@ -425,6 +458,47 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       });
       return record;
     },
+    /** Record a direct HTTP domain route for a trusted local replay. The
+     * operation journal keeps only the request hash; this private tape keeps
+     * the bounded request and result digest needed to re-enter the original
+     * handler without opening an HTTP listener. */
+    recordRoute({ operation_id, route_id = null, request = null, result = null, error = null,
+      received_at = now().toISOString(), operation_start = null, operation_end = null } = {}) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      const session = persistence.get(SESSIONS, captureId);
+      const operationId = String(operation_id ?? context.operation_id ?? '').trim();
+      const routeId = String(route_id ?? context.route_id ?? '').trim();
+      if (!operationId || !routeId) fail('replay_route_record_invalid');
+      const existing = persistence.list(ROUTES).find(item => item.capture_id === captureId && item.operation_id === operationId);
+      const record = {
+        schema: 'deskbot.replay-capture-route.v1', capture_id: captureId,
+        operation_id: operationId, route_id: routeId, index: existing?.index ?? session.route_count ?? 0,
+        request: request === null || request === undefined ? null : copy(request), received_at,
+        status: error ? 'error' : 'success',
+        operation_start: operation_start ?? session.operation_count,
+        operation_end: operation_end ?? session.operation_count,
+        result_digest: error ? null : routeResultDigest(result, routeId),
+        error: error ? { code: error.code ?? 'route_failed', status: error.statusCode ?? error.status ?? null,
+          retryable: error.retryable === true } : null,
+      };
+      record.record_hash = digest(record);
+      if (existing) {
+        // A retry may legitimately return a duplicate/previous-result envelope
+        // and arrive at a different wall-clock instant. Preserve the first
+        // route attempt as the replay source, but reject a reused operation id
+        // with a different request body.
+        if (digest(existing.request ?? null) !== digest(record.request ?? null)) fail('replay_route_duplicate_conflict');
+        return copy(existing);
+      }
+      persistence.transaction(() => {
+        persistence.insert(ROUTES, `${captureId}:${record.index}`, record);
+        persistence.put(SESSIONS, captureId, { ...session, route_count: record.index + 1,
+          coverage: 'canonical_world_with_service_routes' });
+      });
+      return record;
+    },
     /** Record one input-runtime source run and its private deterministic
      * provider fixture.  The public journal only receives resultRef; the
      * fixture is exported into the local replay tape and never into the
@@ -508,7 +582,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, chats, input_runs, providers, voices, journals, namespace_digests;
+  let session, operations, ingresses, chats, input_runs, providers, voices, routes, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -529,6 +603,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(provider => provider.capture_id === captureId);
     voices = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(VOICES)]
       .map(row => JSON.parse(row.payload_json)).filter(voice => voice.capture_id === captureId);
+    routes = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(ROUTES)]
+      .map(row => JSON.parse(row.payload_json)).filter(route => route.capture_id === captureId);
     journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
       .map(row => JSON.parse(row.payload_json)).filter(journal => journal.capture_id === captureId);
     const grouped = new Map();
@@ -548,7 +624,7 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
   const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses,
-    chats, input_runs, providers, voices, journals };
+    chats, input_runs, providers, voices, routes, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
   return { directory: archive, operation_count: operations.length, journal_count: journals.length,
@@ -569,6 +645,8 @@ function validateArchive(tape, codeFingerprint) {
   if (tape.providers.length !== (tape.session.provider_count ?? 0)) fail('replay_provider_fixture_missing');
   if (!Array.isArray(tape.voices)) tape.voices = [];
   if (tape.voices.length !== (tape.session.voice_count ?? 0)) fail('replay_capture_voice_incomplete');
+  if (!Array.isArray(tape.routes)) tape.routes = [];
+  if (tape.routes.length !== (tape.session.route_count ?? 0)) fail('replay_capture_route_incomplete');
   if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
   if (tape.journals.length !== (tape.session.journal_count ?? 0)) fail('replay_capture_journal_incomplete');
   for (const [index, journal] of tape.journals.entries()) {
@@ -634,6 +712,21 @@ function validateArchive(tape, codeFingerprint) {
       || voice.operation_end > tape.operations.length || !Array.isArray(voice.provider_refs)
       || digest(content) !== hash) fail('replay_capture_voice_corrupt');
     voiceOperationIds.add(voice.operation_id);
+  }
+  const routeOperationIds = new Set();
+  for (const [index, route] of tape.routes.entries()) {
+    const { record_hash: hash, ...content } = route;
+    if (route.schema !== 'deskbot.replay-capture-route.v1' || route.capture_id !== tape.session.capture_id
+      || route.index !== index || !route.operation_id || !route.route_id || routeOperationIds.has(route.operation_id)
+      || !Number.isFinite(Date.parse(route.received_at)) || !['success', 'error'].includes(route.status)
+      || (route.status === 'success' && typeof route.result_digest !== 'string')
+      || (route.status === 'error' && (!route.error || typeof route.error.code !== 'string'))
+      || !Number.isSafeInteger(route.operation_start) || !Number.isSafeInteger(route.operation_end)
+      || route.operation_start < 0 || route.operation_end < route.operation_start
+      || route.operation_end > tape.operations.length || !hash || digest(content) !== hash) {
+      fail('replay_capture_route_corrupt');
+    }
+    routeOperationIds.add(route.operation_id);
   }
    let previousOperationEnd = 0;
    for (const [index, ingress] of tape.ingresses.entries()) {
@@ -837,6 +930,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
     ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id)).map(item => ({ kind: 'ingress', item })),
     ...tape.chats.map(item => ({ kind: 'chat', item })),
     ...(tape.voices ?? []).map(item => ({ kind: 'voice', item })),
+    ...(tape.routes ?? []).map(item => ({ kind: 'route', item })),
   ].sort((a, b) => (a.item.operation_start - b.item.operation_start)
     || String(a.item.received_at).localeCompare(String(b.item.received_at))
     || (a.item.index - b.item.index));
@@ -930,10 +1024,38 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
         if (item.status === 'success' && voiceResultDigest(result) !== item.result_digest) {
           fail(`replay_service_voice_result_mismatch:${index}`);
         }
+      } else if (record.kind === 'route') {
+        const replayRoute = runtime.replayRoute;
+        if (typeof replayRoute !== 'function') fail('replay_runtime_route_missing');
+        const call = () => replayRoute(item.route_id, copy(item.request ?? {}), { tape, operation_id: item.operation_id });
+        if (item.status === 'error') {
+          try {
+            await call();
+            fail(`replay_service_route_error_missing:${index}`);
+          } catch (error) {
+            if (error?.code !== item.error?.code) fail(`replay_service_route_error_mismatch:${index}`);
+            result = { error };
+          }
+        } else {
+          result = await call();
+          if (routeResultDigest(result, item.route_id) !== item.result_digest) {
+            fail(`replay_service_route_result_mismatch:${index}`);
+          }
+        }
       } else {
         result = await runtime.ingestNonChatEvent(copy(item.event), copy(item.adapter));
         if (Boolean(result?.duplicate) !== item.duplicate) fail(`replay_service_duplicate_mismatch:${index}`);
-        if (ingressResultDigest(result) !== item.result_digest) fail(`replay_service_ingress_result_mismatch:${index}`);
+        if (ingressResultDigest(result) !== item.result_digest) {
+          const error = Object.assign(new Error(`replay_service_ingress_result_mismatch:${index}`), {
+            code: `replay_service_ingress_result_mismatch:${index}`,
+            expected: item.result_digest,
+            actual: ingressResultDigest(result),
+            event_id: item.event_id,
+            event: item.event,
+            result,
+          });
+          throw error;
+        }
       }
        nextOperation = item.operation_end;
        if (world()?.get && nextOperation && digest(world().get()) !== tape.operations[nextOperation - 1].world_hash) {

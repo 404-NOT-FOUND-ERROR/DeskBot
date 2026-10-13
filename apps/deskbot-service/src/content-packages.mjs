@@ -227,8 +227,37 @@ function validateWorldEvents(raw, settlementId) {
     seen.add(id);
     return clone(event);
   });
+  const packages = events.packages ?? [];
+  if (!Array.isArray(packages)) throw new ContentPackageError(500, 'content_package_invalid', 'world-events.packages must be an array');
+  const packageIds = new Set();
+  const compiledPackages = packages.map((entry, index) => {
+    const pack = object(entry, `world-events.packages[${index}]`);
+    const packageId = text(pack.package_id, `world-events.packages[${index}].package_id`);
+    if (packageIds.has(packageId) || !/^[-a-z0-9]+-v\d+$/u.test(packageId)) {
+      throw new ContentPackageError(500, 'content_package_invalid', `Invalid or duplicate world event package: ${packageId}`);
+    }
+    if (!Number.isInteger(pack.version) || pack.version < 1) throw new ContentPackageError(500, 'content_package_invalid', `${packageId}.version must be a positive integer`);
+    text(pack.title, `${packageId}.title`); text(pack.kind, `${packageId}.kind`); text(pack.provenance, `${packageId}.provenance`);
+    const activation = object(pack.activation, `${packageId}.activation`);
+    stringArray(activation.observation_types, `${packageId}.activation.observation_types`);
+    stringArray(activation.required_any_tags, `${packageId}.activation.required_any_tags`);
+    if (typeof activation.min_confidence !== 'number' || activation.min_confidence < 0 || activation.min_confidence > 1) {
+      throw new ContentPackageError(500, 'content_package_invalid', `${packageId}.activation.min_confidence must be between 0 and 1`);
+    }
+    const eventTemplate = object(pack.event_template, `${packageId}.event_template`);
+    for (const field of ['event_id', 'title', 'summary', 'arc_id', 'status']) text(eventTemplate[field], `${packageId}.event_template.${field}`);
+    const actions = stringArray((pack.actions ?? []).map(item => item?.action), `${packageId}.actions`);
+    if (actions.some(action => !['apply_world_line_event', 'enqueue_pending_item', 'record_external_context'].includes(action))) {
+      throw new ContentPackageError(500, 'content_package_invalid', `${packageId} contains an unsupported action`);
+    }
+    if ((pack.expires_after_hours ?? 0) !== 0 && (!Number.isInteger(pack.expires_after_hours) || pack.expires_after_hours < 1 || pack.expires_after_hours > 24 * 30)) {
+      throw new ContentPackageError(500, 'content_package_invalid', `${packageId}.expires_after_hours must be between 1 and 720`);
+    }
+    packageIds.add(packageId);
+    return clone({ ...pack, version: pack.version, activation: clone(activation), event_template: clone(eventTemplate), actions: clone(pack.actions) });
+  });
   text(events.ingestion_boundary, 'world-events.ingestion_boundary');
-  return { ...clone(events), events: compiled };
+  return { ...clone(events), events: compiled, packages: compiledPackages };
 }
 
 let cached;

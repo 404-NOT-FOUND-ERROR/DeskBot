@@ -2,7 +2,7 @@
   "schema": "deskbot.asamana-migration-catalog.v1",
   "catalog_version": "1.0.0",
   "release": {
-    "branch": "codex/asamana-m6b-r-public-release-2026-10-14",
+    "branch": "codex/asamana-migration-program-v2-release-2026-10-14",
     "base_commit": "ee81de9",
     "status": "release-candidate",
     "updated_at": "2026-10-14",
@@ -285,7 +285,7 @@
       "owner": "DeskBot route maintainer",
       "status": "partial",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G7"],
-      "evidence_refs": ["apps/deskbot-service/test/operation-journal-contract.test.mjs"],
+      "evidence_refs": ["apps/deskbot-service/test/operation-journal-contract.test.mjs", "apps/deskbot-service/test/m6b-route-replay.test.mjs"],
       "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
       "known_gaps": ["original handler replay and full namespace atomicity"]
@@ -367,10 +367,10 @@
       "dependencies": ["M5-world-candidate-governance", "M6b-R-worker-cadence-replay"],
       "risk": "content pack invents unvalidated geography/resources",
       "owner": "DeskBot world-content maintainer",
-      "status": "planned",
+      "status": "partial",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G7"],
-      "evidence_refs": [],
-      "last_verified_at": null,
+      "evidence_refs": ["apps/deskbot-service/test/authored-world-events.test.mjs", "apps/deskbot-service/test/authored-world-events-http.test.mjs", "documentation/world-event-package-v1.schema.json"],
+      "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
       "known_gaps": ["richer multi-source event catalogue"]
     },

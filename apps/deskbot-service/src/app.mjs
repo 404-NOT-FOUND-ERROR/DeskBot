@@ -45,6 +45,7 @@ import { listRoleExperiencePackages } from './role-experience-packages.mjs';
 import { roleExperiencePerformance } from './role-experience-performance.mjs';
 import { listStoryPackages, previewStoryPackage, installStoryPackage } from './story-packages.mjs';
 import { listContentPackages } from './content-packages.mjs';
+import { createAuthoredWorldEventCatalog } from './authored-world-events.mjs';
 import {
   getResearchScenarioCatalog,
   ResearchScenarioError,
@@ -144,6 +145,7 @@ function sendInputAccepted(response, event, duplicate, stateResult) {
     output_route: stateResult?.output_route ?? null,
     role_evolution: stateResult?.roleEvolution ?? null,
     world_candidate: stateResult?.worldCandidate ?? null,
+    authored_world_event: stateResult?.authoredWorldEvent ?? null,
     world_mutation: stateResult?.world_mutation ?? null,
     interaction_decision: stateResult?.interaction_decision ?? null,
   });
@@ -220,6 +222,21 @@ export function createDeskBotServer({
     ingest: event => ingestNonChatEvent(event),
     listMutations: options => persistentWorld.listMutations(options),
   });
+  const authoredWorldEvents = createAuthoredWorldEventCatalog();
+  function observeWorldCandidate(event, world) {
+    const evaluation = authoredWorldEvents.evaluate(event);
+    const match = evaluation.matches[0] ?? null;
+    if (match) {
+      const prepared = authoredWorldEvents.prepare(match.package_id, event);
+      if (prepared.accepted) {
+        return { authored: prepared, candidate: worldCandidates.observe(prepared.candidate_event, {
+          world,
+          ttlMs: Math.max(1, (prepared.expires_after_hours ?? 24) * 60 * 60 * 1000),
+        }) };
+      }
+    }
+    return { authored: null, candidate: worldCandidates.observe(event, { world }) };
+  }
   let npcGoals;
   const sharedLife = createSharedLife({ now, persistence, worldSnapshot: () => persistentWorld.get(), ingest: event => ingestNonChatEvent(event), npcReserved: id => npcGoals?.reserved(id) ?? false });
   const sharedLifeReports = createSharedLifeReports({
@@ -366,14 +383,39 @@ export function createDeskBotServer({
   }
 
   function runServiceOperation({ operationId, operationKind, routeId = null, source = 'service', request = null,
-    logicTime = now().toISOString(), sourceEventIds = [], adapterRef = null, callback }) {
+    logicTime = now().toISOString(), sourceEventIds = [], adapterRef = null, captureRoute = false, callback }) {
     if (typeof callback !== 'function') throw new TypeError('runServiceOperation callback is required');
     if (!replayCapture?.withOperation) return callback();
-    return replayCapture.withOperation({
+    const operationStart = replayCapture.operationCount?.() ?? null;
+    const context = {
       operation_id: String(operationId), operation_kind: String(operationKind), route_id: routeId,
       source, request, logic_time: logicTime, source_event_ids: sourceEventIds,
       adapter_ref: adapterRef,
-    }, callback);
+    };
+    const execute = () => {
+      try {
+        const result = callback();
+        if (!captureRoute || !replayCapture.recordRoute) return result;
+        const record = value => {
+          replayCapture.recordRoute({ operation_id: operationId, route_id: routeId, request,
+            result: value, received_at: now().toISOString(), operation_start: operationStart,
+            operation_end: replayCapture.operationCount?.() ?? operationStart });
+          return value;
+        };
+        return result && typeof result.then === 'function' ? result.then(record, error => {
+          replayCapture.recordRoute({ operation_id: operationId, route_id: routeId, request,
+            error, received_at: now().toISOString(), operation_start: operationStart,
+            operation_end: replayCapture.operationCount?.() ?? operationStart });
+          throw error;
+        }) : record(result);
+      } catch (error) {
+        if (captureRoute && replayCapture.recordRoute) replayCapture.recordRoute({ operation_id: operationId,
+          route_id: routeId, request, error, received_at: now().toISOString(), operation_start: operationStart,
+          operation_end: replayCapture.operationCount?.() ?? operationStart });
+        throw error;
+      }
+    };
+    return replayCapture.withOperation(context, execute);
   }
 
   // The HTTP voice routes and the trusted archive replay use the same
@@ -531,7 +573,7 @@ export function createDeskBotServer({
       const roleEvolutionResult = result.duplicate
         ? null
         : roleEvolution.observeEvent(result.event);
-      const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
+      const worldCandidateResult = observeWorldCandidate(result.event, worldMutation.world);
       const output = {
         event: result.event,
         duplicate: result.duplicate || worldMutation.duplicate,
@@ -542,7 +584,8 @@ export function createDeskBotServer({
         outputRoute,
         bodyOutputRoute,
         roleEvolution: roleEvolutionResult,
-        worldCandidate: worldCandidateResult,
+        worldCandidate: worldCandidateResult.candidate,
+        authoredWorldEvent: worldCandidateResult.authored,
       };
       // This is an audit envelope only. The canonical world and all other
       // domain stores have already committed through their normal handlers;
@@ -938,6 +981,7 @@ export function createDeskBotServer({
         readJson(request)
           .then(body => runServiceOperation({ operationId: `life.commitment.${body.operation ?? 'create'}:${stableOperationSuffix(body.commitment_id ?? body.id ?? body.event_id ?? body.idempotency_key ?? body)}`,
             operationKind: `life.commitment.${body.operation ?? 'create'}`, routeId: 'life.commitment', source: 'http.life', request: body,
+            captureRoute: true,
             callback: () => body.operation === 'resolve' || body.operation === 'cancel'
               ? sharedLifeReports.updateCommitment(body)
               : sharedLifeReports.createCommitment(body) }))
@@ -1503,6 +1547,7 @@ export function createDeskBotServer({
           return runServiceOperation({
             operationId: `${routeId}:${stableOperationSuffix(body.idempotency_key ?? body.operation_id ?? { characterId: characterId ?? null, limit })}`,
             operationKind: routeId, routeId, source: 'http.role', request: body,
+            captureRoute: true,
             callback: () => roleEvolution.sync({ characterId, limit }),
           });
         })
@@ -1718,6 +1763,27 @@ export function createDeskBotServer({
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/world/authored-events') {
+      sendJson(response, 200, {
+        schema: 'deskbot.authored-world-event-package-list.v1',
+        rule_version: authoredWorldEvents.ruleVersion,
+        packages: authoredWorldEvents.list(),
+      });
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/world/authored-events/evaluate') {
+      readJson(request, 64 * 1024).then(body => {
+        const event = normalizePublicEvent(body);
+        const evaluation = authoredWorldEvents.evaluate(event);
+        const prepared = evaluation.matches[0] ? authoredWorldEvents.prepare(evaluation.matches[0].package_id, event) : null;
+        sendJson(response, 200, { schema: 'deskbot.authored-world-event-evaluation-response.v1', evaluation, prepared });
+      }).catch(error => sendJson(response, error instanceof InputError ? error.statusCode : 500, {
+        error: error.code ?? 'authored_world_event_evaluation_failed', message: error.message,
+      }));
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/world/candidates') {
       sendJson(response, 200, {
         schema: 'deskbot.world-candidate-list.v0.1',
@@ -1750,7 +1816,8 @@ export function createDeskBotServer({
         .then((body) => {
           return runServiceOperation({
             operationId: `world.candidate.${action}:${candidateId}`,
-            operationKind: `world.candidate.${action}`, routeId: `world.candidate.${action}`, source: 'http.world-candidate', request: body,
+            operationKind: `world.candidate.${action}`, routeId: `world.candidate.${action}`, source: 'http.world-candidate', request: { ...body, candidate_id: candidateId },
+            captureRoute: true,
             callback: () => {
               if (action === 'preview') return worldCandidates.preview(candidateId);
               if (action === 'accept') return worldCandidates.accept(candidateId, {
@@ -1779,6 +1846,7 @@ export function createDeskBotServer({
         .then((body) => runServiceOperation({
           operationId: `research.scenario.run:${stableOperationSuffix(body.idempotency_key ?? body.scenario_id)}`,
           operationKind: 'research.scenario.run', routeId: 'research.scenario.run', source: 'http.research', request: body,
+          captureRoute: true,
           callback: () => runResearchScenario(body.scenario_id),
         }))
         .then((report) => sendJson(response, 200, report))
@@ -2338,7 +2406,7 @@ export function createDeskBotServer({
           const roleEvolutionResult = result.duplicate
             ? null
             : roleEvolution.observeEvent(result.event);
-          const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
+          const worldCandidateResult = observeWorldCandidate(result.event, worldMutation.world);
            const accepted = {
             ...stateResult,
             outputs: stateResult.outputs,
@@ -2350,14 +2418,16 @@ export function createDeskBotServer({
             world_mutation: worldMutation,
             interaction_decision: interactionDecision,
             roleEvolution: roleEvolutionResult,
-            worldCandidate: worldCandidateResult,
+            worldCandidate: worldCandidateResult.candidate,
+            authoredWorldEvent: worldCandidateResult.authored,
            };
            replayCapture?.recordIngress?.({ event: result.event, result: {
              ...accepted,
              duplicate: result.duplicate || worldMutation.duplicate,
              worldMutation,
              roleEvolution: roleEvolutionResult,
-             worldCandidate: worldCandidateResult,
+             worldCandidate: worldCandidateResult.candidate,
+             authoredWorldEvent: worldCandidateResult.authored,
              evidence: evidenceResult?.evidence ?? null,
            }, received_at: now().toISOString(), operation_start: operationStart });
            sendInputAccepted(response, result.event, result.duplicate || worldMutation.duplicate, accepted);
@@ -2543,6 +2613,34 @@ export function createDeskBotServer({
   // the same route handler and private fixture provider as HTTP, without
   // opening a listener or exposing a public replay capability.
   server.replayVoice = async (routeId, body) => invokeVoiceRoute(routeId, body);
+  // Trusted in-process replay entry for the first direct domain-route wave.
+  // Each branch calls the same domain handler used by its HTTP route; no HTTP
+  // listener or client-supplied mutation is involved.
+  server.replayRoute = async (routeId, body = {}) => {
+    if (routeId === 'role.evolution.run' || routeId === 'role.evolution.sync') {
+      return roleEvolution.sync({ characterId: body.character_id ?? body.characterId ?? undefined, limit: body.limit ?? 200 });
+    }
+    if (routeId.startsWith('world.candidate.')) {
+      const action = routeId.slice('world.candidate.'.length), candidateId = body.candidate_id;
+      if (typeof candidateId !== 'string' || !candidateId) throw Object.assign(new Error('candidate_id is required'), { code: 'replay_route_request_invalid' });
+      if (action === 'preview') return worldCandidates.preview(candidateId);
+      if (action === 'accept') return worldCandidates.accept(candidateId, { expectedWorldRevision: body.expected_world_revision ?? body.expectedWorldRevision });
+      if (action === 'dismiss') return worldCandidates.dismiss(candidateId, { reason: body.reason ?? null });
+    }
+    if (routeId === 'research.scenario.run') return runResearchScenario(body.scenario_id);
+    if (routeId === 'life.commitment') {
+      return body.operation === 'resolve' || body.operation === 'cancel'
+        ? sharedLifeReports.updateCommitment(body)
+        : sharedLifeReports.createCommitment(body);
+    }
+    throw Object.assign(new Error(`unsupported replay route: ${routeId}`), { code: 'replay_route_unsupported' });
+  };
+  // Reproduce deterministic startup-derived indexes for service replay without
+  // opening a listener or starting timers/providers. Only idempotent domain
+  // bootstrap work belongs here; transport startup remains disabled.
+  server.replayStartup = async () => {
+    runWorkerOperation('role-evolution', () => roleEvolution.syncAll(), { suffix: 'startup' });
+  };
   // Test/in-process adapters use the same canonical path as trusted
   // connectors without weakening the public /api/event boundary.
   server.ingestNonChatEvent = ingestNonChatEvent;
