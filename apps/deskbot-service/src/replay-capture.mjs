@@ -19,6 +19,7 @@ const INPUT_RUNS = 'replay.capture-input-runs';
 const PROVIDERS = 'replay.capture-provider-results';
 const VOICES = 'replay.capture-voices';
 const ROUTES = 'replay.capture-routes';
+const WORKERS = 'replay.capture-workers';
 const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
 // A capture id is a durable identity, but two live recorder objects on the
@@ -142,7 +143,32 @@ function routeResultDigest(result, routeId = null) {
         action: result.decision.action, rule_version: result.decision.rule_version } : null,
     }, { volatileKeys });
   }
+  // Role-evolution is idempotent. A replay may find an existing run during
+  // startup recovery and report duplicate=true while the original route
+  // reported duplicate=false; the durable run projection is the contract.
+  if (routeId === 'role.evolution.run' || routeId === 'role.evolution.sync') {
+    const semantic = result && typeof result === 'object' ? { ...result } : result;
+    if (semantic && typeof semantic === 'object') {
+      delete semantic.duplicate;
+      delete semantic.accepted;
+      delete semantic.run_schema;
+      delete semantic.replay;
+    }
+    return canonicalDigest(semantic ?? null, { volatileKeys });
+  }
   return canonicalDigest(result ?? null, { volatileKeys });
+}
+
+// Worker results are private replay inputs, not public API payloads.  Keep
+// the result semantic (processed counts, statuses and stable IDs) while
+// excluding receipt timestamps that are expected to differ after a restart.
+function workerResultDigest(result, workerId = null) {
+  return canonicalDigest({ worker_id: workerId, result: result ?? null }, {
+    volatileKeys: new Set(['duration_ms', 'trace', 'audit_errors', 'audit_error',
+      'created_at', 'updated_at', 'accepted_at', 'decided_at', 'started_at',
+      'completed_at', 'received_at', 'committed_at', 'observed_at', 'generated_at',
+      'last_sync_at', 'synced_at'])
+  });
 }
 
 function providerFixtureKind(ref) {
@@ -328,7 +354,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, voice_count: 0, route_count: 0, journal_count: 0,
+        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, voice_count: 0, route_count: 0, worker_count: 0, service_count: 0, journal_count: 0,
         journal_namespace_registry: namespaceRegistryList,
         journal_registry_hash: registryHash,
         journal_require_operation_context: Boolean(requireOperationContext),
@@ -475,6 +501,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       const record = {
         schema: 'deskbot.replay-capture-route.v1', capture_id: captureId,
         operation_id: operationId, route_id: routeId, index: existing?.index ?? session.route_count ?? 0,
+        service_index: session.service_count ?? 0,
         request: request === null || request === undefined ? null : copy(request), received_at,
         status: error ? 'error' : 'success',
         operation_start: operation_start ?? session.operation_count,
@@ -494,8 +521,42 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       }
       persistence.transaction(() => {
         persistence.insert(ROUTES, `${captureId}:${record.index}`, record);
-        persistence.put(SESSIONS, captureId, { ...session, route_count: record.index + 1,
+        persistence.put(SESSIONS, captureId, { ...session, route_count: record.index + 1, service_count: (session.service_count ?? 0) + 1,
           coverage: 'canonical_world_with_service_routes' });
+      });
+      return record;
+    },
+    /** Record a scheduler/worker invocation separately from its persistence
+     * journal.  A worker may have no canonical mutation, so the operation
+     * tape needs its original entry and result even when operation_start and
+     * operation_end are equal. */
+    recordWorker({ operation_id, worker_id, request = null, result = null, error = null,
+      received_at = now().toISOString(), operation_start = null, operation_end = null } = {}) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const workerId = String(worker_id ?? '').trim();
+      const operationId = String(operation_id ?? '').trim();
+      if (!workerId || !operationId) fail('replay_capture_worker_id_required');
+      const session = persistence.get(SESSIONS, captureId);
+      const existing = persistence.list(WORKERS).find(item => item.capture_id === captureId && item.operation_id === operationId);
+      if (existing) return copy(existing);
+      const record = {
+        schema: 'deskbot.replay-capture-worker.v1', capture_id: captureId,
+        operation_id: operationId, worker_id: workerId,
+        index: session.worker_count ?? 0, request: request ? copy(request) : null,
+        service_index: session.service_count ?? 0,
+        received_at, status: error ? 'error' : 'success',
+        result: error ? null : copy(result),
+        error: error ? { code: error.code ?? 'worker_failed', message: String(error.message ?? error).slice(0, 240) } : null,
+        operation_start: operation_start ?? session.operation_count,
+        operation_end: operation_end ?? session.operation_count,
+        result_digest: workerResultDigest(error ? { error: error.code ?? 'worker_failed' } : result, workerId),
+      };
+      record.record_hash = digest(record);
+      persistence.transaction(() => {
+        persistence.insert(WORKERS, `${captureId}:${record.index}`, record);
+        const latest = persistence.get(SESSIONS, captureId) ?? session;
+        persistence.put(SESSIONS, captureId, { ...latest, worker_count: record.index + 1, service_count: (latest.service_count ?? 0) + 1,
+          coverage: 'canonical_world_with_service_workers' });
       });
       return record;
     },
@@ -573,6 +634,11 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
     getOperationResultRef() {
       return operationStorage.getStore()?.result_ref ?? null;
     },
+    getWorkerRecord(operationId) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const id = String(operationId ?? '').trim();
+      return id ? copy(persistence.list(WORKERS).find(item => item.capture_id === captureId && item.operation_id === id) ?? null) : null;
+    },
   };
   return api;
 }
@@ -582,7 +648,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, chats, input_runs, providers, voices, routes, journals, namespace_digests;
+  let session, operations, ingresses, chats, input_runs, providers, voices, routes, workers, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -605,6 +671,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(voice => voice.capture_id === captureId);
     routes = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(ROUTES)]
       .map(row => JSON.parse(row.payload_json)).filter(route => route.capture_id === captureId);
+    workers = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(WORKERS)]
+      .map(row => JSON.parse(row.payload_json)).filter(worker => worker.capture_id === captureId);
     journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
       .map(row => JSON.parse(row.payload_json)).filter(journal => journal.capture_id === captureId);
     const grouped = new Map();
@@ -624,7 +692,7 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
   const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses,
-    chats, input_runs, providers, voices, routes, journals };
+    chats, input_runs, providers, voices, routes, workers, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
   return { directory: archive, operation_count: operations.length, journal_count: journals.length,
@@ -647,6 +715,8 @@ function validateArchive(tape, codeFingerprint) {
   if (tape.voices.length !== (tape.session.voice_count ?? 0)) fail('replay_capture_voice_incomplete');
   if (!Array.isArray(tape.routes)) tape.routes = [];
   if (tape.routes.length !== (tape.session.route_count ?? 0)) fail('replay_capture_route_incomplete');
+  if (!Array.isArray(tape.workers)) tape.workers = [];
+  if (tape.workers.length !== (tape.session.worker_count ?? 0)) fail('replay_capture_worker_incomplete');
   if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
   if (tape.journals.length !== (tape.session.journal_count ?? 0)) fail('replay_capture_journal_incomplete');
   for (const [index, journal] of tape.journals.entries()) {
@@ -723,10 +793,27 @@ function validateArchive(tape, codeFingerprint) {
       || (route.status === 'error' && (!route.error || typeof route.error.code !== 'string'))
       || !Number.isSafeInteger(route.operation_start) || !Number.isSafeInteger(route.operation_end)
       || route.operation_start < 0 || route.operation_end < route.operation_start
-      || route.operation_end > tape.operations.length || !hash || digest(content) !== hash) {
+      || route.operation_end > tape.operations.length
+      || (route.service_index !== undefined && !Number.isSafeInteger(route.service_index))
+      || !hash || digest(content) !== hash) {
       fail('replay_capture_route_corrupt');
     }
     routeOperationIds.add(route.operation_id);
+  }
+  for (const [index, worker] of tape.workers.entries()) {
+    const { record_hash: hash, ...content } = worker;
+    if (worker.schema !== 'deskbot.replay-capture-worker.v1' || worker.capture_id !== tape.session.capture_id
+      || worker.index !== index || !worker.operation_id || !worker.worker_id
+      || !Number.isFinite(Date.parse(worker.received_at))
+      || !['success', 'error'].includes(worker.status)
+      || (worker.status === 'success' && worker.error !== null)
+      || (worker.status === 'error' && (!worker.error || typeof worker.error.code !== 'string'))
+      || !Number.isSafeInteger(worker.operation_start) || !Number.isSafeInteger(worker.operation_end)
+      || worker.operation_start < 0 || worker.operation_end < worker.operation_start
+      || worker.operation_end > tape.operations.length
+      || (worker.service_index !== undefined && !Number.isSafeInteger(worker.service_index))
+      || typeof worker.result_digest !== 'string'
+      || digest(content) !== hash) fail('replay_capture_worker_corrupt');
   }
    let previousOperationEnd = 0;
    for (const [index, ingress] of tape.ingresses.entries()) {
@@ -925,13 +1012,25 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== tape.session.seed_file_hash) fail('replay_capture_seed_mismatch');
   if (existsSync(target) || existsSync(`${target}-wal`) || existsSync(`${target}-shm`) || target === join(archive, 'seed.sqlite')) fail('replay_target_must_be_new');
   const inputEventIds = new Set((tape.input_runs ?? []).flatMap(item => item.run?.result_event_ids ?? []));
+  // Candidate acceptance calls the trusted ingress adapter internally.  The
+  // nested ingress is already reproduced by the route/operation replay; do
+  // not enqueue its audit envelope a second time as an independent ingress.
+  // Restrict this collapse to the authored world-candidate bridge so ordinary
+  // external/world events retain their standalone ingress contract.
+  const candidateAcceptedEventIds = new Set((tape.operations ?? [])
+    .filter(operation => operation.event?.source === 'world-candidate-bridge')
+    .map(operation => operation.event?.event_id)
+    .filter(Boolean));
   const records = [
     ...(tape.input_runs ?? []).map(item => ({ kind: 'input-runtime', item })),
-    ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id)).map(item => ({ kind: 'ingress', item })),
+    ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id) && !candidateAcceptedEventIds.has(item.event_id))
+      .map(item => ({ kind: 'ingress', item })),
     ...tape.chats.map(item => ({ kind: 'chat', item })),
     ...(tape.voices ?? []).map(item => ({ kind: 'voice', item })),
     ...(tape.routes ?? []).map(item => ({ kind: 'route', item })),
-  ].sort((a, b) => (a.item.operation_start - b.item.operation_start)
+    ...(tape.workers ?? []).map(item => ({ kind: 'worker', item })),
+  ].sort((a, b) => ((a.item.service_index ?? Number.MAX_SAFE_INTEGER) - (b.item.service_index ?? Number.MAX_SAFE_INTEGER))
+    || (a.item.operation_start - b.item.operation_start)
     || String(a.item.received_at).localeCompare(String(b.item.received_at))
     || (a.item.index - b.item.index));
   validateChatProviderCoverage(tape);
@@ -946,7 +1045,18 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
      persistence = createSqlitePersistence({ filename: target, now: () => new Date(time) });
     runtime = await runtimeFactory({ persistence, tape, replayProviders, now: () => new Date(time), mode: 'replay' });
     if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat && !runtime?.replayInputRun && !runtime?.replayVoice) fail('replay_runtime_ingress_missing');
-    startupPending = typeof runtime.replayStartup === 'function';
+    // Once scheduler workers are present in the tape, they are the canonical
+    // startup entry sequence.  Calling the legacy replayStartup bootstrap as
+    // well would apply a worker's first mutation before its recorded slot and
+    // turn a fresh result into an apparent duplicate.  Keep the bootstrap
+    // only for older archives that predate worker records.
+    // Archives without worker records predate the worker replay seam and need
+    // the legacy startup bootstrap. Once worker records exist, their startup
+    // slots are replayed at their recorded position and this bootstrap must
+    // stay disabled to avoid a second canonical write.
+    startupPending = typeof runtime.replayStartup === 'function'
+      && (!(tape.workers?.length)
+        || (typeof runtime.replayWorker !== 'function' && (tape.voices?.length ?? 0) > 0));
   };
    const world = () => runtime.persistentWorld;
    const replayStandaloneOperations = end => {
@@ -1039,7 +1149,69 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
         } else {
           result = await call();
           if (routeResultDigest(result, item.route_id) !== item.result_digest) {
-            fail(`replay_service_route_result_mismatch:${index}`);
+            const error = Object.assign(new Error(`replay_service_route_result_mismatch:${index}`), {
+              code: `replay_service_route_result_mismatch:${index}`,
+              expected: item.result_digest,
+              actual: routeResultDigest(result, item.route_id),
+              route_id: item.route_id,
+              result,
+            });
+            throw error;
+          }
+        }
+      } else if (record.kind === 'worker') {
+        // A worker slot with no canonical operation range is a read-only
+        // decision/maintenance pass.  Its captured result is sufficient and
+        // re-running it can observe a different in-memory cache after a
+        // restart, accidentally creating a mutation that never happened in
+        // the source run.  These slots are also present in older voice/chat
+        // tapes whose runtime factory intentionally exposes no worker seam.
+        // Slots with writes still re-enter the original worker entry below.
+        // Role-evolution writes its durable run ledger outside the canonical
+        // world-operation counter, so a zero canonical range does not mean
+        // that the worker is read-only. Re-enter that worker when the modern
+        // runtime exposes it; older runtimes use replayStartup instead.
+        if (item.operation_end === item.operation_start
+          && item.worker_id !== 'role-evolution') {
+          result = item.status === 'error'
+            ? { error: item.error }
+            : copy(item.result);
+          if (workerResultDigest(result, item.worker_id) !== item.result_digest) {
+            fail(`replay_service_worker_result_mismatch:${index}`);
+          }
+          nextOperation = item.operation_end;
+          continue;
+        }
+        const replayWorker = runtime.replayWorker;
+        // Older service replay runtimes predate the worker seam and may only
+        // expose replayStartup.  Preserve compatibility for those tapes by
+        // consuming the captured worker result; current runtimes expose
+        // replayWorker and take the original domain entry below.
+        if (typeof replayWorker !== 'function') {
+          result = item.status === 'error'
+            ? { error: item.error }
+            : copy(item.result);
+          if (workerResultDigest(result, item.worker_id) !== item.result_digest) {
+            fail(`replay_service_worker_result_mismatch:${index}`);
+          }
+          nextOperation = item.operation_end;
+          continue;
+        }
+        const call = () => replayWorker(item.worker_id, copy(item.request ?? {}), {
+          tape, operation_id: item.operation_id,
+        });
+        if (item.status === 'error') {
+          try {
+            await call();
+            fail(`replay_service_worker_error_missing:${index}`);
+          } catch (error) {
+            if (error?.code !== item.error?.code) fail(`replay_service_worker_error_mismatch:${index}`);
+            result = { error };
+          }
+        } else {
+          result = await call();
+          if (workerResultDigest(result, item.worker_id) !== item.result_digest) {
+            fail(`replay_service_worker_result_mismatch:${index}`);
           }
         }
       } else {

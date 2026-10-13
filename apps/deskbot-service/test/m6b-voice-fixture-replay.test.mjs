@@ -74,7 +74,7 @@ test('standalone voice routes consume private fixtures without provider calls an
     const target = createDeskBotServer({ now: targetNow, persistence: targetPersistence,
       persistentWorld: targetWorld, replayProviders: providers, websocket: false,
       worldLifeEnabled: false, autonomousLifeEnabled: false, residentLifeEnabled: false, livedMemoryEnabled: false });
-    return { replayVoice: target.replayVoice, persistentWorld: targetWorld,
+    return { replayVoice: target.replayVoice, replayWorker: target.replayWorker, persistentWorld: targetWorld,
       providerCalls: providers.providerCalls, replayStartup: () => target.roleEvolution.syncAll(),
       close: () => { try { target.close(); } catch {} targetPersistence.close(); } };
   };
@@ -165,7 +165,7 @@ test('standalone voice route errors are archived and replayed without provider c
     const target = createDeskBotServer({ now: targetNow, persistence: targetPersistence, persistentWorld: targetWorld,
       replayProviders: providers, websocket: false, worldLifeEnabled: false, autonomousLifeEnabled: false,
       residentLifeEnabled: false, livedMemoryEnabled: false });
-    return { replayVoice: target.replayVoice, persistentWorld: targetWorld, providerCalls: providers.providerCalls,
+    return { replayVoice: target.replayVoice, replayWorker: target.replayWorker, persistentWorld: targetWorld, providerCalls: providers.providerCalls,
       replayStartup: () => target.roleEvolution.syncAll(), close: () => targetPersistence.close() };
   };
   const replayed = await replayServiceCapture({ directory: archive, targetDatabase: join(directory, 'replayed.sqlite'), runtimeFactory, codeFingerprint: 'voice-error-test' });

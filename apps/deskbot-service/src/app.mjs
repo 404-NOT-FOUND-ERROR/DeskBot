@@ -745,9 +745,43 @@ export function createDeskBotServer({
   }
 
   function runWorkerOperation(worker, callback, { suffix = null, request = null } = {}) {
-    return runServiceOperation({ operationId: workerOperationId(worker, suffix), operationKind: `scheduler.${worker}`,
-      routeId: `scheduler.${worker}`, source: 'scheduler', request: request ?? { worker, suffix },
-      logicTime: persistentWorld.get()?.clock?.synced_at ?? now().toISOString(), callback });
+    const operationId = workerOperationId(worker, suffix);
+    const workerRequest = request ?? { worker, suffix };
+    // A captured cadence slot is a durable business operation.  On a process
+    // restart (or a timer firing twice in the same logical slot), return the
+    // recorded result instead of invoking the domain worker a second time.
+    const existing = replayCapture?.getWorkerRecord?.(operationId);
+    if (existing) {
+      if (existing.status === 'error') throw Object.assign(new Error(existing.error?.message ?? 'worker replay failed'), {
+        code: existing.error?.code ?? 'worker_failed', replayed: true,
+      });
+      return existing.result;
+    }
+    const operationStart = replayCapture?.operationCount?.() ?? null;
+    const captureResult = result => {
+      replayCapture?.recordWorker?.({ operation_id: operationId, worker_id: worker,
+        request: workerRequest, result, received_at: now().toISOString(),
+        operation_start: operationStart, operation_end: replayCapture.operationCount?.() });
+      return result;
+    };
+    const captureError = error => {
+      replayCapture?.recordWorker?.({ operation_id: operationId, worker_id: worker,
+        request: workerRequest, error, received_at: now().toISOString(),
+        operation_start: operationStart, operation_end: replayCapture.operationCount?.() });
+      throw error;
+    };
+    const operation = runServiceOperation({ operationId, operationKind: `scheduler.${worker}`,
+      routeId: `scheduler.${worker}`, source: 'scheduler', request: workerRequest,
+      logicTime: persistentWorld.get()?.clock?.synced_at ?? now().toISOString(),
+      callback: () => {
+        try {
+          const result = callback();
+          return result && typeof result.then === 'function'
+            ? result.then(captureResult, captureError)
+            : captureResult(result);
+        } catch (error) { return captureError(error); }
+      } });
+    return operation;
   }
 
   const worldObserver = createWorldObserver({
@@ -2635,6 +2669,29 @@ export function createDeskBotServer({
     }
     throw Object.assign(new Error(`unsupported replay route: ${routeId}`), { code: 'replay_route_unsupported' });
   };
+  // Trusted in-process scheduler replay.  This deliberately dispatches to the
+  // same domain entry used by the live timer, without creating a timer,
+  // opening a socket or consulting an external provider.
+  server.replayWorker = async (workerId, request = {}, context = {}) => {
+    const operationId = context.operation_id ?? workerOperationId(workerId, request.suffix ?? null);
+    const callback = () => {
+      switch (workerId) {
+        case 'world-clock': return persistentWorld.syncWallClock?.();
+        case 'tasks': return persistentWorld.syncTasks?.();
+        case 'role-evolution': return roleEvolution.syncAll();
+        case 'shared-life': return sharedLife.tick();
+        case 'npc-goals': return npcGoals.tick();
+        case 'autonomous-life': return tickAutonomousLife();
+        case 'world-life': return worldLife.tick();
+        case 'life-choice': return lifeChoiceWorker.tick();
+        case 'slow-cognition': return slowCognitionWorker.tick();
+        default: throw Object.assign(new Error(`unsupported replay worker: ${workerId}`), { code: 'replay_worker_unsupported' });
+      }
+    };
+    return runServiceOperation({ operationId, operationKind: `scheduler.${workerId}`,
+      routeId: `scheduler.${workerId}`, source: 'scheduler.replay', request,
+      logicTime: persistentWorld.get()?.clock?.synced_at ?? now().toISOString(), callback });
+  };
   // Reproduce deterministic startup-derived indexes for service replay without
   // opening a listener or starting timers/providers. Only idempotent domain
   // bootstrap work belongs here; transport startup remains disabled.
@@ -2681,8 +2738,8 @@ export function createDeskBotServer({
       console.error(`[role-evolution] startup sync failed: ${error.message}`);
     }
     if(livedMemoryEnabled)runWorkerOperation('autonomous-life', () => tickAutonomousLife(), { suffix: 'startup' });
-    void runWorkerOperation('life-choice', () => lifeChoiceWorker.tick(), { suffix: 'startup' }).catch(()=>{});
-    void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick(), { suffix: 'startup' }).catch(error=>console.error(`[slow-cognition] startup failed: ${error.message}`));
+    void Promise.resolve(runWorkerOperation('life-choice', () => lifeChoiceWorker.tick(), { suffix: 'startup' })).catch(()=>{});
+    void Promise.resolve(runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick(), { suffix: 'startup' })).catch(error=>console.error(`[slow-cognition] startup failed: ${error.message}`));
     runWorkerOperation('world-life', () => worldLife.tick(), { suffix: 'startup' });
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
@@ -2708,7 +2765,7 @@ export function createDeskBotServer({
       runWorkerOperation('shared-life', () => sharedLife.tick());
       runWorkerOperation('npc-goals', () => npcGoals.tick());
       runWorkerOperation('autonomous-life', () => tickAutonomousLife());
-      void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick()).catch(error=>console.error(`[slow-cognition] scheduled failed: ${error.message}`));
+      void Promise.resolve(runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick())).catch(error=>console.error(`[slow-cognition] scheduled failed: ${error.message}`));
       runWorkerOperation('world-life', () => worldLife.tick());
     }, 60_000);
     timer.unref();
@@ -2717,7 +2774,7 @@ export function createDeskBotServer({
         runWorkerOperation('world-clock', () => persistentWorld.syncWallClock?.());
         const result = runWorkerOperation('tasks', () => persistentWorld.syncTasks?.());
         if (result?.processed) { runWorkerOperation('role-evolution', () => roleEvolution.syncAll()); runWorkerOperation('shared-life', () => sharedLife.tick()); runWorkerOperation('npc-goals', () => npcGoals.tick()); runWorkerOperation('autonomous-life', () => tickAutonomousLife()); runWorkerOperation('world-life', () => worldLife.tick()); }
-        void runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick()).catch(error=>console.error(`[slow-cognition] task reconciliation failed: ${error.message}`));
+        void Promise.resolve(runWorkerOperation('slow-cognition', () => slowCognitionWorker.tick())).catch(error=>console.error(`[slow-cognition] task reconciliation failed: ${error.message}`));
       }
       catch (error) { console.error(`[world-tasks] scheduled reconciliation failed: ${error.message}`); }
     }, timeMode === 'realtime' || persistentWorld.get().clock?.mode === 'real_time' ? 1000 : 60_000);

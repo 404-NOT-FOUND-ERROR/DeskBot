@@ -69,9 +69,9 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![Asamana migration program 本机运行快照：雾灯镇地图、往事面板与喵呜生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-m6b-r-release-2026-10-14/live-town-public-release.png)
+![Asamana migration program v2 本机运行快照：雾灯镇地图、往事面板与喵呜生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-migration-program-v2-release-2026-10-14/live-town-public-release.png)
 
-> 这张图是本机 `5173` 客户端连接 `4311` DeskBot 服务的实际运行快照：地图、居民、往事回放、生活侧栏和聊天入口同时可见。它用于说明当前可体验的产品形态，不把一张截图当作 7–14 天自然长期生活的替代验收。
+> 这张图是本机 `5173` 客户端连接 `4311` DeskBot 服务的实际运行快照：地图、居民、往事回放、生活侧栏和聊天入口同时可见。它用于说明本版本可体验的产品形态，不把一张截图当作 7–14 天自然长期生活的替代验收。
 
 ![v6.4 M6b-C2/C3/I4/I7 本机发布快照：实时小镇与小镇往事面板（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town-history.jpg)
 

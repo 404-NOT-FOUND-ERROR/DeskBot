@@ -567,13 +567,27 @@ export function createWorldCandidateStore({
       world: clone(world),
       replay,
     };
+    // The first accept may ingest a mutation directly, while a retry after a
+    // process interruption reconstructs that same mutation from the durable
+    // ledger.  `asIngestResult` intentionally exposes that recovery path to
+    // callers, but recording it in the durable decision would make a replay
+    // depend on which path happened to run first (`reason: null` versus
+    // `recovered_from_mutation_ledger`).  Persist only the canonical semantic
+    // result; the live response above keeps the useful recovery annotation.
+    const decisionResult = {
+      ...result,
+      world_mutations: result.world_mutations.map(item => ({
+        ...item,
+        reason: null,
+      })),
+    };
     const timestamp = now().toISOString();
     const decisionRecord = {
       schema: 'deskbot.world-candidate-decision.v0.1',
       decision_id: `${id}:accept`,
       candidate_id: id,
       action: 'accept',
-      result,
+      result: decisionResult,
       decided_at: timestamp,
       rule_version: RULE_VERSION,
       replay,

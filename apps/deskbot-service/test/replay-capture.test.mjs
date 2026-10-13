@@ -330,7 +330,7 @@ test('original chat handler replays a captured LLM fixture with zero provider ca
       residentLifeEnabled: false, livedMemoryEnabled: false });
     // Mirror the non-network startup bootstrap performed by the source
     // server's listen hook without opening a port or starting workers.
-    return { chat: target.chat, persistentWorld: targetWorld, providerCalls: replayProviders.providerCalls,
+    return { chat: target.chat, replayWorker: target.replayWorker, persistentWorld: targetWorld, providerCalls: replayProviders.providerCalls,
       replayStartup: () => target.roleEvolution.syncAll(),
       close: () => { try { target.close(); } catch {} targetPersistence.close(); } };
   };

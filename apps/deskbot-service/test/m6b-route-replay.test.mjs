@@ -66,28 +66,36 @@ test('role and research HTTP routes are captured and replayed through their orig
   const preview = await post(`/api/world/candidates/${encodeURIComponent(candidateId)}/preview`, {});
   assert.equal(preview.status, 200);
   time += 1;
+  const accept = await post(`/api/world/candidates/${encodeURIComponent(candidateId)}/accept`, {
+    expected_world_revision: preview.body.world_revision,
+  });
+  assert.equal(accept.status, 202);
+  const acceptBody = await accept.json();
+  assert.equal(acceptBody.accepted, true);
+  assert.equal(acceptBody.world_mutations.length, 1);
   const commitment = await post('/api/life/commitments', { id: 'route-commitment-001', confirmed: true,
     text: '今天把雾灯镇的回响记下来。', evidence_ref: 'route-replay-test' });
   assert.equal(commitment.status, 200);
 
   const routeRows = persistence.list('replay.capture-routes');
-  assert.deepEqual(routeRows.map(row => row.route_id), ['role.evolution.run', 'research.scenario.run', 'world.candidate.preview', 'life.commitment']);
-  assert.deepEqual(routeRows.map(row => row.status), ['success', 'success', 'success', 'success']);
+  assert.deepEqual(routeRows.map(row => row.route_id), ['role.evolution.run', 'research.scenario.run', 'world.candidate.preview', 'world.candidate.accept', 'life.commitment']);
+  assert.deepEqual(routeRows.map(row => row.status), ['success', 'success', 'success', 'success', 'success']);
   assert.ok(routeRows.every(row => row.request && typeof row.request === 'object'));
 
   exportCanonicalReplayCapture({ databasePath: source, directory: archive, codeFingerprint: CODE });
   const tape = JSON.parse(readFileSync(join(archive, 'capture.json'), 'utf8'));
-  assert.equal(tape.routes.length, 4);
+  assert.equal(tape.routes.length, 5);
   assert.equal(tape.routes[0].request.idempotency_key, 'route-role-001');
   assert.equal(tape.routes[1].request.scenario_id, 'world-line-echo');
   assert.equal(tape.routes[2].request.candidate_id, candidateId);
-  assert.equal(tape.routes[3].request.id, 'route-commitment-001');
+  assert.equal(tape.routes[3].request.candidate_id, candidateId);
+  assert.equal(tape.routes[4].request.id, 'route-commitment-001');
 
   const replayed = await replayServiceCapture({ directory: archive, targetDatabase: join(dir, 'replayed.sqlite'),
     codeFingerprint: CODE, runtimeFactory: ({ persistence: targetPersistence, now: targetNow }) => {
       const target = createRuntime({ persistence: targetPersistence, now: targetNow });
       return { persistentWorld: target.world, replayRoute: target.server.replayRoute, ingestNonChatEvent: target.server.ingestNonChatEvent,
-        replayStartup: target.server.replayStartup,
+        replayStartup: target.server.replayStartup, replayWorker: target.server.replayWorker,
         provider_calls: 0, close: () => { try { target.server.close(); } catch {} targetPersistence.close(); } };
     } });
   assert.equal(replayed.verified, true);
@@ -97,7 +105,7 @@ test('role and research HTTP routes are captured and replayed through their orig
     restartAt: 1, codeFingerprint: CODE, runtimeFactory: ({ persistence: targetPersistence, now: targetNow }) => {
       const target = createRuntime({ persistence: targetPersistence, now: targetNow });
       return { persistentWorld: target.world, replayRoute: target.server.replayRoute, ingestNonChatEvent: target.server.ingestNonChatEvent,
-        replayStartup: target.server.replayStartup, provider_calls: 0,
+        replayStartup: target.server.replayStartup, replayWorker: target.server.replayWorker, provider_calls: 0,
         close: () => { try { target.server.close(); } catch {} targetPersistence.close(); } };
     } });
   assert.equal(restarted.verified, true);
@@ -110,5 +118,5 @@ test('role and research HTTP routes are captured and replayed through their orig
     codeFingerprint: CODE, runtimeFactory: () => ({}) }), /replay_capture_route_corrupt/);
   assert.equal(existsSync(join(dir, 'tampered.sqlite')), false);
   writeFileSync(manifest, original);
-  assert.equal(world.get().world_revision, 1);
+  assert.equal(world.get().world_revision, 2);
 });
