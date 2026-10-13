@@ -2,7 +2,7 @@
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。
 
-本轮发布分支为 `codex/asamana-shared-life-v4`，本地已从 v3 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。
+本轮发布分支为 `codex/asamana-shared-life-v5`，本地已从 v4 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 
@@ -75,4 +75,4 @@
 
 CLI 回放的验证范围仍是 `canonical_world_only`。同一捕获器另外记录经 `ingestNonChatEvent` 的有序入口、投递重复标记、入口前后 canonical operation 边界与结果 hash；带这种入口的归档标记为 `canonical_world_with_service_ingress`，不能据此自动宣称所有服务操作已捕获。`replayServiceCapture` 是本地隔离工厂 seam：先经原 `persistentWorld.ingest` 补齐独立内部操作，再经原业务入口回放输入，核验所有非捕获 namespace 的记录数与语义 hash。多时间、重复投递、SQLite 中途重启及入口篡改拒绝已专项验证；缺少任何 namespace 结果时失败，不用 SQL 导入替代业务重放。
 
-`persistence.mjs` 已提供默认关闭的 commit/before-commit write audit 与流式 namespace 读取，但 input-runtime 调度、独立 proposal/trial/candidate 决策、HTTP chat/provider 输出等路径尚未统一录成可执行操作。因此 M6 全服务生产归档仍未完成，本轮不将入口 seam 测试替代该验收门。canonical 捕获缺口会在恢复或导出时拒绝；其他未捕获服务写入会由全 namespace 对比检出。
+`persistence.mjs` 已提供默认关闭的 commit/before-commit write audit 与流式 namespace 读取，但 input-runtime 调度、独立 proposal/trial/candidate 决策、HTTP chat/provider 输出、wall-clock marker 和 worker/WebSocket 旁路尚未统一录成可执行操作；`POST /api/chat` 也绕过 `ingestNonChatEvent` 的 ingress recorder。因此 M6a 世界捕获已完成，M6b 全服务生产归档仍未完成。本轮不将入口 seam 测试替代该验收门；完整 namespace 边界、原子提交和七项完成门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。canonical 捕获缺口会在恢复或导出时拒绝；其他未捕获服务写入会由全 namespace 对比检出，但事后 digest 不能证明操作顺序、权限或失败分支已被捕获。

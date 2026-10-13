@@ -26,7 +26,7 @@ providers：LLM、embedding、向量存储、人物存储、snapshot
 
 ## 2026-10-13 DeskBot 分支收口
 
-当前已发布代码基线为 `codex/asamana-shared-life-v3`，本轮已在本地创建发布分支 `codex/asamana-shared-life-v4`，仍不修改 `main`。本轮复验服务完整回归 843/843、客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇实际页面再次捕获，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v3 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；没有引入第二套世界引擎。
+当前已发布代码基线为 `codex/asamana-shared-life-v4`，本轮已在本地创建发布分支 `codex/asamana-shared-life-v5`，仍不修改 `main`。本轮复验服务完整回归 843/843、客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇实际页面再次捕获，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v4 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；没有引入第二套世界引擎。
 
 新增跨日验收脚本默认零外部请求，三日受控样本已 `verified`：首日完整目标执行链成立，次日真实实践形成的原具体目标在第三日重启后的下一合法机会执行并完成，没有重置期限或补赠材料。真实 DeepSeek 模式已用 Clash 执行六次调用，Day2 缺少经历依据的目标被拒绝，结果仍为 `inconclusive_reflection_failed`。真实模型多日生活、完整阶段视觉、真实渲染 context loss 与长断线仍待验收。现有 replay tape 是隔离输入 fixture 的确定性重演，任意生产存档的完整捕获导出尚未接入；长期共同生活和全部迁移目标不能据此宣称完成。
 

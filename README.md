@@ -4,7 +4,7 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v4。** 本版发布在 [`codex/asamana-shared-life-v4`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v4)，从 v3 分支派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v4 在 v3 的运行代码基础上补齐迁移矩阵、验证记录和当前效果图；角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用 v3 基线。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v5 发布快照。** 本版发布在 [`codex/asamana-shared-life-v5`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v5)，从 v4 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v5 进一步收口了 Asamana 迁移标准、M6b 全服务回放边界审计、验证记录和当前效果图；角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用 v4 基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
 
 ## 本版本更新
 
@@ -44,15 +44,17 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![v4 当前版本的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
+![v5 发布快照：实时小镇与小镇往事并排概览（2026-10-13）](documentation/images/current/release-v5-overview.jpg)
 
-![v4 当前版本的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
+![v5 发布快照的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
+
+![v5 发布快照的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
 
 ![十三位光粒居民的首批造型，独立陈列预览](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-前两张是 2026-10-13 v4 分支本机正式运行截图，分别展示 13 位居民的实时生活侧栏，以及只读的小镇往事/历史时间线；本版复验后确认 observer 快照可正常读取，页面能继续显示现实输入、进行中的活动、居民项目和历史事实。后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+总览图和接下来的两张是 2026-10-13 v5 发布分支本机正式运行截图：总览图并列展示实时小镇与历史回放，细节图分别展示 13 位居民的实时生活侧栏，以及只读的小镇往事/历史时间线；本版复验后确认 observer 快照可正常读取，页面能继续显示现实输入、进行中的活动、居民项目和历史事实。最后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
 ## 当前完成范围
 
@@ -69,7 +71,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-shared-life-v4 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-shared-life-v5 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -81,7 +83,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v4`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v5`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |

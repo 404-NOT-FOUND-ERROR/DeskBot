@@ -1,7 +1,7 @@
 # Asamana → DeskBot 正式迁移矩阵 v1
 
 核对日期：2026-10-13
-本轮发布分支：`codex/asamana-shared-life-v4`（本地已从 v3 基线创建；远端状态以 Git 交付核验为准）
+本轮发布分支：`codex/asamana-shared-life-v5`（本地已从 v4 基线创建；远端状态以 Git 交付核验为准）
 目标：把 Asamana 中有价值的“感知 → 动机 → 决策 → 行动 → 反馈 → 记忆/回放”机制迁移为 DeskBot 的长期共同生活能力，同时保持聚形域、喵呜、多源输入、受规则约束的世界事实和可逆角色阶段。
 
 本矩阵是 [迁移标准](asamana-migration-standard-v1.md) 与 [迁移管线](asamana-migration-pipeline-v1.md) 的状态权威。它不把上游 Asamana 当作 DeskBot 的运行时，也不把通过单元测试或受控样本误写成已经完成自然长期生活。
@@ -65,6 +65,39 @@
 本轮发布检查也已重新运行客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇截图已按本轮 22:12 的实际页面更新。页面天气显示“等待新天气”，不能据此宣称天气 provider 本轮 fresh。Asamana 独立前端 140/140 是更早的上游部署结果，本轮未重跑。真实 context loss、长断线、完整阶段像素和长期体验仍不能由这些命令代替。
 
 当前三日规则样本的权威报告是 `tmp/asamana-migration-review-lsN0DX/report.json`（`verified`、零外部调用）；真实模式报告是 `tmp/asamana-migration-review-btgixK/report.json`（`inconclusive_reflection_failed`、六次外部调用）。报告和 SQLite 位于忽略目录，不随公开仓库上传。
+
+## M6b namespace 边界审计
+
+M6b 的“全服务”不是“导出时对所有 namespace 算一次 hash”。必须同时记录导致写入的规范化操作、业务输入、adapter/模型结果引用、提交边界和重启位置，并在隔离服务中通过原业务入口重演。当前实现的实际边界如下：
+
+| 覆盖级别 | 实际 namespace/路径 | 当前证据 | 结论 |
+| --- | --- | --- | --- |
+| 事务内 canonical capture | `canonical-world.states`、`canonical-world.mutations`、`canonical-world.turns`；`replay.capture-*` 为捕获自身 | `persistent-world.persistCommit` 调用 `recordCommit`，同一 SQLite transaction；`replay-capture.test.mjs` 通过重启、重复、篡改和零 provider replay | `M6a implemented / automated verified`。这些是世界事实回放，不是全服务归档 |
+| canonical 但未纳入 operation tape | `canonical-world.wall-clock` 的 `persistWallClockMarker`；启动/定时 `syncWallClock` 还会单独写 marker | 代码有普通 `persistence.put`，不进入 `recordCommit` 的 operation/ingress 链 | `M6b gap`。需要记录时钟同步操作，或明确把 marker 作为可由已捕获 canonical event 完全重算的派生记录并验证 |
+| ingress 后副作用、仅被最终 namespace digest 检查 | `input.events`、`state.characters`、`state.results`、`world.active`、`world.matches`、`evidence.records`、`interaction.decisions/settings`、`output.commands/routes`、`devices.records`、`role.evolution-*`、`world.candidates`、`world.candidate-decisions`，以及部分 role/world 业务写入 | `app.ingestNonChatEvent` 在业务写完后调用 `recordIngress`；`replayServiceCapture` 能对已捕获 ingress 重走原入口并最终比较 namespace digest | `partial / not atomic`。捕获失败不能回滚此前已提交的这些写入；任何未从 ingress 触发的写入都没有可执行输入记录 |
+| chat/voice 路径不进入统一 ingress capture | `chat.turns`、`chat.correlations`、`audio.artifacts`；`POST /api/chat` 的 `orchestrator.run` 自己写入并调用 `persistentWorld.ingest`，绕过 `ingestNonChatEvent` 的 `recordIngress` | `app.mjs` `/api/chat` 分支直接调用 orchestrator；现有 service replay 测试只覆盖 `server.ingestNonChatEvent` | `M6b gap`。必须捕获规范化 chat request、provider result reference、output route 和重复语义；不能把 assistant 文本当世界事实 |
+| 直接 HTTP role/life/research 路径 | `role.proposals`、`role.proposal-decisions`、`life.commitments`、`life.daily-summaries`、`life.memories`、`life.plans`、`life.memory-boundaries`、`research.sessions`、`l1b.probes` | `/api/roles/proposals` 的 choose/trial/observations/complete/archive、`/api/life/*` 和 `/api/research/*` 多数直接调用 domain store；只有部分 stage/practical actions 通过 `ingestNonChatEvent` | `M6b gap`。需要 route-level normalized operation envelope 和原 handler replay；只比较最终 hash不足以证明操作顺序/权限/失败分支 |
+| input runtime/provider 外部路径 | `input-runtime.sources`、`input-runtime.runs`、`external-connectors.v1`、`news-title-translations.v1`、`connector.weather` | `inputRuntime` 定时器和 connector refresh 直接写持久化；部分结果再经 `ingestWeatherEvent`，但 run/connector 状态不是 canonical operation | `M6b gap`。需捕获 schedule tick、原始已归一化 provider payload、TTL/backoff、缓存命中和失败分类；密钥不得进入归档 |
+| worker / WebSocket / NPC 旁路 | `life.npc-goals`、`life.npc-agent-decisions`、`output.*` 及设备 ACK 状态；`sharedLife.tick`、`npcGoals.tick`、`worldLife.tick`、`slowCognitionWorker.tick`、WebSocket device path 可能在无 HTTP ingress 时写入 | `app` 启动/定时器/任务 timer 直接调用 worker；现有 replay seam 没有 scheduler tick envelope | `M6b gap`。需捕获 worker tick 的逻辑时刻、选择输入、provider fixture、设备回执以及实际 handler 结果；只重放状态快照不够 |
+
+### M6b 现有实现的两个关键非原子点
+
+1. `persistent-world.persistCommit` 的 canonical mutation 与 `recordCommit` 是同一事务，故 M6a 的世界事实不会出现“已写世界、没有 mutation tape”的半提交。
+2. `app.ingestNonChatEvent` 在 `inputStore`、`persistentWorld`、evidence、output、role evolution、candidate 等业务写入完成后，才调用 `recordIngress`。因此 ingress capture 写失败时，前面的业务 namespace 不能全部回滚；`persistence` 的 `after-commit` write observer 也只能审计，不能补出可执行输入。这个边界正是 M6b 尚未完成的原因。
+
+### M6b 完成门（比“namespace digest 相等”更严格）
+
+要把 M6b 从 `gap` 提升为已完成，必须新增并通过以下证据：
+
+1. **覆盖注册表**：捕获启动时冻结预期 namespace/版本清单，包括本轮无记录的 namespace；运行期间禁止未登记 writer。
+2. **操作封套**：每次 HTTP、WebSocket、input-runtime tick、worker tick、provider result、设备 ACK 和内部 domain action 都有稳定 `operation_id`、规范化请求、adapter、逻辑/收到时间、结果引用和前后 namespace digest。
+3. **原子提交**：业务写入与 operation journal 在同一 SQLite transaction；捕获失败、缺 envelope 或未登记 namespace 必须回滚业务写入。仅 `subscribeWrites` 或事后 hash 不合格。
+4. **原业务重演**：隔离服务按原入口重放 HTTP/worker/domain handler，不能 SQL 导入或直接覆盖状态；provider 使用已捕获、脱敏且固定的结果 fixture，调用数必须为 0。
+5. **边界重启与重复**：在每个 operation 前后、同 commit 多写、定时 tick、provider 失败、候选 preview/accept、重复 HTTP 和 SQLite 重启点重放，比较所有 namespace 的记录顺序、状态、失败分类和 semantic hash。
+6. **负向完整性**：删掉一个 envelope、篡改 adapter/请求/结果、插入未登记 writer、改变 rule/content fingerprint、在 capture 关闭期间写入，均应 fail closed，且目标库不得产生部分业务状态。
+7. **数据安全**：capture 默认关闭、仅本地显式开启、不开放 HTTP；密钥、音频原文和不可回放的用户敏感内容不得进入公开归档，provider 结果引用与脱敏策略可审计。
+
+当前 `replay-capture.test.mjs` 已证明 M6a 和一个 `ingestNonChatEvent` service seam 的多时间/重复/中途重启/篡改拒绝；它尚未证明上述七项的全服务生产覆盖，因此不能将 `service_ingress_namespaces_verified` 写成 M6b 完成。
 
 ## 可复核的验收证据入口
 
