@@ -1,10 +1,10 @@
 # Asamana 迁移标准 v1
 
-> M6b-R 增量（2026-10-14）：`codex/asamana-m6b-r-release-2026-10-14` 已完成受控 input-runtime/chat replay 接缝，并把 voice/device operation context 纳入第一批接缝；服务端广套和其余 route/worker/device 覆盖以本分支证据为准，M6b 全服务仍为 `partial`。
+> M6b-R 增量（2026-10-14）：`codex/asamana-m6b-r-public-release-2026-10-14` 已完成受控 input-runtime/chat、voice transcribe/tts 原入口 replay 接缝，并把 worker operation 纳入验收；服务端广套和其余 route/worker/device 覆盖以本分支证据为准，M6b 全服务仍为 `partial`。
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。逐项执行与证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
-当前公开发布分支为 `codex/asamana-m6b-r-release-2026-10-14`，从 v6.4 replay seam 基线继续推进；`codex/asamana-m6b-r-public-release` 作为上一版 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。当前分支已收口受控的 chat/input-runtime replay 接缝，并把 voice/device operation context 接入第一批 route/worker/device seam；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
+当前公开发布分支为 `codex/asamana-m6b-r-public-release-2026-10-14`，从 `codex/asamana-m6b-r-release-2026-10-14` operation-context preview 继续推进；`codex/asamana-m6b-r-public-release` 作为更早 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。当前分支已收口受控的 chat/input-runtime/voice transcribe/tts replay 接缝，并把 worker operation 接入验收；assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 

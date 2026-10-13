@@ -2,7 +2,7 @@
   "schema": "deskbot.asamana-migration-catalog.v1",
   "catalog_version": "1.0.0",
   "release": {
-    "branch": "codex/asamana-m6b-r-release-2026-10-14",
+    "branch": "codex/asamana-m6b-r-public-release-2026-10-14",
     "base_commit": "ee81de9",
     "status": "release-candidate",
     "updated_at": "2026-10-14",
@@ -94,12 +94,12 @@
       "dependencies": [],
       "risk": "scope drift and stale evidence",
       "owner": "DeskBot migration maintainer",
-      "status": "contract_frozen",
+      "status": "automated_verified",
       "required_gates": ["G0", "G7"],
-      "evidence_refs": [],
+      "evidence_refs": ["scripts/validate-migration-catalog.mjs", "apps/deskbot-service/test/migration-catalog.test.mjs"],
       "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
-      "known_gaps": ["catalog validator test is the next implementation step"]
+      "known_gaps": ["CI invocation and evidence artifact export remain delivery follow-up"]
     },
     {
       "item_id": "M1-runtime-contracts-and-trace",
@@ -304,12 +304,12 @@
       "dependencies": ["M6b-R-http-route-operation-context"],
       "risk": "audio/transcript duplication or sidecar output becoming direct evidence",
       "owner": "DeskBot voice maintainer",
-      "status": "automated_verified",
+      "status": "partial",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G7"],
-      "evidence_refs": ["apps/deskbot-service/test/voice-pipeline.test.mjs", "apps/deskbot-service/test/voice-sidecar-client.test.mjs", "apps/deskbot-service/test/m6b-voice-route-operation.test.mjs"],
+      "evidence_refs": ["apps/deskbot-service/test/voice-pipeline.test.mjs", "apps/deskbot-service/test/voice-sidecar-client.test.mjs", "apps/deskbot-service/test/m6b-voice-route-operation.test.mjs", "apps/deskbot-service/test/m6b-voice-fixture-replay.test.mjs"],
       "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
-      "known_gaps": ["provider fixture consumers and full fresh/restart/replay coverage remain M6b follow-up"]
+      "known_gaps": ["full fresh/restart/replay route archive coverage and real sidecar/firmware remain M6b/P7 follow-up"]
     },
     {
       "item_id": "M6b-R-worker-cadence-replay",
@@ -327,10 +327,10 @@
       "owner": "DeskBot life maintainer",
       "status": "partial",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G7"],
-      "evidence_refs": ["apps/deskbot-service/test/cognition-cadence-integration.test.mjs", "apps/deskbot-service/test/world-life.test.mjs"],
+      "evidence_refs": ["apps/deskbot-service/test/cognition-cadence-integration.test.mjs", "apps/deskbot-service/test/world-life.test.mjs", "apps/deskbot-service/test/m6b-worker-operation.test.mjs"],
       "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
-      "known_gaps": ["worker tick replay and clock marker atomicity"]
+      "known_gaps": ["worker tick replay through every original scheduler entry and clock marker atomicity"]
     },
     {
       "item_id": "M6b-R-device-ack-replay",

@@ -1,12 +1,12 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 当前公开发布分支为 `codex/asamana-m6b-r-release-2026-10-14`；`codex/asamana-m6b-r-public-release` 为上一版 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`（历史 v6.4）、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 从 v6.1 复验的数字作为历史基线保留。本文件区分历史复验、当前专项和更早证据；测试数量不代表迁移完整完成。逐项证据字段与回滚要求见 [迁移作业单](asamana-migration-runbook-v1.md)。
+**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 当前公开发布分支为 `codex/asamana-m6b-r-public-release-2026-10-14`；`codex/asamana-m6b-r-release-2026-10-14` 为上一版 operation-context preview，`codex/asamana-m6b-r-public-release` 为更早 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release`（历史 v6.4）、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 从 v6.1 复验的数字作为历史基线保留。本文件区分历史复验、当前专项和更早证据；测试数量不代表迁移完整完成。逐项证据字段与回滚要求见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归（v6.4） | 广套 861/861 通过；原 chat handler LLM fixture replay 10/10；input-runtime replay 2/2；M8 长时生活回放单独 1/1（2026-10-14）。v6.2 的 operation-journal/replay/persistence 27/27、input-runtime 7/7、chat/replay-capture 19/19 作为历史基线保留 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归；独立 TTS fixture、assistant/provider 全分支和全服务 replay 仍未完成 |
+| DeskBot 服务完整回归（当前分支） | 迁移目录 18 项/8 gates；本轮新增专项 6/6；服务端全量回归 868/868；原 chat handler LLM fixture replay、input-runtime replay 与 M8 长时生活回放继续作为既有证据保留 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归；voice transcribe/tts 原入口 archive/replay 已验证，ASR/cancel、assistant/provider 全分支和全服务 replay 仍未完成 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
 | 3D 客户端 | 44 套、301/301 通过（2026-10-14 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 本轮生产构建通过（含 typecheck/client/server） | 类型一致性和可构建性 |
@@ -17,7 +17,7 @@
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md)、[正式迁移矩阵](asamana-migration-matrix-v1.md) 和 [迁移作业单](asamana-migration-runbook-v1.md)。2026-10-14 v6.2 历史基线在 Windows 工作站通过服务端广套 857 项、M8 长时生活回放 1 项、operation-journal/replay/persistence 27 项、input-runtime 7 项、chat/replay-capture 19 项、客户端 301 项、voice-sidecar 16 项和生产构建。v6.3 当前通过原 chat handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant 分支和全服务 replay 仍未完成。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md)、[正式迁移矩阵](asamana-migration-matrix-v1.md) 和 [迁移作业单](asamana-migration-runbook-v1.md)。2026-10-14 v6.2 历史基线在 Windows 工作站通过服务端广套 857 项、M8 长时生活回放 1 项、operation-journal/replay/persistence 27 项、input-runtime 7 项、chat/replay-capture 19 项、客户端 301 项、voice-sidecar 16 项和生产构建。上一版 v6.4/M6b-R 通过原 chat handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；本分支新增迁移目录 18 项/8 gates、voice/worker/replay 专项 6/6、服务端全量回归 868/868、客户端 typecheck/build 和 `git diff --check`。voice transcribe/tts 原入口 archive/replay 已完成；ASR/cancel、assistant 分支和全服务其余入口仍未完成。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 本次新增 `slow-cognition-action-integration.test.mjs`：托盘、做饭与光果供给从合法候选进入实际任务，由同配方真实结果结算目标；旅行、缺材料及重复结算不形成完成进度。`persistent-world-restart.test.mjs` 验证账本流式恢复、过滤后有限 hydration、feed/历史一致性与跨世界 Scene 隔离；默认账本接口仍保留完整 diff。`slow-cognition.test.mjs` 保留已完成、失败、取消和撤回意图的真实状态。
 

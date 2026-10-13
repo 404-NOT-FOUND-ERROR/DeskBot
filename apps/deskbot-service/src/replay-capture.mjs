@@ -17,6 +17,7 @@ const INGRESSES = 'replay.capture-ingresses';
 const CHATS = 'replay.capture-chats';
 const INPUT_RUNS = 'replay.capture-input-runs';
 const PROVIDERS = 'replay.capture-provider-results';
+const VOICES = 'replay.capture-voices';
 const JOURNAL = 'replay.capture-journal';
 const NONE = new Set();
 // A capture id is a durable identity, but two live recorder objects on the
@@ -101,6 +102,14 @@ function chatResultDigest(result) {
     output_route: turn?.output_route?.route_id ?? result?.output_route?.route_id ?? null,
     error: error ? { code: error.code ?? null, status: error.statusCode ?? error.status ?? null } : null,
   });
+}
+
+// Standalone voice routes have a private provider fixture, but the route
+// envelope itself only carries a stable request/result digest and the public
+// provider reference.  This keeps audio/transcript payloads out of the
+// operation journal while still making the original route replayable.
+function voiceResultDigest(result) {
+  return digest(result ?? null);
 }
 
 function providerFixtureKind(ref) {
@@ -286,7 +295,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         seed_world_hash: digest(world), final_world_hash: digest(world),
         code_fingerprint: codeFingerprint, clock: { time_mode: timeMode, time_zone: timeZone },
         world_id: world.world_id, seed_revision: world.world_revision, final_revision: world.world_revision,
-        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, journal_count: 0,
+        operation_count: 0, ingress_count: 0, chat_count: 0, input_run_count: 0, provider_count: 0, voice_count: 0, journal_count: 0,
         journal_namespace_registry: namespaceRegistryList,
         journal_registry_hash: registryHash,
         journal_require_operation_context: Boolean(requireOperationContext),
@@ -374,6 +383,48 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
         coverage: 'canonical_world_with_service_chat' });
       return record;
     },
+    /** Record one standalone voice route invocation. The provider fixture is
+     * stored separately by setOperationResultRef/recordProviderResult; this
+     * envelope is the route-level replay contract and is intentionally
+     * idempotent for an exact retry of the same operation id. */
+    recordVoice({ operation_id, route_id = null, request = null, result = null, error = null,
+      received_at = now().toISOString(), operation_start = null, operation_end = null } = {}) {
+      if (!initialized) fail('replay_capture_not_initialized');
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      const session = persistence.get(SESSIONS, captureId);
+      const operationId = String(operation_id ?? context.operation_id ?? '').trim();
+      const routeId = String(route_id ?? context.route_id ?? '').trim();
+      if (!operationId || !routeId || !['voice.transcribe', 'voice.tts'].includes(routeId)) fail('replay_voice_record_invalid');
+      const existing = persistence.list(VOICES).find(item => item.capture_id === captureId && item.operation_id === operationId);
+      const providerRecords = persistence.list(PROVIDERS)
+        .filter(item => item.capture_id === captureId && item.operation_id === operationId)
+        .sort((a, b) => String(a.kind).localeCompare(String(b.kind)));
+      const record = {
+        schema: 'deskbot.replay-capture-voice.v1', capture_id: captureId,
+        operation_id: operationId, route_id: routeId, index: existing?.index ?? session.voice_count ?? 0,
+        request: request === null || request === undefined ? null : copy(request),
+        received_at, status: error ? 'error' : 'success',
+        operation_start: operation_start ?? session.operation_count,
+        operation_end: operation_end ?? session.operation_count,
+        result_digest: error ? null : voiceResultDigest(result),
+        error: error ? { code: error.code ?? 'voice_failed', status: error.statusCode ?? error.status ?? null,
+          retryable: error.retryable === true } : null,
+        provider_ref: providerRecords.at(-1)?.ref ?? null,
+        provider_refs: providerRecords.map(item => item.ref),
+      };
+      record.record_hash = digest(record);
+      if (existing) {
+        if (digest(existing) !== digest(record)) fail('replay_voice_duplicate_conflict');
+        return copy(existing);
+      }
+      persistence.transaction(() => {
+        persistence.insert(VOICES, `${captureId}:${record.index}`, record);
+        persistence.put(SESSIONS, captureId, { ...session, voice_count: record.index + 1,
+          coverage: 'canonical_world_with_service_voice' });
+      });
+      return record;
+    },
     /** Record one input-runtime source run and its private deterministic
      * provider fixture.  The public journal only receives resultRef; the
      * fixture is exported into the local replay tape and never into the
@@ -457,7 +508,7 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
 export function exportCanonicalReplayCapture({ databasePath, directory, codeFingerprint = replayCodeFingerprint() } = {}) {
   const archive = resolve(directory), captureId = `capture:${digest(archive).slice(0, 24)}`;
   const database = new DatabaseSync(resolve(databasePath), { readOnly: true });
-  let session, operations, ingresses, chats, input_runs, providers, journals, namespace_digests;
+  let session, operations, ingresses, chats, input_runs, providers, voices, journals, namespace_digests;
   try {
     database.exec('BEGIN');
     const row = database.prepare('SELECT payload_json FROM records WHERE namespace=? AND record_id=?').get(SESSIONS, captureId);
@@ -476,6 +527,8 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
       .map(row => JSON.parse(row.payload_json)).filter(run => run.capture_id === captureId);
     providers = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(PROVIDERS)]
       .map(row => JSON.parse(row.payload_json)).filter(provider => provider.capture_id === captureId);
+    voices = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(VOICES)]
+      .map(row => JSON.parse(row.payload_json)).filter(voice => voice.capture_id === captureId);
     journals = [...database.prepare('SELECT payload_json FROM records WHERE namespace=? ORDER BY rowid ASC').iterate(JOURNAL)]
       .map(row => JSON.parse(row.payload_json)).filter(journal => journal.capture_id === captureId);
     const grouped = new Map();
@@ -495,7 +548,7 @@ export function exportCanonicalReplayCapture({ databasePath, directory, codeFing
   if (replayFileDigest(join(archive, 'seed.sqlite')) !== session.seed_file_hash) fail('replay_capture_seed_mismatch');
   const portableSession = { ...session, namespace_digests }; delete portableSession.source_database; delete portableSession.archive_directory;
   const tape = { schema: CAPTURE_SCHEMA, rule_version: CAPTURE_RULES, session: portableSession, operations, ingresses,
-    chats, input_runs, providers, journals };
+    chats, input_runs, providers, voices, journals };
   validateArchive(tape, codeFingerprint);
   writeFileSync(join(archive, 'capture.json'), `${JSON.stringify(tape)}\n`, { mode: 0o600 });
   return { directory: archive, operation_count: operations.length, journal_count: journals.length,
@@ -514,6 +567,8 @@ function validateArchive(tape, codeFingerprint) {
   if (tape.input_runs.length !== (tape.session.input_run_count ?? 0)) fail('replay_capture_input_run_incomplete');
   if (!Array.isArray(tape.providers)) tape.providers = [];
   if (tape.providers.length !== (tape.session.provider_count ?? 0)) fail('replay_provider_fixture_missing');
+  if (!Array.isArray(tape.voices)) tape.voices = [];
+  if (tape.voices.length !== (tape.session.voice_count ?? 0)) fail('replay_capture_voice_incomplete');
   if (!Array.isArray(tape.journals)) fail('replay_capture_journal_missing');
   if (tape.journals.length !== (tape.session.journal_count ?? 0)) fail('replay_capture_journal_incomplete');
   for (const [index, journal] of tape.journals.entries()) {
@@ -565,6 +620,21 @@ function validateArchive(tape, codeFingerprint) {
       || !provider.operation_id || !provider.kind || !Object.hasOwn(provider, 'ref') || !Number.isFinite(Date.parse(provider.recorded_at))
       || !providerHash || digest(providerContent) !== providerHash) fail('replay_capture_provider_corrupt');
   }
+  const voiceOperationIds = new Set();
+  for (const [index, voice] of tape.voices.entries()) {
+    const { record_hash: hash, ...content } = voice;
+    if (voice.schema !== 'deskbot.replay-capture-voice.v1' || voice.capture_id !== tape.session.capture_id
+      || voice.index !== index || !voice.operation_id || !['voice.transcribe', 'voice.tts'].includes(voice.route_id)
+      || voiceOperationIds.has(voice.operation_id) || !Number.isFinite(Date.parse(voice.received_at))
+      || !voice.request || typeof voice.request !== 'object' || Array.isArray(voice.request)
+      || !['success', 'error'].includes(voice.status) || (voice.status === 'success' && typeof voice.result_digest !== 'string')
+      || (voice.status === 'error' && (!voice.error || typeof voice.error.code !== 'string'))
+      || !Number.isSafeInteger(voice.operation_start) || !Number.isSafeInteger(voice.operation_end)
+      || voice.operation_start < 0 || voice.operation_end < voice.operation_start
+      || voice.operation_end > tape.operations.length || !Array.isArray(voice.provider_refs)
+      || digest(content) !== hash) fail('replay_capture_voice_corrupt');
+    voiceOperationIds.add(voice.operation_id);
+  }
    let previousOperationEnd = 0;
    for (const [index, ingress] of tape.ingresses.entries()) {
     const { record_hash, ...content } = ingress;
@@ -601,9 +671,8 @@ export function createReplayChatProviders({ tape, onFixtureCall = null } = {}) {
     return record;
   });
   let fixtureCalls = 0;
-  const find = (event, kind) => {
-    const operationId = `chat:${String(event?.event_id ?? '').trim()}`;
-    if (operationId === 'chat:') fail('replay_provider_event_id_required');
+  const findByOperation = (operationId, kind) => {
+    if (!operationId) fail('replay_provider_operation_id_required');
     const record = records.find(item => item.operation_id === operationId && item.kind === kind);
     if (!record) fail(`replay_provider_fixture_missing:${operationId}:${kind}`);
     const ref = record.ref;
@@ -611,6 +680,11 @@ export function createReplayChatProviders({ tape, onFixtureCall = null } = {}) {
     fixtureCalls++;
     onFixtureCall?.({ operation_id: operationId, kind });
     return ref;
+  };
+  const find = (event, kind) => {
+    const operationId = `chat:${String(event?.event_id ?? '').trim()}`;
+    if (operationId === 'chat:') fail('replay_provider_event_id_required');
+    return findByOperation(operationId, kind);
   };
   const errorFrom = (ref, fallback) => Object.assign(new Error(ref.error_message ?? fallback), {
     code: ref.error_code ?? fallback,
@@ -632,6 +706,21 @@ export function createReplayChatProviders({ tape, onFixtureCall = null } = {}) {
       return fixture.audio;
     }
     fail(`replay_provider_kind_unsupported:${kind}`);
+  };
+  // Standalone voice routes use their own operation IDs rather than a chat
+  // event ID. Keep their fixture consumer on the same private registry and
+  // fail closed when a route fixture is absent, malformed, or tampered.
+  const resolveVoice = async ({ operation_id: operationId, kind, request } = {}) => {
+    const fixtureKind = kind === 'transcribe' ? 'voice.transcribe' : kind === 'tts' ? 'voice.tts' : String(kind ?? 'voice');
+    const ref = findByOperation(operationId, fixtureKind);
+    if (ref.status === 'error') throw errorFrom(ref, `replay_${fixtureKind}_fixture_error`);
+    const fixture = ref.fixture;
+    const expectedKind = `${fixtureKind}.v1`;
+    if (!fixture || fixture.kind !== expectedKind || !Object.hasOwn(fixture, 'result')
+      || !fixture.result || typeof fixture.result !== 'object' || Array.isArray(fixture.result)) {
+      fail(`replay_provider_fixture_invalid:${operationId}:${fixtureKind}`);
+    }
+    return copy(fixture.result);
   };
   const inputRecords = (tape.input_runs ?? []).map(item => {
     const provider = records.find(record => record.operation_id === item.run_id && record.kind === 'input-runtime');
@@ -656,6 +745,7 @@ export function createReplayChatProviders({ tape, onFixtureCall = null } = {}) {
   };
   return {
     resolve,
+    resolveVoice,
     voiceForEvent: event => records.some(item => item.operation_id === `chat:${String(event?.event_id ?? '').trim()}` && item.kind === 'tts'),
     providerCalls: () => 0,
     fixtureCalls: () => fixtureCalls,
@@ -746,11 +836,12 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
     ...(tape.input_runs ?? []).map(item => ({ kind: 'input-runtime', item })),
     ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id)).map(item => ({ kind: 'ingress', item })),
     ...tape.chats.map(item => ({ kind: 'chat', item })),
+    ...(tape.voices ?? []).map(item => ({ kind: 'voice', item })),
   ].sort((a, b) => (a.item.operation_start - b.item.operation_start)
     || String(a.item.received_at).localeCompare(String(b.item.received_at))
     || (a.item.index - b.item.index));
   validateChatProviderCoverage(tape);
-  const replayProviders = (tape.chats.length || (tape.input_runs ?? []).length)
+  const replayProviders = (tape.chats.length || (tape.input_runs ?? []).length || (tape.voices ?? []).length)
     ? createReplayChatProviders({ tape }) : null;
   if (restartAt !== null && (!Number.isSafeInteger(restartAt) || restartAt < 0 || restartAt > records.length)) fail('replay_restart_range_invalid');
   mkdirSync(dirname(target), { recursive: true }); copyFileSync(join(archive, 'seed.sqlite'), target);
@@ -760,7 +851,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
      time = receivedAt;
      persistence = createSqlitePersistence({ filename: target, now: () => new Date(time) });
     runtime = await runtimeFactory({ persistence, tape, replayProviders, now: () => new Date(time), mode: 'replay' });
-    if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat && !runtime?.replayInputRun) fail('replay_runtime_ingress_missing');
+    if (!runtime?.ingestNonChatEvent && !runtime?.chat && !runtime?.handleChat && !runtime?.replayInputRun && !runtime?.replayVoice) fail('replay_runtime_ingress_missing');
     startupPending = typeof runtime.replayStartup === 'function';
   };
    const world = () => runtime.persistentWorld;
@@ -816,6 +907,29 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
           result = await chat(copy(item.event), copy(item), { tape });
         }
         if (chatResultDigest(result) !== item.result_digest) fail(`replay_service_chat_result_mismatch:${index}`);
+      } else if (record.kind === 'voice') {
+        const voice = runtime.replayVoice ?? runtime.voice;
+        const invoke = typeof voice === 'function'
+          ? voice
+          : voice?.[item.route_id]
+            ?? voice?.[item.route_id.replace(/^voice\./, '')];
+        if (typeof invoke !== 'function') fail('replay_runtime_voice_missing');
+        const call = () => invoke.call(typeof voice === 'function' ? runtime : voice,
+          item.route_id, copy(item.request), { tape, operation_id: item.operation_id });
+        if (item.status === 'error') {
+          try {
+            await call();
+            fail(`replay_service_voice_error_missing:${index}`);
+          } catch (error) {
+            if (error?.code !== item.error?.code) fail(`replay_service_voice_error_mismatch:${index}`);
+            result = { error };
+          }
+        } else {
+          result = await call();
+        }
+        if (item.status === 'success' && voiceResultDigest(result) !== item.result_digest) {
+          fail(`replay_service_voice_result_mismatch:${index}`);
+        }
       } else {
         result = await runtime.ingestNonChatEvent(copy(item.event), copy(item.adapter));
         if (Boolean(result?.duplicate) !== item.duplicate) fail(`replay_service_duplicate_mismatch:${index}`);
@@ -839,8 +953,8 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
     const providerCalls = typeof runtime?.providerCalls === 'function'
       ? runtime.providerCalls()
       : Number.isSafeInteger(runtime?.provider_calls) ? runtime.provider_calls : (tape.chats.length ? null : 0);
-    if (tape.chats.length && providerCalls !== 0) fail('replay_service_provider_called');
-    if (tape.chats.length && providerCalls === null) fail('replay_runtime_provider_counter_missing');
+    if ((tape.chats.length || (tape.voices ?? []).length) && providerCalls !== 0) fail('replay_service_provider_called');
+    if ((tape.chats.length || (tape.voices ?? []).length) && providerCalls === null) fail('replay_runtime_provider_counter_missing');
     return { schema: 'deskbot.service-replay-result.v1', coverage: 'service_ingress_namespaces_verified', ingresses: tape.ingresses.length,
       chats: tape.chats.length,
       namespace_digests: actual, provider_calls: providerCalls ?? 0, verified: true, target_database: target, restart_at: restartAt };
@@ -848,7 +962,7 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
 }
 
 function validateChatProviderCoverage(tape) {
-  if (!tape.chats.length) return;
+  if (!tape.chats.length && !(tape.voices ?? []).length) return;
   const byOperation = new Map();
   for (const record of tape.providers) {
     const list = byOperation.get(record.operation_id) ?? [];
@@ -864,6 +978,18 @@ function validateChatProviderCoverage(tape) {
     if (tts?.ref?.tts?.status === 'success'
       && (tts.ref.fixture?.kind !== 'tts.synthesize.v1' || !tts.ref.fixture.audio)) {
       fail(`replay_provider_fixture_invalid:${operationId}:tts`);
+    }
+  }
+  for (const voice of tape.voices ?? []) {
+    const fixtures = byOperation.get(voice.operation_id) ?? [];
+    const fixture = fixtures.find(item => item.kind === voice.route_id);
+    if (!fixture) fail(`replay_provider_fixture_missing:${voice.operation_id}:${voice.route_id}`);
+    if (!fixture.ref || (fixture.ref.status === 'error' && voice.status !== 'error')) {
+      fail(`replay_provider_fixture_invalid:${voice.operation_id}:${voice.route_id}`);
+    }
+    if (voice.status === 'success'
+      && (fixture.ref.fixture?.kind !== `${voice.route_id}.v1` || !fixture.ref.fixture.result)) {
+      fail(`replay_provider_fixture_invalid:${voice.operation_id}:${voice.route_id}`);
     }
   }
 }

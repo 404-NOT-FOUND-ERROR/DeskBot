@@ -4,6 +4,14 @@ param()
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+Push-Location $repoRoot
+try {
+  & node scripts/validate-migration-catalog.mjs
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} finally {
+  Pop-Location
+}
+
 Push-Location (Join-Path $repoRoot 'apps\deskbot-service')
 try {
   & npm.cmd test

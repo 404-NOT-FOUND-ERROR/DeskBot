@@ -376,6 +376,105 @@ export function createDeskBotServer({
     }, callback);
   }
 
+  // The HTTP voice routes and the trusted archive replay use the same
+  // operation handler.  Keeping the route seam here prevents replay from
+  // opening a listener or inventing a second provider contract.
+  async function invokeVoiceRoute(routeId, body = {}) {
+    if (!['voice.transcribe', 'voice.tts'].includes(routeId)) {
+      throw new TypeError(`unsupported voice replay route: ${routeId}`);
+    }
+    const operationId = `${routeId}:${stableOperationSuffix(body.request_id ?? body.utterance_id ?? body.correlation_id ?? body.event_id ?? body)}`;
+    const operationStart = replayCapture?.operationCount?.() ?? null;
+    const operationKind = routeId;
+    return runServiceOperation({
+      operationId,
+      operationKind,
+      routeId,
+      source: 'http.voice',
+      request: body,
+      sourceEventIds: [body.event_id].filter(Boolean),
+      callback: async () => {
+        try {
+          if (!voiceClient && typeof replayProviders?.resolveVoice !== 'function') {
+            throw new VoiceSidecarError(503, 'voice_sidecar_not_configured', 'voice sidecar is not configured');
+          }
+          if (routeId === 'voice.transcribe') {
+            const sidecarResult = typeof replayProviders?.resolveVoice === 'function'
+              ? await replayProviders.resolveVoice({ operation_id: operationId, kind: 'transcribe', request: body })
+              : await voiceClient.transcribe(body);
+            replayCapture?.setOperationResultRef?.({
+              schema: 'deskbot.provider-result-ref.v1', purpose: routeId, status: 'success',
+              provider: sidecarResult.provider ?? sidecarResult.engine ?? null,
+              model: sidecarResult.model ?? null,
+              result_hash: createHash('sha256').update(JSON.stringify(sidecarResult)).digest('hex'),
+              fixture: { kind: 'voice.transcribe.v1', result: sidecarResult },
+            });
+            const resultList = Array.isArray(sidecarResult.results) ? sidecarResult.results : null;
+            const rawSidecar = sidecarResult.raw && typeof sidecarResult.raw === 'object' && !Array.isArray(sidecarResult.raw)
+              ? sidecarResult.raw : sidecarResult;
+            const hasTopLevelResult = ['stage', 'raw_utterance', 'raw_text', 'clean_utterance', 'cleaned_text', 'text']
+              .some(field => Object.prototype.hasOwnProperty.call(rawSidecar, field))
+              || rawSidecar.is_final === true || rawSidecar.final === true || rawSidecar.partial === true;
+            const resultItems = resultList === null ? (hasTopLevelResult ? [sidecarResult] : [])
+              : resultList.length > 0 ? resultList : (hasTopLevelResult ? [sidecarResult] : []);
+            const ingested = [];
+            for (const item of resultItems) {
+              ingested.push(await ingress.ingest({
+                ...body, ...sidecarResult, ...item,
+                character_id: body.character_id, device_id: body.device_id, shell_id: body.shell_id,
+                role_revision: body.role_revision,
+                correlation_id: sidecarResult.correlation_id ?? body.correlation_id,
+                utterance_id: sidecarResult.utterance_id ?? body.utterance_id,
+                request_id: sidecarResult.request_id ?? body.request_id,
+              }));
+            }
+            const result = { schema: 'foundry.voice-transcription.v0.1', accepted: true, sidecar: sidecarResult, ingested };
+            replayCapture?.recordVoice?.({ operation_id: operationId, route_id: routeId, request: body, result,
+              received_at: now().toISOString(), operation_start: operationStart,
+              operation_end: replayCapture?.operationCount?.() ?? operationStart });
+            return result;
+          }
+          const tts = typeof replayProviders?.resolveVoice === 'function'
+            ? await replayProviders.resolveVoice({ operation_id: operationId, kind: 'tts', request: body })
+            : await voiceClient.synthesize(body);
+          replayCapture?.setOperationResultRef?.({
+            schema: 'deskbot.provider-result-ref.v1', purpose: routeId, status: 'success',
+            provider: tts.provider ?? tts.engine ?? null, model: tts.model ?? null,
+            result_hash: createHash('sha256').update(JSON.stringify(tts)).digest('hex'),
+            fixture: { kind: 'voice.tts.v1', result: tts },
+          });
+          const stored = audioArtifacts.put({ ...tts.audio, audio_id: tts.audio.audio_id ?? tts.request_id,
+            correlation_id: tts.correlation_id, request_id: tts.request_id, profile: tts.profile });
+          const { data_base64: ignoredData, ...audio } = stored.artifact;
+          const result = { schema: 'foundry.voice-tts.v0.1', accepted: true, duplicate: stored.duplicate,
+            request_id: tts.request_id, correlation_id: tts.correlation_id, profile: tts.profile,
+            audio: { ...audio, audio_ref: `/api/audio/${encodeURIComponent(audio.audio_id)}` } };
+          replayCapture?.recordVoice?.({ operation_id: operationId, route_id: routeId, request: body, result,
+            received_at: now().toISOString(), operation_start: operationStart,
+            operation_end: replayCapture?.operationCount?.() ?? operationStart });
+          return result;
+        } catch (error) {
+          const expectedCode = error?.code ?? 'voice_failed';
+          // If the provider already returned successfully but downstream
+          // route validation/ingress failed, retain that provider fixture so
+          // replay can reach the same downstream failure. Only a provider
+          // failure gets an error fixture.
+          if (!replayCapture?.getOperationResultRef?.()) {
+            replayCapture?.setOperationResultRef?.({
+              schema: 'deskbot.provider-result-ref.v1', purpose: routeId, status: 'error',
+              error_code: expectedCode, error_message: error?.message ?? 'voice route failed',
+              retryable: error?.retryable === true,
+            });
+          }
+          replayCapture?.recordVoice?.({ operation_id: operationId, route_id: routeId, request: body, error,
+            received_at: now().toISOString(), operation_start: operationStart,
+            operation_end: replayCapture?.operationCount?.() ?? operationStart });
+          throw error;
+        }
+      },
+    });
+  }
+
   function ingestNonChatEvent(eventInput, adapter = {}) {
     const run = () => {
       const replayReceivedAt = replayCapture ? now().toISOString() : null;
@@ -1059,81 +1158,8 @@ export function createDeskBotServer({
     }
 
     if (request.method === 'POST' && url.pathname === '/api/voice/transcribe') {
-      if (!voiceClient) {
-        sendJson(response, 503, {
-          schema: 'foundry.voice-error.v0.1',
-          error: { code: 'voice_sidecar_not_configured', message: 'voice sidecar is not configured', retryable: false },
-        });
-        return;
-      }
       readJson(request, 20 * 1024 * 1024)
-        .then(async (body) => {
-          const operationId = `voice.transcribe:${stableOperationSuffix(body.request_id ?? body.utterance_id ?? body.correlation_id ?? body.event_id ?? body)}`;
-          return runServiceOperation({
-            operationId,
-            operationKind: 'voice.transcribe',
-            routeId: 'voice.transcribe',
-            source: 'http.voice',
-            request: body,
-            sourceEventIds: [body.event_id].filter(Boolean),
-            callback: async () => {
-          const sidecarResult = await voiceClient.transcribe(body);
-          replayCapture?.setOperationResultRef?.({
-            schema: 'deskbot.provider-result-ref.v1',
-            purpose: 'voice.transcribe',
-            status: 'success',
-            provider: sidecarResult.provider ?? sidecarResult.engine ?? null,
-            model: sidecarResult.model ?? null,
-            result_hash: createHash('sha256').update(JSON.stringify(sidecarResult)).digest('hex'),
-            fixture: { kind: 'voice.transcribe.v1', result: sidecarResult },
-          });
-          const resultList = Array.isArray(sidecarResult.results) ? sidecarResult.results : null;
-          // An explicit empty result list means the recognizer observed no
-          // segment. Do not manufacture a voice event from the normalized
-          // envelope; only fall back to the envelope when it carries an
-          // actual top-level stage or transcript field.
-          const rawSidecar = sidecarResult.raw
-            && typeof sidecarResult.raw === 'object'
-            && !Array.isArray(sidecarResult.raw)
-            ? sidecarResult.raw
-            : sidecarResult;
-          const hasTopLevelResult = [
-            'stage',
-            'raw_utterance',
-            'raw_text',
-            'clean_utterance',
-            'cleaned_text',
-            'text',
-          ].some((field) => Object.prototype.hasOwnProperty.call(rawSidecar, field))
-            || rawSidecar.is_final === true
-            || rawSidecar.final === true
-            || rawSidecar.partial === true;
-          const resultItems = resultList === null
-            ? (hasTopLevelResult ? [sidecarResult] : [])
-            : resultList.length > 0
-              ? resultList
-              : hasTopLevelResult
-                ? [sidecarResult]
-                : [];
-          const ingested = [];
-          for (const item of resultItems) {
-            ingested.push(await ingress.ingest({
-              ...body,
-              ...sidecarResult,
-              ...item,
-              character_id: body.character_id,
-              device_id: body.device_id,
-              shell_id: body.shell_id,
-              role_revision: body.role_revision,
-              correlation_id: sidecarResult.correlation_id ?? body.correlation_id,
-              utterance_id: sidecarResult.utterance_id ?? body.utterance_id,
-              request_id: sidecarResult.request_id ?? body.request_id,
-            }));
-          }
-          return { schema: 'foundry.voice-transcription.v0.1', accepted: true, sidecar: sidecarResult, ingested };
-            },
-          });
-        })
+        .then((body) => invokeVoiceRoute('voice.transcribe', body))
         .then((result) => sendJson(response, result.ingested.some((item) => item.duplicate) ? 200 : 202, result))
         .catch((error) => {
           const expected = error instanceof VoiceSidecarError || error instanceof VoiceIngressError || error instanceof InputError;
@@ -1152,53 +1178,8 @@ export function createDeskBotServer({
     }
 
     if (request.method === 'POST' && url.pathname === '/api/voice/tts') {
-      if (!voiceClient) {
-        sendJson(response, 503, {
-          schema: 'foundry.voice-error.v0.1',
-          error: { code: 'voice_sidecar_not_configured', message: 'voice sidecar is not configured', retryable: false },
-        });
-        return;
-      }
       readJson(request, 2 * 1024 * 1024)
-        .then(async (body) => {
-          return runServiceOperation({
-            operationId: `voice.tts:${stableOperationSuffix(body.request_id ?? body.utterance_id ?? body.correlation_id ?? body.event_id ?? body)}`,
-            operationKind: 'voice.tts',
-            routeId: 'voice.tts',
-            source: 'http.voice',
-            request: body,
-            sourceEventIds: [body.event_id].filter(Boolean),
-            callback: async () => {
-          const tts = await voiceClient.synthesize(body);
-          replayCapture?.setOperationResultRef?.({
-            schema: 'deskbot.provider-result-ref.v1',
-            purpose: 'voice.tts',
-            status: 'success',
-            provider: tts.provider ?? tts.engine ?? null,
-            model: tts.model ?? null,
-            result_hash: createHash('sha256').update(JSON.stringify(tts)).digest('hex'),
-            fixture: { kind: 'voice.tts.v1', result: tts },
-          });
-          const stored = audioArtifacts.put({
-            ...tts.audio,
-            audio_id: tts.audio.audio_id ?? tts.request_id,
-            correlation_id: tts.correlation_id,
-            request_id: tts.request_id,
-            profile: tts.profile,
-          });
-          const { data_base64: ignoredData, ...audio } = stored.artifact;
-          return {
-            schema: 'foundry.voice-tts.v0.1',
-            accepted: true,
-            duplicate: stored.duplicate,
-            request_id: tts.request_id,
-            correlation_id: tts.correlation_id,
-            profile: tts.profile,
-            audio: { ...audio, audio_ref: `/api/audio/${encodeURIComponent(audio.audio_id)}` },
-          };
-            },
-          });
-        })
+        .then((body) => invokeVoiceRoute('voice.tts', body))
         .then((result) => sendJson(response, result.duplicate ? 200 : 202, result))
         .catch((error) => {
           const expected = error instanceof VoiceSidecarError || error instanceof AudioArtifactError;
@@ -2558,6 +2539,10 @@ export function createDeskBotServer({
       },
     };
   };
+  // Trusted in-process replay entry for standalone voice routes. It reuses
+  // the same route handler and private fixture provider as HTTP, without
+  // opening a listener or exposing a public replay capability.
+  server.replayVoice = async (routeId, body) => invokeVoiceRoute(routeId, body);
   // Test/in-process adapters use the same canonical path as trusted
   // connectors without weakening the public /api/event boundary.
   server.ingestNonChatEvent = ingestNonChatEvent;

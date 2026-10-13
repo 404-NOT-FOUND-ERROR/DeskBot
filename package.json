@@ -15,6 +15,7 @@
     "test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1",
     "test:service": "npm.cmd --prefix apps/deskbot-service test",
     "test:voice": "python -m unittest discover -s voice-sidecar/tests -v",
+    "validate:migration": "node scripts/validate-migration-catalog.mjs",
     "package:source": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-source.ps1"
   }
 }

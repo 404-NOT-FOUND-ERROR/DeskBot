@@ -1,7 +1,7 @@
 # Asamana → DeskBot 正式迁移矩阵 v1
 
 核对日期：2026-10-14
-本轮公开发布分支：`codex/asamana-m6b-r-release-2026-10-14`（从 v6.4 replay seam 基线继续推进；`codex/asamana-m6b-r-public-release` 为上一版 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release` 为历史 v6.4 发布基线，`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 保留为历史发布基线，远端状态以 Git 交付核验为准）
+本轮公开发布分支：`codex/asamana-m6b-r-public-release-2026-10-14`（从 `codex/asamana-m6b-r-release-2026-10-14` operation-context preview 继续推进；`codex/asamana-m6b-r-public-release` 为更早 M6b-R 基线，`codex/asamana-m6b-v6-4-public-release` 为历史 v6.4 发布基线，`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 保留为历史发布基线，远端状态以 Git 交付核验为准）
 目标：把 Asamana 中有价值的“感知 → 动机 → 决策 → 行动 → 反馈 → 记忆/回放”机制迁移为 DeskBot 的长期共同生活能力，同时保持聚形域、喵呜、多源输入、受规则约束的世界事实和可逆角色阶段。
 
 本矩阵是 [迁移标准](asamana-migration-standard-v1.md) 与 [迁移管线](asamana-migration-pipeline-v1.md) 的状态权威。逐项执行、回滚和证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。它不把上游 Asamana 当作 DeskBot 的运行时，也不把通过单元测试或受控样本误写成已经完成自然长期生活。

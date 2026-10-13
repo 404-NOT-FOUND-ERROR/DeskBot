@@ -1,9 +1,9 @@
-# DeskBot v6.4 M6b-R 发布记录（2026-10-14）
+# DeskBot v6.4 M6b-R replay-hardening 发布记录（2026-10-14）
 
 ## 发布身份
 
-- 分支：`codex/asamana-m6b-r-release-2026-10-14`
-- 基线：`codex/asamana-m6b-r-public-release` 的公开 replay seam
+- 分支：`codex/asamana-m6b-r-public-release-2026-10-14`
+- 基线：`codex/asamana-m6b-r-release-2026-10-14` 的 operation-context preview
 - 目标：在不改变 `main` 的前提下，发布当前 operation-context 接缝与本机可体验效果
 - 视觉资产：`documentation/images/asamana-m6b-r-release-2026-10-14/live-town-public-release.png`
 
@@ -11,22 +11,25 @@
 
 1. 保留持续生活、雾灯镇地图、居民面板、共同经历、记忆、愿望/试做/可逆角色阶段等 v6.4 能力。
 2. 保留 `deskbot.service-operation.v1` 脱敏 journal 和 input-runtime/chat 受控 fixture replay。
-3. 将 voice ASR、transcribe、TTS、cancel HTTP 路由纳入稳定 operation scope。
-4. 将 WebSocket device bridge 接入 replay capture scope 的第一批 ACK 路径。
-5. 更新公开 README、包描述、运行命令和效果图；本版不提交密钥、数据库、capture tape、音频或临时截图。
+3. 增加迁移目录机器校验：18 个迁移项的唯一性、状态、依赖、证据和 freshness 在测试入口先检查。
+4. 增加 voice `transcribe/tts` 的私有 fixture consumer 与原入口 archive/replay；fresh/restart、缺失、篡改和错误 fixture fail closed，且 replay 不调用真实 provider。
+5. 增加 worker scheduler operation 的稳定 operation ID、SQLite 重启恢复和 canonical mutation/role-run 去重验收。
+6. 将 voice ASR、transcribe、TTS、cancel HTTP 路由纳入稳定 operation scope。
+7. 将 WebSocket device bridge 接入 replay capture scope 的第一批 ACK 路径。
+8. 更新公开 README、包描述、运行命令和效果图；本版不提交密钥、数据库、capture tape、音频或临时截图。
 
 ## 验收边界
 
 本版是可复核的接缝预览，不是 M6b 全服务生产归档。已验证和待验收范围必须分开：
 
 - 已有的服务端、客户端、voice-sidecar 与 replay 专项回归继续作为发布门槛。
-- voice/device operation context 证明的是稳定归属、脱敏摘要和异步上下文边界，不证明真实 TTS、固件 ACK 或机械外壳。
+- voice transcribe/tts fixture consumer、原入口 fresh/restart replay 与 worker operation 专项已验证；voice ASR/cancel、device operation context 证明的是稳定归属、脱敏摘要和异步上下文边界，不证明真实 TTS、固件 ACK 或机械外壳。
 - role/life/world-candidate/worker/device/voice 的完整 fresh/restart/replay/fail-closed 全入口仍按 [M6b 合同](asamana-m6b-route-worker-device-replay-v1.md) 逐波次推进。
 
 ## 本地体验
 
 ```powershell
-git clone --branch codex/asamana-m6b-r-release-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-r-public-release-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 # 编辑本机 DeepSeek 配置；天气配置按 config\README.md 准备

@@ -58,7 +58,7 @@ terminal 状态不可变。重试使用相同 `operation_id` 和幂等键；重�
 - `http.chat` / `http.event`：通过 `ingestNonChatEvent` 或 chat handler；
 - `input-runtime.source-run`：success/skip/error、TTL/backoff、重启/重复和 fail-closed fixture replay；
 - `role/world-candidate/research` 的首批 route：已进入统一 scope，但原入口 replay 尚未完成，状态仍为 `partial`。
-- `voice.asr`、`voice.transcribe`、`voice.tts`、`voice.cancel`：已进入稳定 operation scope，公开 journal 只保留脱敏请求摘要；真实 provider/TTS replay 尚未完成。
+- `voice.asr`、`voice.transcribe`、`voice.tts`、`voice.cancel`：已进入稳定 operation scope；独立 `transcribe/tts` 已能消费私有 fixture 并在缺失/篡改时 fail closed，完整 fresh/restart/replay route archive 仍未完成。
 - WebSocket `device.hello`、`device.event`、audio stream、command ACK 和本地 failure：已进入 bridge operation scope；完整 ACK/failure/restart/replay 门仍为 `partial`。
 
 ### 待接入的高价值 route
