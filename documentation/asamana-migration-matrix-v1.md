@@ -1,7 +1,7 @@
 # Asamana → DeskBot 正式迁移矩阵 v1
 
 核对日期：2026-10-13
-本轮发布分支：`codex/asamana-replay-journal-v6`（本地从 v5 基线创建；远端状态以 Git 交付核验为准）
+本轮发布分支：`codex/asamana-replay-journal-v6-1`（本地从 v6 基线创建；远端状态以 Git 交付核验为准）
 目标：把 Asamana 中有价值的“感知 → 动机 → 决策 → 行动 → 反馈 → 记忆/回放”机制迁移为 DeskBot 的长期共同生活能力，同时保持聚形域、喵呜、多源输入、受规则约束的世界事实和可逆角色阶段。
 
 本矩阵是 [迁移标准](asamana-migration-standard-v1.md) 与 [迁移管线](asamana-migration-pipeline-v1.md) 的状态权威。它不把上游 Asamana 当作 DeskBot 的运行时，也不把通过单元测试或受控样本误写成已经完成自然长期生活。
@@ -60,7 +60,7 @@
 
 ## 当前复验与历史证据
 
-2026-10-14 v6 增量复验：服务端广套 **853/853**，M8 长时生活回放单独 **1/1**；operation-journal/replay/persistence 联合专项 **27/27**。该数字是当前回归证据，不是新增 854 项迁移验收，也不是最终生活目标已经完成。
+2026-10-14 v6.1 增量复验：服务端广套 **855/855**，M8 长时生活回放单独 **1/1**；operation-journal/replay/persistence 联合专项 **27/27**。该数字是当前回归证据，不是最终生活目标已经完成。
 
 本轮发布检查也已重新运行客户端 44 套 301/301、voice-sidecar 16/16 和生产构建（含 typecheck/client/server），全部通过；正式实时小镇截图已按本轮 22:12 的实际页面更新。页面天气显示“等待新天气”，不能据此宣称天气 provider 本轮 fresh。Asamana 独立前端 140/140 是更早的上游部署结果，本轮未重跑。真实 context loss、长断线、完整阶段像素和长期体验仍不能由这些命令代替。
 

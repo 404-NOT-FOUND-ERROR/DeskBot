@@ -1,20 +1,20 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-13。** 本轮发布分支为 `codex/asamana-replay-journal-v6`（本地从 v5 代码基线创建，远端状态以交付核验为准）。本文件区分本轮复验和更早历史证据；测试数量不代表迁移完整完成。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
+**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-14。** 本轮发布分支为 `codex/asamana-replay-journal-v6-1`（本地从 v6 代码基线创建，远端状态以交付核验为准）。本文件区分本轮复验和更早历史证据；测试数量不代表迁移完整完成。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 广套 853/853 通过；M8 长时生活回放单独 1/1（2026-10-14；合计 854 项）。operation-journal/replay/persistence 联合专项 27/27 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归基线；M8 单测约 135 秒，完整 suite 受单测试 180 秒默认门限制，故单独复验 |
+| DeskBot 服务完整回归 | 广套 855/855 通过；M8 长时生活回放单独 1/1（2026-10-14）。operation-journal/replay/persistence 联合专项 27/27 | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归基线；M8 单测约 135 秒，完整 suite 受单测试 180 秒默认门限制，故单独复验 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
-| 3D 客户端 | 44 套、301/301 通过（2026-10-13 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
+| 3D 客户端 | 44 套、301/301 通过（2026-10-14 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
 | 前端类型与生产构建 | 本轮生产构建通过（含 typecheck/client/server） | 类型一致性和可构建性 |
-| voice-sidecar 接口 | 16 项通过（2026-10-13 本轮发布复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
+| voice-sidecar 接口 | 16 项通过（2026-10-14 本轮发布复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md) 和 [正式迁移矩阵](asamana-migration-matrix-v1.md)。2026-10-13 本轮在 Windows 工作站重新运行服务端 843 项、客户端 301 项、voice-sidecar 16 项、生产构建（含 typecheck/client/server），全部通过。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md) 和 [正式迁移矩阵](asamana-migration-matrix-v1.md)。2026-10-14 本轮在 Windows 工作站重新运行服务端广套 855 项、M8 长时生活回放单独 1 项、operation-journal/replay/persistence 联合专项 27 项、客户端 301 项、voice-sidecar 16 项、生产构建（含 typecheck/client/server），全部通过。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 本次新增 `slow-cognition-action-integration.test.mjs`：托盘、做饭与光果供给从合法候选进入实际任务，由同配方真实结果结算目标；旅行、缺材料及重复结算不形成完成进度。`persistent-world-restart.test.mjs` 验证账本流式恢复、过滤后有限 hydration、feed/历史一致性与跨世界 Scene 隔离；默认账本接口仍保留完整 diff。`slow-cognition.test.mjs` 保留已完成、失败、取消和撤回意图的真实状态。
 

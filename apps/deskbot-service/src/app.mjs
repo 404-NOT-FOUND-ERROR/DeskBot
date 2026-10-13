@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DEFAULT_CHARACTER_ID } from './world-definition.mjs';
 import { activeWorldTask, worldTaskReadModel } from './realtime-world.mjs';
 import { createSharedLife } from './shared-life.mjs';
@@ -283,6 +283,7 @@ export function createDeskBotServer({
         };
       });
     },
+    onProviderResult: resultRef => replayCapture?.setOperationResultRef?.(resultRef),
     refreshWeather: weatherConnector
       ? async ({ force = false } = {}) => {
         const weather = await weatherConnector.refresh({ force });
@@ -2068,7 +2069,20 @@ export function createDeskBotServer({
       readJson(request)
         .then((body) => {
           if (url.pathname === '/api/chat' && (body.role ?? 'user') === 'user') {
-            return orchestrator.run(body).then((turn) => {
+            // Chat is a first-class service operation rather than an alias for
+            // the public event ingress. Normalize once here so generated event
+            // IDs are stable for retries and every persistence write performed
+            // by the orchestrator shares one operation context. The message
+            // itself is represented only by a hash in the journal envelope.
+            const normalizedRequest = normalizeChat({
+              ...body,
+              role: 'user',
+              source: 'deskbot-chat',
+            }, { now });
+            const executeChat = () => orchestrator.run({
+              ...body,
+              event_id: normalizedRequest.event_id,
+            }).then((turn) => {
               const roleEvolutionResult = turn.duplicate
                 ? null
                 : roleEvolution.observeEvent(turn.input_event);
@@ -2091,6 +2105,22 @@ export function createDeskBotServer({
                 },
               });
             });
+            if (!replayCapture?.withOperation) return executeChat();
+            const requestSummary = {
+              event_id: normalizedRequest.event_id,
+              type: normalizedRequest.type,
+              source: normalizedRequest.source,
+              character_id: normalizedRequest.character_id,
+              correlation_id: normalizedRequest.correlation_id,
+              role_revision: normalizedRequest.role_revision,
+              metadata: normalizedRequest.payload.metadata ?? null,
+            };
+            return replayCapture.withOperation({
+              operation_id: `chat:${normalizedRequest.event_id}`,
+              operation_kind: 'chat.request',
+              source: 'http.chat',
+              request_hash: createHash('sha256').update(JSON.stringify(requestSummary)).digest('hex'),
+            }, executeChat);
           }
 
           const event = url.pathname === '/api/chat'

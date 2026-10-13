@@ -218,3 +218,62 @@ test('service replay seam replays non-canonical ingress through original handler
     runtimeFactory, codeFingerprint: CODE }), error => error.code === 'replay_service_namespace_mismatch'
       && error.namespaces.includes('uncaptured-service-writer'));
 });
+
+test('HTTP chat is journaled as one operation without retaining message text', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskbot-chat-capture-'));
+  const databasePath = join(dir, 'source.sqlite');
+  const archive = join(dir, 'archive');
+  const persistence = createSqlitePersistence({ filename: databasePath, now: () => new Date(BASE) });
+  const now = () => new Date(BASE);
+  const capture = createCanonicalReplayCapture({ persistence, directory: archive, now, codeFingerprint: CODE });
+  const world = createPersistentWorld({ persistence, now, timeMode: 'realtime', replayCapture: capture });
+  const llm = {
+    id: 'chat-journal-fake',
+    status: () => ({ configured: false }),
+    complete: async () => ({ provider: 'chat-journal-fake', model: 'fixture-v1', text: '喵呜。记下了。' }),
+  };
+  const server = createDeskBotServer({
+    now,
+    persistence,
+    persistentWorld: world,
+    replayCapture: capture,
+    llm,
+    websocket: false,
+    worldLifeEnabled: false,
+    autonomousLifeEnabled: false,
+    residentLifeEnabled: false,
+    livedMemoryEnabled: false,
+  });
+  await new Promise((resolve, reject) => server.listen(0, '127.0.0.1', error => error ? reject(error) : resolve()));
+  t.after(async () => {
+    await new Promise(resolve => server.close(() => resolve()));
+    capture.close();
+    persistence.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const message = '这句正文只应该参与哈希，不应该落进操作封套。';
+  const request = { event_id: 'chat-journal-001', correlation_id: 'chat-correlation-001', message };
+  const first = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+  });
+  assert.equal(first.status, 202);
+  const firstBody = await first.json();
+  assert.equal(firstBody.duplicate, false);
+  const journalsAfterFirst = persistence.list('replay.capture-journal');
+  const chatJournals = journalsAfterFirst.filter(journal => journal.operation_id === 'chat:chat-journal-001');
+  assert.ok(chatJournals.length >= 1);
+  assert.ok(chatJournals.every(journal => journal.operation_kind === 'chat.request'));
+  assert.ok(chatJournals.every(journal => journal.source === 'http.chat'));
+  assert.ok(chatJournals.every(journal => /^[a-f0-9]{64}$/.test(journal.request_hash)));
+  assert.ok(chatJournals.some(journal => journal.result_ref?.schema === 'deskbot.provider-result-ref.v1'));
+  assert.ok(chatJournals.every(journal => !JSON.stringify(journal).includes(message)));
+
+  const duplicate = await fetch(`http://127.0.0.1:${server.address().port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+  });
+  assert.equal(duplicate.status, 200);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.duplicate, true);
+  assert.equal(persistence.list('replay.capture-journal').length, journalsAfterFirst.length);
+});

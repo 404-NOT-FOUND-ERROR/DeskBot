@@ -166,12 +166,18 @@ export function createCanonicalReplayCapture({ persistence, directory, now = () 
       if (!operation_kind) throw new TypeError('operation_kind must be a non-empty string');
       const source = String(context.source ?? 'service').trim() || 'service';
       const request_hash = context.request_hash ?? (context.request === undefined ? null : digest(context.request));
-      const normalized = Object.freeze({
+      const normalized = {
         schema: 'deskbot.service-operation-context.v1', operation_id, operation_kind, source,
         request_hash, result_ref: context.result_ref ?? null,
         started_at: context.started_at ?? now().toISOString(),
-      });
+      };
       return operationStorage.run(normalized, callback);
+    },
+    setOperationResultRef(resultRef) {
+      const context = operationStorage.getStore();
+      if (!context) fail('operation_context_required');
+      context.result_ref = resultRef === null || resultRef === undefined ? null : copy(resultRef);
+      return context.result_ref;
     },
     operationCount() {
       if (!initialized) fail('replay_capture_not_initialized');

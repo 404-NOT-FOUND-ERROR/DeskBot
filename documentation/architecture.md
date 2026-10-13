@@ -22,7 +22,7 @@ canonical task / travel / NPC activity
 
 ## 运行结构与状态归属
 
-### Asamana 参考迁移（2026-10-13，独立分支验证）
+### Asamana 参考迁移（2026-10-14，独立分支验证）
 
 新增 `runtime-contracts.mjs` 为来源调度、角色演化和世界候选提供审计合同、内容指纹和 replay 引用，始终标记 `audit_only`；它不取代 SQLite 幂等账本、不重放模型，也不授予 mutation 权限。`memory-ranking.mjs` 接入现有记忆召回，以词法相关性、近期性和重要性排序、同源/相似内容去重，并把解释关联到已有事实；读取不增加成长或写入世界。Jev Town 生活流按 canonical mutation sequence 排序，通过刷新 generation 门控拦截过时响应。慢认知目标严格绑定同角色、同活动和同话题的 canonical `activity_id`；主题相同但活动不同的记录不能结算目标。
 

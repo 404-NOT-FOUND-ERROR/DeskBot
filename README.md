@@ -4,14 +4,16 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v6 发布快照。** 本版发布在 [`codex/asamana-replay-journal-v6`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-replay-journal-v6)，从 v5 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6 在 v5 的迁移标准、共享生活和 canonical replay 基础上，新增统一 operation context 与 capture journal 的第一批服务入口接入，并保留严格的 M6b 未完成边界说明；角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v6.1 发布快照。** 本版发布在 [`codex/asamana-replay-journal-v6-1`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-replay-journal-v6-1)，从 v6 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.1 在 v6 的迁移标准、共享生活和 canonical replay 基础上，补齐 HTTP chat 入口的 operation context、请求摘要哈希、provider/TTS 结果引用和重复请求幂等测试；它仍是 M6b 的增量发布，不宣称完整生产服务归档已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
 
-### v6 本轮新增
+### v6.1 本轮新增
 
 - 为本地回放捕获增加版本化 `deskbot.service-operation.v1` journal envelope：记录 operation、来源、请求摘要、写入 namespace、事务边界和记录哈希，不把原始请求或密钥写入归档。
 - 为 `ingestNonChatEvent` 接入 `AsyncLocalStorage` operation context，事件入口与其 SQLite 写入可以关联到同一 operation id；捕获失败时保持 fail-closed。
 - 增加 operation-journal 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测和敏感请求不落盘。
 - 这是 M6b 的增量发布，不宣称全服务生产归档已完成；chat/provider、input-runtime、worker、WebSocket 和直接 HTTP domain route 仍按迁移矩阵逐项接入。
+- `/api/chat` 的本轮 journal 只保存规范化请求摘要和哈希，不保存聊天正文；provider 与 TTS 结果以脱敏引用进入 operation journal，失败也保留结构化错误摘要。
+- 本版效果图继续使用 2026-10-13 的正式实时小镇与往事面板截图：v6.1 主要增强服务端可核验回放，视觉布局和世界内容包没有伪装成新的 UI 改版。
 
 ## 本版本更新
 
@@ -33,7 +35,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 | 能力 | 当前表现 |
 | --- | --- |
-| 持续生活 | 喵呜与十二位居民共用现实 1:1 时钟，按需要和可行条件选择生活。出行、工作、吃饭、休息和约定都有耗时与持久状态，关闭网页不暂停服务中的世界。 |
+| 持续生活 | 喵呜与十二位居民（共十三位角色）共用现实 1:1 时钟，按需要和可行条件选择生活。出行、工作、吃饭、休息和约定都有耗时与持久状态，关闭网页不暂停服务中的世界。 |
 | 有后果的世界 | 五个地区、十个地点，含内部区域、设施与通路。取水、净滤、育苗、收获、制种、制作、炖餐和搬运使用有限资源；库存、预留、失败与恢复都有记录。 |
 | 社会生活 | 居民可以相遇、邀请、搭手、交换、赴约、分享食物。苔团的浮圃、扣扣的小泵和锅粒的叶芽汤通过实际任务推进；其他居民仍有待进一步实现的私人项目。 |
 | 现实折射 | 天气、新闻、区域空气质量和主人互动保留来源、时效与影响依据，进入有限生活选择。本机已配置上海天气；其他 agent 有输入边界，尚未接入真实外部 agent 服务。 |
@@ -51,7 +53,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![v6 发布快照：实时小镇与小镇往事并排概览（2026-10-13；视觉沿用 v5，回放日志能力在后端增强）](documentation/images/current/release-v6-overview.jpg)
+![v6.1 发布快照：实时小镇与小镇往事并排概览（2026-10-13；视觉沿用 v6，回放日志能力在后端增强）](documentation/images/current/release-v6-overview.jpg)
 
 ![v6 发布快照的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
 
@@ -61,13 +63,13 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-总览图和接下来的两张是 2026-10-13 v6 发布分支本机正式运行截图：总览图并列展示实时小镇与历史回放，细节图分别展示 13 位居民的实时生活侧栏，以及只读的小镇往事/历史时间线；本版视觉没有改版，新增能力主要位于服务端 operation journal 和回放审计，因此总览图沿用同一运行基线并在文件名上标记 v6。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+总览图和接下来的两张是 2026-10-13 v6.1 发布分支本机正式运行截图：总览图并列展示实时小镇与历史回放，细节图分别展示喵呜与十二位居民（共十三位角色）的实时生活侧栏，以及只读的小镇往事/历史时间线；本版视觉没有改版，新增能力主要位于服务端 operation journal 和回放审计，因此继续复用同一运行基线。截图是当前可体验效果的证据，不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
 ## 当前完成范围
 
 当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-14 Windows 本机复验：服务端广套 **853/853**，M8 长时生活回放单独 **1/1**（合计 854 项）；前端 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过。Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-14 Windows 本机复验：服务端广套 **855/855**，M8 长时生活回放单独 **1/1**；前端 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过。Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
 
 `node scripts/review-asamana-migration.mjs` 在临时 SQLite 运行受控三日链，不访问正式存档、默认不调用外部模型。规则样本已经 `verified`：第二日形成的具体目标，在第三日重启后通过原生活计划与真实任务完成，材料和每日实践上限保持有效。真实 DeepSeek 样本仍有缺少经历依据的目标被拒绝，结果为 `inconclusive_reflection_failed`；规则样本通过不代表真实模型或长期自然生活已验收。
 
@@ -78,7 +80,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-replay-journal-v6 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-replay-journal-v6-1 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -90,7 +92,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-replay-journal-v6`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-replay-journal-v6-1`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
@@ -136,7 +138,7 @@ flowchart LR
 | [当前设计与实现](documentation/design-implementation-map.md) | 已完成能力、实现对应和剩余工作 |
 | [架构](documentation/architecture.md) · [流程](documentation/flows.md) | 状态边界、生活与角色发展链路 |
 | [验证](documentation/tests.md) · [自动运行](documentation/automation.md) | 验证方法、连接器与服务运行 |
-| [Asamana 评估](documentation/asamana-review.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
+| [Asamana 评估](documentation/asamana-review.md) · [v6.1 发布说明](documentation/asamana-replay-journal-v6-1.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
 | [Asamana attribution](third-party/asamana/README.md) | 上游版本、Apache-2.0 许可证与迁移归属说明 |
 | [居民设计](research/npcs/resident-life-design-v1.md) · [地图目录](world-content/companion-world/map.v1.json) | 生活角色与地图内容 |
 | [阶段规则](research/world/role-stages-v1.md) · [身体协议](research/protocol/body-perception-v1.md) | 角色采用、回退与后续硬件适配 |

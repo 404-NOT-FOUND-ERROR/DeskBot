@@ -64,6 +64,7 @@ export function createChatOrchestrator({
   continuityContext = null,
   conversationHistoryAfter = null,
   recordRoleTrialObservation = null,
+  onProviderResult = null,
 }) {
   const turns = new Map(
     (persistence?.list('chat.turns') ?? []).map((turn) => [turn.turn_id, turn]),
@@ -255,13 +256,34 @@ export function createChatOrchestrator({
     });
     // Runtime sources inform the character's reply. They must not replace the
     // character with a collection of hard-coded question-and-answer handlers.
-    const rawCompletion = await llm.complete({
-      userText: userEvent.payload.text,
-      prompt: composed.prompt,
-      state: stateResult.state,
-      worldConditions,
-      worldSnapshot: currentWorldSnapshot(),
-    });
+    let rawCompletion;
+    try {
+      rawCompletion = await llm.complete({
+        userText: userEvent.payload.text,
+        prompt: composed.prompt,
+        state: stateResult.state,
+        worldConditions,
+        worldSnapshot: currentWorldSnapshot(),
+      });
+      onProviderResult?.({
+        schema: 'deskbot.provider-result-ref.v1',
+        purpose: 'chat',
+        status: 'success',
+        provider: rawCompletion.provider ?? llm.id ?? null,
+        model: rawCompletion.model ?? null,
+        result_hash: createHash('sha256').update(String(rawCompletion.text ?? '')).digest('hex'),
+      });
+    } catch (error) {
+      onProviderResult?.({
+        schema: 'deskbot.provider-result-ref.v1',
+        purpose: 'chat',
+        status: 'error',
+        provider: llm.id ?? null,
+        model: null,
+        error_code: error.code ?? 'provider_error',
+      });
+      throw error;
+    }
     const factGuard = guardDevelopmentFacts({
       userText: userEvent.payload.text,
       text: rawCompletion.text,
@@ -363,6 +385,21 @@ export function createChatOrchestrator({
         if (voiceRequired) throw error;
       }
     }
+    onProviderResult?.({
+      schema: 'deskbot.provider-result-ref.v1',
+      purpose: 'chat',
+      status: 'success',
+      provider: rawCompletion.provider ?? llm.id ?? null,
+      model: rawCompletion.model ?? null,
+      result_hash: createHash('sha256').update(String(rawCompletion.text ?? '')).digest('hex'),
+      ...(voice ? {
+        tts: {
+          status: 'success',
+          audio_id: voice.audio_id,
+          sha256: voice.sha256,
+        },
+      } : voiceError ? { tts: { status: 'error', code: voiceError.code } } : {}),
+    });
 
     const replyEvent = normalizeChat({
       event_id: `reply-${userEvent.event_id}`,
