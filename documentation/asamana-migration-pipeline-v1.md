@@ -29,7 +29,7 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮工作分支为 `codex/asamana-m6b-v6-4-release`，v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮公开发布分支为 `codex/asamana-m6b-v6-4-public-release`，`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 

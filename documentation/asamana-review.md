@@ -1,6 +1,6 @@
 # Asamana 本地部署与源码评估
 
-> v6.4 增量（2026-10-14）：当前发布分支为 `codex/asamana-m6b-v6-4-release`；`input-runtime` I4/I7 受控回放 2/2、服务端广套 861/861。下文保留 v6.3/v6.2 的历史数字时，按其原发布记录理解；未完成范围仍以迁移矩阵为准。
+> v6.4 增量（2026-10-14）：当前公开发布分支为 `codex/asamana-m6b-v6-4-public-release`；`input-runtime` I4/I7 受控回放 2/2、服务端广套 861/861。下文保留 v6.3/v6.2 的历史数字时，按其原发布记录理解；未完成范围仍以迁移矩阵为准。
 
 核对日期：2026-10-14。上游：[dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana)，核对版本 `e9fc862642369ba8b177595d2f8e3f20c1636da4`，许可证 Apache-2.0。源码、素材和示例部署在 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，与 DeskBot 的数据库、端口和模型配置隔离。DeskBot 当前工作分支为 `codex/asamana-m6b-v6-4-release`；v5/v6.2/v6.3 仅作为历史基线，逐项执行以 [迁移作业单](asamana-migration-runbook-v1.md) 为准。
 

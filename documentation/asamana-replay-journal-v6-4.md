@@ -1,6 +1,6 @@
 # Asamana 迁移回放日志 v6.4 发布说明
 
-本分支 `codex/asamana-m6b-v6-4-release` 是 v6.4 replay seam 基线的发布分支，补齐 `input-runtime` source run 的受控捕获与原业务入口回放。它仍不把受控回放写成完整生产归档，也不改变 DeskBot 的唯一世界事实写入口。
+本分支 `codex/asamana-m6b-v6-4-public-release` 是 v6.4 replay seam 基线的公开发布分支，补齐 `input-runtime` source run 的受控捕获与原业务入口回放。它仍不把受控回放写成完整生产归档，也不改变 DeskBot 的唯一世界事实写入口。
 
 ## 本版范围
 
@@ -25,4 +25,4 @@ assistant 分支、独立 TTS 成功 fixture、worker/WebSocket/device ACK、直
 
 ## 视觉基线
 
-本版没有改动雾灯镇 3D 世界的交互布局。README 中的 v6.4 release 图片 `documentation/images/asamana-v6-4-release/live-town.png` 是 2026-10-14 04:01 通过本机运行页面截取的实际截图，展示实时小镇、居民侧栏和小镇往事面板；原 `asamana-v6-4` JPG 仍作为历史版本化副本保留。本版新增能力位于服务端 input-runtime replay、operation journal 和回放审计。
+本版没有改动雾灯镇 3D 世界的交互布局。README 中的公开发布图片 `documentation/images/asamana-v6-4-release/live-town-public-release.png` 是 2026-10-14 通过本机运行页面截取并归档的实际截图，展示实时小镇、居民侧栏和小镇往事面板；原 `live-town.png` 与 `asamana-v6-4` JPG 仍作为历史版本化副本保留。本版新增能力位于服务端 input-runtime replay、operation journal 和回放审计。
