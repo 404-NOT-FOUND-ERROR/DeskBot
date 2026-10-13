@@ -91,7 +91,7 @@ export async function runMigrationReview({ live = false, configPath = null, maxR
   let time = Date.parse(START), sequence = 0, persistence, world, life, choices, slow, candidates;
   let checkpoint = 'initialize';
   const now = () => new Date(time), at = () => now().toISOString();
-  const calls = [], snapshots = [], goalPlans = new Map(), originalIngress = [];
+  const calls = [], snapshots = [], goalPlans = new Map(), canonicalGoalTasks = new Map(), originalIngress = [];
   let realProvider = provider;
   if (live && !realProvider) realProvider = createReloadableLlm({ configPath: resolve(configPath), now });
   const counts = () => ({ all: calls.length, slow: calls.filter(call => call.purpose === 'slow_cognition').length,
@@ -155,6 +155,17 @@ export async function runMigrationReview({ live = false, configPath = null, maxR
       goalPlans.set(plan.plan_id, { plan_id: plan.plan_id, goal_id: plan.cognition_goal_id,
         goal: plan.goal, task_id: plan.task_id, status: plan.status, at: at(),
         task_ids: [...new Set([...(previous?.task_ids ?? []), plan.task_id].filter(Boolean))] });
+    }
+    // A completed plan is intentionally cleared by the autonomous loop. Keep
+    // the durable task's authored life_plan_id as the audit bridge so a
+    // cross-day carried intention remains verifiable after restart and settle.
+    for (const task of state.tasks.filter(task => task.actor_id === OWNER && task.cognition_goal_id && task.life_plan_id)) {
+      canonicalGoalTasks.set(task.task_id, structuredClone(task));
+      const previous = goalPlans.get(task.life_plan_id) ?? { plan_id: task.life_plan_id,
+        goal_id: task.cognition_goal_id, goal: task.life_goal, status: 'completed', at: task.finished_at ?? at(), task_ids: [] };
+      previous.task_ids = [...new Set([...(previous.task_ids ?? []), task.task_id])];
+      previous.status = task.status === 'running' ? 'executing' : previous.status;
+      goalPlans.set(task.life_plan_id, previous);
     }
     const snapshot = { id, at: at(), date: localWorldDate(at(), 'Asia/Shanghai').date, world_revision: state.world_revision,
       sequence: world.readSnapshot({ feedLimit: 1 }).sequence,
@@ -283,17 +294,39 @@ export async function runMigrationReview({ live = false, configPath = null, maxR
       .some(goal => goal.history?.length && goal.created_by !== firstRequest.id), day2Goals.length ? 120 : 0,
     { date: nextDate });
     capture('day2-life-results');
+    // An intention formed after today's discretionary practice legitimately
+    // waits for the next local day. Follow that same captured goal through a
+    // bounded third date; don't reset it, refill materials, mint a model goal
+    // or confuse tomorrow's separate ordinary task with this intention.
+    const carriedGoalIds = new Set(day2Goals.map(goal => goal.goal_id));
+    const carriedGoalSettled = () => [...(world.get().memory.maintenance.actors[OWNER].goals ?? []),
+      ...(world.get().memory.maintenance.actors[OWNER].goal_history ?? [])]
+      .some(goal => carriedGoalIds.has(goal.goal_id) && goal.history?.length);
+    let nextOpportunitySettled = day2GoalSettled;
+    const thirdDate = localWorldDate(new Date(Date.parse(START) + 2 * DAY).toISOString(), 'Asia/Shanghai').date;
+    if (!nextOpportunitySettled && day2Goals.length) {
+      checkpoint = 'carried_intention_next_day';
+      assert.equal(await until(() => localWorldDate(at(), 'Asia/Shanghai').date === thirdDate, 600, { choose: false }), true);
+      capture('day3-carried-intention');
+      restart(); capture('day3-restarted-intention');
+      checkpoint = 'carried_intention_execution';
+      nextOpportunitySettled = await until(carriedGoalSettled, 180, { date: thirdDate });
+      capture('day3-life-results');
+    }
     const own = world.get().memory.maintenance.actors[OWNER];
     report.gates.cross_day_reflection = own.request.date !== firstRequest.date;
     report.gates.reflection_outputs_valid = [firstRequest.status, own.request.status].every(status => status === 'completed');
     report.gates.goal_execution = { day1: day1GoalSettled, day2: day2GoalSettled,
+      carried_intention_next_opportunity: nextOpportunitySettled,
+      day2_goal_ids: [...carriedGoalIds],
       empty_day1: firstGoals.length === 0, empty_day2: day2Goals.length === 0 };
     const chains = [...(own.goals ?? []), ...(own.goal_history ?? [])].map(goal => ({ ...goalSummary(goal),
       plans: [...goalPlans.values()].filter(plan => plan.goal_id === goal.goal_id),
-      canonical_tasks: world.get().tasks.filter(task => task.cognition_goal_id === goal.goal_id).map(task => ({
+      canonical_tasks: [...canonicalGoalTasks.values()].filter(task => task.cognition_goal_id === goal.goal_id).map(task => ({
         task_id: task.task_id, activity_id: task.activity_id, status: task.status, plan_id: task.life_plan_id,
         origin: task.origin, result_success: task.completion?.result?.success ?? null })) }));
     checkpoint = 'canonical_goal_chains';
+    report.goal_execution_chains = chains;
     for (const chain of chains) for (const result of chain.history ?? []) {
       assert.equal(result.authority, 'canonical_task');
       const task = chain.canonical_tasks.find(task => task.task_id === result.task_id);
@@ -338,7 +371,7 @@ export async function runMigrationReview({ live = false, configPath = null, maxR
     } else report.gates.final_reflection_skipped_new_date = true;
     report.gates.final_restart_memory_and_call_count = true;
     report.status = !report.gates.reflection_outputs_valid ? 'inconclusive_reflection_failed'
-      : day1GoalSettled && day2GoalSettled ? 'verified'
+      : day1GoalSettled && nextOpportunitySettled ? 'verified'
       : firstGoals.length === 0 || day2Goals.length === 0 ? 'inconclusive_no_intention' : 'inconclusive_goal_not_executed';
     report.calls = calls; report.fixture_calls = live ? 0 : calls.length; report.external_calls = live ? calls.length : 0;
     report.ended_at = at(); report.snapshots = snapshots;

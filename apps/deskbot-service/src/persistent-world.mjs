@@ -1660,7 +1660,7 @@ export class PersistentWorldError extends Error {
   }
 }
 
-export function createPersistentWorld({ now = () => new Date(), persistence = null, timeMode = 'simulation', timeZone = 'Asia/Shanghai' } = {}) {
+export function createPersistentWorld({ now = () => new Date(), persistence = null, timeMode = 'simulation', timeZone = 'Asia/Shanghai', replayCapture = null, syncClockOnCreate = true } = {}) {
   if (!['simulation', 'realtime'].includes(timeMode)) throw new TypeError('timeMode must be simulation or realtime');
   localWorldDate(now().toISOString(), timeZone);
   const storedWorlds = persistence?.list('canonical-world.states') ?? [];
@@ -1941,7 +1941,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     };
   }
 
-  function persistCommit(world, mutation, countedTurn = null) {
+  function persistCommit(world, mutation, countedTurn = null, replayInput = null) {
     const operation = () => {
       persistence?.put('canonical-world.states', world.world_id, world);
       if (persistence?.insert) {
@@ -1952,6 +1952,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       if (countedTurn) {
         persistence?.put('canonical-world.turns', countedTurn.turn_key, countedTurn);
       }
+      replayCapture?.recordCommit({ ...replayInput, mutation, world });
     };
     if (persistence?.transaction) persistence.transaction(operation);
     else operation();
@@ -2137,6 +2138,12 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       return { applied: false, duplicate: false, reason: 'voice_transport_stage_is_not_a_user_turn', mutation: null, world: get() };
     }
 
+    // One receipt instant is the authoritative clock for this synchronous
+    // commit. Re-reading wall time during apply/finalize/ledger could otherwise
+    // make a captured input impossible to reproduce across a millisecond edge.
+    const receivedAt = now().toISOString();
+    const commitNow = () => new Date(receivedAt);
+
     let projection;
     let countedTurn = null;
     if (eventType === 'conversation.input') {
@@ -2177,14 +2184,14 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
         && (event.source !== 'slow-cognition-engine' || adapter.maintenanceInternal !== true)) {
         throw new PersistentWorldError(403,'slow_cognition_requires_server_adapter','慢认知只能由服务端生活引擎调用。');
       }
-      try { projection = applyExplicitMutation(world, event, now().toISOString()); }
+      try { projection = applyExplicitMutation(world, event, receivedAt); }
       catch (error) {
         if (error instanceof RealTimeWorldError || error instanceof WorldMapError || error instanceof LivingResourceError || error instanceof AutonomousLifeError || error instanceof SocialLifeError || error instanceof PracticalRoleTrialError || error instanceof RoleStageError) throw new PersistentWorldError(error.statusCode, error.code, error.message);
         throw error;
       }
     } else if (['body.commands.linked', 'body.command.dispatched', 'body.command.acknowledged','body.command.failed'].includes(eventType)) {
       if (adapter.bodyInternal !== true) return { applied: false, duplicate: false, reason: 'body_internal_event_requires_server_adapter', mutation: null, world: get() };
-      const next=clone(world), at=now().toISOString();
+      const next=clone(world), at=receivedAt;
       const details=eventType==='body.commands.linked' ? markBodyCommands(next,event.payload.turn_id,event.payload.commands,at,adapter)
         : eventType==='body.command.dispatched' ? markBodyCommandDispatched(next,event.payload.command,at,adapter)
         : eventType==='body.command.failed' ? applyBodyCommandLocalFailure(next,event.payload.command,at,adapter)
@@ -2192,7 +2199,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       projection={next,action:eventType,details};
     } else {
       if (!world.refraction && !world.body) return { applied: false, duplicate: false, reason: 'event_does_not_mutate_canonical_world', mutation: null, world: get() };
-      const next=clone(world),at=now().toISOString();
+      const next=clone(world),at=receivedAt;
       const bodyObservation=(eventType.startsWith('sensor.') || eventType==='shell.install.detected') && world.body
         ? applyBodyObservation(next,event,at,adapter) : null;
       const details=world.refraction ? refractInput(next,event,at,{...adapter,bodyObservation}) : {accepted:bodyObservation?.accepted===true};
@@ -2202,8 +2209,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       projection={next,action:'refract_input',details};
     }
 
-    if(projection.details?.accepted!==false && eventType==='conversation.input')refractInput(projection.next,event,now().toISOString(),adapter);
-    if(projection.details?.accepted!==false && eventType==='world.mutation' && event.payload?.action==='update_weather')refractInput(projection.next,event,now().toISOString(),adapter);
+    if(projection.details?.accepted!==false && eventType==='conversation.input')refractInput(projection.next,event,receivedAt,adapter);
+    if(projection.details?.accepted!==false && eventType==='world.mutation' && event.payload?.action==='update_weather')refractInput(projection.next,event,receivedAt,adapter);
 
     const beforeRevision = world.world_revision;
     const beforeLogicalTime = clone(world.logical_time);
@@ -2211,8 +2218,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     // does not advance canonical revision/tick or overwrite the accepted
     // projection (for example, a stale weather sample).
     const observationAccepted = projection.details?.accepted !== false;
-    if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settlePracticalTrials(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
-    const next = canonicalJson(observationAccepted ? finalizeWorld(projection.next, now) : world);
+    if(observationAccepted){syncLivedMemory(projection.next,receivedAt);settlePracticalTrials(projection.next,receivedAt);settleBodyPerception(projection.next,receivedAt);}
+    const next = canonicalJson(observationAccepted ? finalizeWorld(projection.next, commitNow) : world);
     const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
     for (const change of changes) {
       change.source_layer = 'L3';
@@ -2247,17 +2254,17 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       trigger_event_id: eventId,
       time: {
         occurred_at: event.occurred_at ?? null,
-        committed_at: now().toISOString(),
+        committed_at: receivedAt,
       },
       before_revision: beforeRevision,
       after_revision: next.world_revision,
       logical_time_before: beforeLogicalTime,
       logical_time_after: clone(next.logical_time),
       occurred_at: event.occurred_at ?? null,
-      committed_at: now().toISOString(),
+      committed_at: receivedAt,
     });
 
-    persistCommit(next, mutation, countedTurn);
+    persistCommit(next, mutation, countedTurn, { event, adapter, received_at: receivedAt, before_world: world });
     worlds.set(next.world_id, next);
     appendFeedProjection(mutation);
     const retainedMutation = streamedLedger ? mutationHeader(mutation) : mutation;
@@ -2314,7 +2321,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       character_id: DEFAULT_CHARACTER_ID, occurred_at: until, payload: { action: 'advance_living_world', until, force } });
   }
 
-  if (timeMode === 'realtime' || get().clock?.mode === 'real_time') syncWallClock();
+  replayCapture?.initialize({ world: get(), timeMode, timeZone });
+  if (syncClockOnCreate && (timeMode === 'realtime' || get().clock?.mode === 'real_time')) syncWallClock();
   return {
     get,
     ingest,

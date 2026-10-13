@@ -26,7 +26,7 @@ providers：LLM、embedding、向量存储、人物存储、snapshot
 
 ## 2026-10-13 DeskBot 分支收口
 
-当前发布分支为 `codex/asamana-shared-life-v2`。服务完整回归 819/819、客户端 44 套 301/301、typecheck/build 通过，正式小镇与往事效果图已更新。本轮修复实际候选的慢认知目标接线、终结意图状态、流式大账本恢复、渲染失败后文字视图回执和旧历史断层出口；没有引入第二套世界引擎。
+当前发布分支为 `codex/asamana-shared-life-v3`。服务完整回归 843/843、客户端 44 套 301/301、voice-sidecar 16/16、typecheck/build 通过，正式小镇与往事效果图已更新。本轮收紧角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；没有引入第二套世界引擎。
 
 新增跨日验收脚本默认零外部请求，首日目标完整执行链成立，次日新目标未在有限观察窗执行，诚实返回 `inconclusive_goal_not_executed`。真实模型多日生活、完整阶段视觉、真实渲染 context loss 与长断线仍待验收。现有 replay tape 是隔离输入 fixture 的确定性重演，任意生产存档的完整捕获导出尚未接入；长期共同生活和全部迁移目标不能据此宣称完成。
 
@@ -80,7 +80,7 @@ Asamana 能让一个主题下的冲突更丰富，但开放行动和模型叙事
 
 ## 本轮实际交付与验证
 
-- DeskBot 服务端完整回归：811/811 通过；Jev Town 客户端 297/297、Asamana 前端历史回归 140/140、voice-sidecar 历史回归 16/16，当前客户端 typecheck 与 production build 通过。Asamana/voice-sidecar 数字不是本轮重跑结果。
+- DeskBot 服务端完整回归：843/843 通过；Jev Town 客户端 301/301、Asamana 前端历史回归 140/140，当前客户端 typecheck 与 production build 通过。voice-sidecar 本轮 16/16 通过；Asamana 前端数字仍为既有结果。
 - Jev Town 客户端：生活 feed/刷新 race 9/9；typecheck 和生产 build 通过。构建通过不是长期沉浸体验完成。
 - Asamana 前端：17 个测试文件、140/140 通过；本地 API 能读取长安和现代都市两种地图。
 - M3/M4/M6/M7/M8 的模块能力已接入并自动验证。进一步语义复核已收紧目标为具体合法 activity、NPC 候选输入脱敏、按查询时刻过滤来信、撤回邀请只保留不可行动的历史，并隔离非法来源时间戳；以上均有专项测试。本轮已完成基础浏览器验收并保存 DeskBot/Asamana 画面证据；完整阶段像素验收、长断线与长期历史浏览、真实模型多日慢认知、生成式世界事件和真实中文 TTS 仍待验收。

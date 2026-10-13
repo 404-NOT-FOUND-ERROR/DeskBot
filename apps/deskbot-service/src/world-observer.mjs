@@ -95,10 +95,31 @@ function observerMapProjection(map) {
         return true;
       });
     }
+    if (Array.isArray(projected.memory.development?.facets?.actors)) {
+      // These empty topics are already hidden by the life panel. Their long
+      // authored explanations are not history or current evidence; sending
+      // all of them for every resident crowds out the actual recent facts.
+      projected.memory.development.facets.actors = projected.memory.development.facets.actors.map(actor => ({
+        ...actor,
+        topics: (actor.topics ?? []).filter(topic => !(topic.contact?.count === 0
+          && topic.interest?.status === 'unobserved'
+          && topic.capability?.status === 'unobserved'
+          && topic.self_assessment?.status === 'unobserved')),
+      }));
+    }
   }
   if (projected.autonomy) {
     delete projected.autonomy.cadence;
-    projected.autonomy.actors = (projected.autonomy.actors ?? []).map(({ last_candidates, cooldowns, ...actor }) => actor);
+    const displayFeedback = feedback => {
+      if (!feedback) return feedback;
+      const { action_feedback, ...display } = feedback;
+      return display;
+    };
+    projected.autonomy.actors = (projected.autonomy.actors ?? []).map(({ last_candidates, cooldowns, ...actor }) => ({
+      ...actor,
+      ...(actor.last_feedback ? { last_feedback: displayFeedback(actor.last_feedback) } : {}),
+    }));
+    if (Array.isArray(projected.autonomy.recent)) projected.autonomy.recent = projected.autonomy.recent.map(displayFeedback);
   }
   if (projected.social) {
     delete projected.social.residents;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { actorPerception, actorCognitionContext, influenceActorCognitionChoices, perceptionNarrativeLabel } from '../src/actor-perception.mjs';
 import { composePrompt } from '../src/prompt-composer.mjs';
 import { createPersistentWorld } from '../src/persistent-world.mjs';
+import { advanceWorldMessages } from '../src/world-message-transport.mjs';
 
 const base = {
   protagonist: { character_id: 'shaping-001', location_id: 'moss-sprout-garden' },
@@ -91,4 +92,62 @@ test('actor cognition is source-bounded and only reorders legal choices', () => 
   assert.equal(choices.find(item => item.goal === 'care').perception_bonus, 3);
   assert.equal(choices.find(item => item.goal === 'teleport').perception_bonus, 0);
   assert.equal(JSON.stringify(world.memory.episodes).includes('secret-model'), true);
+});
+
+test('remote public scenes and events remain news while local public scenes are observed', () => {
+  const world = structuredClone(base);
+  Object.assign(world.life.current_scene, { location_id: 'warm-pot-courtyard', visibility: 'public', topic: 'cook' });
+  Object.assign(world.active_event, { visibility: 'public', topic: 'cook' });
+  world.world_line.recent_events = [world.world_line.latest_event];
+  const before = JSON.stringify(world);
+  const context = actorCognitionContext(world);
+  assert.deepEqual(context.same_place, []);
+  assert.deepEqual(new Set(context.public.map(item => item.id)), new Set(['scene-garden', 'private-far', 'public-news']));
+  const choices = [{ goal: 'cook', development_topic: 'cook', score: 20, available: true }];
+  assert.equal(influenceActorCognitionChoices(world, 'shaping-001', choices)[0].perception_bonus, 1);
+  assert.equal(JSON.stringify(world), before);
+  world.protagonist.location_id = 'warm-pot-courtyard';
+  assert.equal(actorPerception(world).scene.perception.visibility, 'observed');
+  assert.equal(influenceActorCognitionChoices(world, 'shaping-001', choices)[0].perception_bonus, 3);
+});
+
+test('future and invalid-time information cannot enter perception, cognition or chat', () => {
+  const world = createPersistentWorld({ now: () => new Date('2026-10-12T02:00:00Z') }).get();
+  world.protagonist.location_id = 'moss-sprout-garden';
+  const future = '2026-10-12T03:00:00.000Z';
+  world.life.current_scene = { scene_id: 'future-scene', title: 'future-scene-text', started_at: future, visibility: 'public' };
+  world.active_event = { event_id: 'future-active', title: 'future-active-text', occurred_at: future, visibility: 'public' };
+  world.world_line.latest_event = { event_id: 'future-news', title: 'future-news-text', occurred_at: future, visibility: 'public' };
+  world.world_line.recent_events = [world.world_line.latest_event];
+  world.social = { commitments: [], notices: [
+    { id: 'future-note', text: 'future-note-text', at: future, audience: ['shaping-001'] },
+    { id: 'invalid-note', text: 'invalid-note-text', at: 'invalid', audience: ['shaping-001'] },
+  ] };
+  const at = '2026-10-12T02:00:00.000Z';
+  world.updated_at = at;
+  const view = actorPerception(world, 'shaping-001', at);
+  assert.equal(view.scene, null); assert.equal(view.active_event, null); assert.equal(view.latest_event, null);
+  assert.deepEqual(view.notices, []); assert.deepEqual(view.world_events, []);
+  assert.deepEqual(actorCognitionContext(world, 'shaping-001', at).delivered, []);
+  const composed = composePrompt({ worldSnapshot: world, userText: '今天镇上怎么样？' });
+  assert.doesNotMatch(composed.prompt, /future-(?:scene|active|news|note)-text|invalid-note-text/);
+});
+
+test('canonical public notice reaches remote actors only through delivered transport', () => {
+  const world = structuredClone(base), at = '2026-10-12T02:00:00.000Z', later = '2026-10-12T02:02:00.000Z';
+  world.social.commitments = [{ id: 'completed', actors: ['far'], status: 'completed', location_id: 'warm-pot-courtyard' }];
+  world.social.notices = [{ id: 'canonical-news', text: '锅边那碗汤已经喝完了。', at, audience: 'public',
+    author_id: 'far', verified_by: 'canonical_world_record', source_commitment_id: 'completed' }];
+  advanceWorldMessages(world, at);
+  const remote = actorPerception(world, 'shaping-001', at);
+  assert.deepEqual(remote.notices, []); assert.deepEqual(remote.messages, []);
+  assert.equal(actorPerception(world, 'far', at).notices[0].perception.visibility, 'witnessed');
+  world.npcs.push({ npc_id: 'local-witness', location_id: 'warm-pot-courtyard' });
+  assert.equal(actorPerception(world, 'local-witness', at).notices[0].perception.visibility, 'observed');
+  advanceWorldMessages(world, later);
+  const received = actorPerception(world, 'shaping-001', later);
+  assert.deepEqual(received.notices, [], 'transport content is never duplicated through global notices');
+  assert.equal(received.messages[0].content, world.social.notices[0].text);
+  assert.equal(received.messages[0].perception.visibility, 'delivered');
+  assert.deepEqual(actorPerception(world, 'shaping-001', at).messages, [], 'historical read cannot see later delivery');
 });

@@ -12,7 +12,7 @@
 | M3 | 慢认知维护 | 只在 cadence 到期时执行 decay → compression → reflection → goal/relation revision；失败不阻塞生活 | `implemented` / `automated verified` |
 | M4 | 自治 cadence gate | 主角和居民按需要、压力、情绪和空闲阈值安排认知；跨日重启后频率连续 | `implemented` / `automated verified` |
 | M5 | mutation channel 治理强化（DeskBot 原有能力；本轮增加 candidate replay 审计） | 非确定性/非受信观察先成为候选；preview 无 revision 变化；accept 只能写合法 mutation；受信天气 adapter 继续兼容 | `baseline implemented` / `automated verified` |
-| M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | `implemented` / `automated verified`；新序列可回放，真实迁移断层、重复 sequence 和 revision 分叉严格返回 `history_unavailable` |
+| M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | `canonical capture implemented` / `automated verified`；隔离服务入口 seam 支持多时间、重复与中途重启并核验全部 namespace；独立调度/决策/chat 操作尚未统一捕获，完整生产服务归档未完成；历史断层仍严格返回 `history_unavailable` |
 | M7 | 前端观察连续性 | 服务端统一 snapshot/WS、客户端 revision/sequence gate、重连和有界 render gate | `implemented` / `automated verified`；基础历史面板已接入，长期断线与历史浏览体验待验收 |
 | M8 | 长期共同生活回放 | 两个逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | 既有 288 事件隔离 fixture `automated verified`；新增自主追求验收 `inconclusive_goal_not_executed`，真实模型与人工体验 `pending` |
 
@@ -27,7 +27,7 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 属于本分支的实现，本次发布在 `codex/asamana-shared-life-v2`，保留 `main`。2026-10-13 复验服务端 819/819、客户端 44 套 301/301、typecheck/build 通过；voice-sidecar 16 项与 Asamana 独立前端 140 项为既有结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 属于本分支的实现，本次发布在 `codex/asamana-shared-life-v3`，保留 `main` 和前两版分支。2026-10-13 复验服务端 843/843、客户端 44 套 301/301、voice-sidecar 16/16、typecheck/build 通过；Asamana 独立前端 140 项为既有结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
@@ -84,7 +84,9 @@ decay → compression → reflection → goal revision → relation evolution
 
 为输入运行、角色演化和 world candidate 提供统一 replay fixture：同一 SQLite、同一 event 序列、同一规则版本必须产生相同 canonical revision 和 mutation IDs；LLM 输出不作为重放确定性的假设。
 
-现有 replay tape 是已捕获 fixture 的隔离确定性输入重演；正式历史面板是只读 snapshot/ledger 观察。任意正式存档的完整 seed、provider response 与时钟自动导出入口尚待接入，不能把两者描述成已完成的生产归档器；该原有迁移目标保留在后续验收中。
+现有 replay tape 是已捕获 fixture 的隔离确定性输入重演；正式历史面板是只读 snapshot/ledger 观察。显式本地捕获器通过 `DESKBOT_REPLAY_CAPTURE_DIR` 开启：canonical world 的 seed、原始 event、受信 adapter、receipt/logic clock、mutation receipt 和已取得的慢认知模型结果引用在 canonical 事务内记录，`scripts/replay-capture.mjs export/replay` 在新 SQLite 只经原写入口回放。它默认关闭，不开放 HTTP，不读取密钥，不写源存档；导出和恢复均拒绝未捕获 canonical gap。
+
+另外已捕获 `ingestNonChatEvent` 的有序入口、重复投递、operation 边界与结果 hash，归档为 `canonical_world_with_service_ingress`。本地 `replayServiceCapture` seam 通过隔离原 runtime 核对所有 namespace 的语义 hash，专项证明多时间、重复事件和中途重启；CLI 仍只验证 `canonical_world_only`。持久化 write audit 是可用基础，不是已完成的统一可执行 journal。input-runtime 独立调度、proposal/trial/candidate 独立决策、HTTP chat 与 provider 输出尚待捕获和对应原业务重放，不能将本轮称为全服务生产归档器。
 
 ### M8：人工体验
 

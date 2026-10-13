@@ -146,3 +146,64 @@ test('WebSocket observer requires explicit subscribe and streams read-only updat
   assert.equal(persistentWorld.get().world_revision, 1);
   assert.equal(messages[0].snapshot.world_revision, 0);
 });
+
+test('resident-rich observer preserves actual facets and fits both HTTP and WebSocket bounds', async t => {
+  const persistentWorld = createPersistentWorld({ now: () => fixed });
+  const before = persistentWorld.get();
+  const map = getWorldMap(before);
+  const actorIds = Array.from({ length: 13 }, (_, index) => index ? `resident-${index}` : 'shaping-001');
+  const unusedExplanation = 'No actual practice is established. '.repeat(80);
+  map.memory = {
+    owner_id: 'shaping-001', own: [], recent: [], actors: actorIds.map(actor_id => ({ actor_id })),
+    development: {
+      recent: [],
+      facets: { actors: actorIds.map(actor_id => ({ actor_id, topics: [
+        { topic: 'care', contact: { count: 1 }, interest: { status: 'trying', active_roots: ['actual-interest'] },
+          capability: { status: 'practiced', root_outcome_ids: ['actual-practice'] }, self_assessment: { status: 'evidence_summary' } },
+        { topic: 'new-contact', contact: { count: 1 }, interest: { status: 'unobserved' }, capability: { status: 'unobserved' }, self_assessment: { status: 'unobserved' } },
+        ...Array.from({ length: 6 }, (_, index) => ({ topic: `unused-${index}`, contact: { count: 0 },
+          interest: { status: 'unobserved', summary: unusedExplanation },
+          capability: { status: 'unobserved', summary: unusedExplanation },
+          self_assessment: { status: 'unobserved', summary: unusedExplanation } })),
+      ] })) },
+    },
+  };
+  map.autonomy = { actors: actorIds.map(actor_id => ({ actor_id, energy: 0.8,
+    last_feedback: { at: fixed.toISOString(), text: 'Cared for seedlings', kind: 'completed',
+      action_feedback: { authority: 'audit_only', receipt_id: actor_id, detailed_receipt: unusedExplanation } } })),
+    recent: [{ actor_id: actorIds[0], text: 'Cared for seedlings', action_feedback: { authority: 'audit_only', detailed_receipt: unusedExplanation } }],
+  };
+  const rawMap = structuredClone(map);
+  assert.ok(Buffer.byteLength(JSON.stringify(map)) > 512 * 1024);
+  const observer = createWorldObserver({ persistentWorld, now: () => fixed, mapReadModel: () => map, heartbeatMs: 60_000 });
+  const server = createServer((request, response) => observer.handleHttp(request, response));
+  observer.attach(server); server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  let socket;
+  t.after(async () => { socket?.close(); observer.close(); if (server.listening) await new Promise(resolve => server.close(resolve)); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const response = await fetch(origin + '/api/world/snapshot');
+  assert.equal(response.status, 200);
+  assert.ok(Number(response.headers.get('content-length')) < 512 * 1024);
+  const snapshot = await response.json();
+  assert.deepEqual(snapshot.map.memory.development.facets.actors.map(actor => actor.actor_id), actorIds);
+  for (const actor of snapshot.map.memory.development.facets.actors) {
+    assert.deepEqual(actor.topics.map(topic => topic.topic), ['care', 'new-contact']);
+    assert.deepEqual(actor.topics[0].capability.root_outcome_ids, ['actual-practice']);
+  }
+  assert.equal(snapshot.map.autonomy.actors[0].last_feedback.text, 'Cared for seedlings');
+  assert.equal(snapshot.map.autonomy.actors[0].last_feedback.action_feedback, undefined);
+  assert.equal(snapshot.map.autonomy.recent[0].action_feedback, undefined);
+  socket = new WebSocket(origin.replace('http', 'ws') + '/api/world/stream');
+  await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
+  const initial = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('bounded observer stream timed out')), 2_000);
+    socket.addEventListener('message', event => { clearTimeout(timer); resolve(JSON.parse(event.data)); }, { once: true });
+  });
+  socket.send(JSON.stringify({ schema: 'deskbot.world-stream.v1', type: 'world.subscribe' }));
+  const streamed = await initial;
+  assert.equal(streamed.type, 'world.snapshot');
+  assert.ok(Buffer.byteLength(JSON.stringify(streamed)) < 512 * 1024);
+  assert.deepEqual(streamed.snapshot, snapshot);
+  assert.deepEqual(map, rawMap);
+  assert.deepEqual(persistentWorld.get(), before);
+});

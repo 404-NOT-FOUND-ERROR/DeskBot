@@ -66,3 +66,11 @@
 - 阶段体验包采用时冻结 version/snapshot/hash，已有阶段的生活、表达、TTS 意图与虚拟外观不会被新 registry 静默改写。
 
 以上为本分支的本地实现与验证记录。隔离两日 M8 回放及重启/重复规则已自动验证；新序列历史回放与真实迁移断层拒绝已自动验证。本轮浏览器已人工验收 DeskBot 页面加载、实时地图/居民、往事面板、向前/向后单条翻阅、加载更早记录、回到最近和恢复实时；Asamana 已人工验收示例世界、人物认知、叙事流、回放滑条和沉浸视图。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。
+
+### M6 本地捕获范围
+
+`src/replay-capture.mjs` 提供一个显式、本地、默认关闭的 canonical-ingress 捕获器。设置 `DESKBOT_REPLAY_CAPTURE_DIR` 后，它在 canonical mutation 的同一 SQLite 事务中记录版本化 seed、原始 event、受信 adapter、receipt/logic clock、mutation digest，以及已取得的慢认知模型结果引用；`scripts/replay-capture.mjs export/replay` 可在新的 SQLite 中只通过现有 `persistentWorld.ingest` 回放，支持中途重启、重复投递和零 provider calls。归档目录被 gitignore，未开放 HTTP 入口，不读取密钥，也不写源存档。
+
+CLI 回放的验证范围仍是 `canonical_world_only`。同一捕获器另外记录经 `ingestNonChatEvent` 的有序入口、投递重复标记、入口前后 canonical operation 边界与结果 hash；带这种入口的归档标记为 `canonical_world_with_service_ingress`，不能据此自动宣称所有服务操作已捕获。`replayServiceCapture` 是本地隔离工厂 seam：先经原 `persistentWorld.ingest` 补齐独立内部操作，再经原业务入口回放输入，核验所有非捕获 namespace 的记录数与语义 hash。多时间、重复投递、SQLite 中途重启及入口篡改拒绝已专项验证；缺少任何 namespace 结果时失败，不用 SQL 导入替代业务重放。
+
+`persistence.mjs` 已提供默认关闭的 commit/before-commit write audit 与流式 namespace 读取，但 input-runtime 调度、独立 proposal/trial/candidate 决策、HTTP chat/provider 输出等路径尚未统一录成可执行操作。因此 M6 全服务生产归档仍未完成，本轮不将入口 seam 测试替代该验收门。canonical 捕获缺口会在恢复或导出时拒绝；其他未捕获服务写入会由全 namespace 对比检出。

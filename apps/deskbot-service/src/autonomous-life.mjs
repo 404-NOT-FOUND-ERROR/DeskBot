@@ -67,26 +67,49 @@ function addDiscretionaryPractice(world,state,at,result,add) {
   const date=localWorldDate(at,world.clock.time_zone).date;
   if((world.memory?.development?.records??[]).some(r=>r.actor_ids.includes(state.actor_id)&&r.activity_id
     &&r.causes?.motivation?.kind==='self_continuation'&&localWorldDate(r.at,world.clock.time_zone).date===date))return;
+  // A grounded intention can invite a later attempt even when its first
+  // experience was a duty, rather than an invitation or established interest.
+  // This adds only an authored, feasibility-checked spare-time candidate. It
+  // neither grants practice credit nor displaces needs or the daily limit.
+  const intentions=slowCognitionContext(world,state.actor_id,at).intentions.filter(goal=>goal.activity_id);
   const topics=(facets.actors.find(a=>a.actor_id===state.actor_id)?.topics??[])
-    .filter(t=>(t.contact?.count??0)+(t.interest.active_roots?.length??0)+(t.interest.invited_roots?.length??0)>0)
-    .sort((a,b)=>(b.interest.bonus??0)-(a.interest.bonus??0)||a.topic.localeCompare(b.topic));
+    .filter(t=>(t.contact?.count??0)+(t.interest.active_roots?.length??0)+(t.interest.invited_roots?.length??0)>0
+      ||intentions.some(goal=>goal.topic===t.topic))
+    .sort((a,b)=>Number(intentions.some(goal=>goal.topic===b.topic))-Number(intentions.some(goal=>goal.topic===a.topic))
+      ||(b.interest.bonus??0)-(a.interest.bonus??0)||a.topic.localeCompare(b.topic));
   const count=(id,resource)=>stock(world,id,resource)+carried(world,state.actor_id,resource);
   for(const topic of topics) {
     let recipe=null,build=null;
+    const intention=intentions.find(goal=>goal.topic===topic.topic);
+    // A still-valid grounded exact recipe is a legal continuation candidate
+    // on a later day even when its original need trigger has settled. The
+    // authored planner remains the gate: activitySteps checks route, inputs,
+    // reservations and target conditions; it never tops up resources.
+    if(intention?.activity_id && activityTopic(intention.activity_id)===topic.topic
+      && ACTIVITIES.some(activity=>activity.activity_id===intention.activity_id)) recipe=intention.activity_id;
     const bed=world.living.objects['garden-bed'];
-    if(topic.topic==='care'&&bed.quantity>0&&bed.health>=.65&&bed.health<.95&&bed.moisture>=.32&&bed.moisture<=.72
+    if(!recipe&&topic.topic==='care'&&bed.quantity>0&&bed.health>=.65&&bed.health<.95&&bed.moisture>=.32&&bed.moisture<=.72
       &&stock(world,'seedling-rack','water')>=6)recipe='tend-bed';
-    if(topic.topic==='craft'&&count('seedling-rack','trays')<2&&stock(world,'parts-drawers','wood')>=3&&stock(world,'parts-drawers','fasteners')>=5)recipe='craft-tray';
-    if(topic.topic==='cook'&&stock(world,'shared-table','rations')>=6&&stock(world,'shared-table','rations')<=12
+    if(!recipe&&topic.topic==='craft'&&count('seedling-rack','trays')<2&&stock(world,'parts-drawers','wood')>=3&&stock(world,'parts-drawers','fasteners')>=5)recipe='craft-tray';
+    if(!recipe&&topic.topic==='cook'&&stock(world,'shared-table','rations')>=6&&stock(world,'shared-table','rations')<=12
       &&stock(world,'trial-stove','water')>=3&&(count('seedling-rack','moss')>=4||count('seedling-rack','light_fruit')>=4)) {
       recipe='cook';build=()=>cookAndStoreSteps(world,state.actor_id);
     }
+    // Observing a familiar route is a harmless authored exploration, but only
+    // a sourced exact-recipe intention enables this extra practice candidate.
+    if(topic.topic==='explore'&&intention?.activity_id==='scout-route')recipe='scout-route';
+    if(intention&&recipe&&recipe!=='cook'&&recipe!==intention.activity_id)continue;
     if(!recipe||result.some(c=>c.available&&c.steps?.some(s=>s.kind==='activity'&&s.activity_id===recipe)))continue;
     const activity=ACTIVITIES.find(a=>a.activity_id===recipe);
     const goal=`continue:${topic.topic}`;
     add(goal,topic.topic==='cook'?'再试一次做饭并放到长桌':activity.title,
       `手头的事和基本需要已经留好余地，想把之前关注的${topic.label}实际试一小次。`,31,
-      build??(()=>activitySteps(world,state.actor_id,recipe)));
+      ()=>{
+        const steps=build?build():activitySteps(world,state.actor_id,recipe);
+        if(intention&&!steps.some(step=>step.kind==='activity'&&step.activity_id===intention.activity_id))
+          throw planError('这次可行的配方与先前惦记的活动不同，留待合适条件再试。');
+        return steps;
+      });
     const candidate=result.find(c=>c.goal===goal);
     if(candidate)Object.assign(candidate,{development_topic:topic.topic,discretionary_practice:true});
     // One attempted plan per decision and one enacted practice per local day.

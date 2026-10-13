@@ -34,7 +34,25 @@ function samePlace(actor, item) {
   return Boolean(actor?.location_id && item?.location_id && actor.location_id === item.location_id);
 }
 
-function eventAccess(event, actorId, actor, { legacyPublic = false } = {}) {
+function eventTime(event) {
+  return event?.occurred_at ?? event?.started_at ?? event?.at ?? event?.created_at ?? null;
+}
+
+function eventIsAvailable(event, at) {
+  if (!at) return true;
+  const until = Date.parse(at);
+  if (!Number.isFinite(until)) return true;
+  const rawStarted = eventTime(event);
+  if (rawStarted !== null && rawStarted !== undefined && !Number.isFinite(Date.parse(rawStarted))) return false;
+  const started = Date.parse(rawStarted);
+  if (Number.isFinite(started) && started > until) return false;
+  if (event?.expires_at !== null && event?.expires_at !== undefined && !Number.isFinite(Date.parse(event.expires_at))) return false;
+  const expires = Date.parse(event?.expires_at);
+  return !Number.isFinite(expires) || expires > until;
+}
+
+function eventAccess(event, actorId, actor, { legacyPublic = false, at = null } = {}) {
+  if (!eventIsAvailable(event, at)) return { visibility: 'unknown', witnessed: false, delivered: false, public: false, observed: false };
   const participants = ids(event?.participants ?? event?.actor_ids ?? event?.participant_ids);
   const audience = ids(event?.audience ?? event?.audience_ids ?? event?.visible_to);
   const hasScope = Boolean(event?.location_id || participants.length || audience.length || event?.recipient_id
@@ -47,11 +65,11 @@ function eventAccess(event, actorId, actor, { legacyPublic = false } = {}) {
   const observed = samePlace(actor, event);
   if (participated) return { visibility: 'witnessed', witnessed: true, delivered: false, public: publicEvent, observed: true };
   if (delivered) return { visibility: 'delivered', witnessed: false, delivered: true, public: publicEvent, observed: false };
-  if (publicEvent) return { visibility: 'public', witnessed: false, delivered: false, public: true, observed: false };
   if (event?.visibility === 'private' || event?.public === false && audience.length) {
     return { visibility: 'unknown', witnessed: false, delivered: false, public: false, observed: false };
   }
-  if (observed) return { visibility: 'observed', witnessed: false, delivered: false, public: false, observed: true };
+  if (observed) return { visibility: 'observed', witnessed: false, delivered: false, public: publicEvent, observed: true };
+  if (publicEvent) return { visibility: 'public', witnessed: false, delivered: false, public: true, observed: false };
   return { visibility: 'unknown', witnessed: false, delivered: false, public: false, observed: false };
 }
 
@@ -69,14 +87,28 @@ export function actorPerception(world, actorId = world?.protagonist?.character_i
   const actor = travelling(world, actorId) ? { ...storedActor, location_id: null } : storedActor;
 
   const scene = world?.life?.current_scene ?? null;
-  const sceneAccess = scene ? eventAccess(scene, actorId, actor) : null;
+  const sceneAccess = scene ? eventAccess(scene, actorId, actor, { at }) : null;
   const activeEvent = world?.active_event ?? null;
-  const activeAccess = activeEvent ? eventAccess(activeEvent, actorId, actor) : null;
+  const activeAccess = activeEvent ? eventAccess(activeEvent, actorId, actor, { at }) : null;
   const latestEvent = world?.world_line?.latest_event ?? null;
   // The canonical world-line stream is an authored public notice. Its
   // individual event payload need not repeat a visibility field.
-  const latestAccess = latestEvent ? eventAccess(latestEvent, actorId, actor, { legacyPublic: true }) : null;
-  const notices = (world?.social?.notices ?? []).map(notice => ({ notice, access: eventAccess(notice, actorId, actor) }))
+  const latestAccess = latestEvent ? eventAccess(latestEvent, actorId, actor, { legacyPublic: true, at }) : null;
+  const commitments = world?.social?.commitments ?? [];
+  const notices = (world?.social?.notices ?? []).map(notice => {
+    const commitment = notice.source_commitment_id
+      ? commitments.find(item => item.id === notice.source_commitment_id)
+      : null;
+    const sourceActors = ids(commitment?.actors);
+    const sourceEvent = commitment && !notice.location_id
+      ? { ...notice, location_id: commitment.location_id ?? null, participants: sourceActors }
+      : notice;
+    const canonicalRemote = notice.verified_by === 'canonical_world_record' && Boolean(notice.source_commitment_id)
+      && !sourceActors.includes(actorId) && !samePlace(actor, sourceEvent);
+    return { notice, access: canonicalRemote
+      ? { visibility: 'unknown', witnessed: false, delivered: false, public: false, observed: false }
+      : eventAccess(sourceEvent, actorId, actor, { at }) };
+  })
     .filter(item => item.access.visibility !== 'unknown')
     .slice(-12)
     .map(item => project(item.notice, item.access));
@@ -87,7 +119,7 @@ export function actorPerception(world, actorId = world?.protagonist?.character_i
     latestAccess?.visibility === 'unknown' ? { kind: 'latest_event', id: latestEvent?.event_id ?? null } : null,
     sceneAccess?.visibility === 'unknown' ? { kind: 'scene', id: scene?.scene_id ?? null } : null,
   ].filter(Boolean);
-  const worldEvents = (world?.world_line?.recent_events ?? []).map(event => ({ event, access: eventAccess(event, actorId, actor, { legacyPublic: true }) }))
+  const worldEvents = (world?.world_line?.recent_events ?? []).map(event => ({ event, access: eventAccess(event, actorId, actor, { legacyPublic: true, at }) }))
     .filter(item => item.access.visibility !== 'unknown').slice(-12).map(item => project(item.event, item.access));
   return {
     schema: ACTOR_PERCEPTION_SCHEMA, actor_id: actorId, actor_found: true,
@@ -122,16 +154,15 @@ export function actorCognitionContext(world, actorId = world?.protagonist?.chara
     .slice(0, 12)
     .map(item => ({ id: item.id, at: item.at, topic: item.topic ?? null, outcome: item.outcome ?? null,
       source_kind: item.source.kind, text: item.model_text ?? item.text ?? null, visibility: 'witnessed' }));
-  const scene = view.scene ? {
-    id: view.scene.scene_id ?? null, title: view.scene.title ?? null,
-    location_id: view.scene.location_id ?? null, topic: topicFor(view.scene), visibility: view.scene.perception.visibility,
-  } : null;
-  const events = (view.world_events ?? []).filter(item => validAt(item.occurred_at)).map(item => ({ id: item.event_id ?? null,
-    title: item.title ?? null, topic: topicFor(item), location_id: item.location_id ?? null,
-    visibility: item.perception?.visibility ?? 'public' }));
-  const notices = (view.notices ?? []).map(item => ({ id: item.id ?? item.notice_id ?? null,
-    text: item.text ?? item.summary ?? null, topic: topicFor(item), location_id: item.location_id ?? null,
-    visibility: item.perception?.visibility ?? 'delivered' }));
+  // Bucket by the way this actor knows it, rather than the observer panel
+  // where the item happens to live. One public item may be both latest and
+  // recent, so deduplicate before giving any preference weight.
+  const seen = new Set();
+  const information = [view.scene, view.active_event, view.latest_event, ...(view.world_events ?? []), ...(view.notices ?? [])]
+    .filter(Boolean).map(item => ({ id: item.scene_id ?? item.event_id ?? item.id ?? item.notice_id ?? null,
+      title: item.title ?? null, text: item.text ?? item.summary ?? null, topic: topicFor(item),
+      location_id: item.location_id ?? null, visibility: item.perception?.visibility ?? 'unknown' }))
+    .filter(item => { if (!item.id) return true; if (seen.has(item.id)) return false; seen.add(item.id); return true; });
   const messages = (view.messages ?? []).map(item => ({ id: item.id, sender_id: item.sender_id ?? null,
     text: item.content ?? null, topic: topicFor(item), at: item.at ?? null, source: clone(item.source),
     ...(item.invitation_state ? { invitation_state: item.invitation_state, actionable: item.actionable, historical_only: item.historical_only } : {}),
@@ -139,11 +170,9 @@ export function actorCognitionContext(world, actorId = world?.protagonist?.chara
   return {
     schema: ACTOR_COGNITION_SCHEMA, actor_id: actorId, observed_at: at ?? null,
     witnessed_facts: facts,
-    same_place: [scene, ...(view.active_event ? [{ id: view.active_event.event_id ?? null,
-      title: view.active_event.title ?? null, topic: topicFor(view.active_event), location_id: view.active_event.location_id ?? null,
-      visibility: view.active_event.perception?.visibility ?? 'observed' }] : [])].filter(Boolean),
-    delivered: [...notices.filter(item => item.visibility === 'delivered'), ...messages],
-    public: events.filter(item => item.visibility === 'public'),
+    same_place: information.filter(item => ['witnessed', 'observed'].includes(item.visibility)),
+    delivered: [...information.filter(item => item.visibility === 'delivered'), ...messages],
+    public: information.filter(item => item.visibility === 'public'),
     nearby_npcs: (view.nearby_npcs ?? []).map(item => ({ npc_id: item.npc_id, display_name: item.display_name ?? null,
       location_id: item.location_id ?? null, visibility: item.perception?.visibility ?? 'observed' })),
     unknown: structuredClone(view.unknown ?? []),

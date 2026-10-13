@@ -4,7 +4,7 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life runtime（2026-10-13）。** 本版发布在 [`codex/asamana-shared-life-v2`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v2)，保留 `main` 原有版本。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。本分支进一步接入了阶段化认知、慢认知、角色知识边界、结构化行动反馈、只读世界观察和历史浏览。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life runtime。** 本版发布在 [`codex/asamana-shared-life-v3`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v3)，保留 `main` 和前两版分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。本分支进一步完善角色感知边界、慢认知、跨日目标追求和可核验的本地回放捕获。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
 
 ## 本版本更新
 
@@ -12,7 +12,10 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - 增加角色视角边界和世界消息 transport：角色只知道亲历、同地观察、延迟投递或公开消息，不共享全镇全知剧情；撤回消息保留历史但不继续产生行动偏好。
 - 增加统一只读 observer、WebSocket 重连标记、冻结 head 的双向历史分页、回最近和渲染序列门控。
 - 角色目标严格绑定实际 `activity_id`；行动反馈区分计划、进行中、成功、失败、取消和未执行，台词不能伪造世界事实。
-- 本次补齐合法生活候选到实际目标任务的连接，保留已经完成或失败的目标状态；大存档账本按需读取，渲染异常后切换为持续更新的文字视图，旧历史断层提供返回实时入口。
+- 跨日再次想到同一具体活动时保留原目标、期限、进度和任务链。每日实践额度用完后，目标可等到下一次合法机会继续；不会重置期限或补赠材料。
+- 慢认知持久记录已经处理的来源，来源窗口缩小、排序变化和重启不会重复计费；关系理解仅引用共同亲历的事实，失败原因使用服务端分类。
+- 角色上下文按请求时间过滤：未来事实和非法时间不会提前泄露，远方事件作为消息，同地事件作为观察；公告经实际消息运输后才到达远方角色。
+- 增加默认关闭的本地 canonical 回放捕获和受控 service-ingress 重演。捕获目录不提交，重演使用独立 SQLite、原规则和零 provider 调用；完整服务操作归档仍待完成。
 
 慢认知可以把实际经历整理成自己的理解、有限目标和来往偏好；目标仍需通过真实任务、路线、材料和时间实现。前端往事浏览与隔离输入重演分别验证，当前输入重演工具还不是任意正式存档的完整导出器。验证结果和人工待验收项见下文与 [验证文档](documentation/tests.md)。
 
@@ -40,23 +43,23 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![当前版本的雾灯镇实时小镇、居民与生活侧栏](documentation/images/current/live-town.jpg)
+![v3 当前版本的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
 
-![当前版本的小镇往事、历史翻阅与世界回放](documentation/images/current/world-history.jpg)
+![v3 当前版本的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
 
 ![十三位光粒居民的首批造型，独立陈列预览](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-前两张是 2026-10-13 本分支本机正式运行截图，展示当前实时小镇和历史观察面板；后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+前两张是 2026-10-13 本分支本机正式运行截图，展示当前实时小镇和历史观察面板；本版复验后确认 observer 快照可正常读取，页面能继续显示 13 位居民、现实输入和进行中的活动。后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
 ## 当前完成范围
 
 当前角色方向和 3D 造型为作者制作的有限集合。开放图像或几何生成、更多职业与地图扩展仍待开发。真实中文 ASR/TTS 尚未接通，现有 voice-sidecar 是无模型接口基线。ESP 喵伴目前运行小智固件，DeskBot 实机协议、电机与换壳校准尚未完成；虚拟阶段不会自动改变实体外壳或硬件能力。
 
-第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-13 Windows 本机复验：后端完整 **819/819**、前端 **44 套 301/301**、类型检查与生产构建全部通过；voice-sidecar 16 项和 Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
+第六阶段通过九种隔离 SQLite 样本验证准备、跨日结果、预览、双轴采用、普通生活、重启和回退。2026-10-13 Windows 本机复验：后端完整 **843/843**、前端 **44 套 301/301**、voice-sidecar **16/16**、类型检查与生产构建全部通过；Asamana 独立前端 140 项为既有历史结果。三个公开虚构状态摘要曾完成真实 DeepSeek 调用验证。样本、有限对话和本轮浏览器基础验收不代替正式世界连续 7–14 天的自然生活观察。详见 [当前验证](documentation/tests.md)、[Asamana 评估](documentation/asamana-review.md) 与 [本阶段验收和实验边界](research/milestones/role-development-stage6.md)。
 
-新增 `node scripts/review-asamana-migration.mjs` 可在临时 SQLite 运行受控跨日链，不访问正式存档、默认不调用外部模型。本次首日目标到实际任务完成成立，次日新意图尚未在有限窗口执行，报告为 `inconclusive_goal_not_executed`；它把待观察结果保留下来，不把测试全绿等同于自然演化闭环通过。
+`node scripts/review-asamana-migration.mjs` 在临时 SQLite 运行受控三日链，不访问正式存档、默认不调用外部模型。规则样本已经 `verified`：第二日形成的具体目标，在第三日重启后通过原生活计划与真实任务完成，材料和每日实践上限保持有效。真实 DeepSeek 样本仍有缺少经历依据的目标被拒绝，结果为 `inconclusive_reflection_failed`；规则样本通过不代表真实模型或长期自然生活已验收。
 
 当前先收口真实模型慢认知、行动目标、历史与断线恢复体验，再扩展地方故事和居民协作，并开展连续 7–14 天观察。真实中文声音与身体联调沿 [v0.5 开发路线](research/development-roadmap-v0.5.md) 后续阶段推进；本分支的具体验收顺序见 [迁移管线](documentation/asamana-migration-pipeline-v1.md)。
 
@@ -65,7 +68,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-shared-life-v2 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-shared-life-v3 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -77,7 +80,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v2`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v3`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |

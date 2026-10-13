@@ -76,6 +76,25 @@ test('daily source-preserving decay/compression/reflection cannot change resourc
   assert.equal(own(h.world.get()).request.id, state.request.id);
 });
 
+test('sources leaving the rolling window or changing order do not repeat a billed reflection after restart', async t => {
+  const h = fixture(t); let calls = 0;
+  const llm = { id: 'fixture', complete: async () => { calls++; return { model: 'fixture',
+    text: response(own(h.world.get()).request, { goals: [], insights: [] }) }; } };
+  h.save(w => fact(w, 'day-one')); await h.worker(llm).tick(); assert.equal(calls, 1);
+  h.advance(DAY); h.save(w => { fact(w, 'day-two'); w.memory.episodes.at(-1).at = h.now().toISOString(); });
+  await h.worker(llm).tick(); assert.equal(calls, 2);
+  const settledRequest = own(h.world.get()).request.id;
+  h.advance(13 * DAY + 60000); h.restart();
+  await h.worker(llm).tick(); assert.equal(calls, 2);
+  assert.equal(own(h.world.get()).request.id, settledRequest);
+  h.save(w => w.memory.episodes.reverse()); await h.worker(llm).tick(); assert.equal(calls, 2);
+  // A genuinely changed retained source version is new information.
+  h.save(w => { const fact = w.memory.episodes.find(episode => episode.source.task_id === 'day-two');
+    fact.outcome = 'failed'; fact.model_text = '镇内照料活动：未完成。'; });
+  await h.worker(llm).tick(); assert.equal(calls, 3);
+  h.restart(); await h.worker(llm).tick(); assert.equal(calls, 3);
+});
+
 test('assistant, hearsay, body and private outcomes cannot become slow-cognition sources', t => {
   const h = fixture(t), w = h.world.get();
   for (const [name, kind, source, safe] of [['assistant', 'personal_interpretation', 'model_choice', true],
@@ -105,10 +124,22 @@ test('shared facts support an actor-specific relationship view without altering 
   const h = fixture(t), w = h.world.get(); w.npcs.push({ npc_id: 'peer', display_name: '邻居' });
   fact(w, 'joint', ['shaping-001', 'peer']); installSlowCognition(w, h.now().toISOString()); prepareSlowCognition(w, h.now().toISOString());
   const r = own(w).request, original = structuredClone(w.social);
+  const context = JSON.parse(slowCognitionPrompt(w, r).split('\n').at(-1));
+  assert.deepEqual(context.relation_sources, [{ actor_id: 'peer', name: '邻居', source_ids: r.source_ids }]);
   resolveSlowCognition(w, r.id, { text: response(r, { relations: [{ actor_id: 'peer', label: 'grateful_to', text: '和它一起照料后，我愿意下次再找它。', source_ids: r.source_ids }] }) }, h.now().toISOString());
   assert.equal(own(w).relations[0].authority, 'subjective_view'); assert.deepEqual(w.social, original);
   assert.equal(slowCognitionContext(w).views_of_others[0].actor_id, 'peer');
   assert.equal(slowCognitionContext(w, 'shaping-001', new Date(BASE + 15 * DAY).toISOString()).views_of_others.length, 0);
+});
+
+test('nearby residents without a shared captured fact are absent from the reflection relation allowlist', t => {
+  const h = fixture(t), w = h.world.get(); fact(w); installSlowCognition(w, h.now().toISOString());
+  w.npcs.push({ npc_id: 'nearby-only', display_name: '隔壁居民', location_id: w.protagonist.location_id });
+  prepareSlowCognition(w, h.now().toISOString());
+  const r = own(w).request, context = JSON.parse(slowCognitionPrompt(w, r).split('\n').at(-1));
+  assert.deepEqual(context.relation_sources, []);
+  assert.equal(resolveSlowCognition(w, r.id, { text: response(r, { relations: [{ actor_id: 'nearby-only', label: 'curious_about',
+    text: '想和它继续合作。', source_ids: r.source_ids }] }) }, h.now().toISOString()).error, 'ungrounded_relation');
 });
 
 test('subjective intentions influence only existing legal candidates with a bounded bonus', t => {
@@ -211,18 +242,58 @@ test('expiry leaves canonical tasks running and preserves their later completion
   assert.equal(goal.history[0].authority, 'canonical_task');
 });
 
-test('a later reflection withdraws an unstarted intention but preserves an executing one', t => {
+test('renewing the same exact intention preserves identity, deadline and its later canonical execution', t => {
   const h = fixture(t), w = h.world.get(); fact(w); installSlowCognition(w, h.now().toISOString()); prepareSlowCognition(w, h.now().toISOString());
   const r = own(w).request; resolveSlowCognition(w, r.id, { text: response(r) }, h.now().toISOString());
-  const original = own(w).goals[0]; h.advance(DAY); fact(w, 'next-reflection'); prepareSlowCognition(w, h.now().toISOString());
+  const original = structuredClone(own(w).goals[0]); h.advance(DAY); fact(w, 'next-reflection'); prepareSlowCognition(w, h.now().toISOString());
   const next = own(w).request; resolveSlowCognition(w, next.id, { text: response(next) }, h.now().toISOString());
-  assert.equal(own(w).goal_history.find(goal => goal.goal_id === original.goal_id).status, 'withdrawn');
+  assert.equal(own(w).goals[0].goal_id, original.goal_id);
+  assert.equal(own(w).goals[0].created_by, r.id);
+  assert.equal(own(w).goals[0].expires_at, original.expires_at);
+  assert.equal(own(w).goals[0].renewed_by, next.id);
+  assert.equal(own(w).goals[0].renewal_count, 1);
+  assert.deepEqual(own(w).goals[0].source_history[0].source_ids, r.source_ids);
+  assert.equal(own(w).goal_history.some(goal => goal.goal_id === original.goal_id), false);
   const continuing = own(w).goals[0], task = { task_id: 'continuing-goal', actor_id: 'shaping-001', activity_id: 'tend-bed', status: 'running' };
   w.tasks.push(task); bindSlowCognitionTask(w, 'shaping-001', continuing.goal_id, task, h.now().toISOString());
   h.advance(DAY); fact(w, 'third-reflection'); prepareSlowCognition(w, h.now().toISOString());
   const third = own(w).request; resolveSlowCognition(w, third.id, { text: response(third) }, h.now().toISOString());
   assert.equal(own(w).goals[0].goal_id, continuing.goal_id); assert.equal(own(w).goals[0].status, 'trying');
   assert.equal(own(w).goal_history.some(goal => goal.goal_id === continuing.goal_id), false); assert.equal(task.status, 'running');
+});
+
+test('omitting a future intention withdraws it; changing its exact activity creates a distinct grounded goal', t => {
+  const h = fixture(t), w = h.world.get(); fact(w); installSlowCognition(w, h.now().toISOString()); prepareSlowCognition(w, h.now().toISOString());
+  const first = own(w).request; resolveSlowCognition(w, first.id, { text: response(first) }, h.now().toISOString());
+  const original = own(w).goals[0];
+  h.advance(DAY); fact(w, 'next'); prepareSlowCognition(w, h.now().toISOString());
+  const second = own(w).request;
+  resolveSlowCognition(w, second.id, { text: response(second, { goals: [] }) }, h.now().toISOString());
+  assert.equal(own(w).goals.length, 0);
+  assert.equal(own(w).goal_history.find(goal => goal.goal_id === original.goal_id).status, 'withdrawn');
+  h.advance(DAY); fact(w, 'third'); prepareSlowCognition(w, h.now().toISOString());
+  const third = own(w).request;
+  resolveSlowCognition(w, third.id, { text: response(third, { goals: [{ text: '想继续留意苗圃。', topic: 'care',
+    activity_id: null, source_ids: third.source_ids }] }) }, h.now().toISOString());
+  assert.notEqual(own(w).goals[0].goal_id, original.goal_id);
+  assert.equal(own(w).goals[0].activity_id, null);
+});
+
+test('daily renewal cannot extend an intention indefinitely or revive an expired goal', t => {
+  const h = fixture(t), w = h.world.get(); fact(w); installSlowCognition(w, h.now().toISOString()); prepareSlowCognition(w, h.now().toISOString());
+  const first = own(w).request; resolveSlowCognition(w, first.id, { text: response(first) }, h.now().toISOString());
+  const original = structuredClone(own(w).goals[0]);
+  for (let day = 1; day <= 7; day++) {
+    h.advance(DAY); fact(w, `renewal-${day}`); prepareSlowCognition(w, h.now().toISOString());
+    const request = own(w).request; resolveSlowCognition(w, request.id, { text: response(request) }, h.now().toISOString());
+    if (day < 7) {
+      assert.equal(own(w).goals[0].goal_id, original.goal_id);
+      assert.equal(own(w).goals[0].expires_at, original.expires_at);
+    }
+  }
+  const expired = own(w).goal_history.find(goal => goal.goal_id === original.goal_id);
+  assert.equal(expired.status, 'expired'); assert.equal(expired.expires_at, original.expires_at);
+  assert.equal(expired.progress.completed, 0); assert.notEqual(own(w).goals[0].goal_id, original.goal_id);
 });
 
 test('provider timeout is isolated, writes no placeholder narrative and never bills again after restart', async t => {

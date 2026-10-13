@@ -187,6 +187,7 @@ export function createDeskBotServer({
   livedMemoryEnabled = false,
   bodyPerceptionEnabled = residentLifeEnabled,
   bodyDeviceProfiles = [],
+  replayCapture = null,
 } = {}) {
   const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
   function bodyContextForPeer(peer) {
@@ -352,6 +353,8 @@ export function createDeskBotServer({
   }
 
   function ingestNonChatEvent(eventInput, adapter = {}) {
+    const replayReceivedAt = replayCapture ? now().toISOString() : null;
+    const replayOperationStart = replayCapture?.operationCount?.() ?? null;
     const trialAction = ['start_role_practical_trial', 'control_role_practical_trial'].includes(eventInput.payload?.action);
     const stageAction = ['accept_role_stage', 'rollback_role_stage'].includes(eventInput.payload?.action);
     if (eventInput.type === 'world.mutation' && (['update_weather', 'start_activity', 'control_task', 'transfer_resource'].includes(eventInput.payload?.action)
@@ -405,7 +408,7 @@ export function createDeskBotServer({
       ? null
       : roleEvolution.observeEvent(result.event);
     const worldCandidateResult = worldCandidates.observe(result.event, { world: worldMutation.world });
-    return {
+    const output = {
       event: result.event,
       duplicate: result.duplicate || worldMutation.duplicate,
       worldMutation,
@@ -417,6 +420,12 @@ export function createDeskBotServer({
       roleEvolution: roleEvolutionResult,
       worldCandidate: worldCandidateResult,
     };
+    // This is an audit envelope only. The canonical world and all other
+    // domain stores have already committed through their normal handlers;
+    // replay adapters remain private and cannot be supplied by HTTP clients.
+    replayCapture?.recordIngress?.({ event: result.event, adapter, result: output, received_at: replayReceivedAt,
+      operation_start: replayOperationStart });
+    return output;
   }
 
   function ingestWeatherEvent(event) {

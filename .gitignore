@@ -24,6 +24,8 @@ venv/
 **/*.sqlite
 **/*.sqlite-*
 **/audio-artifacts/
+**/replay-captures/
+*.replay-capture.json
 *.wav
 *.mp3
 *.ogg

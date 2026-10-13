@@ -8,6 +8,8 @@ import { createSqlitePersistence } from './persistence.mjs';
 import { createVoiceSidecarClient } from './voice-sidecar-client.mjs';
 import { createWeatherConnector } from './weather-connector.mjs';
 import { loadBodyDeviceProfiles } from './body-device-config.mjs';
+import { createPersistentWorld } from './persistent-world.mjs';
+import { createCanonicalReplayCapture } from './replay-capture.mjs';
 
 const host = process.env.DESKBOT_HOST ?? '127.0.0.1';
 const port = Number.parseInt(process.env.DESKBOT_PORT ?? '4311', 10);
@@ -35,6 +37,10 @@ const voiceClient = voiceSidecarUrl
 const weatherConnector = createWeatherConnector({ persistence });
 const timeMode = process.env.DESKBOT_TIME_MODE ?? 'realtime';
 const timeZone = process.env.DESKBOT_TIME_ZONE ?? 'Asia/Shanghai';
+// Private, explicit local opt-in. No HTTP route grants replay adapters.
+const replayDirectory = process.env.DESKBOT_REPLAY_CAPTURE_DIR?.trim();
+const replayCapture = replayDirectory ? createCanonicalReplayCapture({ persistence, directory: replayDirectory }) : null;
+const replayWorld = replayCapture ? createPersistentWorld({ persistence, timeMode, timeZone, replayCapture }) : null;
 const bodyDeviceProfiles = loadBodyDeviceProfiles(process.env.DESKBOT_BODY_DEVICES_CONFIG ?? resolve(serviceRoot, '../../config/body_devices.json'));
 const refractionSources = createExternalConnectors({ persistence,
   newsEnabled: process.env.DESKBOT_NEWS_ENABLED === '1', airEnabled: process.env.DESKBOT_AIR_ENABLED === '1',
@@ -45,7 +51,9 @@ const refractionSources = createExternalConnectors({ persistence,
     return result.text;
   } : null });
 const server = createDeskBotServer({ persistence, llm, voiceClient, weatherConnector, websocketPath, worldLifeEnabled: true, autonomousLifeEnabled: true,
-  residentLifeEnabled: true, livedMemoryEnabled: process.env.DESKBOT_MEMORY_ENABLED !== '0', timeMode, timeZone, refractionSources, bodyDeviceProfiles });
+  residentLifeEnabled: true, livedMemoryEnabled: process.env.DESKBOT_MEMORY_ENABLED !== '0', timeMode, timeZone, refractionSources, bodyDeviceProfiles,
+  ...(replayWorld ? { persistentWorld: replayWorld } : {}),
+  ...(replayCapture ? { replayCapture } : {}) });
 
 server.listen(port, host, () => {
   console.log(`DeskBot Service v0.1.0 listening on http://${host}:${port}`);
