@@ -1,6 +1,6 @@
 # Asamana 迁移管线 v1
 
-目标：把 Asamana 已验证的编排和可观察性机制，迁移到 DeskBot 的“长期共同生活的桌面潮玩生命体”闭环，同时保留聚形域、喵呜、多源输入、角色阶段和受控世界事实边界。
+目标：把 Asamana 已验证的编排和可观察性机制，迁移到 DeskBot 的“长期共同生活的桌面潮玩生命体”闭环，同时保留聚形域、喵呜、多源输入、角色阶段和受控世界事实边界。逐项的目标、代码映射、依赖、验收门和状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。
 
 ## 阶段门
 
@@ -14,7 +14,7 @@
 | M5 | mutation channel 治理强化（DeskBot 原有能力；本轮增加 candidate replay 审计） | 非确定性/非受信观察先成为候选；preview 无 revision 变化；accept 只能写合法 mutation；受信天气 adapter 继续兼容 | `baseline implemented` / `automated verified` |
 | M6 | snapshot/replay/restart | 事件序号、SQLite 状态、候选、trial、stage 在重启和重复回放下保持一致 | `canonical capture implemented` / `automated verified`；隔离服务入口 seam 支持多时间、重复与中途重启并核验全部 namespace；独立调度/决策/chat 操作尚未统一捕获，完整生产服务归档未完成；历史断层仍严格返回 `history_unavailable` |
 | M7 | 前端观察连续性 | 服务端统一 snapshot/WS、客户端 revision/sequence gate、重连和有界 render gate | `implemented` / `automated verified`；基础历史面板已接入，长期断线与历史浏览体验待验收 |
-| M8 | 长期共同生活回放 | 两个逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | 既有 288 事件隔离 fixture `automated verified`；新增自主追求验收 `inconclusive_goal_not_executed`，真实模型与人工体验 `pending` |
+| M8 | 长期共同生活回放 | 两个以上逻辑日、多源输入、角色试行、合法世界候选、重启和人工沉浸体验闭环通过 | 既有 288 事件隔离 fixture `automated verified`；三日受控目标追求样本 `verified`；真实模型为 `inconclusive_reflection_failed`，人工长期体验仍 `pending` |
 
 ## 每阶段固定流程
 
@@ -27,17 +27,17 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 属于本分支的实现，本次发布在 `codex/asamana-shared-life-v3`，保留 `main` 和前两版分支。2026-10-13 复验服务端 843/843、客户端 44 套 301/301、voice-sidecar 16/16、typecheck/build 通过；Asamana 独立前端 140 项为既有结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于 v3 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮已在本地创建 `codex/asamana-shared-life-v4`，保留 `main` 和 v1–v3 分支；远端完成状态由交付核验确认。2026-10-13 本轮复验服务端 843/843、客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server），全部通过。Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
-`scripts/review-asamana-migration.mjs` 新增零外部请求的跨日实际生活验收，首日完整意图→计划→任务→结果成立；次日真实实践与反思成立，但新目标在有限窗口没有执行，结论保留为 `inconclusive_goal_not_executed`。模型合法返回空目标也必须报告 inconclusive。来源幂等、SQLite 重启和世界候选门通过，不把该样本说成 M8 完整通过；真实模型模式尚未运行。
+`scripts/review-asamana-migration.mjs` 新增零外部请求的三日实际生活验收，首日完整意图→计划→任务→结果成立；次日真实实践与反思成立，原具体目标等待下一次合法机会，第三日重启后通过原计划和真实任务完成。最新报告 `tmp/asamana-migration-review-lsN0DX/report.json` 为 `verified`，原资源、每日实践上限和期限保持有效。模型合法返回空目标仍必须报告 inconclusive。来源幂等、SQLite 重启和世界候选门通过，但该受控样本不等于 M8 自然长期生活通过。真实 DeepSeek 模式已使用 Clash 执行最多六次调用；报告 `tmp/asamana-migration-review-btgixK/report.json` 为 `inconclusive_reflection_failed`，Day2 `ungrounded_goal` 被拒绝，未放宽 validator。
 
-历史完整性差异已定位并修复新序列的表示问题；当前应验收“小镇往事”的前端交互和真实旧断层提示，再做真实模型的多日慢认知及断线/长期浏览体验。其后扩展有规则后果的地方故事、居民项目和协作，再进行 7–14 天现实 1:1 观察；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
+历史完整性差异已定位并修复新序列的表示问题，“小镇往事”的基础前端交互和真实旧断层提示已有人工证据。下一批顺序为：M6b 全服务生产归档 → M8b 真实模型多日目标追求 → M7 真实渲染异常/长断线 → I2 规则世界事件内容包 → M8c 7–14 天现实 1:1 观察。无需重复实现已通过的 M1/M2/M3/M4 基线；真实中文声音、设备和外壳沿 v0.5 后续阶段推进。
 
-## 本轮实施合同与验收门
+## 原迁移合同与持续验收门
 
-本轮继续沿 M3 → M4 → M6 → M7 → M8 顺序完成；并行开发只在文件所有权不重叠时采用。每项必须同时具备源码、负向测试、SQLite 恢复和可观察结果，完成状态再写回本表。保留现有实际愿望、试做和双轴阶段，不回退成旧聊天试行机制。
+以下是原迁移的固定合同，并非重新开工的待办清单。当前缺口优先级按上文和正式矩阵执行；并行开发只在文件所有权不重叠时采用。每项必须同时具备源码、负向测试、SQLite 恢复和可观察结果，完成状态再写回矩阵。保留现有实际愿望、试做和双轴阶段，不回退成旧聊天试行机制。
 
 | 门 | 可实施合同 | 必须证明的结果 |
 | --- | --- | --- |

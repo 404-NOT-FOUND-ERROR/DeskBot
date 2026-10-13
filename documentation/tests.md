@@ -1,20 +1,20 @@
 # 当前验证与实验
 
-**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-13。** 本文件介绍现版本已验证的规则和实际边界。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
+**当前功能基线：v0.5 · 角色发展第 6 阶段、Asamana 迁移与持续生活投影补强，2026-10-13。** 本轮发布分支为 `codex/asamana-shared-life-v4`（本地已从 v3 代码基线创建，远端状态以交付核验为准）。本文件区分本轮复验和更早历史证据；测试数量不代表迁移完整完成。各阶段历史数字与运行日志保存在验收记录中，不作为当前部署状态。
 
 ## 最近完成的检查
 
 | 范围 | 已完成结果 | 能说明什么 |
 | --- | --- | --- |
-| DeskBot 服务完整回归 | 843/843 通过（2026-10-13 本机复验，含角色时空感知、跨日目标续接、回放捕获、流式重启、行动反馈、历史完整性与 Asamana 语义边界专项） | 世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则的回归基线 |
+| DeskBot 服务完整回归 | 843/843 通过（2026-10-13 本轮文档审计重跑，退出码 0；含角色时空感知、跨日目标续接、回放捕获、流式重启、行动反馈、历史完整性与 Asamana 语义边界专项） | 当前代码的世界、存档、资源、生活、来源、记忆、角色发展、体验包、设备与接口规则回归基线；不是新增 843 项迁移验收 |
 | 第 6 阶段最终专项复核 | 37 项通过 | 最终组合答语、重试边界、实际制作与送架、原自主生活接入；这是补充复核，不另报未经全量重跑的总数 |
-| 3D 客户端 | 44 套、301/301 通过（2026-10-13 本机复验，`--maxWorkers=2`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
-| 前端类型与生产构建 | 均通过 | 类型一致性和可构建性 |
-| voice-sidecar 接口 | 16 项通过（2026-10-08 本机复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
+| 3D 客户端 | 44 套、301/301 通过（2026-10-13 本轮发布复验，`npm.cmd --prefix apps/jev-town-client test`） | 读模型、控制、样本、场景、组合几何、渲染失败回退和生活 feed 连续性；不替代浏览器像素检查 |
+| 前端类型与生产构建 | 本轮生产构建通过（含 typecheck/client/server） | 类型一致性和可构建性 |
+| voice-sidecar 接口 | 16 项通过（2026-10-13 本轮发布复验） | 无真实模型的 ASR/TTS 协议与失败边界；不代表中文识别或合成已接通 |
 | SQLite 阶段实验 | 九种隔离样本，重启前后完整世界一致 | 原任务和配方产生的实际成果能支持预览、采用、组合和按轴回退 |
 | DeepSeek Flash 有限状态样本 | 三种公开虚构摘要真实调用通过 | 明确区分未采用、已采用、形态回退而职业继续；不代表所有连续聊天或真实语音均已验收 |
 
-完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md) 和 [角色体验包路线](role-experience-roadmap-v1.md)。2026-10-13 本轮在 Windows 工作站重新运行服务端 843 项、客户端 301 项、voice-sidecar 16 项、类型检查和生产构建，全部通过；Asamana 前端 140 项是既有测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
+完整证据与条件见 [第 6 阶段验收](../research/milestones/role-development-stage6.md)、[角色体验包路线](role-experience-roadmap-v1.md) 和 [正式迁移矩阵](asamana-migration-matrix-v1.md)。2026-10-13 本轮在 Windows 工作站重新运行服务端 843 项、客户端 301 项、voice-sidecar 16 项、生产构建（含 typecheck/client/server），全部通过。Asamana 前端 140 项是更早测试结果，本轮未重跑。Asamana 本地 mock 部署与 DeskBot 隔离，不代表 DeskBot 已采用 Asamana 运行时。
 
 本次新增 `slow-cognition-action-integration.test.mjs`：托盘、做饭与光果供给从合法候选进入实际任务，由同配方真实结果结算目标；旅行、缺材料及重复结算不形成完成进度。`persistent-world-restart.test.mjs` 验证账本流式恢复、过滤后有限 hydration、feed/历史一致性与跨世界 Scene 隔离；默认账本接口仍保留完整 diff。`slow-cognition.test.mjs` 保留已完成、失败、取消和撤回意图的真实状态。
 
@@ -85,9 +85,9 @@ node scripts/review-body-perception.mjs
 node scripts/review-asamana-migration.mjs
 ```
 
-脚本新建 `tmp/asamana-migration-review-*/isolated.sqlite`，只使用公开虚构初始化、真实生活执行器、受控时钟和最多六次 fixture 选择，不读取或写入正式世界，也不种入完成任务或记忆结果。本次默认运行使用两日反思、四次生活选择，零外部请求；首日目标→计划→同配方任务→完成成立，次日有真实活动与新反思，但新意图未在有限观察窗执行，因此返回 `inconclusive_goal_not_executed`（退出码 2）。SQLite 恢复、来源事件幂等、候选 preview 无副作用、accept 与重启后重复 accept 均通过。合法空目标另测返回 `inconclusive_no_intention`；不注入目标来强行通过。
+脚本新建 `tmp/asamana-migration-review-*/isolated.sqlite`，只使用公开虚构初始化、真实生活执行器、受控时钟和最多六次 fixture 选择，不读取或写入正式世界，也不种入完成任务或记忆结果。最新默认运行跨三个上海日期，使用两日反思和有限生活选择，零外部请求；首日目标→计划→同配方任务→完成成立，次日真实活动与新反思形成的原具体目标在第三日重启后的下一合法机会完成。`tmp/asamana-migration-review-lsN0DX/report.json` 返回 `verified`，资源、每日实践上限、原期限和任务链保持有效。SQLite 恢复、来源事件幂等、候选 preview 无副作用、accept 与重启后重复 accept 均通过。合法空目标另测仍返回 `inconclusive_no_intention`；不注入目标来强行通过。
 
-`--live --config <本地配置路径> --max-requests 6` 是显式真实模型模式，需要在 Node 启动前配置 Clash HTTP/HTTPS 代理并启用 `NODE_USE_ENV_PROXY=1` 或 `--use-env-proxy`；本轮未运行。报告与数据库留在忽略目录。当前脚本用于受控目标追求验收，不能证明真实多日自发愿望、完整阶段像素或长期沉浸效果。
+`--live --config <本地配置路径> --max-requests 6` 是显式真实模型模式，需要在 Node 启动前配置 Clash HTTP/HTTPS 代理并启用 `NODE_USE_ENV_PROXY=1` 或 `--use-env-proxy`。本轮已经执行六次真实调用，`tmp/asamana-migration-review-btgixK/report.json` 返回 `inconclusive_reflection_failed`：Day1 反思与目标成功，Day2 `ungrounded_goal` 被拒绝；所有 life-choice 请求均返回。未放宽 validator，也不把 provider 返回等同于目标采纳或自然生活成功。报告与数据库留在忽略目录。当前脚本用于受控目标追求验收，不能证明真实多日自发愿望、完整阶段像素或长期沉浸效果。
 
 ## 实验效果的解释
 

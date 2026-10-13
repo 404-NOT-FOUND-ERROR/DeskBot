@@ -4,7 +4,7 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life runtime。** 本版发布在 [`codex/asamana-shared-life-v3`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v3)，保留 `main` 和前两版分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。本分支进一步完善角色感知边界、慢认知、跨日目标追求和可核验的本地回放捕获。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v4。** 本版发布在 [`codex/asamana-shared-life-v4`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-shared-life-v4)，从 v3 分支派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v4 在 v3 的运行代码基础上补齐迁移矩阵、验证记录和当前效果图；角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用 v3 基线。这是开发路线的版本标识；各软件包版本和接口版本独立管理。
 
 ## 本版本更新
 
@@ -16,6 +16,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - 慢认知持久记录已经处理的来源，来源窗口缩小、排序变化和重启不会重复计费；关系理解仅引用共同亲历的事实，失败原因使用服务端分类。
 - 角色上下文按请求时间过滤：未来事实和非法时间不会提前泄露，远方事件作为消息，同地事件作为观察；公告经实际消息运输后才到达远方角色。
 - 增加默认关闭的本地 canonical 回放捕获和受控 service-ingress 重演。捕获目录不提交，重演使用独立 SQLite、原规则和零 provider 调用；完整服务操作归档仍待完成。
+- 增加 [Asamana → DeskBot 正式迁移矩阵](documentation/asamana-migration-matrix-v1.md)，逐项记录上游机制、DeskBot 映射、验收门、当前状态、拒绝迁移边界与下一步；矩阵不把受控样本或单元测试写成自然长期生活。
 
 慢认知可以把实际经历整理成自己的理解、有限目标和来往偏好；目标仍需通过真实任务、路线、材料和时间实现。前端往事浏览与隔离输入重演分别验证，当前输入重演工具还不是任意正式存档的完整导出器。验证结果和人工待验收项见下文与 [验证文档](documentation/tests.md)。
 
@@ -43,15 +44,15 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![v3 当前版本的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
+![v4 当前版本的雾灯镇实时小镇、居民与生活侧栏（2026-10-13）](documentation/images/current/live-town.jpg)
 
-![v3 当前版本的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
+![v4 当前版本的小镇往事、历史翻阅与世界回放（2026-10-13）](documentation/images/current/world-history.jpg)
 
 ![十三位光粒居民的首批造型，独立陈列预览](documentation/images/shaping-field-2026-10-05/residents-day.jpg)
 
 ![午夜小镇，普通窗灯与店招渐息，公共路灯保留](documentation/images/shaping-field-2026-10-05/midnight-town.jpg)
 
-前两张是 2026-10-13 本分支本机正式运行截图，展示当前实时小镇和历史观察面板；本版复验后确认 observer 快照可正常读取，页面能继续显示 13 位居民、现实输入和进行中的活动。后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
+前两张是 2026-10-13 v4 分支本机正式运行截图，分别展示 13 位居民的实时生活侧栏，以及只读的小镇往事/历史时间线；本版复验后确认 observer 快照可正常读取，页面能继续显示现实输入、进行中的活动、居民项目和历史事实。后两张是 2026-10-05 的只读美术预览，展示场景风格与昼夜灯光。截图不等于长期自然生活已经完成。更多图片与说明见 [场景与持续生活](documentation/shaping-field-visual-life.md)。
 
 ## 当前完成范围
 
@@ -68,7 +69,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-shared-life-v3 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-shared-life-v4 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -80,7 +81,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v3`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-shared-life-v4`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
@@ -126,7 +127,7 @@ flowchart LR
 | [当前设计与实现](documentation/design-implementation-map.md) | 已完成能力、实现对应和剩余工作 |
 | [架构](documentation/architecture.md) · [流程](documentation/flows.md) | 状态边界、生活与角色发展链路 |
 | [验证](documentation/tests.md) · [自动运行](documentation/automation.md) | 验证方法、连接器与服务运行 |
-| [Asamana 评估](documentation/asamana-review.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) | 参考项目的源码映射、迁移边界与阶段验收 |
+| [Asamana 评估](documentation/asamana-review.md) · [迁移标准](documentation/asamana-migration-standard-v1.md) · [迁移管线](documentation/asamana-migration-pipeline-v1.md) · [迁移矩阵](documentation/asamana-migration-matrix-v1.md) | 参考项目的源码映射、迁移边界、逐项状态与阶段验收 |
 | [Asamana attribution](third-party/asamana/README.md) | 上游版本、Apache-2.0 许可证与迁移归属说明 |
 | [居民设计](research/npcs/resident-life-design-v1.md) · [地图目录](world-content/companion-world/map.v1.json) | 生活角色与地图内容 |
 | [阶段规则](research/world/role-stages-v1.md) · [身体协议](research/protocol/body-perception-v1.md) | 角色采用、回退与后续硬件适配 |

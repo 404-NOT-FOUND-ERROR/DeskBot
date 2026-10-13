@@ -1,6 +1,8 @@
 # Asamana 迁移标准 v1
 
-状态：`adopted`（迁移标准）；具体能力按下表分别标记 `planned`、`implemented`、`automated verified` 或 `manual pending`。
+状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。
+
+本轮发布分支为 `codex/asamana-shared-life-v4`，本地已从 v3 已验证代码基线创建；本文是能力范围说明，远端交付仍以 commit 和远端核验为准。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 
@@ -65,7 +67,7 @@
 - `action-feedback.mjs`：以 `deskbot.action-feedback.v1` 固定 `authority=audit_only`，保存稳定回执 ID、因果事件、任务状态和失败分类；真实任务失败仍是一次发生过的尝试，而没有 canonical task 的“完成”文本只能是 `not_executed`。
 - 阶段体验包采用时冻结 version/snapshot/hash，已有阶段的生活、表达、TTS 意图与虚拟外观不会被新 registry 静默改写。
 
-以上为本分支的本地实现与验证记录。隔离两日 M8 回放及重启/重复规则已自动验证；新序列历史回放与真实迁移断层拒绝已自动验证。本轮浏览器已人工验收 DeskBot 页面加载、实时地图/居民、往事面板、向前/向后单条翻阅、加载更早记录、回到最近和恢复实时；Asamana 已人工验收示例世界、人物认知、叙事流、回放滑条和沉浸视图。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。
+以上为 v3 代码基线的本地实现与验证记录。本轮发布复验服务端完整测试 843/843、客户端 44 套 301/301、voice-sidecar 16/16、生产构建（含 typecheck/client/server），全部通过。隔离两日 M8 fixture 及重启/重复规则已自动验证，最新三日规则目标追求样本也已 `verified`；真实 DeepSeek 六次调用仍是 `inconclusive_reflection_failed`。新序列历史回放与真实迁移断层拒绝已自动验证。v3 发布前已人工验收 DeskBot 页面加载、实时地图/居民、往事面板、向前/向后单条翻阅、加载更早记录、回到最近和恢复实时；本轮再次捕获正式实时小镇实际页面，天气为“等待新天气”。Asamana 示例世界、人物认知、叙事流、回放滑条和沉浸视图属于此前部署验收。长时间断线恢复、完整阶段像素验收、真实模型多日运行和长期沉浸体验仍需验收。逐项代码映射、依赖和验收门见 [正式迁移矩阵](asamana-migration-matrix-v1.md)。
 
 ### M6 本地捕获范围
 
