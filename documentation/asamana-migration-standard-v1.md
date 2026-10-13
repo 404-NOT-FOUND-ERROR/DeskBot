@@ -1,10 +1,10 @@
 # Asamana 迁移标准 v1
 
-> v6.4 增量（2026-10-14）：`codex/asamana-m6b-seam-v6-4-input-runtime-replay` 已完成 input-runtime I4/I7 受控 fixture replay（2/2），服务端广套 861/861；M6b 全服务仍为 `partial`。
+> v6.4 增量（2026-10-14）：`codex/asamana-m6b-v6-4-release` 已完成 input-runtime I4/I7 受控 fixture replay（2/2），服务端广套 861/861；M6b 全服务仍为 `partial`。
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。逐项执行与证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。
 
-当前发布分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`，从 v6.3 已验证基线继续推进；v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。v6.4 已收口受控的 chat 用户 handler LLM fixture-replay 与 input-runtime source run replay 接缝并通过专项/广套回归；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
+当前发布分支为 `codex/asamana-m6b-v6-4-release`，从 v6.4 replay seam 基线继续推进；v6.3/v6.2 的发布记录仍保留为历史基线。本文是能力范围说明，分支交付仍以 commit 和远端核验为准。v6.4 已收口受控的 chat 用户 handler LLM fixture-replay 与 input-runtime source run replay 接缝并通过专项/广套回归；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务生产回放仍未完成，M6b 仍为 `partial`。
 
 本文把本地部署的 [dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana) 作为架构参考，不把它当作 DeskBot 的上游运行时。Asamana 本地副本位于 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，Apache-2.0，后端 `7860`、前端 `5174`，当前可浏览示例世界，本机组装 file+mock profile 使用上游提供的 mock provider；Docker/真实模型不是本次 DeskBot 运行前提。
 

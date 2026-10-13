@@ -29,7 +29,7 @@
 
 ## 当前交付边界与下一批顺序
 
-M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`，v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
+M0–M8 的代码底座属于历史 v4 基线，但不等于每个迁移项或最终闭环都已通过；精确状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准。本轮工作分支为 `codex/asamana-m6b-v6-4-release`，v6.3/v6.2 的发布记录与远端分支仍保留为历史基线。v6.4 已通过受控 chat 用户 handler LLM fixture replay 专项 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；独立 TTS fixture、assistant/provider 全分支和 M6b 全服务仍未完成，M6b 仍为 `partial`。v6.2/v6.3 的历史服务端、客户端和生产构建数字见发布记录；Asamana 独立前端 140 项是更早的上游部署结果，本轮未重跑。自动样本不会污染正式世界。
 
 本版补齐 M3.2 合法候选到同配方实际任务的连接，保留终结目标状态；M6 的大存档恢复按需 hydration，因果场景索引不载入无关 diff；M7 的 WebGL/CSS2D/RAF 异常进入真实文字视图后才推进序列，旧断层提供返回实时入口。普通正式页面与往事已检查并更新效果图，真实 context loss、长断线、真实模型多日生活与完整阶段像素仍待验收。
 
@@ -45,7 +45,7 @@ M6b 不以“导出时所有 namespace 的 hash 相同”为完成条件，而�
 | --- | --- | --- | --- |
 | M6b-C0/C1 | `/api/chat` 用户/assistant分支、provider/TTS 结果 | 稳定 chat operation、request hash、结果引用与失败分类；不保存聊天正文 | success/error/TTS/duplicate 均可归属；缺 fixture/篡改 fail closed |
 | M6b-C2/C3 | chat 原入口回放 | 原 `/api/chat` handler 在 fresh/restart/duplicate 下重放，固定 fixture 零联网 | turn/correlation/output/world 等 namespace 顺序与 semantic hash 相等；不能由台词伪造事实 |
-| M6b-I0/I3 | input-runtime source refresh | 已接入 `input-runtime:<run_id>` operation scope，覆盖 schedule、source 状态、TTL、backoff、脱敏 result reference 和 ingest callback；专项合同通过 | success/skip/error、多个 source 隔离、网络等待在事务外且捕获失败不留半状态；I4–I7 fixture/replay 仍待完成 |
+| M6b-I0/I3 | input-runtime source refresh | 已接入 `input-runtime:<run_id>` operation scope，覆盖 schedule、source 状态、TTL、backoff、脱敏 result reference 和 ingest callback；专项合同通过 | success/skip/error、多个 source 隔离、网络等待在事务外且捕获失败不留半状态；I4–I7 受控 fixture/replay 已完成 2/2，真实 provider 长期运行与其他旁路仍待 |
 | M6b-I4/I7 | input-runtime replay 与安全边界 | 重启/重复/缺 fixture/篡改/过期回放；脱敏 provider fixture registry | run/source/事件 IDs/错误分类和 namespace hash 一致，`provider_calls=0` |
 | M6b-R | role/life/research route、world candidate、worker/WebSocket/device | 直接 HTTP、定时 worker 和设备回执统一封套 | 覆盖注册表冻结；全服务原入口 replay 通过后才允许开启 `requireOperationContext` |
 

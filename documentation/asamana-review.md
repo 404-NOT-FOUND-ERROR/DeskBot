@@ -1,8 +1,8 @@
 # Asamana 本地部署与源码评估
 
-> v6.4 增量（2026-10-14）：当前发布分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`；`input-runtime` I4/I7 受控回放 2/2、服务端广套 861/861。下文保留 v6.3/v6.2 的历史数字时，按其原发布记录理解；未完成范围仍以迁移矩阵为准。
+> v6.4 增量（2026-10-14）：当前发布分支为 `codex/asamana-m6b-v6-4-release`；`input-runtime` I4/I7 受控回放 2/2、服务端广套 861/861。下文保留 v6.3/v6.2 的历史数字时，按其原发布记录理解；未完成范围仍以迁移矩阵为准。
 
-核对日期：2026-10-14。上游：[dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana)，核对版本 `e9fc862642369ba8b177595d2f8e3f20c1636da4`，许可证 Apache-2.0。源码、素材和示例部署在 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，与 DeskBot 的数据库、端口和模型配置隔离。DeskBot 当前工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`；v5/v6.2/v6.3 仅作为历史基线，逐项执行以 [迁移作业单](asamana-migration-runbook-v1.md) 为准。
+核对日期：2026-10-14。上游：[dreamscroll-lab/asamana](https://github.com/dreamscroll-lab/asamana)，核对版本 `e9fc862642369ba8b177595d2f8e3f20c1636da4`，许可证 Apache-2.0。源码、素材和示例部署在 `C:\Users\Administrator\Desktop\Jeremy\asamana-runtime`，与 DeskBot 的数据库、端口和模型配置隔离。DeskBot 当前工作分支为 `codex/asamana-m6b-v6-4-release`；v5/v6.2/v6.3 仅作为历史基线，逐项执行以 [迁移作业单](asamana-migration-runbook-v1.md) 为准。
 
 ## 架构实际做了什么
 
@@ -28,7 +28,7 @@ providers：LLM、embedding、向量存储、人物存储、snapshot
 
 ## 2026-10-14 DeskBot 分支收口
 
-历史代码基线为 `codex/asamana-shared-life-v5`，v6.2 是已发布的 M6b operation-journal 增量；当前工作分支为 `codex/asamana-m6b-seam-v6-4-input-runtime-replay`，仍不修改 `main`。v6.2 的 857/857、M8 1/1、专项 27/27、7/7、19/19 和客户端/构建数字作为历史基线保留。v6.4 当前已通过受控 chat 用户 handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；M6b 仍为 `partial`，独立 TTS fixture、assistant/provider 全分支和完整 chat replay 仍未完成。正式实时小镇实际页面再次核对，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v4/v5 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；v6.2/v6.3/v6.4 不引入第二套世界引擎。
+历史代码基线为 `codex/asamana-shared-life-v5`，v6.2 是已发布的 M6b operation-journal 增量；当前工作分支为 `codex/asamana-m6b-v6-4-release`，仍不修改 `main`。v6.2 的 857/857、M8 1/1、专项 27/27、7/7、19/19 和客户端/构建数字作为历史基线保留。v6.4 当前已通过受控 chat 用户 handler LLM fixture replay 10/10、input-runtime replay 2/2、服务端广套 861/861、客户端 typecheck/build、voice-sidecar 16/16 和 `git diff --check`；M6b 仍为 `partial`，独立 TTS fixture、assistant/provider 全分支和完整 chat replay 仍未完成。正式实时小镇实际页面再次核对，天气显示“等待新天气”，不把画面当作 provider fresh 验收。v4/v5 收紧了角色时空感知、慢认知来源计费、跨日目标续接和本地回放边界；v6.2/v6.3/v6.4 不引入第二套世界引擎。
 
 新增跨日验收脚本默认零外部请求，三日受控样本已 `verified`：首日完整目标执行链成立，次日真实实践形成的原具体目标在第三日重启后的下一合法机会执行并完成，没有重置期限或补赠材料。真实 DeepSeek 模式已用 Clash 执行六次调用，Day2 缺少经历依据的目标被拒绝，结果仍为 `inconclusive_reflection_failed`。真实模型多日生活、完整阶段视觉、真实渲染 context loss 与长断线仍待验收。现有 replay tape 是隔离输入 fixture 的确定性重演，任意生产存档的完整捕获导出尚未接入；长期共同生活和全部迁移目标不能据此宣称完成。
 

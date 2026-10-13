@@ -4,7 +4,7 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.5 · Asamana-inspired shared-life v6.4 M6b-C2/C3/I4/I7 接缝发布。** 本版发布在 [`codex/asamana-m6b-seam-v6-4-input-runtime-replay`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-seam-v6-4-input-runtime-replay)，从 v6.3 已验证基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.4 在 v6.3 的 chat handler fixture replay 之上，补齐 `input-runtime` source run 的 success/skip/error、TTL/backoff、重启/重复与 fail-closed 回放门；回放期间 provider 调用数必须为零。provider/TTS 引用仍按阶段记录，但独立 TTS 成功 fixture 尚不作为本版通过条件。它仍是增量发布，不宣称完整生产服务归档或任意入口回放已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.5 · Asamana-inspired shared-life v6.4 M6b-C2/C3/I4/I7 release。** 本版发布在 [`codex/asamana-m6b-v6-4-release`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-v6-4-release)，从已验证的 v6.4 replay seam 基线派生，保留 `main` 和历史分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段。v6.4 在 chat handler fixture replay 之上，补齐 `input-runtime` source run 的 success/skip/error、TTL/backoff、重启/重复与 fail-closed 回放门；回放期间 provider 调用数必须为零。provider/TTS 引用仍按阶段记录，但独立 TTS 成功 fixture 尚不作为本版通过条件。它仍是增量发布，不宣称完整生产服务归档或任意入口回放已经完成。角色感知边界、慢认知、跨日目标追求及本地回放捕获沿用既有基线。这是开发路线的发布标识；各软件包版本和接口版本独立管理。
 
 ### v6.4 M6b-C2/C3/I4/I7 本轮新增
 
@@ -53,6 +53,8 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
+![v6.4 release 本机运行快照：雾灯镇地图、往事面板与喵呜生活侧栏（页面实际运行截图，2026-10-14 04:01）](documentation/images/asamana-v6-4-release/live-town.png)
+
 ![v6.4 M6b-C2/C3/I4/I7 本机发布快照：实时小镇与小镇往事面板（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town-history.jpg)
 
 ![v6.4 M6b-C2/C3/I4/I7 本机运行效果：雾灯镇实时小镇、居民与生活侧栏（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town.jpg)
@@ -80,7 +82,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-m6b-seam-v6-4-input-runtime-replay https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-v6-4-release https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -92,7 +94,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-seam-v6-4-input-runtime-replay`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-v6-4-release`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
