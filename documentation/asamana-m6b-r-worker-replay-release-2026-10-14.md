@@ -23,6 +23,6 @@ Covered route, worker, voice fixture, chat fixture, fresh replay, restart replay
 
 ## Visual evidence
 
-![M6b-R worker replay runtime snapshot](images/asamana-m6b-r-worker-replay-2026-10-14/live-town-worker-replay.png)
+![Morrowmere complete 3D town and life-development panel](images/asamana-m6b-r-worker-replay-2026-10-14/live-town-3d.jpg)
 
-The screenshot shows the current town map, resident panel, shared-life history and chat entry. The worker/replay work is a service-layer change, so the client visual baseline is intentionally unchanged.
+The screenshot reuses the fully rendered local visual baseline dated 2026-10-14, showing the town map, life-development panel and chat entry. The worker/replay work is a service-layer change, so the client visual baseline is intentionally unchanged; the image is not replay verification evidence.
