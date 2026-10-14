@@ -4,14 +4,14 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.6.1 · M6b-R worker cadence replay / Asamana migration program v2（2026-10-14）。** 本版发布在 [`codex/asamana-m6b-r-worker-replay-2026-10-14`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-r-worker-replay-2026-10-14)，从已发布的 Asamana migration program v2 preview 分支派生，保留 `main` 与历史发布分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本版进一步收口 HTTP route、scheduler worker、voice fixture 和 chat fixture 的原入口 replay、SQLite 重启恢复与幂等边界。该分支仍是迁移开发快照，不代表 P4 或长期自然共同生活已经完成：真实模型跨日目标追求、全入口生产归档、device/ASR-cancel、7–14 日人工观察以及真实 TTS、实体 ACK、外壳机械实现仍在后续范围内；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.6.2 · M6b-R route / worker replay · Asamana migration program v2（2026-10-14）。** 本版发布在 [`codex/asamana-m6b-route-worker-replay-2026-10-14`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-route-worker-replay-2026-10-14)，从 worker replay 开发快照派生，保留 `main` 与历史发布分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本版新增角色阶段 accept/rollback 原入口 replay，并继续收口 life/role HTTP route、scheduler worker、voice fixture 和 chat fixture 的 SQLite 重启恢复与幂等边界。该分支仍是迁移开发快照，不代表 P4 或长期自然共同生活已经完成：真实模型跨日目标追求、全入口生产归档、device/ASR-cancel、7–14 日人工观察以及真实 TTS、实体 ACK、外壳机械实现仍在后续范围内；各软件包版本和接口版本独立管理。
 
 ### 本版发布亮点
 
 - 迁移目录现在由 `scripts/validate-migration-catalog.mjs` 机器校验，运行时会先检查 18 个迁移项的唯一性、状态、依赖、证据和 freshness。
 - voice `transcribe/tts` 在受控 replay 模式下可从私有 fixture 完整重入原 route，fresh/restart、缺失、篡改和错误 fixture 会 fail closed；这不等同于真实语音模型或 ASR/cancel 的完整生产归档。
 - worker scheduler operation 已有稳定 operation ID、SQLite 重启恢复、原 worker 入口 replay 和 canonical mutation/role-run 去重验收；旧 archive/runtime 缺少 worker seam 时仍能安全消费只读 worker 记录。
-- route、worker、voice fixture、chat fixture replay 专项合计 **14/14 通过**；服务端全量回归 **874/874 通过**。本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
+- route、worker、voice fixture、chat fixture replay 专项合计 **15/15 通过**；服务端全量回归 **877/877 通过**。本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
 - README、发布记录和运行截图与本分支一致；本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
 
 ### 本次迁移程序分支新增
@@ -104,7 +104,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-m6b-r-worker-replay-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-route-worker-replay-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -116,7 +116,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-r-worker-replay-2026-10-14`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-route-worker-replay-2026-10-14`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |

@@ -2,7 +2,7 @@
   "name": "deskbot",
   "version": "0.1.0",
   "private": true,
-  "description": "DeskBot · 聚形域：多源现实输入驱动持续奇幻小镇中的潮玩生命体，共同生活、记忆、关系与形态/职业探索。Asamana migration program：M6b-R operation replay 接缝、受限 authored world-event candidate 与 preview/accept 治理；Node.js + SQLite + React/Three.js；感知、慢认知、跨日目标、voice/device 接缝、可核验回放与迁移验收矩阵。",
+  "description": "DeskBot · 聚形域：多源现实输入驱动持续奇幻小镇中的潮玩生命体，共同生活、记忆、关系与形态/职业探索。Asamana migration program v2：M6b route/worker replay、受限 authored world-event candidate 与 preview/accept 治理；Node.js + SQLite + React/Three.js；感知、慢认知、跨日目标、voice/device 接缝、可核验回放与迁移验收矩阵。",
   "engines": {
     "node": ">=24"
   },

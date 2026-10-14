@@ -241,12 +241,12 @@
       "dependencies": ["M6a-canonical-world-replay"],
       "risk": "provider prose becomes fact or fixture is skipped",
       "owner": "DeskBot route maintainer",
-      "status": "partial",
+      "status": "automated_verified",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G7"],
-      "evidence_refs": ["apps/deskbot-service/test/replay-capture.test.mjs"],
+      "evidence_refs": ["apps/deskbot-service/test/replay-capture.test.mjs", "documentation/evidence/M6b-C-chat-handler-replay-20261014.md"],
       "last_verified_at": "2026-10-14",
-      "base_commit": "ee81de9",
-      "known_gaps": ["assistant branch, independent TTS fixture and all success/error combinations"]
+      "base_commit": "7fd853b",
+      "known_gaps": ["assistant-role requests remain audit-only; TTS cancellation and device ACK replay are later items"]
     },
     {
       "item_id": "M6b-I-input-runtime-replay",
@@ -285,7 +285,7 @@
       "owner": "DeskBot route maintainer",
       "status": "partial",
       "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G7"],
-      "evidence_refs": ["apps/deskbot-service/test/operation-journal-contract.test.mjs", "apps/deskbot-service/test/m6b-route-replay.test.mjs"],
+      "evidence_refs": ["apps/deskbot-service/test/operation-journal-contract.test.mjs", "apps/deskbot-service/test/m6b-route-replay.test.mjs", "apps/deskbot-service/test/role-stage-route-replay.test.mjs", "documentation/asamana-m6b-route-worker-replay-release-2026-10-14.md"],
       "last_verified_at": "2026-10-14",
       "base_commit": "ee81de9",
       "known_gaps": ["original handler replay and full namespace atomicity"]

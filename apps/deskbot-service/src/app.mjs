@@ -364,6 +364,49 @@ export function createDeskBotServer({
     return requiredRoleText(value, field);
   }
 
+  // The HTTP stage action and the trusted replay route must enter the same
+  // domain handler. Keeping the validation and canonical-ingress construction
+  // here prevents replay from growing a second role-stage lifecycle.
+  function executeRoleStageAction(proposalId, operation, body = {}) {
+    const allowedKeys = operation === 'accept'
+      ? ['event_id', 'reason', 'preview_fingerprint']
+      : ['event_id', 'reason', 'stage_id'];
+    if (Object.keys(body).some(key => !allowedKeys.includes(key))) {
+      throw new InputError(400, 'invalid_role_stage_request', '阶段操作只接受已登记的预览或当前阶段编号，不能提交形象、技能、经历或结果。');
+    }
+    const proposal = roles.get(proposalId);
+    if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
+    if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'role_stage_requires_lived_wish', '新的生活阶段需要已经保存的生活愿望和实际试做，旧聊天反馈不能替代。');
+    const world = persistentWorld.get(), stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
+    const previewFingerprint = operation === 'accept' ? requiredRoleText(body.preview_fingerprint, 'preview_fingerprint') : null;
+    const stageId = operation === 'rollback' ? requiredRoleText(body.stage_id, 'stage_id') : null;
+    const eventId = optionalRoleText(body.event_id, 'event_id') ?? `role-stage:${operation}:${proposalId}`;
+    const savedEvent = inputStore.get(eventId);
+    const sameReplay = savedEvent?.source === 'role-stage-engine' && savedEvent.type === 'world.mutation'
+      && (operation === 'accept' ? savedEvent.payload?.action === 'accept_role_stage' && savedEvent.payload?.proposal_id === proposalId
+        : savedEvent.payload?.action === 'rollback_role_stage' && savedEvent.payload?.stage_id === stageId);
+    if (operation === 'accept' && !sameReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
+      throw new RoleProposalError(409, 'role_stage_requires_prepared_wish', '采用生活阶段需要原先已支持的准备愿望与实际结果。');
+    }
+    if (operation === 'rollback' && (!stage || stage.stage_id !== stageId || !sameReplay && (stage.status !== 'accepted' || stage.current !== true))) {
+      throw new RoleProposalError(409, 'role_stage_not_current', '只有当前轴上采用的这份阶段可以回退，请重新读取阶段卡。');
+    }
+    const reason = optionalRoleText(body.reason, 'reason');
+    const payload = operation === 'accept'
+      ? { action: 'accept_role_stage', proposal_id: proposalId, actor_id: proposal.character_id,
+        direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
+        preview_fingerprint: previewFingerprint, ...(reason ? { reason } : {}) }
+      : { action: 'rollback_role_stage', stage_id: stageId, ...(reason ? { reason } : {}) };
+    const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-stage-engine',
+      source_kind: 'world_engine', character_id: world.protagonist.character_id,
+      occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { roleStageInternal: true });
+    roleEvolution.reconcileRoleStage(proposalId);
+    return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
+      proposal: roleEvolution.wishProposal(proposalId), role_stage: roleStageReadModel(persistentWorld.get(), { proposalId,
+        actorId: proposal.character_id, at: now().toISOString() }), role_stages: roleEvolution.snapshot({ characterId: proposal.character_id }).role_stages,
+      world_mutation: result.worldMutation };
+  }
+
   function sendResearchSessionError(response, error) {
     const expected = error instanceof ResearchSessionError;
     sendJson(response, expected ? error.statusCode : 500, {
@@ -1680,40 +1723,8 @@ export function createDeskBotServer({
         const eventId = optionalRoleText(body.event_id, 'event_id') ?? `role-stage:${operation}:${proposalId}`;
         return runServiceOperation({
           operationId: `role.stage.${operation}:${stableOperationSuffix(eventId)}`,
-          operationKind: `role.stage.${operation}`, routeId: `role.stage.${operation}`, source: 'http.role', request: body,
-          sourceEventIds: [eventId], callback: () => {
-            const allowedKeys = operation === 'accept' ? ['event_id', 'reason', 'preview_fingerprint'] : ['event_id', 'reason', 'stage_id'];
-            if (Object.keys(body).some(key => !allowedKeys.includes(key))) throw new InputError(400, 'invalid_role_stage_request', '阶段操作只接受已登记的预览或当前阶段编号，不能提交形象、技能、经历或结果。');
-            const proposal = roles.get(proposalId);
-            if (!proposal) throw new RoleProposalError(404, 'role_proposal_not_found', '没有这份角色愿望。');
-            if (proposal.origin !== 'lived_wish') throw new RoleProposalError(409, 'role_stage_requires_lived_wish', '新的生活阶段需要已经保存的生活愿望和实际试做，旧聊天反馈不能替代。');
-            const world = persistentWorld.get(), stage = roleStageReadModel(world, { proposalId, actorId: proposal.character_id, at: now().toISOString() });
-            const previewFingerprint = operation === 'accept' ? requiredRoleText(body.preview_fingerprint, 'preview_fingerprint') : null;
-            const stageId = operation === 'rollback' ? requiredRoleText(body.stage_id, 'stage_id') : null;
-            const savedEvent = inputStore.get(eventId);
-            const sameReplay = savedEvent?.source === 'role-stage-engine' && savedEvent.type === 'world.mutation'
-              && (operation === 'accept' ? savedEvent.payload?.action === 'accept_role_stage' && savedEvent.payload?.proposal_id === proposalId
-                : savedEvent.payload?.action === 'rollback_role_stage' && savedEvent.payload?.stage_id === stageId);
-            if (operation === 'accept' && !sameReplay && (proposal.status !== 'prepared' || proposal.user_choice !== 'try')) {
-              throw new RoleProposalError(409, 'role_stage_requires_prepared_wish', '采用生活阶段需要原先已支持的准备愿望与实际结果。');
-            }
-            if (operation === 'rollback' && (!stage || stage.stage_id !== stageId || !sameReplay && (stage.status !== 'accepted' || stage.current !== true))) {
-              throw new RoleProposalError(409, 'role_stage_not_current', '只有当前轴上采用的这份阶段可以回退，请重新读取阶段卡。');
-            }
-            const reason = optionalRoleText(body.reason, 'reason');
-            const payload = operation === 'accept' ? { action: 'accept_role_stage', proposal_id: proposalId,
-              actor_id: proposal.character_id, direction_id: proposal.direction_id, wish_basis: proposal.wish_basis,
-              preview_fingerprint: previewFingerprint, ...(reason ? { reason } : {}) }
-              : { action: 'rollback_role_stage', stage_id: stageId, ...(reason ? { reason } : {}) };
-            const result = ingestNonChatEvent({ event_id: eventId, type: 'world.mutation', source: 'role-stage-engine',
-              source_kind: 'world_engine', character_id: world.protagonist.character_id,
-              occurred_at: savedEvent?.occurred_at ?? now().toISOString(), payload }, { roleStageInternal: true });
-            roleEvolution.reconcileRoleStage(proposalId);
-            return { duplicate: result.duplicate || result.worldMutation.mutation?.details?.duplicate === true,
-              proposal: roleEvolution.wishProposal(proposalId), role_stage: roleStageReadModel(persistentWorld.get(), { proposalId,
-                actorId: proposal.character_id, at: now().toISOString() }), role_stages: roleEvolution.snapshot({ characterId: proposal.character_id }).role_stages,
-              world_mutation: result.worldMutation };
-          },
+          operationKind: `role.stage.${operation}`, routeId: `role.stage.${operation}`, source: 'http.role', request: { ...body, proposal_id: proposalId },
+          sourceEventIds: [eventId], callback: () => executeRoleStageAction(proposalId, operation, body),
         });
       }).then(result => sendJson(response, result.duplicate ? 200 : 202, {
         schema: 'deskbot.role-stage-action-response.v1', accepted: true, ...result,
@@ -2651,6 +2662,55 @@ export function createDeskBotServer({
   // Each branch calls the same domain handler used by its HTTP route; no HTTP
   // listener or client-supplied mutation is involved.
   server.replayRoute = async (routeId, body = {}) => {
+    if (routeId === 'role.stage.accept' || routeId === 'role.stage.rollback') {
+      const proposalId = requiredRoleText(body.proposal_id, 'proposal_id');
+      const request = { ...body };
+      delete request.proposal_id;
+      return executeRoleStageAction(proposalId, routeId.slice('role.stage.'.length), request);
+    }
+    if (routeId.startsWith('life.story-package.')) {
+      const operation = routeId.slice('life.story-package.'.length), packageId = requiredRoleText(body.package_id, 'package_id');
+      const options = { now: now(), plans: sharedLife.plans(), world: persistentWorld.get() };
+      if (operation === 'preview') return previewStoryPackage(packageId, options);
+      if (operation === 'install') return installStoryPackage(packageId, { ...options, schedule: sharedLife.schedule });
+      throw Object.assign(new Error('invalid_story_package_operation'), { code: 'invalid_story_package_operation' });
+    }
+    if (routeId === 'life.npc-goal') {
+      const operation = body.operation ? 'control' : 'add';
+      return body.operation ? npcGoals.control(body.id, body.operation) : npcGoals.add(body);
+    }
+    if (routeId === 'life.input') {
+      if (!Object.hasOwn(LIFE_SUGGESTIONS, body.suggestion)) throw Object.assign(new Error('invalid_life_suggestion'), { code: 'invalid_life_suggestion' });
+      const id = body.event_id ?? `life-suggestion-${stableOperationSuffix(body)}`;
+      const result = ingestNonChatEvent({ event_id: id, type: 'user.preference.life', source: 'life-suggestion-interface',
+        character_id: DEFAULT_CHARACTER_ID, occurred_at: inputStore.get(id)?.occurred_at ?? now().toISOString(),
+        payload: { suggestion: body.suggestion, text: LIFE_SUGGESTIONS[body.suggestion].title } },
+      { attestedKind: 'user', sourceLabel: '用户建议' });
+      return result;
+    }
+    if (routeId === 'life.social') {
+      const id = body.event_id ?? `social-response-${stableOperationSuffix(body)}`;
+      const result = ingestNonChatEvent({ event_id: id, type: 'world.mutation', source: 'social-life-control', source_kind: 'world_engine',
+        character_id: DEFAULT_CHARACTER_ID, occurred_at: inputStore.get(id)?.occurred_at ?? now().toISOString(),
+        payload: { action: 'respond_social_invitation', invitation_id: body.invitation_id, operation: body.operation } });
+      return result;
+    }
+    if (routeId === 'life.autonomy') {
+      const id = body.event_id ?? `life-control-${stableOperationSuffix(body)}`;
+      const result = ingestNonChatEvent({ event_id: id, type: 'world.mutation', source: 'world-life-control', source_kind: 'world_engine',
+        character_id: DEFAULT_CHARACTER_ID, occurred_at: inputStore.get(id)?.occurred_at ?? now().toISOString(),
+        payload: { action: 'control_autonomy', operation: body.operation } });
+      return result;
+    }
+    if (routeId === 'life.world.replay') return worldLife.replay(body);
+    if (routeId === 'life.npc-interaction') return worldLife.interactWithAgent(body);
+    if (routeId === 'life.daily-summary') {
+      return body.operation === 'preview' ? sharedLifeReports.previewDailySummary(body) : sharedLifeReports.materializeDailySummary(body);
+    }
+    if (routeId === 'life.memory' || routeId === 'life.plan') {
+      if (routeId === 'life.memory') return body.operation === 'forget' ? { removed: sharedLife.forget(body.id) } : sharedLife.remember(body);
+      return body.operation === 'cancel' ? sharedLife.cancel(body.id) : sharedLife.schedule(body);
+    }
     if (routeId === 'role.evolution.run' || routeId === 'role.evolution.sync') {
       return roleEvolution.sync({ characterId: body.character_id ?? body.characterId ?? undefined, limit: body.limit ?? 200 });
     }
