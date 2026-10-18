@@ -6,10 +6,13 @@ import {COGNITIVE_CONTEXT_VERSION,cognitiveInputs,perceptionFact,cognitiveWorkin
 import {interpretationWindow,adoptInterpretations,refractionDialogue} from './cognitive-refraction.mjs';
 
 import {fantasyPersonalContext} from './fantasy-inquiry.mjs';
+import {windleafPersonalContext} from './windleaf-life.mjs';
+import {localWindleafLore} from './windleaf-story.mjs';
 import {resonantPersonalContext} from './resonant-life.mjs';
 import {cognitiveDestinations,resolveCognitiveRoute} from './cognitive-travel.mjs';
 import {cognitiveSocialContext,cognitiveSpeechEvidence,compileCognitiveMessage,commitCognitiveMessage,adoptCognitiveRelationViews} from './cognitive-social.mjs';
 import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink,attachCognitiveTrial} from './cognitive-development.mjs';
+import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor} from './cognitive-continuation.mjs';
 
 export const COGNITIVE_ACTORS=['shaping-001','wetland-grower-001','lamp-keeper-001'];
 export const cognitiveActorIds=world=>[...new Set([...COGNITIVE_ACTORS,...(world.cognition?.admitted_actors??[])])].filter(id=>cognitivePerson(world,id));
@@ -31,7 +34,9 @@ export function cognitiveContext(world,id,at,phase='plan'){
   const catalogue=livingReadModel(world,id,{at})?.activities.filter(a=>a.location_id===p.location_id)??[];
   const inputs=cognitiveInputs(world,id,at),seen=new Set((saved.perception_receipts??[]).map(r=>r.source_id));
   const perceptions=inputs.filter(s=>!seen.has(s.id)).slice(0,id===world.protagonist.character_id?5:3);
+  const social=cognitiveSocialContext(world,id,at);
   return {schema:COGNITIVE_CONTEXT_VERSION,phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
+    time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments),
     actor:{actor_id:id,name:p.display_name??'喵呜',role:role?.role??'聚形域伴生个体',traits:id==='shaping-001'?['好奇','有自己的节奏','先观察再判断']:[role?.temperament??'关心自己的生活'],
       values:id==='lamp-keeper-001'?['可靠','把光照与安全联系起来']:id==='wetland-grower-001'?['照料生命','在实际苗况中调整方法']:['具体可靠','愿意探索'],
       background:role?JSON.stringify({desires:role.desires,likes:role.likes,flaws:role.flaws}):'现实桌边的光粒造物，虚拟化身生活在聚形域。',
@@ -39,9 +44,10 @@ export function cognitiveContext(world,id,at,phase='plan'){
     saved:cognitiveWorkingState(saved,[saved.followup?.question,...inputs.map(i=>i.content)].join(' ')),inputs,perceptions,refraction:interpretationWindow(inputs,saved,p.location_id),
     location:{id:p.location_id,name:world.locations.find(l=>l.location_id===p.location_id)?.name??p.location_id,description:'伴生于现实的聚形域；虚拟观察只能读取现场公开状态。'},
     objects:objects.map((o,i)=>({object_index:i+1,id:o.object_id,name:o.name??o.object_id,description:o.description??'实际生活对象',state:copy(o)})),
+    local_lore:{places:localWindleafLore(world,p.location_id),rule:'作者背景可以描述地方，居民初始观点不是现场发言；假说尚未证实。读到这些内容不等于亲历过去、接到请求或验证结论，不能改写为任务、承诺或私人经历。'},
     visible_people:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id).map(other=>({actor_id:other.character_id??other.npc_id,name:other.display_name})),
-    development:cognitiveDevelopmentContext(world,id,at),social:cognitiveSocialContext(world,id,at),speech_evidence:cognitiveSpeechEvidence(world,id,at,objects.map(o=>({id:o.object_id,name:o.name??o.object_id,state:o}))),
-    inventory:copy(world.living?.inventories[id]??{stock:{},capacity:24}),inquiry:fantasyPersonalContext(world,id),resonant_inquiry:resonantPersonalContext(world,id),capabilities:{activities:catalogue.map((a,i)=>({...a,activity_index:i+1})),travel:{destinations:cognitiveDestinations(world,p.location_id).map((p,i)=>({...p,destination_index:i+1})),rule:'虚拟化身按通路和实际时间行走；到达以后才能使用当地设施。这里只知道公开地理，不知道远处库存和私人活动。'},observe:{seconds:180,rule:'亲自观察一个现场对象，记录执行前后值；观察不改变库存、技能、形态。'},rest:{seconds:300,rule:'休息按现有体能规则恢复；不伪装实践。'},
+    development:cognitiveDevelopmentContext(world,id,at),social,speech_evidence:cognitiveSpeechEvidence(world,id,at,objects.map(o=>({id:o.object_id,name:o.name??o.object_id,state:o}))),
+    inventory:copy(world.living?.inventories[id]??{stock:{},capacity:24}),inquiry:fantasyPersonalContext(world,id),windleaf_inquiry:windleafPersonalContext(world,id),resonant_inquiry:resonantPersonalContext(world,id),capabilities:{activities:catalogue.map((a,i)=>({...a,activity_index:i+1})),travel:{destinations:cognitiveDestinations(world,p.location_id).map((p,i)=>({...p,destination_index:i+1})),rule:'虚拟化身按通路和实际时间行走；到达以后才能使用当地设施。这里只知道公开地理，不知道远处库存和私人活动。'},observe:{seconds:180,rule:'亲自观察一个现场对象，记录执行前后值；观察不改变库存、技能、形态。'},rest:{seconds:300,rule:'休息按现有体能规则恢复；不伪装实践。'},
       share:{seconds:30,receivers:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id&&cognitiveActorIds(world).includes(other.character_id??other.npc_id)).map((other,i)=>({receiver_index:i+1,actor_id:other.character_id??other.npc_id,name:other.display_name})),rule:'向在场人递送自己的话；引用事实使用证据编号。邀请与回复必须使用当前 social 合同，双方明确接受才成立，实际共同任务完成才算履约。不替别人答应，也不凭话语改变关系身份。'},
       wait:{rule:'暂不行动，留下一项具体后续。'}},
     signals:[`现场时间 ${at}；天气信息 ${JSON.stringify(world.weather??{})}`,...(saved.last_result?[`我上一次实际结果：${saved.last_result.fact}`]:[]),
@@ -167,6 +173,13 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(!refs||refs.location_id!==context.location.id)fail('cognitive_context_changed');
     // Validate optional choices before reserving resources or changing personal state.
     adoptCognitiveDevelopment(copy(world),id,compiled,refs,at);
+    if(compiled.operation==='wait'&&compiled.wait_for){
+      validateWaitFor(compiled.wait_for,refs.continuation??context.continuation);
+      const captured=refs.continuation?.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
+      const current=context.continuation.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
+      if(captured?.asset_id&&captured.asset_id!==current?.asset_id)fail('cognitive_context_changed');
+    }
+    const waiting=compiled.operation==='wait'?cognitiveWaitFollowup(life,compiled,context.continuation,at):null;
     if(proposal.interpretations)adoptInterpretations(life,proposal.interpretations,refs,at);
     const cause=cognitiveCause(world,id,compiled,refs,life);
     if(cause.life_source_context.some(s=>s.expires_at&&s.expires_at<=at))fail('cognitive_source_expired');
@@ -199,6 +212,10 @@ export function applyCognitiveMutation(world,payload,at,eventId){
       // A rejected activity runs against a copy: no partial resource reservation leaks.
       const trial=copy(world);
       try{
+        if(compiled.operation==='share'){
+          const repeated=duplicateUnansweredMessage(trial,id,life.outgoing_message);
+          if(repeated)fail('duplicate_message_without_reply',repeated);
+        }
         advanceLivingResources(trial,at,{force:true});
         const trialLink=compiled.operation==='activity'?cognitiveTrialLink(trial,id,args.activity_id,at):null;
         const started=compiled.operation==='travel'
@@ -217,10 +234,11 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     }
     const landed=world.cognition.actors[id];
     adoptCognitiveDevelopment(world,id,compiled,refs,at,{task,blocked});
-    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,from_location_id:refs.location_id,blocked,created_at:at};
+    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,from_location_id:refs.location_id,blocked,created_at:at,followup_decision:compiled.followup_decision??null};
     adoptPersonalContinuity(world,id,landed,proposal,at);landed.retry=null;
     if(compiled.operation==='wait'){
-      landed.pending=null;landed.followup={status:compiled.followup_decision==='drop'?'drop':'postpone',question:compiled.reason,reason:'此回合决定暂不执行',next_review_at:new Date(Date.parse(at)+4*3600000).toISOString()};
+      if(['drop','none','new'].includes(compiled.followup_decision))archiveCognitiveFollowup(landed,at,compiled.reason);
+      landed.pending=null;landed.followup=waiting;
       landed.next_decision_at=landed.followup.next_review_at;
       if(landed.pilot_plan_limit!==null&&landed.plan_count>=landed.pilot_plan_limit){landed.enabled=false;landed.pilot_finished_at=at;}
     }
@@ -235,7 +253,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(task&&!['completed','failed','cancelled'].includes(task.status))fail('result_not_terminal');
     if(JSON.stringify(cognitiveActualResult(world,id,payload.result.occurred_at))!==JSON.stringify(payload.result))fail('cognitive_actual_result_changed');
     const proposal=payload.proposal,followup=proposal.followup;
-    if(!followup||!['continue','postpone','drop','none'].includes(followup.status)||typeof followup.question!=='string'||typeof followup.reason!=='string'||!Number.isSafeInteger(followup.delay_hours)||followup.delay_hours<1||followup.delay_hours>48)fail('followup_invalid');
+    const nextFollowup=cognitiveResultFollowup(life,followup,cognitiveContext(world,id,at,'feedback').continuation,at,pending.root_outcome_id,pending.followup_decision);
     // Existing factual IDs/raw sources never overwritten by a later interpretation.
     const old=new Map(life.memories.map(m=>[m.id,m]));
     for(const memory of proposal.memories??[]){
@@ -256,7 +274,9 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     life.memories=[...old.values()];life.memory_sequence=proposal.memory_sequence;
     adoptPersonalContinuity(world,id,life,proposal,at);
     life.state=copy(proposal.state);life.last_result=copy(payload.result);life.reflection=copy(proposal.reflection??null);
-    life.followup={...copy(followup),next_review_at:new Date(Date.parse(at)+followup.delay_hours*3600000).toISOString(),from_root_outcome_id:pending.root_outcome_id};
+    if(life.followup)life.followup_transitions=[...(life.followup_transitions??[]),{at,previous:copy(life.followup),decision:pending.followup_decision,next_status:followup.status,next_question:followup.question,actual_root_outcome_id:pending.root_outcome_id}].slice(-16);
+    if(['drop','none'].includes(followup.status)||['new','drop','none'].includes(pending.followup_decision))archiveCognitiveFollowup(life,at,followup.reason);
+    life.followup=nextFollowup;
     life.pending=null;life.version++;life.job.status='completed';life.retry=null;life.next_decision_at=life.followup.next_review_at;
     if(life.pilot_plan_limit!==null&&life.plan_count>=life.pilot_plan_limit){life.enabled=false;life.pilot_finished_at=at;}
     life.history.push({job_id:payload.job_id,phase:'feedback',at,result:copy(payload.result),followup:copy(life.followup)});life.history=life.history.slice(-24);

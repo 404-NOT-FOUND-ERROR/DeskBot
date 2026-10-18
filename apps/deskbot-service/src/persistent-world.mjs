@@ -6,7 +6,9 @@ import { startPracticalTrial, controlPracticalTrial, settlePracticalTrials, Prac
 import { acceptRoleStage, rollbackRoleStage, RoleStageError } from './role-stages.mjs';
 import { installBodyPerception, applyBodyObservation, markBodyCommands, markBodyCommandDispatched, applyBodyCommandAck, applyBodyCommandLocalFailure, settleBodyPerception } from './body-perception.mjs';
 import { applyLifeChoice } from './autonomous-life.mjs';
-import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, upgradeCommunitySupplyMap, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
+import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, upgradeCommunitySupplyMap, upgradeWindleafMap, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
+import {installWindleafLife} from './windleaf-life.mjs';
+import {installWindleafStory} from './windleaf-story.mjs';
 import { getWorldEnvironment } from './world-environment.mjs';
 import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
 import { installResidentLife } from './resident-life.mjs';
@@ -595,6 +597,7 @@ function migrateWorldToCurrentSetting(world, now) {
 
   if (upgradeAuthoredScene(next, timestamp)) changed = true;
   if (upgradeCommunitySupplyMap(next, timestamp)) changed = true;
+  if (upgradeWindleafMap(next, timestamp)) changed = true;
   if (installLivingResources(next, timestamp)) {
     changed = true; next.world_revision += 1;
     next.schema_migrations=[...(next.schema_migrations??[]),{id:'morrowmere-living-resources-v1',applied_at:timestamp,scope:'additive_resources',preserved_existing_tasks:true}];
@@ -619,6 +622,8 @@ function migrateWorldToCurrentSetting(world, now) {
   if(installResonantLife(next,timestamp)){
     changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'shaping-resonant-life-v1',applied_at:timestamp,scope:'additive_fictional_physics',past_events_created:0,preserved_existing_stocks:true}];
   }
+  if(installWindleafLife(next,timestamp)){changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'windleaf-life-v1',applied_at:timestamp,scope:'additive_finite_forest_life',past_events_created:0,preserved_existing_stocks:true}];}
+  if(installWindleafStory(next,timestamp)){changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'windleaf-old-light-v1',applied_at:timestamp,scope:'additive_authored_lore_and_finite_wind_trace',past_events_created:0,preserved_existing_stocks:true}];}
 
   const initialField = createInitialShapingField(
     typeof next.shaping_field?.shaping_time === 'string' ? next.shaping_field.shaping_time : timestamp,
@@ -1453,10 +1458,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   if (!worlds.has(DEFAULT_WORLD_ID)) {
     const initial = createDefaultWorld(now);
     installWorldMapContent(initial, loadWorldMapContent(), initial.created_at);
+    upgradeWindleafMap(initial,initial.created_at,{initialization:true});
     installLivingResources(initial, initial.created_at);
     installCommunitySupply(initial, initial.created_at);
     installFantasyInquiry(initial,initial.created_at);
     installResonantLife(initial,initial.created_at);
+    installWindleafLife(initial,initial.created_at);
+    installWindleafStory(initial,initial.created_at);
     worlds.set(initial.world_id, initial);
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }
@@ -1945,6 +1953,7 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
       const passage = passageFor(world,location.location_id,neighbor.location_id);
       routes.push({
         passage_id: passage?.passage_id ?? null,
+        ...(passage?{presentation_space:passage.presentation_space,presentation_points:presentationRouteFor(world,location.location_id,neighbor.location_id)}:{}),
         from_location_id: location.location_id, to_location_id: neighbor.location_id,
         travel_cost_minutes: from ? (neighbor.travel_cost ?? 10) : to ? (location.travel_cost ?? 10) : null,
         reachable: access.allowed && (from || to), open: access.allowed,
@@ -2065,7 +2074,7 @@ export function getWorldRoute(world, { destinationLocationId, characterId = DEFA
       to_name: to?.name ?? toLocationId,
       travel_cost_minutes: travelCost,
       ...(presentationPoints ? {
-        presentation_space: PRESENTATION_SPACE,
+        presentation_space: passageFor(world,fromLocationId,toLocationId)?.presentation_space??PRESENTATION_SPACE,
         presentation_points: presentationPoints,
       } : {}),
     };

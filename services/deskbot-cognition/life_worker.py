@@ -7,6 +7,7 @@ import asyncio
 from collections import Counter
 from dataclasses import asdict, fields, is_dataclass
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from enum import Enum
 import hashlib
 import json
@@ -138,7 +139,37 @@ async def contract_json(router,messages,validator,max_tokens=900,repair_hint=Non
 
 
 def valid_followup(value):
-    return value.get('status') in ('continue','postpone','drop','none') and all(isinstance(value.get(k),str) for k in ('question','reason')) and type(value.get('delay_hours')) is int and 1<=value['delay_hours']<=48
+    return (value.get('status') in ('continue','postpone','drop','none') and all(isinstance(value.get(k),str) for k in ('question','reason'))
+        and type(value.get('delay_hours')) is int and 1<=value['delay_hours']<=48
+        and ('review_after_minutes' not in value or type(value['review_after_minutes']) is int and 10<=value['review_after_minutes']<=2880))
+
+
+def valid_continuation_binding(value,context):
+    target=value.get('wait_for')
+    if target is not None:
+        if not isinstance(target,dict) or set(target)!={'kind','id'}: return False
+        option=next((o for o in context.get('continuation',{}).get('wait_options',[]) if o['kind']==target['kind'] and o['id']==target['id']),None)
+        if not option:return False
+        if value.get('operation')=='wait' and value.get('followup_decision') not in ('drop','none'):
+            current=context.get('continuation',{}).get('current') or {}
+            if option.get('available') or current.get('condition')=='review_required' and current.get('wait_for')==target:return False
+    minutes=value.get('review_after_minutes')
+    return minutes is None or type(minutes) is int and 10<=minutes<=(240 if value.get('operation')=='wait' else 2880)
+
+
+def prompt_json(value,context):
+    """Display ISO fields with explicit local/UTC labels; canonical values stay untouched."""
+    zone=context.get('time',{}).get('zone','Asia/Shanghai')
+    def display(item):
+        if isinstance(item,dict):return {k:display(v) for k,v in item.items()}
+        if isinstance(item,list):return [display(v) for v in item]
+        if isinstance(item,str) and len(item)>=20 and item[4:5]=='-' and item[10:11]=='T':
+            try:
+                instant=datetime.fromisoformat(item.replace('Z','+00:00'))
+                if instant.tzinfo:return instant.astimezone(ZoneInfo(zone)).strftime('%Y-%m-%d %H:%M:%S')+' '+zone+' (UTC '+instant.astimezone(timezone.utc).isoformat()+')'
+            except (ValueError,KeyError):pass
+        return item
+    return json.dumps(display(value),ensure_ascii=False)
 
 
 def valid_compilation(value):
@@ -238,18 +269,22 @@ async def run(context):
     actor=context['actor']; saved=context.get('saved',{}); at=datetime.fromisoformat(context['at'].replace('Z','+00:00'))
     epoch=datetime.fromisoformat(context['epoch'].replace('Z','+00:00'))
     # Elapsed world hours, never number of API calls. Fine execution timestamps stay in Node.
-    step=max(0,int((at-epoch).total_seconds()//3600)); start=(epoch+timedelta(hours=8)).hour*3600
-    time_label=lambda n: ((at if n==step else epoch+timedelta(hours=n))+timedelta(hours=8)).strftime('%Y-%m-%d %H:%M 上海')
+    zone=ZoneInfo(context.get('time',{}).get('zone','Asia/Shanghai'))
+    step=max(0,int((at-epoch).total_seconds()//3600)); start=epoch.astimezone(zone).hour*3600
+    time_label=lambda n: (at if n==step else epoch+timedelta(hours=n)).astimezone(zone).strftime('%Y-%m-%d %H:%M:%S')+' '+str(zone)
     lock=asyncio.Lock()
     router=LLMRouter({s:PipeProvider(s.value,context['mode'],lock) for s in LLMScene})
     capability_names=json.loads(json.dumps(context['capabilities']))
     for activity in capability_names.get('activities',[]): activity.pop('activity_index',None)
-    constraints='现实身体无摄像头、不能走动，仅圆屏、声音、触摸、单轴转头。虚拟化身可在聚形域按真实任务行动。\n' + json.dumps(capability_names,ensure_ascii=False)
+    constraints='现实身体无摄像头、不能走动，仅圆屏、声音、触摸、单轴转头。虚拟化身可在聚形域按真实任务行动。\n' + prompt_json(capability_names,context)
     constraints += '\n时间：当前 '+time_label(step)+'。原始记录中以 Z 结尾的是 UTC 时间，上海时间需加八小时，不能混作同一时区。'
-    constraints += '\n只知道给定现场和自己的记录；不能声明库存、技能、角色或外壳已改变。所有方法必须由 Node 核验。\n未完成事项：'+json.dumps(saved.get('followup'),ensure_ascii=False)
+    constraints += '\n只知道给定现场和自己的记录；不能声明库存、技能、角色或外壳已改变。所有方法必须由 Node 核验。\n未完成事项：'+prompt_json(saved.get('followup'),context)
+    constraints += '\n后续与等待的实际条件：'+prompt_json(context.get('continuation'),context)
+    constraints += '\n等待应绑定具体条件，已经可测记不能误当尚需等待。未收到回复可以先自己观察、改办法、明确暂缓或收束；不反复发送相同问题。条件期限到达后需重新考虑，而不是靠重写理由续期。现场数值不是已完成的测记；没有实际记录时不能说已测得或已经证实。'
     constraints += '\n我的实际随身材料：'+json.dumps(context.get('inventory'),ensure_ascii=False)
-    constraints += '\n我的实际测记：'+json.dumps(context.get('inquiry'),ensure_ascii=False)
-    constraints += '\n我的回声与余辉记录：'+json.dumps(context.get('resonant_inquiry'),ensure_ascii=False)
+    constraints += '\n我的实际测记：'+prompt_json(context.get('inquiry'),context)
+    constraints += '\n我的回声与余辉记录：'+prompt_json(context.get('resonant_inquiry'),context)
+    constraints += '\n我的风语林造物与实际测记：'+prompt_json(context.get('windleaf_inquiry'),context)
     constraints += '\n我的实际兴趣、机会、愿望和试做：'+json.dumps(context.get('development'),ensure_ascii=False)
     constraints += '\n第一次自选探索还不能证明稳定爱好。需要实际返回，受邀劳动也不自动成为兴趣。已有试做可选对应的实际活动，不必每天做；条件受阻可以暂缓或换方法。'
     constraints += '\n我的明确约定与可商量事项：'+json.dumps(context.get('social'),ensure_ascii=False)
@@ -280,8 +315,8 @@ async def run(context):
                 is_main_character=actor['actor_id']=='shaping-001',seconds_per_step=3600,world_start_second_of_day=start)
     restore_continuity(agent,memory,saved)
     spatial=SpatialPerception(location_id=context['location']['id'],location_view=LocationView(context['location']['name'],context['location']['description']),
-         world_time_label=time_label(step),current_step=step,world_time_hour=(at+timedelta(hours=8)).hour,
-         visible_entities=[VisibleEntity(entity_id=o['id'],name=o['name'],entity_type='landmark',description=o['description'],content=json.dumps(o['state'],ensure_ascii=False)) for o in context['objects']],
+         world_time_label=time_label(step),current_step=step,world_time_hour=at.astimezone(zone).hour,
+         visible_entities=[VisibleEntity(entity_id=o['id'],name=o['name'],entity_type='landmark',description=o['description'],content=prompt_json(o['state'],context)) for o in context['objects']],
          visible_agents={p['actor_id']:PerceivedPresence(identity=PerceivedIdentity(name=p['name'])) for p in context.get('visible_people',[])},
          ambient_events=[AmbientEvent(content=s) for s in context.get('signals',[])],
          reachable_locations=[ReachableLocation(location_id=p['id'],view=LocationView(p['name'],p['description']),travel_seconds=p['travel_seconds']) for p in context['capabilities'].get('travel',{}).get('destinations',[])])
@@ -320,9 +355,12 @@ async def run(context):
             compile_prompt['speech_contract']='share必须用message_parts数组（最多3段），message填空字符串，不直接发自由事实叙述。每段为{kind:evidence,evidence_id:给定证据ID}或{kind:question|hypothesis|intention|greeting,text:最多160字}。事实仅选择speech_evidence编号，由服务端呈现完整原文，系统会标注观察/听闻/实际结果。猜想和打算各自标注未核验/未执行；自由文本不许声称已完成、别人已答应或已经证实。greeting只允许你好、谢谢你、回头见、早上好、晚上好。若是在回复消息，reply_to填social.replies中的精确message_id，否则null。正式邀请需social:{operation:invite,option_id:可用选项ID}；回复约定需social:{operation:respond,commitment_id:自己的约定ID,response:accept|decline|delay|withdraw,delay_minutes:延期15至240整数}。正式时间只写在social.delay_minutes，系统据此表达；附言不要写时刻或时长，避免两套时间冲突。没有正式社交命令则social:null。只邀请一个人，不能从话语推断对方答应。'
             compile_prompt['format_limits']='只返回一个简短 JSON 对象，不复述上下文。title最多40字，reason最多160字，message最多180字。motivation、source_ids（无来源填[]）、prior_root_id（无则null）、followup_decision 均不可省略。不得加入解释段落。没有本人已完成任务证据，不说刚忙完、刚照料完、刚到达；问候可直接开始。'
             compile_prompt['development']=context.get('development')
+            compile_prompt['time']=context.get('time')
+            compile_prompt['continuation']=context.get('continuation')
+            compile_prompt['continuation_contract']='wait可填顶层wait_for:{kind:activity|reply|commitment,id:continuation.wait_options里的精确ID}和review_after_minutes:10至240整数。所等条件已ready不能继续以该条件为等待理由；reply期限到需改办法、drop收束或wait_for:null明确暂缓。暂缓并不等于放弃兴趣。不复述已送达且未回应的相同问题；有新邀请或新信息可明确说明。continue/postpone会保留原问题和出处，new明确另起事项，drop/none结束旧后续。'
             compile_prompt['development_contract']='interest_choice 和 wish_choice 是输出JSON顶层字段，不可再套development对象。通常两者填 null。确实决定改变当前投入时可填 interest_choice:{topic:给定主题,decision:continue|pause|drop|revisit,reason:具体原因,root_ids:该主题给定active_roots或recent_success_roots的非空子集}；只表达选择，不凭话增加喜欢或实践。如果我确实想提出或暂缓某个新角色，可填 wish_choice:{direction_id:给定方向,decision:consider|propose|defer,reason:具体原因}；propose仅在eligible为true时可用，仍不改变外观。不同于“可以提出”，“我现在愿意提出”需要我自己的选择。不为满足进度强行换角色。'
             compile_prompt['speech_contract']+='证据段简化为{kind:evidence,evidence_id:给定ID}即可，不需要quote字段，服务器会逐字插入带来源的完整原文。若仍填写quote必须与speech_evidence.text完全一致，不能只抄social.replies.text。'
-            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',json.dumps(compile_prompt,ensure_ascii=False))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context))
+            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context))
         else: output['compiled']={'operation':'wait','reason':'本回合没有可采用的行动。','followup_decision':'postpone'}
     elif context['phase']=='reflect':
         output['reflection']=plain(await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step))
@@ -341,8 +379,9 @@ async def run(context):
             reflection=await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step)
             output['reflection']=plain(reflection)
         output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。只返回 JSON。'),
-             LLMMessage('user',json.dumps({'personality':personality.to_prompt_context(),'actual_result':result,'prior_followup':saved.get('followup'),
-              'now':context['at'],'contract':'{"status":"continue|postpone|drop|none", "question":"仍想做或暂时放下什么", "reason":"为什么", "delay_hours":1至48整数}。status字段名必须是status，不能写type。delay_hours 从 now 的实际时间计算；用具体事项描述后续，不写与delay_hours不符的明天/今晚。受阻应改变办法或等待具体条件，不能声称失败的工作已完成。'},ensure_ascii=False))],valid_followup)
+             LLMMessage('user',prompt_json({'personality':personality.to_prompt_context(),'actual_result':result,'prior_followup':saved.get('followup'),
+              'now':context.get('time',context['at']),'continuation':context.get('continuation'),
+              'contract':'{"status":"continue|postpone|drop|none", "question":"仍想做或暂时放下什么", "reason":"为什么", "delay_hours":1至48整数,"wait_for":null或{kind:activity|reply|commitment,id:给定ID},"review_after_minutes":10至2880整数}。后两字段可省略。status字段名必须是status，不能写type。delay_hours 从 now 的实际时间计算；用具体事项描述后续，不写与delay_hours不符的明天/今晚。可绑定具体测记或已送达消息，服务端核对条件和实际复查时间。受阻应改变办法或等待具体条件，不能声称失败的工作已完成；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context))
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['state']=plain(personality.state); output['memory_sequence']=memory._seq

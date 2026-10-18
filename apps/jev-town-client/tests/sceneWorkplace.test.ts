@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { sceneWorkAnchor } from '../src/three/sceneWorkplace.ts';
+import { sceneWorkAnchor,sceneWorkTarget } from '../src/three/sceneWorkplace.ts';
 
 describe('task workplace projection', () => {
+  it('stands in front of a rotated personal frame on the raised forest deck',()=>{
+    const forest=new THREE.Group(),rack=new THREE.Group(),frame=new THREE.Group();forest.add(rack);rack.position.set(130,2.7,5);rack.add(frame);frame.position.set(-3.9,.27,.6);frame.rotation.y=Math.PI;frame.userData.work_anchor=[0,0,2.35];frame.userData.inspection_anchor=[0,1.6,0];
+    const anchor=sceneWorkAnchor(frame,new THREE.Vector3(130,0,5),'leaf-read');expect(anchor.x).toBeCloseTo(126.1);expect(anchor.y).toBeCloseTo(2.97);expect(anchor.z).toBeCloseTo(3.25);
+    const target=sceneWorkTarget(frame,'leaf-read')!;expect(target.x).toBeCloseTo(126.1);expect(target.y).toBeCloseTo(4.57);expect(target.z).toBeCloseTo(5.6);
+  });
   it('uses the lot transform before the scene has ever rendered', () => {
     const lot = new THREE.Group(); lot.position.set(-40, 0, 30);
     const fixture = new THREE.Group(); lot.add(fixture);

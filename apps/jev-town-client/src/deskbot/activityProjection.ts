@@ -1,5 +1,7 @@
 import type { Point } from "@shared/positions.ts";
 import { canonicalRouteBetween } from "./canonicalGeometry.ts";
+import {canonicalPointForLocation} from './canonicalGeometry.ts';
+import {resolveTravelRoute} from './routeVisual.ts';
 import type { DeskBotWorldMap } from "./types.ts";
 
 /** A read-only presentation of an admitted task. Animation never settles it. */
@@ -43,6 +45,8 @@ export function projectSceneActivities(map: DeskBotWorldMap | null | undefined):
     .map((task): SceneLifeActivity => {
       const from = locations.get(task.from_location_id ?? "");
       const to = locations.get(task.to_location_id ?? "");
+      const path=from&&to?map.paths?.find(p=>(p.from_location_id===from.location_id&&p.to_location_id===to.location_id)||(p.from_location_id===to.location_id&&p.to_location_id===from.location_id)):undefined;
+      const points=path?.presentation_points?.map(p=>({...p}));if(points&&path?.from_location_id!==from?.location_id)points.reverse();
       return {
         actorId: task.actor_id,
         citizenId: sceneCitizenId(task.actor_id, task.actor_id === map.protagonist.character_id),
@@ -60,7 +64,7 @@ export function projectSceneActivities(map: DeskBotWorldMap | null | undefined):
         remainingMs: task.remaining_ms,
         fromLocationId: task.from_location_id,
         toLocationId: task.to_location_id,
-        route: task.kind === "travel" && from && to ? canonicalRouteBetween(from, to) : undefined,
+        route: task.kind === "travel" && from && to ? resolveTravelRoute(points,canonicalPointForLocation(from),canonicalPointForLocation(to),canonicalRouteBetween(from,to),path?.presentation_space) : undefined,
         projectedAt: map.environment?.projected_at,
         realTime: map.environment?.time.mode === "real_time",
         carriedStock: { ...(task.actor_id === map.protagonist.character_id

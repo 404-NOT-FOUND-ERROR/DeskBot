@@ -538,7 +538,7 @@ export function DeskBotApp() {
   }
 
   return (
-    <div className="deskbot-mode">
+    <div className="deskbot-mode deskbot-mode--daily">
       <header className="deskbot-mode__header">
         <div>
           <span className="deskbot-mode__eyebrow">THE SHAPING FIELD · 聚形域</span>

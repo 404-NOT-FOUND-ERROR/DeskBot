@@ -12,6 +12,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { DeskBotLocation } from "../deskbot/types.ts";
 import { buildCompanionScenery, type CompanionScenery } from "./companionScenery.ts";
 import { createShapingFigure } from "./shapingFigures.ts";
+import { hasWindleaf } from './windleafLayout.ts';
+import {createMoltedShellLandscape} from './moltedShellLandscape.ts';
 import type {ShapingAppearance} from './shapingAppearance.ts';
 import { sceneOperationAt } from './sceneLife.ts';
 import { createSoftLightTexture } from './sceneLifeEffects.ts';
@@ -201,30 +203,37 @@ const TILE_HEIGHT = 0.35;
 
 const PAVEMENT = 1.3;
 
-function addGround(batch: GeometryBatch): void {
+function addGround(batch: GeometryBatch, expanded = false): void {
   const p = new Parts(batch, new THREE.Matrix4());
   // Street-coloured slab: every gap between the raised tiles below reads as a road.
-  p.box(MAP_W, 3, MAP_H, 0, -3, 0, topAndSides(PALETTE.street, PALETTE.slabSide));
-  p.box(MAP_W + 1.6, 1.4, MAP_H + 1.6, 0, -4.2, 0, PALETTE.slabUnder);
+  // The forest replaces the old east border from map x=112. One shared lower
+  // foundation avoids a double slab and a visible internal wall at x=120.
+  p.box(expanded ? 112 : MAP_W, 3, MAP_H, expanded ? -4 : 0, -3, 0, topAndSides(PALETTE.street, PALETTE.slabSide));
+  p.box((expanded ? 220 : MAP_W) + 1.6, 1.4, MAP_H + 1.6, expanded ? 50 : 0, -4.2, 0, PALETTE.slabUnder);
   for (const tile of TILE_SPECS) {
+    if(expanded && tile.x > 52) continue;
+    const pavementRight = expanded ? Math.min(52, tile.x + tile.width/2 + PAVEMENT) : tile.x + tile.width/2 + PAVEMENT;
+    const pavementLeft = tile.x - tile.width/2 - PAVEMENT;
+    const lawnRight = expanded ? Math.min(52, tile.x + tile.width/2) : tile.x + tile.width/2;
+    const lawnLeft = tile.x - tile.width/2;
     // A kerbed pavement runs around each block, with the lawn or paving on top.
     p.box(
-      tile.width + PAVEMENT * 2,
+      pavementRight - pavementLeft,
       TILE_HEIGHT * 0.62,
       tile.depth + PAVEMENT * 2,
-      tile.x,
+      (pavementRight + pavementLeft)/2,
       0,
       tile.z,
       topAndSides(PALETTE.pavement, PALETTE.kerb),
     );
-    p.box(tile.width, TILE_HEIGHT, tile.depth, tile.x, 0, tile.z, topAndSides(TILE_TOP[tile.kind], PALETTE.kerb));
+    p.box(lawnRight-lawnLeft, TILE_HEIGHT, tile.depth, (lawnRight+lawnLeft)/2, 0, tile.z, topAndSides(TILE_TOP[tile.kind], PALETTE.kerb));
   }
   addRoadMarkings(p);
-  addPlanting(p);
+  addPlanting(p, expanded);
 }
 
 /** Tufts of longer grass and the odd flower, so lawns are not flat colour. */
-function addPlanting(p: Parts): void {
+function addPlanting(p: Parts, expanded = false): void {
   const half = MAP_W / 2;
   const flowers = [PALETTE.flowerA, PALETTE.flowerB, PALETTE.flowerC];
   let seed = 1;
@@ -237,6 +246,7 @@ function addPlanting(p: Parts): void {
       const rz = (hash(seed * 5 + 2) - 0.5) * (tile.depth - 1.5);
       const x = tile.x + rx;
       const z = tile.z + rz;
+      if(expanded && x > 52) continue;
       // Keep clear of the middle of a block, where buildings stand.
       if (tile.kind !== "border" && Math.abs(rx) < tile.width * 0.3 && Math.abs(rz) < tile.depth * 0.3) continue;
       const roll = hash(seed * 7 + 3);
@@ -659,7 +669,7 @@ function addPond(batch: GeometryBatch, water: GeometryBatch, x: number, z: numbe
 
 export interface TownScenery {
   companion?: CompanionScenery;
-  updateVegetation: (time:number,wind:number,reducedMotion:boolean)=>void;
+  updateVegetation: (time:number,wind:number,reducedMotion:boolean,wetness?:number)=>void;
   /** Decorative background windows use the same local household dimming convention. */
   updateDomesticLights?: (minute:number,night:number)=>void;
   /** Everything that doesn't move, merged. */
@@ -684,18 +694,23 @@ export function buildTownScenery(locations?: readonly DeskBotLocation[]): TownSc
   const glow = new GeometryBatch();
   const extras: SignatureExtras = { water, glow, bell: null };
 
-  addGround(ground);
+  const expanded = hasWindleaf(locations);
+  const shellLandscape=expanded?createMoltedShellLandscape(locations!):undefined;
+  if(shellLandscape)root.add(shellLandscape.root);else addGround(ground, expanded);
   const lots=(locations??[]).flatMap(place=>place.presentation?.lot ? [mapToWorld(place.presentation.lot.x,place.presentation.lot.y)] : []);
   const reserved=(x:number,z:number)=>lots.some(lot=>Math.abs(lot.x-x)<8 && Math.abs(lot.z-z)<8);
   const backgroundCottages=COTTAGE_SPECS.filter(cottage=>!reserved(cottage.x,cottage.z));
-  for (const cottage of backgroundCottages) addCottage(solid, cottage);
-  TREE_SPECS.forEach((tree, i) => {if(!reserved(tree.x,tree.z)) addTree(vegetation, tree, i);});
-  for (const signature of SIGNATURE_SPECS) if(!reserved(signature.x,signature.z)) addSignature(solid, extras, signature);
-  if(!reserved(PLAZA_SPEC.x,PLAZA_SPEC.z)) addPlaza(solid, water);
-  for (const pond of POND_SPECS) if(!reserved(pond.x,pond.z)) addPond(solid, water, pond.x, pond.z);
+  if(!shellLandscape){
+    for (const cottage of backgroundCottages) addCottage(solid, cottage);
+    TREE_SPECS.forEach((tree, i) => {if(!reserved(tree.x,tree.z) && !(expanded && tree.x > 52)) addTree(vegetation, tree, i);});
+    for (const signature of SIGNATURE_SPECS) if(!reserved(signature.x,signature.z)) addSignature(solid, extras, signature);
+    if(!reserved(PLAZA_SPEC.x,PLAZA_SPEC.z)) addPlaza(solid, water);
+    for (const pond of POND_SPECS) if(!reserved(pond.x,pond.z)) addPond(solid, water, pond.x, pond.z);
+  }
   const companion=lots.length ? buildCompanionScenery(locations!) : undefined;
   if(companion)root.add(companion.root);
-  const updateDomesticLights=companion ? addDomesticWindowLights(root,backgroundCottages) : undefined;
+  let shellMinute=720,shellNight=0;
+  const updateDomesticLights=shellLandscape?((minute:number,night:number)=>{shellMinute=minute;shellNight=night;}):companion ? addDomesticWindowLights(root,backgroundCottages) : undefined;
 
   const solidMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
   // Terrain receives building shadows but must not shadow its own large coplanar faces.
@@ -750,7 +765,7 @@ export function buildTownScenery(locations?: readonly DeskBotLocation[]): TownSc
     fountainJets,
     companion,
     updateDomesticLights,
-    updateVegetation:(time,wind,reducedMotion)=>{treeTime.value=reducedMotion ? 0 : time;treeWind.value=reducedMotion ? 0 : wind;},
+    updateVegetation:(time,wind,reducedMotion,wetness=0)=>{treeTime.value=reducedMotion ? 0 : time;treeWind.value=reducedMotion ? 0 : wind;shellLandscape?.update(time,shellNight,shellMinute,reducedMotion,wetness);},
     dispose: () => {depthMaterial.dispose();disposeObject(root);},
   };
 }

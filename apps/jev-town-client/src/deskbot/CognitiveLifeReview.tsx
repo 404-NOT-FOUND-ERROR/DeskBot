@@ -5,6 +5,7 @@ import {FantasyInquiryReview} from './FantasyInquiryReview';
 import {CognitiveInputEvidence} from './CognitiveInputEvidence';
 import {CognitiveSocialReview} from './CognitiveSocialReview';
 import {CognitiveDevelopmentReview} from './CognitiveDevelopmentReview';
+import {CognitiveContinuityReview} from './CognitiveContinuityReview';
 import {ResonantLifeReview} from './ResonantLifeReview';
 
 type Scope='live'|'experiment';
@@ -39,8 +40,8 @@ export function CognitiveLifeReview({baseUrl='http://127.0.0.1:4311'}:{baseUrl?:
  const report=data?.[scope],calls=report?.budget.calls??[],tasks=report?.tasks??[];
  return <main className="cgl-page">
   <header><div><p className="cgl-eyebrow">聚形域 / Asamana 认知迁移 / 多源理解与奇幻研究</p><h1>想做的事，怎样成为生活</h1><p>听见与看见 → 自己的理解 → 实际行动 → 经历与后续</p></div><a href={`/?mode=deskbot&deskbotUrl=${encodeURIComponent(baseUrl)}&view=journal`}>回到世界 · 和喵呜说话 ↗</a></header>
-  <nav><a href="?sample=development">兴趣与角色愿望</a><a href="?sample=resonance">水岸回声与夜灯</a><a href="?sample=social">各自的安排与共同生活</a><a href="?sample=inquiry">凝光苔试验与现场</a><a href="?sample=inputs">多源输入对照</a></nav>
-  {new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='development'?<CognitiveDevelopmentReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='resonance'?<ResonantLifeReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='social'?<CognitiveSocialReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='inquiry'?<FantasyInquiryReview/>:<CognitiveInputEvidence/>}
+  <nav><a href="?sample=continuity">时间与后续</a><a href="?sample=development">兴趣与角色愿望</a><a href="?sample=resonance">水岸回声与夜灯</a><a href="?sample=social">各自的安排与共同生活</a><a href="?sample=inquiry">凝光苔试验与现场</a><a href="?sample=inputs">多源输入对照</a></nav>
+  {new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='continuity'?<CognitiveContinuityReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='development'?<CognitiveDevelopmentReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='resonance'?<ResonantLifeReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='social'?<CognitiveSocialReview/>:new URLSearchParams(typeof window==='undefined'?'':window.location.search).get('sample')==='inquiry'?<FantasyInquiryReview/>:<CognitiveInputEvidence/>}
   <nav aria-label="观察范围"><button className={scope==='experiment'?'selected':''} onClick={()=>setScope('experiment')}>第二阶段留存实验</button><button className={scope==='live'?'selected':''} onClick={()=>setScope('live')}>正式世界 · 现实时间</button><a href="/cognition-review.html">第一阶段接口参照</a></nav>
   <section className="cgl-status"><div><span>{scope==='experiment'?'保留第二阶段原始记录及其叙述问题；测试时间不能证明真实跨日生活。':'与正式任务、存档和对话共享状态；时间 1:1，不提供加速。'}</span><strong>上海时间 {time(report?.at)}</strong></div><div><span>第二阶段原额度 ¥{report?.budget.approval.limit_cny??2} · {calls.length} / {report?.budget.approval.max_calls??120} 条调用记录</span><strong>保守费用 ¥{(report?.budget.used_upper_cny??0).toFixed(3)}</strong></div></section>
   <p className="cgl-boundary">认知使用 DeepSeek，观察和照料按实际世界规则执行。心情、解释与反思不会增加技能、实践次数或换形资格。每人首轮最多 {report?.max_plans_per_actor??4} 次安排，达到费用或回合限制后停止。</p>

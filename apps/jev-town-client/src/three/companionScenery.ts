@@ -8,6 +8,9 @@ import { createResourceSupplyEffects } from './resourceSupplyEffects.ts';
 import {createFantasyInquiryScene} from './fantasyInquiryScene.ts';
 import {createResonantLifeScene} from './resonantLifeScene.ts';
 import {createProjectScene} from './projectScene.ts';
+import {createWindleafScene} from './windleafScene.ts';
+import {shellVaultGeometry} from './moltedShellGeometry.ts';
+import {hasWindleaf,windleafHeightAt} from './windleafLayout.ts';
 
 const C = { wood:0x997052, dark:0x5e5142, cream:0xe8dfc3, teal:0x508e86, soil:0x765b40, leaf:0x7eab59, water:0x6eabb2, red:0xb6513c };
 const solidMaterial = () => new THREE.MeshLambertMaterial({ vertexColors:true });
@@ -54,6 +57,7 @@ export interface CompanionScenery {
 
 export function buildCompanionScenery(locations: readonly DeskBotLocation[]): CompanionScenery {
   const root=new THREE.Group();root.name="morrowmere-authored-facilities";
+  const forest=createWindleafScene(locations);if(forest)root.add(forest.root);
   const objects=new Map<string,THREE.Group>(), water:THREE.Mesh[]=[], lamps:THREE.Mesh[]=[], trees:THREE.Group[]=[], flags:THREE.Group[]=[];
   const lifeEffects:{locationId:string;effect:ReturnType<typeof createSceneLifeEffects>}[]=[];
   const supplyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResourceSupplyEffects>>}[]=[];
@@ -78,8 +82,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     glow.scale.set(.7,1.1,.7);glow.position.set(x,height,z);glow.name='public-lantern';
     glow.userData={light_channel:'public',location_id:parent.userData.location_id,model:parent.userData.model};parent.add(glow);lamps.push(glow);
     // A small pool of warm light, without one shadow map per lamp.
-    const pool=new THREE.Mesh(new THREE.CircleGeometry(2.6,24),new THREE.MeshBasicMaterial({color:0xffca69,map:glowTexture,transparent:true,opacity:0,depthWrite:false}));
-    pool.rotation.x=-Math.PI/2;pool.position.set(x,.41,z);pool.name='public-light-pool';pool.userData={...glow.userData,pool:true};parent.add(pool);lamps.push(pool);
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(3.1,24),new THREE.MeshBasicMaterial({color:0xffca69,map:glowTexture,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
+    pool.rotation.x=-Math.PI/2;pool.position.set(x,.84,z);pool.name='public-light-pool';pool.userData={...glow.userData,pool:true};parent.add(pool);lamps.push(pool);
   }
   function tree(parent:THREE.Group,x:number,z:number,seed:number) {
     const group=new THREE.Group();group.position.set(x,.3,z);parent.add(group);trees.push(group);
@@ -87,11 +91,16 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     m.ball(1.6,0,3,0,seed%2 ? 0x659057 : 0x89a85e);m.ball(1.2,.5,4,0,0x93b56d);m.finish("wind-canopy");
   }
   function cottage(m:Model,x:number,z:number,roof=0x718d84,w=6,wall=C.cream) {
-    m.box(w,3.5,5,x,.3,z,wall);m.roof(w+.5,5.8,2,x,3.8,z,roof);
+    const shell=shellVaultGeometry(w+.5,4.9,5.4,.28);
+    const outside=new THREE.Color(0xf3edcf).lerp(new THREE.Color(roof),.24).getHex();
+    m.add(shell.outer,x,.3,z,outside);m.add(shell.inner,x,.3,z,0x588a91);m.add(shell.rim,x,.3,z,0xf2ddaf);
+    // A low rear wall, round openings and the old work courtyard remain usable.
+    m.box(w*.7,2.9,.25,x,.3,z-2.35,new THREE.Color(wall).lerp(new THREE.Color(0x9ac6be),.45).getHex());
     m.box(1.1,2.1,.12,x,.3,z+2.55,C.dark);
     for(const dx of [-w*.32,w*.32]) {
-      m.box(1,1.15,.15,x+dx,1.7,z+2.56,0x7bada7);
-      const glow=new THREE.Mesh(new THREE.PlaneGeometry(.8,.95),new THREE.MeshBasicMaterial({color:0xffdf99,transparent:true,opacity:0}));
+      m.add(new THREE.TorusGeometry(.56,.13,4,12),x+dx,2.27,z+2.58,0xd7b880);
+      m.add(new THREE.CircleGeometry(.49,12),x+dx,2.27,z+2.59,0x477b87);
+      const glow=new THREE.Mesh(new THREE.CircleGeometry(.43,12),new THREE.MeshBasicMaterial({color:0xffdf99,transparent:true,opacity:0}));
       glow.position.set(x+dx,2.27,z+2.65);glow.name='occupied-window';
       glow.userData={light_channel:'window',location_id:m.parent.userData.location_id,model:m.parent.userData.model,variation:lamps.length};m.parent.add(glow);lamps.push(glow);
       // Mullions, sills, and lintels keep the window legible even with its room light off.
@@ -114,7 +123,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     const binding=place.presentation;
     if(!binding?.lot || !binding.model)continue;
     const group=new THREE.Group();const position=mapToWorld(binding.lot.x,binding.lot.y);
-    group.position.set(position.x,0,position.z);group.name=`location:${place.location_id}`;
+    group.position.set(position.x,hasWindleaf(locations)?windleafHeightAt(binding.lot.x,binding.lot.y):0,position.z);group.name=`location:${place.location_id}`;
     group.userData.location_id=place.location_id;group.userData.model=binding.model;root.add(group);
     const m=new Model(group);
     const fixture=(id:string,build:(m:Model,g:THREE.Group)=>void) => {
@@ -287,6 +296,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     }
   }
   function applyState(next:readonly DeskBotLocation[]) {
+    forest?.applyState(next);
     const states=new Map<string,DeskBotObjectState>();
     for(const place of next)for(const area of place.areas??[])for(const object of area.objects??[])if(object.state){states.set(object.object_id,object.state);const group=objects.get(object.object_id);if(group)group.userData.state_scope='persistent_living';}
     const bed=states.get('garden-bed'),garden=objects.get('garden-bed');
@@ -318,15 +328,17 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
       }
     }
   }
+  if(forest)for(const [id,object]of forest.objects)objects.set(id,object);
   applyState(locations);
   return {root,objects,water,lamps,trees,flags,applyState,update(time,night,wind,wetness,reducedMotion,context) {
+    forest?.update(time,night,wind,wetness,reducedMotion,context);
     const activitiesByLocation=new Map<string,SceneLifeContext['activities'][number][]>();
     for(const activity of context?.activities??[]) {const local=activitiesByLocation.get(activity.locationId)??[];local.push(activity);activitiesByLocation.set(activity.locationId,local);}
     for(const glow of lamps) {
       const mat=glow.material as THREE.MeshBasicMaterial,local=activitiesByLocation.get(glow.userData.location_id)??[];
       const view=sceneOperationAt(glow.userData.model,context?.minute??(night>.5?1200:720),night,local,glow.userData.variation??0);
       const channel=glow.userData.light_channel as SceneLightChannel,power=view[channel];
-      mat.opacity=glow.userData.pool ? power*(channel==='work'?.19:.26) : channel==='public'?.06+power*.86:power*.94;
+      mat.opacity=glow.userData.pool ? power*(channel==='work'?.26:.42) : channel==='public'?.06+power*.86:power*.94;
       glow.userData.operation={...view,minute:context?.minute};
     }
     trees.forEach((tree,i)=>{tree.rotation.z=reducedMotion ? 0 : Math.sin(time*1.6+i)*Math.min(wind/150,.09);});

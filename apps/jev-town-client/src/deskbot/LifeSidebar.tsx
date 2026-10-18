@@ -6,6 +6,7 @@ import {LivedMemory} from './LivedMemory.tsx';
 import {activeActorTask,taskDisplayTitle} from './lifeGlance.ts';
 import {residentProjectFor,projectStateLabel} from './ResidentProject.tsx';
 import {CommunitySupply} from './CommunitySupply.tsx';
+import {WindleafKeepsakes} from './WindleafKeepsakes.tsx';
 import {RoleWishes} from './RoleWishes.tsx';
 import type {StageControl,StagePreview} from './RoleStages.tsx';
 
@@ -68,6 +69,7 @@ export function LifeSidebar({map,selectedNpcId,selectionRequest,busy,npcDetail,t
           <button className="life-subtle" disabled={busy||!own} onClick={onAutonomy}>{own?.paused?'恢复自发安排':'给下一次安排留点空闲'}</button>
         </section>
         {invites.length?<section className="life-block"><div className="life-row"><h2>有人约你</h2><button className="life-place-link" onClick={()=>setTab('social')}>全部约定 ↗</button></div>{card(invites[0]!)}</section>:null}
+        <WindleafKeepsakes map={map} onPlace={onPlace}/>
         <CommunitySupply map={map} onPlace={onPlace}/>
         <RoleWishes snapshot={roleWishes} memory={map?.memory} busy={busy} readOnly={replay} onChoose={onRoleWish} onPracticalTrial={onPracticalTrial} onStagePreview={onStagePreview} onStageControl={onStageControl}/>
         {map?<LivedMemory memory={map.memory} actorId={map.protagonist.character_id}/>:null}

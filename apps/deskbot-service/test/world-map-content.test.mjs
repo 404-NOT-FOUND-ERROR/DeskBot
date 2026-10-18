@@ -29,12 +29,12 @@ test('catalog connects ten stable locations, internal areas and inspectable obje
   const content=loadWorldMapContent();
   assert.equal(content.locations.length,10);assert.equal(content.areas.length,20);assert.equal(content.objects.length,21);
   const world=createPersistentWorld().get(), map=getWorldMap(world);
-  assert.equal(map.regions.length,5);assert.equal(map.npcs.length,0);
+  assert.equal(map.regions.length,6);assert.equal(map.npcs.length,0);
   assert.deepEqual(map.locations.flatMap(place=>place.areas.map(area=>area.area_id)).sort(),map.areas.map(area=>area.area_id).sort());
-  assert.equal(map.locations.flatMap(place=>place.areas.flatMap(area=>area.objects)).length,21);
-  for(const place of map.locations){assert.ok(getWorldRoute(world,{destinationLocationId:place.location_id}).found);assert.deepEqual(place.presentation,content.locations.find(item=>item.location_id===place.location_id).presentation);}
+  assert.equal(map.locations.flatMap(place=>place.areas.flatMap(area=>area.objects)).length,27);
+  for(const place of map.locations){assert.ok(getWorldRoute(world,{destinationLocationId:place.location_id}).found);const base=content.locations.find(item=>item.location_id===place.location_id);if(base)assert.deepEqual(place.presentation,base.presentation);else assert.equal(place.presentation.space,'jev-town-map-v2');}
   assert.equal(map.content.objects_have_simulated_state,true);
-  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,10);
+  assert.equal(map.objects.filter(object=>object.state_scope==='persistent_living').length,16);
   assert.equal(map.objects.find(object=>object.object_id==='square-noticeboard').state_scope,'persistent_living','night lanterns are projected from actual world state');
   assert.equal(content.objects.every(object=>object.state_scope==='catalog_only'),true,'the authored directory cannot forge live state');
 });
@@ -95,9 +95,9 @@ test('legacy migration adds catalog once while retaining home references, object
   legacy.locations[0].visibility='hidden';legacy.locations[0].custom_decoration={cloth:'blue'};
   legacy.npcs=[{npc_id:'pathfinder-001',display_name:'阿砾',location_id:ROAD,home_location_id:HOME}];legacy.object_states={'keepsake-shelf':{keepsakes:['old-stone']}};
   h.persistence.put('canonical-world.states',legacy.world_id,legacy);h.restart();
-  const world=h.world.get();assert.equal(world.locations.length,10);assert.deepEqual(world.tasks,legacy.tasks);assert.deepEqual(world.clock,legacy.clock);assert.deepEqual(world.object_states,legacy.object_states);assert.deepEqual(world.npcs,legacy.npcs);
+  const world=h.world.get();assert.equal(world.locations.length,14);assert.deepEqual(world.tasks,legacy.tasks);assert.deepEqual(world.clock,legacy.clock);assert.deepEqual(world.object_states,legacy.object_states);assert.deepEqual(world.npcs,legacy.npcs);
   assert.equal(world.locations[0].visibility,'hidden');assert.deepEqual(world.locations[0].custom_decoration,legacy.locations[0].custom_decoration);
-  assert.equal(world.schema_migrations.filter(m=>m.id==='companion-living-map-v1').length,1);assert.equal(world.world_revision,legacy.world_revision+1);
+  assert.equal(world.schema_migrations.filter(m=>m.id==='companion-living-map-v1').length,1);assert.equal(world.schema_migrations.filter(m=>m.id==='windleaf-grove-v1').length,1);assert.equal(world.world_revision,legacy.world_revision+2);
   h.restart();assert.deepEqual(h.world.get(),world);
 });
 
@@ -111,7 +111,7 @@ function expanded(content){
   return candidate;
 }
 test('community source migration preserves expanded geography and old stocks, tasks and cursors, with zero initial fruit',t=>{
-  const h=harness(t),candidate=expanded(loadWorldMapContent());
+  const h=harness(t),candidate=expanded(h.world.get().map_catalog);
   h.mutate('expanded-before-supply',{action:'admit_map_content',content:candidate,expected_world_revision:h.world.get().world_revision});
   h.mutate('old-running-task',{action:'start_activity',task_id:'old-observe',kind:'care',title:'保留原来的观察',duration_seconds:1800});
   const legacy=h.world.get();
@@ -120,7 +120,7 @@ test('community source migration preserves expanded geography and old stocks, ta
   delete legacy.living.objects['seedling-rack'].stock.light_fruit;
   h.persistence.put('canonical-world.states',legacy.world_id,legacy);h.restart();
   const migrated=h.world.get();
-  assert.equal(migrated.map_catalog.version,'extension-test-v2');assert.equal(migrated.locations.length,11);
+  assert.equal(migrated.map_catalog.version,'extension-test-v2');assert.equal(migrated.locations.length,15);
   assert.ok(migrated.map_catalog.objects.some(o=>o.object_id==='quiet-bench'));
   assert.ok(migrated.map_catalog.objects.some(o=>o.object_id==='light-fruit-bough'));
   assert.equal(migrated.living.objects['light-fruit-bough'].stock.light_fruit,0);
@@ -133,11 +133,11 @@ test('community source migration preserves expanded geography and old stocks, ta
   h.restart();assert.deepEqual(h.world.get(),migrated);
 });
 test('validated expansion commits atomically, preserves ownership and survives reload without reverting to ten places',t=>{
-  const h=harness(t),candidate=expanded(loadWorldMapContent()),before=h.world.get();
+  const h=harness(t),candidate=expanded(h.world.get().map_catalog),before=h.world.get();
   assert.throws(()=>h.mutate('stale-expand',{action:'admit_map_content',content:candidate,expected_world_revision:before.world_revision-1}),{code:'map_revision_conflict'});
   assert.deepEqual(h.world.get(),before);
   h.mutate('expand',{action:'admit_map_content',content:candidate,expected_world_revision:before.world_revision});
-  assert.equal(h.world.get().locations.length,11);assert.ok(getWorldRoute(h.world.get(),{destinationLocationId:'quiet-step'}).found);
+  assert.equal(h.world.get().locations.length,15);assert.ok(getWorldRoute(h.world.get(),{destinationLocationId:'quiet-step'}).found);
   const after=h.world.get();h.restart();assert.deepEqual(h.world.get(),after);
   const invalid=structuredClone(candidate);invalid.version='v3';invalid.objects[0].area_id='quiet-seat';
   assert.throws(()=>h.mutate('rewrite',{action:'admit_map_content',content:invalid,expected_world_revision:after.world_revision}),{code:'map_identity_conflict'});assert.deepEqual(h.world.get(),after);
@@ -159,7 +159,7 @@ test('HTTP map and route are read-only and public observations cannot close path
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base=`http://127.0.0.1:${server.address().port}`,read=async path=>(await(await fetch(base+path)).json());
   const before=(await read('/api/world')).world;
-  const map=await read('/api/world/map');assert.equal(map.locations.length,10);assert.equal(map.areas.length,20);
+  const map=await read('/api/world/map');assert.equal(map.locations.length,14);assert.equal(map.areas.length,24);
   const route=await read('/api/world/route?destination_location_id=moss-sprout-garden');assert.equal(route.route.found,true);assert.ok(route.route.steps.every(step=>step.presentation_points));
   for(const action of ['set_passage_access','admit_map_content']){
     const response=await fetch(base+'/api/event',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({event_id:action,type:'world.mutation',source:'world-engine',character_id:'shaping-001',occurred_at:'2026-10-04T08:00:00Z',payload:{action}})});

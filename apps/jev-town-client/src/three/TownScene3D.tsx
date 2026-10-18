@@ -21,9 +21,15 @@ import { LABEL_SPECS, type LabelKind, type LabelSpec } from "./sceneSpec.ts";
 import type { DeskBotRoutePreview, DeskBotTravelVisual } from "../deskbot/routeVisual.ts";
 import type { DeskBotEnvironment, DeskBotLocation } from "../deskbot/types.ts";
 import { createEnvironmentEffects } from "./environmentEffects.ts";
+import {worldSceneBounds,hasWindleaf} from './windleafLayout.ts';
+import {captureFigureGrounding,forestFigureBaseY,forestGroundingWeight,groundFigureRings,type FigureGrounding} from './sceneGrounding.ts';
+import {createShapingRender} from './shapingRender.ts';
+import {shapingWorldPoint,projectShapingScenery} from './shapingProjection.ts';
+import {windleafHeightAt} from './windleafLayout.ts';
 import { activityProgressAt, type SceneLifeActivity } from "../deskbot/activityProjection.ts";
 import { sceneEnvironmentAt } from "./sceneEnvironment.ts";
 import { sceneWorkAnchor, sceneWorkTarget } from './sceneWorkplace.ts';
+import {forestArrivalAnchors,forestIdleArrivalAt} from './forestArrival.ts';
 import {isProjectActivity,projectActivityView} from './projectScene.ts';
 import {shapingAppearanceKey,type ShapingAppearance} from './shapingAppearance.ts';
 
@@ -117,9 +123,14 @@ function renderRoutePreview(group: THREE.Group, preview: DeskBotRoutePreview | n
   disposeRoutePreview(group);
   if (!preview || preview.points.length < 2) return;
 
-  const worldPoints = preview.points.map((point) => {
-    const world = mapToWorld(point.x, point.y);
-    return new THREE.Vector3(world.x, 0.35, world.z);
+  const sampledPoints=preview.points.flatMap((point,index)=>{
+    const next=preview.points[index+1];if(!next)return [point];
+    const steps=Math.max(1,Math.ceil(Math.hypot(next.x-point.x,next.y-point.y)/1.5));
+    return Array.from({length:steps},(_,i)=>({x:point.x+(next.x-point.x)*i/steps,y:point.y+(next.y-point.y)*i/steps}));
+  });
+  const worldPoints = sampledPoints.map((point) => {
+    const world = group.userData.shapingStyle?shapingWorldPoint(point.x,point.y):mapToWorld(point.x, point.y);
+    return new THREE.Vector3(world.x, (group.userData.shapingStyle?windleafHeightAt(point.x,point.y):0)+0.35, world.z);
   });
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(worldPoints),
@@ -130,8 +141,8 @@ function renderRoutePreview(group: THREE.Group, preview: DeskBotRoutePreview | n
   group.add(line);
 
   const locationWorldPoints = preview.locationPoints.map((point) => {
-    const world = mapToWorld(point.x, point.y);
-    return new THREE.Vector3(world.x, 0.5, world.z);
+    const world = group.userData.shapingStyle?shapingWorldPoint(point.x,point.y):mapToWorld(point.x, point.y);
+    return new THREE.Vector3(world.x, (group.userData.shapingStyle?windleafHeightAt(point.x,point.y):0)+0.5, world.z);
   });
   for (let index = 1; index < preview.locationIds.length; index += 1) {
     const isDestination = index === preview.locationIds.length - 1;
@@ -147,7 +158,6 @@ function renderRoutePreview(group: THREE.Group, preview: DeskBotRoutePreview | n
     );
     marker.name = isDestination ? "deskbot-route-destination" : "deskbot-route-transfer";
     marker.position.copy(markerPoint);
-    marker.position.y = 0.5;
     marker.renderOrder = 5;
     group.add(marker);
 
@@ -164,7 +174,7 @@ function renderRoutePreview(group: THREE.Group, preview: DeskBotRoutePreview | n
     ring.name = "deskbot-route-marker-ring";
     ring.rotation.x = -Math.PI / 2;
     ring.position.copy(markerPoint);
-    ring.position.y = 0.62;
+    ring.position.y = markerPoint.y+0.12;
     ring.renderOrder = 5;
     group.add(ring);
   }
@@ -182,6 +192,7 @@ interface ViewState {
 interface CitizenEntry {
   citizen: Citizen;
   figure: CitizenFigure;
+  grounding: FigureGrounding;
   badgeEl: HTMLSpanElement;
   route: RoutePoint[];
   routeLength: number;
@@ -223,6 +234,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
   const focusLocationRef=useRef(focusLocationId);focusLocationRef.current=focusLocationId;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const callbacksRef = useRef({ getHotspot, onPlaceClick, onZoomChange, onContextLost });
+  const placeInteractive=Boolean(onPlaceClick);
   callbacksRef.current = { getHotspot, onPlaceClick, onZoomChange, onContextLost };
 
   const apiRef = useRef<TownScene3DHandle | null>(null);
@@ -265,9 +277,10 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
-    // Filmic response keeps the sunlit roofs from clipping to flat white.
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    const shapingStyle=hasWindleaf(sceneLocations);
+    const scenePoint=shapingStyle?shapingWorldPoint:mapToWorld;
+    renderer.toneMapping = shapingStyle?THREE.NoToneMapping:THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = shapingStyle?1:1.25;
     const canvas = renderer.domElement;
     canvas.className = "town-map__canvas";
     canvas.setAttribute("aria-hidden", "true");
@@ -295,7 +308,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     sun.position.set(-45, 90, 55);
     sun.castShadow = true;
     sun.shadow.mapSize.set(4096, 4096);
-    const shadowSpan = Math.max(MAP_W, MAP_H) * 0.72;
+    const sceneBounds=worldSceneBounds(sceneLocations),sceneCentre=mapToWorld((sceneBounds.min_x+sceneBounds.max_x)/2,(sceneBounds.min_y+sceneBounds.max_y)/2);
+    const shadowSpan = Math.max(sceneBounds.max_x-sceneBounds.min_x,sceneBounds.max_y-sceneBounds.min_y) * 0.72;
     Object.assign(sun.shadow.camera, {
       left: -shadowSpan,
       right: shadowSpan,
@@ -313,28 +327,33 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
 
     // --- Static scenery ---
     const scenery = buildTownScenery(sceneLocations);
+    const shapingProjection=shapingStyle?projectShapingScenery(scenery.root):null;
+    const shapingRender=shapingStyle?createShapingRender():null;
+    shapingRender?.attach(scenery.root);
     let appliedSceneLocations=sceneLocations;
     scene.add(scenery.root);
-    const environmentEffects=createEnvironmentEffects(scene,sky,sun,fill,scenery.companion,scenery.updateVegetation);
+    const environmentEffects=createEnvironmentEffects(scene,sky,sun,fill,scenery.companion,scenery.updateVegetation,sceneBounds);
 
     const routePreviewGroup = new THREE.Group();
     routePreviewGroup.name = "deskbot-route-preview";
+    routePreviewGroup.userData.shapingStyle=shapingStyle;
     routePreviewGroupRef.current = routePreviewGroup;
     scene.add(routePreviewGroup);
     renderRoutePreview(routePreviewGroup, routePreviewRef.current);
 
     const labelObjects: Array<{ id: string; object: CSS2DObject; kind: LabelKind }> = [];
     for (const label of labels) {
-      const el = document.createElement(onPlaceClick ? "button" : "div");
+      const el = document.createElement(placeInteractive ? "button" : "div");
       if (el instanceof HTMLButtonElement) {
         el.type = "button";
         el.setAttribute("aria-label", `查看地点：${label.label}`);
         el.addEventListener("click", () => callbacksRef.current.onPlaceClick?.(label.id));
       }
-      el.className = `place-label place-label--${label.kind}${onPlaceClick ? " place-label--interactive" : ""}`;
+      el.className = `place-label place-label--${label.kind}${placeInteractive ? " place-label--interactive" : ""}`;
       el.textContent = label.label;
       const object = new CSS2DObject(el);
-      object.position.set(label.x, label.height, label.z);
+      const labelPoint=shapingStyle?shapingWorldPoint(label.x+60,label.z+60):{x:label.x,z:label.z};
+      object.position.set(labelPoint.x, label.height+(shapingStyle?windleafHeightAt(label.x+60,label.z+60):0), labelPoint.z);
       object.center.set(0.5, 1);
       scene.add(object);
       labelObjects.push({ id: label.id, object, kind: label.kind });
@@ -346,8 +365,10 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const now0 = performance.now();
     for (const citizen of citizens) {
       const figure = createCitizenFigure(citizen.palette, citizen.id,citizen.residentStyle,shapingAppearances?.get(citizen.id));
+      const grounding = captureFigureGrounding(figure);
+      shapingRender?.attach(figure.group,true);
       const start = initialPositionsRef.current.get(citizen.id) ?? { x: MAP_W / 2, y: MAP_H / 2 };
-      const world = mapToWorld(start.x, start.y);
+      const world = scenePoint(start.x, start.y);
       figure.group.position.set(world.x, 0, world.z);
       scene.add(figure.group);
 
@@ -362,6 +383,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       entries.set(citizen.id, {
         citizen,
         figure,
+        grounding,
         badgeEl,
         route: [start],
         routeLength: 0,
@@ -382,9 +404,9 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       azimuth: DEFAULT_AZIMUTH,
       elevation: DEFAULT_ELEVATION,
       zoom: DEFAULT_ZOOM,
-      targetX: 0,
+      targetX: sceneCentre.x,
       targetY: 0,
-      targetZ: 0,
+      targetZ: sceneCentre.z,
     };
     let fitHalfHeight = 60;
     let viewport = { width: 1, height: 1 };
@@ -395,12 +417,12 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     const corner = new THREE.Vector3();
     function computeFitHalfHeight() {
       // Frame the whole slab (plus the tallest roofs) for the current angle and aspect.
-      applyCamera(1, 0, 0);
+      applyCamera(1, sceneCentre.x, sceneCentre.z);
       const aspect = viewport.width / viewport.height;
       let maxX = 0;
       let maxY = 0;
-      for (const x of [-MAP_W / 2, MAP_W / 2]) {
-        for (const z of [-MAP_H / 2, MAP_H / 2]) {
+      for (const x of [sceneBounds.min_x-60,sceneBounds.max_x-60]) {
+        for (const z of [sceneBounds.min_y-60,sceneBounds.max_y-60]) {
           for (const y of [-4, 14]) {
             corner.set(x, y, z).applyMatrix4(camera.matrixWorldInverse);
             maxX = Math.max(maxX, Math.abs(corner.x));
@@ -408,7 +430,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
           }
         }
       }
-      fitHalfHeight = Math.max(maxY, maxX / aspect) * 1.03;
+      fitHalfHeight = Math.max(maxY, maxX / aspect) * (shapingStyle?.81:1.03);
     }
 
     function applyCamera(halfHeight: number, targetX: number, targetZ: number) {
@@ -429,9 +451,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     }
 
     function clampTarget() {
-      const limit = Math.max(MAP_W, MAP_H) / 2;
-      view.targetX = clamp(view.targetX, -limit, limit);
-      view.targetZ = clamp(view.targetZ, -limit, limit);
+      view.targetX = clamp(view.targetX, sceneBounds.min_x-60,sceneBounds.max_x-60);
+      view.targetZ = clamp(view.targetZ, sceneBounds.min_y-60,sceneBounds.max_y-60);
     }
 
     function updateCamera() {
@@ -461,9 +482,9 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
 
     apiRef.current = {
       zoomBy: (factor) => animateTo({ zoom: clamp(view.zoom * factor, MIN_ZOOM, MAX_ZOOM) }),
-      fitTown: () => animateTo({ zoom: FIT_ZOOM, targetX: 0, targetY: 0, targetZ: 0 }),
+      fitTown: () => animateTo({ zoom: FIT_ZOOM, targetX: sceneCentre.x, targetY: 0, targetZ: sceneCentre.z }),
       resetView: () =>
-        animateTo({ azimuth: DEFAULT_AZIMUTH, elevation: DEFAULT_ELEVATION, zoom: DEFAULT_ZOOM, targetX: 0, targetY: 0, targetZ: 0 }),
+        animateTo({ azimuth: DEFAULT_AZIMUTH, elevation: DEFAULT_ELEVATION, zoom: DEFAULT_ZOOM, targetX: sceneCentre.x, targetY: 0, targetZ: sceneCentre.z }),
       rotateBy: (radians) => animateTo({ azimuth: view.azimuth + radians }),
       focusObject: (objectId) => {
         const object=scenery.companion?.objects.get(objectId);if(!object)return;
@@ -604,7 +625,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       for (const [id, entry] of entries) {
         const el = callbacksRef.current.getHotspot(id);
         if (!el) continue;
-        projected.set(entry.figure.group.position.x, CITIZEN_HEAD_HEIGHT * 0.75, entry.figure.group.position.z).project(camera);
+        projected.set(entry.figure.group.position.x, entry.figure.group.position.y+CITIZEN_HEAD_HEIGHT * 0.75, entry.figure.group.position.z).project(camera);
         const x = (projected.x * 0.5 + 0.5) * viewport.width;
         const y = (1 - (projected.y * 0.5 + 0.5)) * viewport.height;
         const offscreen = x < -20 || y < -20 || x > viewport.width + 20 || y > viewport.height + 20;
@@ -613,9 +634,10 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       }
     }
 
-    const plaza = mapToWorld(getPlace("plaza").x, getPlace("plaza").y);
-    const tower = mapToWorld(getPlace("watchtower").x, getPlace("watchtower").y);
+    const plaza = scenePoint(getPlace("plaza").x, getPlace("plaza").y);
+    const tower = scenePoint(getPlace("watchtower").x, getPlace("watchtower").y);
     const workAnchors = new Map<string, THREE.Vector3>();
+    const arrivalAnchors = forestArrivalAnchors(scenery.companion?.objects,sceneLocations);
     let previousCitizenFrame = performance.now();
 
     function updateCitizens(now: number): boolean {
@@ -638,13 +660,17 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         const sampleDistance = admittedTravel ? progress * routeLength(route) : easeInOutCubic(progress) * entry.routeLength;
         const sample = sampleRoute(route, sampleDistance);
         entry.current = { x: sample.x, y: sample.y };
-        const world = mapToWorld(sample.x, sample.y);
-        figure.group.position.set(world.x, 0, world.z);
+        const world = scenePoint(sample.x, sample.y);
+        const forest = hasWindleaf(sceneLocationsRef.current);
+        const groundWeight=forest?forestGroundingWeight(sample.x):0;
+        figure.group.position.set(world.x, forest?forestFigureBaseY(entry.grounding,sample.x,sample.y):0, world.z);
+        groundFigureRings(figure,entry.grounding,groundWeight);
         let workAnchor:THREE.Vector3|undefined;
         let workTarget:THREE.Vector3|null = null;
         if(activity && !admittedTravel && activity.targetObjectId) {
           workAnchor = workAnchors.get(activity.taskId);
-          const object = scenery.companion?.objects.get(activity.targetObjectId);
+          const facility = scenery.companion?.objects.get(activity.targetObjectId);
+          const object=activity.targetObjectId==='windleaf-rack'?facility?.children.find(child=>child.userData.owner_id===activity.actorId)??facility:facility;
           if(!workAnchor && object) {
             workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z), activity.activityId);
             workAnchors.set(activity.taskId,workAnchor);
@@ -652,14 +678,18 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
           }
           if (object) workTarget = sceneWorkTarget(object, activity.activityId);
         }
-        const targetOffset = workAnchor ? new THREE.Vector3(workAnchor.x-world.x,0,workAnchor.z-world.z) : new THREE.Vector3();
+        const standingAnchor=workAnchor??forestIdleArrivalAt(arrivalAnchors,sample,walking,Boolean(admittedTravel));
+        const workMapX=sample.x;
+        const workWeight=forest?forestGroundingWeight(workMapX):0;
+        const targetOffset = standingAnchor ? new THREE.Vector3(standingAnchor.x-world.x,standingAnchor.y-entry.grounding.footY*workWeight-figure.group.position.y,standingAnchor.z-world.z) : new THREE.Vector3();
         if(entry.workOffset.distanceToSquared(targetOffset)>.0001)moving=true;
         entry.workOffset.lerp(targetOffset,blend);
         figure.group.position.add(entry.workOffset);
+        if(standingAnchor)groundFigureRings(figure,entry.grounding,workWeight);
 
         // Face the direction of travel; once arrived, face what the decision is about.
         let facing = figure.group.rotation.y;
-        if (walking) facing = Math.PI / 2 - sample.heading;
+        if (walking) {const ahead=scenePoint(sample.x+Math.cos(sample.heading),sample.y+Math.sin(sample.heading));facing=Math.atan2(ahead.x-world.x,ahead.z-world.z);}
         else if(workAnchor) facing = workTarget ? Math.atan2(workTarget.x-figure.group.position.x,workTarget.z-figure.group.position.z) : Math.atan2(world.x-workAnchor.x,world.z-workAnchor.z)+Math.PI;
         else if (entry.action === "INVESTIGATE" || entry.action === "JOIN")
           facing = Math.atan2(plaza.x - world.x, plaza.z - world.z);
@@ -756,7 +786,10 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     requestFrameRef.current = requestFrame;
 
     let rafId = 0;
+    const measure=new URLSearchParams(window.location.search).get('sceneMetrics')==='1';
+    const frameTimes:number[]=[];let measuredPrevious=0,measuredFrames=0;
     function render(now: number) {
+      if(measure&&measuredPrevious){const delta=now-measuredPrevious;if(delta>0&&delta<250){frameTimes.push(delta);if(frameTimes.length>240)frameTimes.shift();}}measuredPrevious=now;
       frameRequested = false;
 
       if (tween) {
@@ -780,13 +813,16 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       }
       if (!reducedMotion && scenery.fountainJets.visible) updateFountainJets(scenery.fountainJets, now / 1000);
       if(sceneLocationsRef.current && sceneLocationsRef.current!==appliedSceneLocations){scenery.companion?.applyState(sceneLocationsRef.current);appliedSceneLocations=sceneLocationsRef.current;}
-      environmentEffects.update(environmentRef.current,now/1000,reducedMotion,Date.now(),activitiesRef.current);
       if (environmentRef.current) {
         const lighting = sceneEnvironmentAt(environmentRef.current);
         scenery.updateDomesticLights?.(lighting.minute, lighting.night);
       }
+      environmentEffects.update(environmentRef.current,now/1000,reducedMotion,Date.now(),activitiesRef.current);
+      shapingProjection?.update();
 
+      shapingRender?.update();
       renderer.render(scene, camera);
+      if(measure&&++measuredFrames%60===0&&frameTimes.length){const sorted=[...frameTimes].sort((a,b)=>a-b);window.dispatchEvent(new CustomEvent('deskbot-scene-metrics',{detail:{frames:frameTimes.length,p50_ms:sorted[Math.floor(sorted.length*.5)],p95_ms:sorted[Math.floor(sorted.length*.95)],draw_calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}));}
       labelRenderer.render(scene, camera);
       if (cameraDirty || citizensMoving || tween) positionHotspots();
       cameraDirty = false;
@@ -825,6 +861,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       disposeRoutePreview(routePreviewGroup);
       routePreviewGroupRef.current = null;
       for (const entry of entries.values()) disposeObject(entry.figure.group);
+      shapingRender?.dispose();
       scene.clear();
       renderer.dispose();
       container.removeChild(canvas);
@@ -833,7 +870,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       entriesRef.current = null;
       requestFrameRef.current = () => {};
     };
-  }, [citizenKey, labelKey, sceneryKey, onPlaceClick]);
+  }, [citizenKey, labelKey, sceneryKey, placeInteractive]);
 
   useEffect(()=>{if(focusObjectId)apiRef.current?.focusObject(focusObjectId);else if(focusLocationId)apiRef.current?.focusPlace(focusLocationId);else if((focusRequest??0)>0)apiRef.current?.fitTown();},[focusLocationId,focusRequest,focusObjectId,citizenKey,labelKey,sceneryKey]);
   // An expired observation or a minute change still updates a reduced-motion view.

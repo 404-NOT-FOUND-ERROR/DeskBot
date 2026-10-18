@@ -24,6 +24,11 @@ const localDay = at => DAY_FORMAT.format(new Date(at));
 // establish what was actually practised. Eating is not social competence.
 export function activityTopic(activityId) {
   if (!REGISTERED.has(activityId) || activityId === 'share-meal') return null;
+  if(['leaf-read','leaf-observe-lowland','leaf-open','leaf-half-close','leaf-close','leaf-turn-lee','leaf-turn-wind'].includes(activityId))return 'explore';
+  if(['leaf-craft-kit','leaf-install'].includes(activityId))return 'craft';
+  if(activityId==='leaf-gather')return 'care';
+  if(activityId==='leaf-repair')return 'repair';
+  if(activityId==='night-line-with-leaf')return 'craft';
   if (['glow-read-pair','glow-swap-pair','echo-read-bell','echo-raise-bell','echo-lower-bell','night-read-lantern'].includes(activityId)) return 'explore';
   if (['glow-set-pair','glow-press-study','echo-craft-bell','echo-set-bell','echo-dampen-bell','echo-open-bell','night-mount-lantern'].includes(activityId)) return 'craft';
   if (['glow-take-cuttings','glow-water-pair','glow-drain-pair','glow-shelter-pair','glow-unshelter-pair'].includes(activityId)) return 'care';

@@ -1,5 +1,6 @@
 import { routeBetween, type RoutePoint } from "@shared/routes.ts";
 import type { DeskBotLocation } from "./types.ts";
+import {WINDLEAF_BLUEPRINT} from '../three/windleafLayout.ts';
 
 /**
  * DeskBot owns a presentation-neutral 0-100 map. Jev Town's scene is a
@@ -44,6 +45,7 @@ export function canonicalPointForLocation(location: CanonicalLocationRef): Route
   // Current catalogs carry their scene anchors from the service. The table
   // below is only a compatibility fallback for older map responses.
   const supplied = location.presentation;
+  if(supplied?.space==='jev-town-map-v2'&&Number.isFinite(supplied.point.x)&&Number.isFinite(supplied.point.y)&&supplied.point.x>=0&&supplied.point.x<=220&&supplied.point.y>=0&&supplied.point.y<=120)return {...supplied.point};
   if (supplied?.space === "jev-town-map-v1" && [supplied.point.x, supplied.point.y].every(value => Number.isFinite(value) && value >= 10 && value <= 110)) return { ...supplied.point };
   const anchored = location.location_id ? CANONICAL_SCENE_ANCHORS[location.location_id] : undefined;
   if (anchored) return { ...anchored };
@@ -62,6 +64,11 @@ export function canonicalRouteBetween(
   from: CanonicalLocationRef,
   to: CanonicalLocationRef,
 ): RoutePoint[] {
+  const route=WINDLEAF_BLUEPRINT.passages.find(p=>(p.from_location_id===from.location_id&&p.to_location_id===to.location_id)||(p.to_location_id===from.location_id&&p.from_location_id===to.location_id));
+  if(route){const points=route.presentation_points.map(p=>({...p}));if(route.from_location_id!==from.location_id)points.reverse();
+    const a=canonicalPointForLocation(from),b=canonicalPointForLocation(to);
+    if(Math.hypot(points[0]!.x-a.x,points[0]!.y-a.y)<.1&&Math.hypot(points.at(-1)!.x-b.x,points.at(-1)!.y-b.y)<.1)return points;
+  }
   return routeBetween(canonicalPointForLocation(from), canonicalPointForLocation(to));
 }
 

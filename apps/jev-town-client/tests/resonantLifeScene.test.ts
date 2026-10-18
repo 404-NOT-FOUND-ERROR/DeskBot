@@ -16,4 +16,10 @@ describe('water and night actual objects',()=>{
   expect(core.material.emissiveIntensity).toBeCloseTo(.4);expect(core.parent!.userData.observation_root).toBe('task:read');
   asset.closed=true;asset.brightness=0;scene.update(1,false);expect(core.visible).toBe(false);expect(core.material.emissiveIntensity).toBe(0);expect(core.parent!.getObjectByName('actual-shutter')!.visible).toBe(true);
  });
+ it('the old frame holds no invented lamp and a spent inlay retains its task source',()=>{
+  const {object,scene}=fixture('square-noticeboard');scene.update(999999,false);expect(object.getObjectByName('authored-old-guide-frame')).toBeDefined();expect(scene.root.getObjectByName('resonant-asset:0')!.visible).toBe(false);
+  const asset={lantern_id:'l',study_id:'s',observation_root:'read',closed:false,brightness:.1,leaf_inlay:{active:true,strength:.7,root_outcome_id:'task:lined'}};object.userData.state={night_lanterns:[asset]};scene.update(1,true);
+  const inlay=scene.root.getObjectByName('actual-leaf-inlay')!;expect(inlay.visible).toBe(true);expect(inlay.userData.root_outcome_id).toBe('task:lined');
+  asset.leaf_inlay.active=false;asset.leaf_inlay.strength=0;const before=JSON.stringify(asset);scene.update(999999,false);expect(inlay.visible).toBe(true);expect(JSON.stringify(asset)).toBe(before);
+ });
 });

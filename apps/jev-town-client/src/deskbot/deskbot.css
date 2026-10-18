@@ -7,6 +7,18 @@
   color: var(--ink);
   background: var(--cream);
 }
+
+/* 6B: retain all controls, give the world more room, keep the composer anchored. */
+.deskbot-mode--daily {padding:18px 22px;}
+.deskbot-mode--daily .deskbot-mode__header h1 {font-size:1.55rem;line-height:1.2;}
+.deskbot-mode--daily .deskbot-mode__header p {font-size:.8rem;}
+.deskbot-mode--daily .deskbot-mode__header {align-items:center;}
+.deskbot-mode--daily .deskbot-mode__grid {grid-template-columns:minmax(0,1fr) minmax(290px,350px);gap:16px;}
+.deskbot-mode--daily .deskbot-mode__stage {height:calc(100dvh - 150px);min-height:520px;max-height:960px;border-radius:18px;}
+.deskbot-mode--daily .life-sidebar {height:calc(100dvh - 150px);min-height:520px;}
+.life-forest {background:linear-gradient(135deg,#f1f5eb,#f9f7eb);border-radius:12px;padding:14px!important;}
+@media(max-width:1000px){.deskbot-mode--daily .deskbot-mode__grid{grid-template-columns:minmax(0,1fr) minmax(260px,310px);}.deskbot-mode--daily{padding:14px;}}
+@media(max-width:760px){.deskbot-mode--daily .deskbot-mode__grid{grid-template-columns:1fr;}.deskbot-mode--daily .deskbot-mode__header{align-items:flex-start;flex-wrap:wrap;}.deskbot-mode--daily .deskbot-mode__stage{height:70dvh;min-height:470px;}.deskbot-mode--daily .life-sidebar{height:72dvh;min-height:480px;}.deskbot-mode--daily .deskbot-mode__status{justify-items:start;}}
 .deskbot-mode *, .deskbot-mode *::before, .deskbot-mode *::after { box-sizing: border-box; }
 
 .deskbot-mode__header,

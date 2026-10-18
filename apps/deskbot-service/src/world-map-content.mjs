@@ -34,6 +34,13 @@ export function validateWorldMapContent(content) {
   if (content?.schema !== 'deskbot.world-map-content.v1' || content.settlement_id !== 'morrowmere'
     || content.setting_id !== 'shaping-field-v2.1' || content.objects_have_simulated_state !== false) fail('Map must belong to the current setting and declare catalog-only objects');
   id(content.content_id, 'content_id'); text(content.version, 'version');
+  const expanded = content.geography?.space === 'jev-town-map-v2';
+  if (content.geography && (!expanded || !equal(content.geography.bounds, { min_x:0,min_y:0,max_x:220,max_y:120 }))) fail('Unknown versioned geography bounds');
+  const within = (value, label, space) => {
+    if (space === 'jev-town-map-v1') return point(value,label,10,110);
+    if (!expanded || space !== 'jev-town-map-v2' || !value || !Number.isFinite(value.x) || !Number.isFinite(value.y)
+      || value.x < 0 || value.x > 220 || value.y < 0 || value.y > 120) fail(`${label} outside admitted geography`);
+  };
   const regions = entries(content, 'regions', 'region_id', 100);
   const locations = entries(content, 'locations', 'location_id', 200);
   const areas = entries(content, 'areas', 'area_id', 1000);
@@ -46,15 +53,15 @@ export function validateWorldMapContent(content) {
   }
   for (const location of locations.values()) {
     if (!regions.has(location.region_id) || location.settlement_id !== content.settlement_id) fail('Location region or settlement is unknown');
-    text(location.description, 'location.description'); point(location, 'location');
+    text(location.description, 'location.description');
+    if (location.presentation?.space === 'jev-town-map-v2') within(location,'location','jev-town-map-v2'); else point(location, 'location');
     if (!Number.isSafeInteger(location.travel_cost) || location.travel_cost < 1 || location.travel_cost > 10080) fail('Travel cost must be positive minutes');
     if (!['visible','hidden'].includes(location.visibility)) fail('Invalid location visibility');
     if (!Array.isArray(location.neighbors) || new Set(location.neighbors).size !== location.neighbors.length || !location.neighbors.length) fail('Location requires unique neighbors');
     for (const neighborId of location.neighbors) {
       if (neighborId === location.location_id || !locations.has(neighborId) || !locations.get(neighborId).neighbors?.includes(location.location_id)) fail('Neighbors must exist and connect in both directions');
     }
-    if (location.presentation?.space !== 'jev-town-map-v1') fail('Unknown presentation space');
-    point(location.presentation.point, 'presentation.point', 10, 110);
+    within(location.presentation?.point, 'presentation.point', location.presentation?.space);
     if (location.presentation.lot) {
       point(location.presentation.lot, 'presentation.lot', 20, 100);
       if (![20,40,60,80,100].includes(location.presentation.lot.x) || ![20,40,60,80,100].includes(location.presentation.lot.y)
@@ -67,7 +74,8 @@ export function validateWorldMapContent(content) {
   if (seen.size !== locations.size) fail('Every admitted location needs a geographic connection');
   for (const area of areas.values()) {
     if (!locations.has(area.location_id) || !['public','resident'].includes(area.access)) fail('Area location or access is invalid');
-    text(area.description, 'area.description'); point(area, 'area');
+    text(area.description, 'area.description');
+    if(locations.get(area.location_id).presentation.space==='jev-town-map-v2') within(area,'area','jev-town-map-v2'); else point(area, 'area');
     if (!Array.isArray(area.neighbor_area_ids) || new Set(area.neighbor_area_ids).size !== area.neighbor_area_ids.length) fail('Area requires unique connections');
     for (const neighborId of area.neighbor_area_ids) {
       const neighbor = areas.get(neighborId);
@@ -87,9 +95,9 @@ export function validateWorldMapContent(content) {
     const edge = [from.location_id, to.location_id].sort().join('--');
     if (edges.has(edge)) fail('Duplicate geographic passage');
     edges.add(edge);
-    if (passage.default_status !== 'open' || passage.presentation_space !== 'jev-town-map-v1'
+    if (passage.default_status !== 'open' || !['jev-town-map-v1','jev-town-map-v2'].includes(passage.presentation_space)
       || !Array.isArray(passage.presentation_points) || passage.presentation_points.length < 2 || passage.presentation_points.length > 20) fail('Invalid passage presentation or default access');
-    passage.presentation_points.forEach(p => point(p, 'passage.point', 10, 110));
+    passage.presentation_points.forEach(p => within(p,'passage.point',passage.presentation_space));
     if (!equal(passage.presentation_points[0], from.presentation.point) || !equal(passage.presentation_points.at(-1), to.presentation.point)) fail('Passage presentation must match its endpoints');
   }
   for (const location of locations.values()) for (const neighbor of location.neighbors) {
@@ -100,6 +108,29 @@ export function validateWorldMapContent(content) {
 
 const authored = validateWorldMapContent(JSON.parse(readFileSync(new URL('../../../world-content/companion-world/map.v1.json', import.meta.url), 'utf8')));
 export function loadWorldMapContent() { return structuredClone(authored); }
+
+const windleaf = JSON.parse(readFileSync(new URL('../../../world-content/companion-world/windleaf-region.v1.json',import.meta.url),'utf8'));
+export function loadWindleafRegionContent() { return structuredClone(windleaf); }
+export function upgradeWindleafMap(world, at, {initialization=false}={}) {
+  const old=world.map_catalog;
+  if(!old || old.windleaf_revision===windleaf.version) return false;
+  if(windleaf.locations.some(p=>old.locations.some(o=>o.location_id===p.location_id))) fail('Windleaf IDs conflict with an existing expansion','map_identity_conflict');
+  const content=structuredClone(old);
+  content.version=`${old.version}+${windleaf.version}`;content.windleaf_revision=windleaf.version;
+  content.geography={space:windleaf.geometry.space,bounds:structuredClone(windleaf.geometry.bounds)};
+  content.regions.push(structuredClone(windleaf.region));
+  for(const key of ['locations','areas','objects','passages'])content[key].push(...structuredClone(windleaf[key]));
+  for(const passage of windleaf.passages)for(const [from,to] of [[passage.from_location_id,passage.to_location_id],[passage.to_location_id,passage.from_location_id]]) {
+    const p=content.locations.find(l=>l.location_id===from);if(!p)fail('Windleaf entrance is missing');
+    if(!p.neighbors.includes(to))p.neighbors.push(to);
+  }
+  const installed=installWorldMapContent(world,content,at,{expansion:true});
+  if(!initialization){world.world_revision++;
+  world.schema_migrations=[...(world.schema_migrations??[]),{id:windleaf.version,applied_at:at,scope:'additive_geography',...installed,
+    preserved_existing_tasks:true,preserved_existing_stocks:true,preserved_location_ids:old.locations.map(p=>p.location_id),past_events_created:0}];
+  }
+  return true;
+}
 
 // Explicit, versioned correction of the imported scene layout. This is not an
 // expansion and cannot be requested by public observations. Stable identities,

@@ -1,5 +1,5 @@
 import unittest,asyncio
-from life_worker import LexicalRetrieval,hydrate,plain,valid_compilation,valid_followup,contract_json,restore_relations,restore_continuity,valid_activity_binding,valid_social_compilation,valid_development_binding
+from life_worker import LexicalRetrieval,hydrate,plain,valid_compilation,valid_followup,contract_json,restore_relations,restore_continuity,valid_activity_binding,valid_social_compilation,valid_development_binding,valid_continuation_binding,prompt_json
 from core.interfaces.llm import LLMResponse
 from providers.agent_store.in_memory import InMemoryAgentStore
 from collections import deque
@@ -9,6 +9,19 @@ from agent.motivation import MotivationBlender,ExternalDriveType
 from agent.need import NeedType
 from relationship_review import review_relationships
 class LifeAdapterTests(unittest.TestCase):
+ def test_prompt_time_view_preserves_canonical_context_and_labels_midnight(self):
+  context={'time':{'zone':'Asia/Shanghai'}};data={'at':'2026-10-11T18:04:00Z','text':'任务:2026-10-11T18:04:00Z'}
+  shown=prompt_json(data,context);self.assertIn('2026-10-12 02:04:00 Asia/Shanghai',shown);self.assertIn('UTC',shown)
+  self.assertEqual(data['at'],'2026-10-11T18:04:00Z');self.assertIn('任务:2026-10-11T18:04:00Z',shown)
+ def test_ready_and_overdue_conditions_need_reconsideration_not_renewed_wait(self):
+  target={'kind':'activity','id':'echo-read-bell'};context={'continuation':{'wait_options':[{**target,'available':True}]}}
+  self.assertFalse(valid_continuation_binding({'operation':'wait','wait_for':target},context))
+  self.assertTrue(valid_continuation_binding({'operation':'activity','wait_for':target},context))
+  target={'kind':'reply','id':'own'};context={'continuation':{'wait_options':[{**target,'available':False}],'current':{'condition':'review_required','wait_for':target}}}
+  self.assertFalse(valid_continuation_binding({'operation':'wait','wait_for':target},context))
+  self.assertTrue(valid_continuation_binding({'operation':'wait','wait_for':None,'followup_decision':'postpone'},context))
+  self.assertFalse(valid_continuation_binding({'wait_for':{'kind':'reply','id':'private'}},context))
+  self.assertFalse(valid_continuation_binding({'operation':'wait','review_after_minutes':True},context))
  def test_development_choice_requires_own_roots_and_ready_direction(self):
   context={'development':{'topics':[{'topic':'care','active_roots':['task:own'],'recent_success_roots':[]}],'wish_options':[{'direction_id':'wetland_frog','eligible':False}]}}
   self.assertTrue(valid_development_binding({},context))

@@ -149,7 +149,7 @@ export function resolveTravelRoute(
   presentationSpace?: string,
 ): Point[] {
   if (!presentationPoints || presentationPoints.length < 2) return fallback.map((point) => ({ ...point }));
-  if (presentationSpace && presentationSpace !== DESKBOT_PRESENTATION_SPACE) {
+  if (presentationSpace && ![DESKBOT_PRESENTATION_SPACE,'jev-town-map-v2'].includes(presentationSpace)) {
     return fallback.map((point) => ({ ...point }));
   }
   if (presentationPoints.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
@@ -159,8 +159,8 @@ export function resolveTravelRoute(
     .map((point) => ({ x: point.x, y: point.y }));
   if (points.length < 2) return fallback.map((point) => ({ ...point }));
   if (presentationSpace && points.some((point) => (
-    point.x < PRESENTATION_MIN || point.x > PRESENTATION_MAX
-    || point.y < PRESENTATION_MIN || point.y > PRESENTATION_MAX
+    point.x < PRESENTATION_MIN || point.x > (presentationSpace==='jev-town-map-v2'?220:PRESENTATION_MAX)
+    || point.y < PRESENTATION_MIN || point.y > (presentationSpace==='jev-town-map-v2'?120:PRESENTATION_MAX)
   ))) {
     return fallback.map((point) => ({ ...point }));
   }

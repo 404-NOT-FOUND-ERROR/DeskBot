@@ -1,0 +1,482 @@
+{
+  "schema": "deskbot.windleaf-region.v1",
+  "version": "windleaf-grove-v1",
+  "geometry": {
+    "space": "jev-town-map-v2",
+    "bounds": {
+      "min_x": 0,
+      "min_y": 0,
+      "max_x": 220,
+      "max_y": 120
+    },
+    "town_bounds": {
+      "min_x": 0,
+      "min_y": 0,
+      "max_x": 120,
+      "max_y": 120
+    }
+  },
+  "region": {
+    "region_id": "windleaf-outer-grove",
+    "settlement_id": "morrowmere",
+    "name": "风语林",
+    "description": "光叶记下风经过的方向；林间低地与风口的条件不同，留下的造物需要后来照看。",
+    "color": "#7fa86d"
+  },
+  "locations": [
+    {
+      "location_id": "windleaf-edge",
+      "settlement_id": "morrowmere",
+      "region_id": "windleaf-outer-grove",
+      "name": "风语林缘",
+      "description": "一条主路与回镇支路在这里相接，可以歇脚、看路或暂缓深入。",
+      "x": 125,
+      "y": 50,
+      "travel_cost": 12,
+      "visibility": "visible",
+      "neighbors": [
+        "backlit-grove",
+        "windleaf-lowland",
+        "windleaf-return-platform"
+      ],
+      "arrival_text": "一条主路与回镇支路在这里相接，可以歇脚、看路或暂缓深入。",
+      "presentation": {
+        "space": "jev-town-map-v2",
+        "point": {
+          "x": 125,
+          "y": 50
+        },
+        "model": "windleaf-edge"
+      }
+    },
+    {
+      "location_id": "windleaf-lowland",
+      "settlement_id": "morrowmere",
+      "region_id": "windleaf-outer-grove",
+      "name": "林间低地",
+      "description": "树冠遮住一部分风，光叶按固定规则缓慢凝聚；观察不等于已经采集。",
+      "x": 150,
+      "y": 30,
+      "travel_cost": 6,
+      "visibility": "visible",
+      "neighbors": [
+        "windleaf-edge",
+        "windleaf-shelter"
+      ],
+      "arrival_text": "树冠遮住一部分风，光叶按固定规则缓慢凝聚；观察不等于已经采集。",
+      "presentation": {
+        "space": "jev-town-map-v2",
+        "point": {
+          "x": 150,
+          "y": 30
+        },
+        "model": "windleaf-lowland"
+      }
+    },
+    {
+      "location_id": "windleaf-shelter",
+      "settlement_id": "morrowmere",
+      "region_id": "windleaf-outer-grove",
+      "name": "风口棚",
+      "description": "这里更迎风，可安置自己的收集架，调节遮片、实际测记或修补后再来。",
+      "x": 190,
+      "y": 65,
+      "travel_cost": 8,
+      "visibility": "visible",
+      "neighbors": [
+        "windleaf-lowland",
+        "windleaf-return-platform"
+      ],
+      "arrival_text": "这里更迎风，可安置自己的收集架，调节遮片、实际测记或修补后再来。",
+      "presentation": {
+        "space": "jev-town-map-v2",
+        "point": {
+          "x": 190,
+          "y": 65
+        },
+        "model": "windleaf-shelter"
+      }
+    },
+    {
+      "location_id": "windleaf-return-platform",
+      "settlement_id": "morrowmere",
+      "region_id": "windleaf-outer-grove",
+      "name": "归枝台",
+      "description": "回镇前整理携带物，存取公共备料或与在场居民交流；不能隔空交付。",
+      "x": 145,
+      "y": 95,
+      "travel_cost": 10,
+      "visibility": "visible",
+      "neighbors": [
+        "tidal-old-road",
+        "windleaf-shelter",
+        "windleaf-edge"
+      ],
+      "arrival_text": "回镇前整理携带物，存取公共备料或与在场居民交流；不能隔空交付。",
+      "presentation": {
+        "space": "jev-town-map-v2",
+        "point": {
+          "x": 145,
+          "y": 95
+        },
+        "model": "windleaf-return"
+      }
+    }
+  ],
+  "areas": [
+    {
+      "area_id": "windleaf-edge-area",
+      "location_id": "windleaf-edge",
+      "name": "林缘回镇口",
+      "description": "一条主路与回镇支路在这里相接，可以歇脚、看路或暂缓深入。",
+      "x": 125,
+      "y": 50,
+      "access": "public",
+      "neighbor_area_ids": []
+    },
+    {
+      "area_id": "windleaf-lowland-area",
+      "location_id": "windleaf-lowland",
+      "name": "光叶低地",
+      "description": "树冠遮住一部分风，光叶按固定规则缓慢凝聚；观察不等于已经采集。",
+      "x": 150,
+      "y": 30,
+      "access": "public",
+      "neighbor_area_ids": []
+    },
+    {
+      "area_id": "windleaf-shelter-area",
+      "location_id": "windleaf-shelter",
+      "name": "风口工作地",
+      "description": "这里更迎风，可安置自己的收集架，调节遮片、实际测记或修补后再来。",
+      "x": 190,
+      "y": 65,
+      "access": "public",
+      "neighbor_area_ids": []
+    },
+    {
+      "area_id": "windleaf-return-area",
+      "location_id": "windleaf-return-platform",
+      "name": "归枝交接台",
+      "description": "回镇前整理携带物，存取公共备料或与在场居民交流；不能隔空交付。",
+      "x": 145,
+      "y": 95,
+      "access": "public",
+      "neighbor_area_ids": []
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "windleaf-canopy",
+      "area_id": "windleaf-lowland-area",
+      "name": "光叶枝簇",
+      "object_kind": "windleaf-source",
+      "description": "有限光叶枝簇，日照、风和潮湿影响它；初始可采光叶为零。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    },
+    {
+      "object_id": "windleaf-observation-stone",
+      "area_id": "windleaf-lowland-area",
+      "name": "低地测记石",
+      "object_kind": "windleaf-observation",
+      "description": "可以实际观察现场条件，并把它作为之后比较的起点。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    },
+    {
+      "object_id": "windleaf-rack",
+      "area_id": "windleaf-shelter-area",
+      "name": "光叶收集架位",
+      "object_kind": "windleaf-rack",
+      "description": "最多容纳三位居民各自的一套架子；没有安置的架子不会预先出现在世界。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    },
+    {
+      "object_id": "windleaf-rain-basin",
+      "area_id": "windleaf-shelter-area",
+      "name": "风口雨盆",
+      "object_kind": "windleaf-basin",
+      "description": "只记录可信天气窗口中的雨水和蒸发；当前不输出可用清水。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    },
+    {
+      "object_id": "windleaf-return-table",
+      "area_id": "windleaf-return-area",
+      "name": "归枝台备料篮",
+      "object_kind": "windleaf-store",
+      "description": "公开的有限备料与带回物存放处，初始库存为空。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    },
+    {
+      "object_id": "windleaf-waymarker",
+      "area_id": "windleaf-edge-area",
+      "name": "林缘路牌",
+      "object_kind": "windleaf-waymarker",
+      "description": "回镇与林内的路线提示；装饰不会改变通路状态。",
+      "state_scope": "catalog_only",
+      "capabilities": [
+        "inspect"
+      ]
+    }
+  ],
+  "passages": [
+    {
+      "passage_id": "path-backlit-grove-windleaf-edge",
+      "name": "逆光林地至风语林缘",
+      "from_location_id": "backlit-grove",
+      "to_location_id": "windleaf-edge",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 40,
+          "y": 68
+        },
+        {
+          "x": 48,
+          "y": 68
+        },
+        {
+          "x": 50,
+          "y": 70
+        },
+        {
+          "x": 110,
+          "y": 70
+        },
+        {
+          "x": 110,
+          "y": 50
+        },
+        {
+          "x": 125,
+          "y": 50
+        }
+      ]
+    },
+    {
+      "passage_id": "path-tidal-old-road-windleaf-return-platform",
+      "name": "潮痕旧路至归枝台",
+      "from_location_id": "tidal-old-road",
+      "to_location_id": "windleaf-return-platform",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 80,
+          "y": 68
+        },
+        {
+          "x": 80,
+          "y": 70
+        },
+        {
+          "x": 110,
+          "y": 70
+        },
+        {
+          "x": 118,
+          "y": 90
+        },
+        {
+          "x": 130,
+          "y": 95
+        },
+        {
+          "x": 145,
+          "y": 95
+        }
+      ]
+    },
+    {
+      "passage_id": "path-windleaf-edge-windleaf-lowland",
+      "name": "风语林缘至林间低地",
+      "from_location_id": "windleaf-edge",
+      "to_location_id": "windleaf-lowland",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 125,
+          "y": 50
+        },
+        {
+          "x": 135,
+          "y": 50
+        },
+        {
+          "x": 140,
+          "y": 35
+        },
+        {
+          "x": 150,
+          "y": 30
+        }
+      ]
+    },
+    {
+      "passage_id": "path-windleaf-lowland-windleaf-shelter",
+      "name": "林间低地至风口棚",
+      "from_location_id": "windleaf-lowland",
+      "to_location_id": "windleaf-shelter",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 150,
+          "y": 30
+        },
+        {
+          "x": 172,
+          "y": 30
+        },
+        {
+          "x": 180,
+          "y": 50
+        },
+        {
+          "x": 190,
+          "y": 65
+        }
+      ]
+    },
+    {
+      "passage_id": "path-windleaf-shelter-windleaf-return-platform",
+      "name": "风口棚至归枝台",
+      "from_location_id": "windleaf-shelter",
+      "to_location_id": "windleaf-return-platform",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 190,
+          "y": 65
+        },
+        {
+          "x": 184,
+          "y": 85
+        },
+        {
+          "x": 165,
+          "y": 95
+        },
+        {
+          "x": 145,
+          "y": 95
+        }
+      ]
+    },
+    {
+      "passage_id": "path-windleaf-return-platform-windleaf-edge",
+      "name": "归枝台至风语林缘",
+      "from_location_id": "windleaf-return-platform",
+      "to_location_id": "windleaf-edge",
+      "default_status": "open",
+      "presentation_space": "jev-town-map-v2",
+      "presentation_points": [
+        {
+          "x": 145,
+          "y": 95
+        },
+        {
+          "x": 125,
+          "y": 85
+        },
+        {
+          "x": 125,
+          "y": 50
+        }
+      ]
+    }
+  ],
+  "terrain": {
+    "patches": [
+      {
+        "x": 170,
+        "y": 60,
+        "width": 100,
+        "depth": 120,
+        "height": 0.14,
+        "color": "#a3bb81"
+      },
+      {
+        "x": 155,
+        "y": 31,
+        "width": 48,
+        "depth": 33,
+        "height": 0.15,
+        "color": "#94ae73"
+      },
+      {
+        "x": 190,
+        "y": 69,
+        "width": 36,
+        "depth": 32,
+        "height": 1.2,
+        "color": "#b2bb83"
+      }
+    ],
+    "stream": [
+      {
+        "x": 211,
+        "y": 0
+      },
+      {
+        "x": 206,
+        "y": 25
+      },
+      {
+        "x": 211,
+        "y": 48
+      },
+      {
+        "x": 206,
+        "y": 72
+      },
+      {
+        "x": 212,
+        "y": 94
+      },
+      {
+        "x": 204,
+        "y": 120
+      }
+    ],
+    "clearings": [
+      {
+        "x": 125,
+        "y": 50,
+        "r": 8
+      },
+      {
+        "x": 150,
+        "y": 30,
+        "r": 13
+      },
+      {
+        "x": 190,
+        "y": 65,
+        "r": 14
+      },
+      {
+        "x": 145,
+        "y": 95,
+        "r": 13
+      }
+    ]
+  }
+}

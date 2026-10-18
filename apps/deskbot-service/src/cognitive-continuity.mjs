@@ -46,6 +46,7 @@ export function freezeCognitiveReferences(context){
   return {location_id:context.location.id,objects:context.objects.map(o=>o.id),activities:context.capabilities.activities.map(a=>a.activity_id),
     destinations:(context.capabilities.travel?.destinations??[]).map(p=>p.id),receivers:context.capabilities.share.receivers.map(r=>r.actor_id),sources:copy(context.inputs??[]),
     social:copy(context.social??{}),speech_evidence:copy(context.speech_evidence??[]),development:copy(context.development??null),
+    continuation:copy(context.continuation??null),
     perceptions:copy(context.perceptions??[]),interpretation_pending:copy(context.refraction?.pending??[]),known_people:copy(context.visible_people??[]),captured_at:context.at};
 }
 

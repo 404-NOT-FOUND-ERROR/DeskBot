@@ -28,8 +28,9 @@ export function scheduleCognitiveActor(w,id,at,context,{actualResult=false}={}){
  if(context.social?.relation_evidence?.length&&since('relate')>=720)return {phase:'relate',reason:'social_review',priority:30+Math.min(45,age/60)};
  if((life.memories?.length??0)>0&&since('maintain')>=1440)return {phase:'maintain',reason:'daily_memory_and_goals',priority:35+Math.min(45,age/60)};
  const due=life.next_decision_at&&life.next_decision_at<=at;
+ const conditionReview=context.continuation?.urgent_review;
  const newOpportunity=context.refraction?.pending?.length>0||commitments.some(c=>c.available_responses?.length&&c.status==='proposed');
- if((due||newOpportunity)&&age>=10)return {phase:'plan',reason:due?'followup_due':'new_opportunity',priority:40+Math.min(40,age/60)};
+ if((due||newOpportunity||conditionReview)&&age>=10)return {phase:'plan',reason:conditionReview?'followup_condition_review':due?'followup_due':'new_opportunity',priority:40+Math.min(40,age/60)};
  return null;
 }
 export function fairCognitiveQueue(candidates){

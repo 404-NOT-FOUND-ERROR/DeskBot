@@ -34,7 +34,10 @@ export interface GlowSample {id:string;light:number;charge:number;moisture:numbe
 export interface GlowTrial {trial_id:string;owner_id:string;started_at:string;changed_at:string;updated_at:string;setup_root:string;sheltered:boolean;read_count:number;samples:GlowSample[]}
 export interface GlowStudy {study_id:string;owner_id:string;created_at:string;root_outcome_id:string;observation_root:string;charge:number;cohesion:number;brightness:number;title:string}
 export interface EchoBell {bell_id:string;owner_id:string;height:number;dampened:boolean;measurement:{water_level:number;immersion:number;resonance:number;noise:number;tone:number;wind_mps:number}}
-export interface NightLantern {lantern_id:string;owner_id:string;study_id:string;observation_root:string;charge:number;cohesion:number;brightness:number;closed:boolean}
+export interface NightLantern {lantern_id:string;owner_id:string;study_id:string;observation_root:string;charge:number;cohesion:number;brightness:number;closed:boolean;leaf_inlay?:{rule_version:string;root_outcome_id:string;installed_at:string;expires_at:string;updated_at:string;active:boolean;strength:number;material_inputs:{resource:string;count:number}[]}}
+export interface WindTrace {rule_version:string;active:boolean;intensity:number;formed_at:string|null;expires_at:string|null;weather_event_id:string|null;last_sample_at:string;eligible_seconds:number;cooldown_until:string|null;generation:number}
+export interface PlaceStory {schema:'deskbot.place-story.v1';content_id:string;location_id:string;interpretation:string;entries:{id:string;epistemic:'authored_background'|'authored_viewpoint'|'hypothesis';title:string;text:string;actor_id?:string;actor_name?:string;source:{kind:string;reference:string;label:string}}[]}
+export interface WindleafFrame {frame_id:string;slot:number;owner_id:string;setup_root:string;installed_at:string;changed_at:string;updated_at:string;shutter:'open'|'half'|'closed';exposure:'windward'|'leeward';condition:number;patches:number;charge:number;moisture:number;pattern:number;brightness:number;read_count:number;last_read_at?:string}
 export interface DeskBotObjectState {
   object_id: string; kind: string; updated_at: string;
   water_level?: number; moisture?: number; health?: number; growth?: number; quantity?: number; dead_quantity?:number; condition?: number;
@@ -42,6 +45,8 @@ export interface DeskBotObjectState {
   glow_moss?:{rule_version:string;charge:number;cohesion:number;brightness:number;updated_at:string};
   glow_trials?:GlowTrial[];glow_studies?:GlowStudy[];
   echo_bells?:EchoBell[];night_lanterns?:NightLantern[];
+  leaf_frames?:WindleafFrame[];charge?:number;pattern?:number;
+  wind_trace?:WindTrace;place_story?:PlaceStory;
   project_assets?: {
     floating_seedbed?: { project_id:string; status:'prototype'|'growing'|'ready'|'empty'|'dead'; installed_at:string; accepted_at?:string|null; quantity:number; health:number; moisture:number; growth:number; last_cared_at?:string|null; last_inspected_at?:string|null };
     small_water_pump?: { project_id:string; status:'assembled'|'moved'|'installed_trial'|'ready'|'broken'; assembled_at?:string; carrier_id?:string; installed_at?:string; accepted_at?:string|null; condition?:number; last_used_at?:string|null; use_count?:number };
@@ -224,7 +229,7 @@ export interface DeskBotWorldMap {
   regions?: { region_id: string; name: string; description: string; color: string }[];
   areas?: DeskBotArea[];
   objects?: DeskBotObject[];
-  paths?: { passage_id: string | null; from_location_id: string; to_location_id: string; open: boolean; blocked_reason: string | null }[];
+  paths?: { passage_id: string | null; from_location_id: string; to_location_id: string; open: boolean; blocked_reason: string | null;presentation_space?:string;presentation_points?:DeskBotPresentationPoint[] }[];
   protagonist: { character_id: string; location_id: string; appearance?:{schema?:string;role_stage?:ShapingAppearance};travel_state?: { status: string; task_id?: string; arrival_text?: string | null } };
   world_setting?: {
     setting_id: string;

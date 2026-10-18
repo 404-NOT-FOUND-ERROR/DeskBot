@@ -13,6 +13,7 @@ import {
 
 const SLOT_MS = 30 * 60 * 1000;
 import { residentResponse } from './resident-life.mjs';
+import {windleafSceneTemplates} from './windleaf-life.mjs';
 const NPC_ROUTINE_SLOT_MS = 2 * 60 * 60 * 1000;
 const SCENE_COOLDOWN_COUNT = 2;
 const LIFE_CONTENT_VERSION = 'world-life-v2';
@@ -299,7 +300,7 @@ function selectScene(world, now, { roleStages = [] } = {}) {
   const causal = selectCausalScene(world, now, { roleStages });
   if (causal) return causal;
   const locationId = world.protagonist.location_id;
-  const catalog = LIFE_SCENES[locationId] ?? LIFE_SCENES['shaping-field-desk'];
+  const catalog = windleafSceneTemplates(world,locationId) ?? LIFE_SCENES[locationId] ?? LIFE_SCENES['shaping-field-desk'];
   const band = timeBand(world.logical_time?.minute_of_day ?? 0);
   const preferred = catalog.filter((scene) => scene.bands.includes(band));
   const eligible = preferred.length ? preferred : catalog;

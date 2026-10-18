@@ -3,6 +3,7 @@
 import { PROJECT_ACTIVITIES, projectActivityReason, projectActivityBinding, projectActivityVisible, applyProjectActivityEffect, advanceProjectAssets } from './resident-projects.mjs';
 import {FANTASY_ACTIVITIES,fantasyActivityReason,fantasyActivityBinding,applyFantasyActivity,advanceFantasyInquiry} from './fantasy-inquiry.mjs';
 import {RESONANT_ACTIVITIES,resonantActivityReason,resonantActivityBinding,applyResonantActivity,advanceResonantLife} from './resonant-life.mjs';
+import {WINDLEAF_ACTIVITIES,windleafActivityReason,windleafActivityBinding,applyWindleafActivity,advanceWindleafLife} from './windleaf-life.mjs';
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
 export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
 export const SPRING_UNITS_PER_HOUR = .75;
@@ -18,7 +19,7 @@ export class LivingResourceError extends Error {
   constructor(code, message, statusCode = 409) { super(message); this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, status) => { throw new LivingResourceError(code, message, status); };
-export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', light_fruit: '林间光果', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '日常饭食', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤', shade_hood:'可拆遮风罩', echo_bell:'回声浮铃', glow_lens:'带出处的余辉标本' });
+export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', light_fruit: '林间光果', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '日常饭食', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤', shade_hood:'可拆遮风罩', echo_bell:'回声浮铃', glow_lens:'带出处的余辉标本',light_leaf:'光叶',leaf_frame_kit:'可拆光叶架' });
 const INITIAL = {
   'floating-frame': { kind: 'waterside', water_level: .46, condition: .67, stock: { raw_water: 12 }, capacity: 24 },
   'garden-bed': { kind: 'plant_bed', moisture: .58, health: .88, growth: .25, quantity: 10 },
@@ -49,7 +50,7 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
   { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
   { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
-  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES,
+  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES, ...WINDLEAF_ACTIVITIES,
 ]);
 function definition(world, objectId) {
   const object = world.map_catalog?.objects?.find(o => o.object_id === objectId);
@@ -184,6 +185,8 @@ function step(world, start, end, daylight) {
   advanceProjectAssets(world, start, end, { daylight, rain, evaporation });
   advanceFantasyInquiry(world,start,end,{daylight,rain,evaporation,wind:fresh?weather.wind_mps:0});
   advanceResonantLife(world,start,end,{daylight,rain,wind:fresh?weather.wind_mps:0});
+  advanceWindleafLife(world,start,end,{daylight,rain,evaporation,wind:fresh?weather.wind_mps:0,
+    weather_source:fresh?{trusted:true,event_id:weather.event_id,from:weather.from,until:weather.until}:null});
   for (const id of ['floating-frame', 'seedling-rack', 'repair-bench', 'market-canopy', 'trial-stove']) {
     const item = l.objects[id]; if (!item) continue;
     const exposed = ['floating-frame', 'market-canopy'].includes(id);
@@ -232,7 +235,7 @@ function activityBlocker(world, recipe, actorId, { completion = false, taskId = 
   if (!canUse(world, target, actorId)) return blocked('permission_required', 'coordination', '需要住户同意。');
   if ((world.tasks ?? []).some(t => ['running', 'paused'].includes(t.status) && t.task_id !== taskId && (t.actor_id === actorId || t.target_object_id === recipe.target))) return blocked('facility_busy', 'coordination', '有人正在使用这个设施，或还有未完成的活动。');
   if (!completion && world.living.recovery.pending) return blocked('world_recovery_pending', 'condition', '世界正在补算此前经过的时间。');
-  const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task })??fantasyActivityReason(world,recipe,actorId,at,{completion,task})??resonantActivityReason(world,recipe,actorId,at,{completion,task});
+  const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task })??fantasyActivityReason(world,recipe,actorId,at,{completion,task})??resonantActivityReason(world,recipe,actorId,at,{completion,task})??windleafActivityReason(world,recipe,actorId,at,{completion,task});
   if (projectReason) return blocked('project_conditions_changed', 'condition', projectReason);
   const bed = world.living.objects['garden-bed'];
   if (recipe.activity_id === 'harvest-bed' && (!bed || bed.quantity === 0 || bed.growth < .85 || bed.health < .35)) return blocked('crop_not_harvestable', 'condition', '苔芽还未成熟，或苗况不适合收获。');
@@ -267,7 +270,7 @@ export function prepareLivingActivity(world, activityId, actorId, at) {
   world.living.revision += 1;
   note(world, at, `${person(world, actorId).display_name ?? '居民'}开始${recipe.title}。`, { kind: 'activity_started', activity_id: activityId, actor_id: actorId });
   return { activity_id: activityId, target_object_id: recipe.target, title: recipe.title, kind: recipe.kind, duration_seconds: recipe.seconds,
-    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved }, ...projectBinding, ...fantasyActivityBinding(world,recipe,actorId),...resonantActivityBinding(world,recipe,actorId) };
+    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved }, ...projectBinding, ...fantasyActivityBinding(world,recipe,actorId),...resonantActivityBinding(world,recipe,actorId),...windleafActivityBinding(world,recipe,actorId) };
 }
 export function releaseLivingReservation(world, task, at) {
   if (task.reservation?.status !== 'held') return;
@@ -301,7 +304,7 @@ export function completeLivingActivity(world, task, at) {
     }
     case 'repair-frame': case 'repair-bench': case 'repair-rack': case 'repair-stove': case 'stitch-canopy': target.condition = clamp(target.condition + .35); break;
   }
-  const fantasyResult=applyFantasyActivity(world,recipe,task,at)??applyResonantActivity(world,recipe,task,at);
+  const fantasyResult=applyFantasyActivity(world,recipe,task,at)??applyResonantActivity(world,recipe,task,at)??applyWindleafActivity(world,recipe,task,at);
   const projectResult = applyProjectActivityEffect(world, recipe, task, at);
   if (projectResult) changes.push(...projectResult.stock_changes);
   if (recipe.output) {
@@ -324,9 +327,10 @@ function canUse(world, object, actorId) {
 export function transferLivingResource(world, payload, at) {
   if(payload.resource==='glow_lens')fail('bound_asset_not_transferable','带有个人试验出处的标本需要本人带去安置。');
   const actorId = payload.actor_id ?? world.protagonist.character_id;
+  if(payload.resource==='leaf_frame_kit'&&payload.operation==='store'&&world.windleaf_life?.packed_kits?.[actorId]?.length)fail('bound_asset_not_transferable','使用过的个人光叶架保留编号和磨损，需本人携带重新安置；未使用的架套件可作公共备料。');
   const actor = person(world, actorId), object = definition(world, payload.object_id), storage = world.living?.objects[payload.object_id];
   if (!object || !storage?.stock || !canUse(world, object, actorId)) fail('resource_store_unknown', '这里没有可以使用的公共库存。', 404);
-  if (storage.kind === 'ecological_source') fail('resource_source_requires_gathering', '光果仍长在林缘枝上，需要实际完成采集活动后才能携带。');
+  if (['ecological_source','windleaf_source'].includes(storage.kind)) fail('resource_source_requires_gathering', '物品仍在生态来源上，需要实际完成采集活动后才能携带。');
   if (actor.location_id !== object.location_id || (world.tasks ?? []).some(t => t.actor_id === actorId && ['running', 'paused'].includes(t.status))) fail('resource_actor_unavailable', '先到达这个地点并完成当前活动。');
   if (!Object.hasOwn(storage.stock, payload.resource) || !Object.hasOwn(RESOURCES, payload.resource)) fail('resource_unknown', '这里不存放这种物品。', 400);
   if (!Number.isSafeInteger(payload.count) || payload.count < 1 || payload.count > 24 || !['take', 'store'].includes(payload.operation)) fail('invalid_resource_transfer', '每次取放 1 到 24 份物品。', 400);
@@ -347,6 +351,9 @@ export function livingObjectReadModel(world, object) {
 }
 function objectStatus(state) {
   const percent = x => Math.round(x * 100);
+  if(state.kind==='windleaf_source')return `可采光叶 ${Math.floor(state.stock.light_leaf*10)/10}/${state.capacity} 片 · 纹路 ${percent(state.pattern)}%`;
+  if(state.kind==='windleaf_rack')return `已安置 ${state.leaf_frames.length}/3 套光叶架 · 各自保存与测记`;
+  if(state.kind==='windleaf_basin')return `雨盆水位 ${percent(state.water_level)}% · 未净滤，不作为清水库存`;
   if (state.kind === 'ecological_source') return `已凝聚光果 ${Math.round((state.stock.light_fruit ?? 0) * 10) / 10}/${state.capacity} 份 · 每小时凝聚 ${LIGHT_FRUIT_UNITS_PER_HOUR} 份`;
   if (state.kind === 'plant_bed') return state.quantity ? `土壤湿润 ${percent(state.moisture)}% · 苗况 ${percent(state.health)}% · 生长 ${percent(state.growth)}%${state.growth >= .85 ? ' · 可收获' : ''}` : state.dead_quantity ? '留下了枯苗，重新播种时需要清理' : '苗床空着，等待播种';
   if (state.kind === 'waterside') return `水位 ${percent(state.water_level)}% · 浮框完好 ${percent(state.condition)}%${state.stock && Object.hasOwn(state.stock, 'raw_water') ? ` · 原水 ${Math.round(state.stock.raw_water * 10) / 10}/${state.capacity} 份` : ''}`;

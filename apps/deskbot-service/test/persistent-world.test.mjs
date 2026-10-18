@@ -50,7 +50,7 @@ test('default world is small, deterministic, and supports a bounded NPC schema',
   assert.equal(initial.protagonist.appearance.version, 'appearance-baseline-v0.2');
   assert.equal(initial.protagonist.appearance.silhouette, '白色圆润多瓣底座 + 圆形黑屏幕脸 + 两只短三角耳');
   assert.equal(initial.protagonist.appearance.recognition_anchor, '白色多瓣底座 + 黑色圆屏 + 两只短三角耳 + 黄色胸口圆点');
-  assert.equal(initial.locations.length, 10);
+  assert.equal(initial.locations.length, 14);
   assert.equal(initial.locations.find((location) => location.location_id === 'tidal-old-road').neighbors.includes('whisper-market'), true);
   assert.deepEqual(initial.npcs, []);
   assert.equal(initial.active_event, null);

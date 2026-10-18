@@ -1,0 +1,29 @@
+{
+  "schema": "deskbot.place-story-content.v1",
+  "content_id": "windleaf-old-light-v1",
+  "source": {"kind":"author_content","reference":"windleaf-old-light.v1.json","label":"聚形域地方设定"},
+  "interpretation": "这里记录作者提供的地方背景、居民初始取舍与未证实假说；不是居民实际说过的话，不是当前任务、亲历或已经验证的结论。只有实际活动结果另行形成亲历。",
+  "objects": [
+    {"object_id":"windleaf-canopy","location_id":"windleaf-lowland","entries":[
+      {"id":"windleaf-forked-crown","epistemic":"authored_background","title":"留风树","text":"居民把这簇分叉的光叶枝冠叫作留风树。枝冠和镇中旧引光框都留有一道未闭合的缺口轮廓；这是地方造物的外形背景，不是已经解开的来历。"},
+      {"id":"windleaf-retention-law","epistemic":"authored_background","title":"经过的风暂留成形","text":"已有至少一片光叶且蓄光足够时，可信天气中持续十分钟的风可能令枝间留下短暂折面。折面最多留三十分钟，逐渐消散；不会保存声音，也不产生额外材料。"},
+      {"id":"windleaf-shared-notch","epistemic":"hypothesis","title":"同一种旧夹具？","text":"相似缺口可能来自同一种旧夹具，也可能只是常见的制作形状。相似外观不能证明林地和远方曾有连通的引光线路；现有活动还没有验证这件事。"}
+    ]},
+    {"object_id":"windleaf-waymarker","location_id":"windleaf-edge","entries":[
+      {"id":"windleaf-waymarker-fragment","epistemic":"authored_background","title":"路牌旁的旧引光框","text":"路牌旁留着一小段未闭合的引光框，作为旧时手艺的地方背景。它没有可拆库存，也不表示新的道路已经开放。回镇仍沿已登记的小径。"}
+    ]},
+    {"object_id":"windleaf-rack","location_id":"windleaf-shelter","entries":[
+      {"id":"windleaf-shelter-use","epistemic":"authored_background","title":"普通木棚里的奇异叶片","text":"棚前的架位让居民比较光叶的开合、风纹和潮湿。做好一件东西、改变办法、放下问题或带它回镇，都是这里允许的生活。初始架位为空。"},
+      {"id":"windleaf-lamp-value","epistemic":"authored_viewpoint","actor_id":"lamp-keeper-001","actor_name":"灯穗","title":"让回镇的一段路看得清","text":"灯穗的初始取舍是优先照顾归途的可见性与灯的耐用，愿意考虑把光叶作为有限灯衬。此处未发生请求、承诺或交付。"},
+      {"id":"windleaf-shade-value","epistemic":"authored_viewpoint","actor_id":"shade-collector-001","actor_name":"影栖","title":"也给幽暗留下位置","text":"影栖的初始取舍是保留低地的幽暗与细小光色，不希望每片叶子都被采去照明。此处没有发生争执或达成共识。"}
+    ]},
+    {"object_id":"windleaf-return-table","location_id":"windleaf-return-platform","entries":[
+      {"id":"windleaf-return-choice","epistemic":"authored_background","title":"带回去，也可以留下","text":"归枝台是整理随身材料和考虑用途的停步处。真正采得的光叶能带去镇中给已有个人夜灯装灯衬；空篮、放弃和下次再来也有位置。没有完成采集的叶片不能出现在袋里。"}
+    ]},
+    {"object_id":"square-noticeboard","location_id":"fog-lamp-square","entries":[
+      {"id":"windleaf-old-town-frame","epistemic":"authored_background","title":"镇中的旧引光框","text":"告示板旁的旧引光框有修过的接缝和一处缺口，供居民挂上亲手做成的余辉小灯。框的旧痕是作者背景；每盏个人灯的来源、安装与读数由实际任务记录，初始不会凭故事亮起一盏灯。"},
+      {"id":"windleaf-leaf-inlay-use","epistemic":"authored_background","title":"有限的光叶灯衬","text":"一片实际携带的光叶与一份布料可装成自己既有小灯的灯衬。它在六个真实小时内逐渐退去：稍遮暗灯光，同时减慢开灯时的夜间耗光。旧灯的编号和余辉标本出处保留，拆灯不回收已使用的叶片。"},
+      {"id":"windleaf-town-differing-uses","epistemic":"authored_viewpoint","actor_id":"lamp-keeper-001","actor_name":"灯穗","title":"够看清，比一味更亮要紧","text":"灯穗关心夜归人能看清近处与灯能用多久；影栖更愿意保留林里的暗处。两种作者设定的偏好可以成为将来商量的起点，尚不代表双方已见面或发言。"}
+    ]}
+  ]
+}

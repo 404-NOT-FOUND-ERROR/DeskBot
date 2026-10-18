@@ -1,0 +1,343 @@
+{
+  "schema": "deskbot.continuity.review.v1",
+  "note": "确定性规则回放。前态、时间与选择由夹具编排，任务通过实际执行器结算。不是模型自然跨日记录。",
+  "traces": [
+    {
+      "id": "timed-reading",
+      "title": "该复测的时候，时间是明确的",
+      "kind": "rule_replay",
+      "rows": [
+        {
+          "label": "刚完成一次实际测记",
+          "at": "2026-10-11T03:04:00.000Z",
+          "time": {
+            "utc": "2026-10-11T03:04:00.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-11 11:04:00"
+          },
+          "question": "想弄清我架的回声杯在风和水位变化时怎样发声，选一个现在可以做的方法继续试试",
+          "wait_for": null,
+          "next_review": null,
+          "condition": "unbound",
+          "wait_started_at": null,
+          "task_count": 3,
+          "notes": 1,
+          "outbox_count": 0
+        },
+        {
+          "label": "保留原问题，在半小时条件到期时复查",
+          "at": "2026-10-11T03:04:00.000Z",
+          "time": {
+            "utc": "2026-10-11T03:04:00.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-11 11:04:00"
+          },
+          "question": "想弄清我架的回声杯在风和水位变化时怎样发声，选一个现在可以做的方法继续试试",
+          "wait_for": {
+            "kind": "activity",
+            "id": "echo-read-bell"
+          },
+          "next_review": "2026-10-11T03:34:00.000Z",
+          "condition": "waiting",
+          "wait_started_at": "2026-10-11T03:04:00.000Z",
+          "task_count": 3,
+          "notes": 1,
+          "outbox_count": 0
+        },
+        {
+          "label": "服务端确认冷却已到期，方法当前可用",
+          "at": "2026-10-11T03:34:00.000Z",
+          "time": {
+            "utc": "2026-10-11T03:34:00.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-11 11:34:00"
+          },
+          "question": "想弄清我架的回声杯在风和水位变化时怎样发声，选一个现在可以做的方法继续试试",
+          "wait_for": {
+            "kind": "activity",
+            "id": "echo-read-bell"
+          },
+          "next_review": "2026-10-11T03:34:00.000Z",
+          "condition": "ready",
+          "wait_started_at": "2026-10-11T03:04:00.000Z",
+          "task_count": 3,
+          "notes": 1,
+          "outbox_count": 0
+        },
+        {
+          "label": "实际执行复测，留下第二份记录",
+          "at": "2026-10-11T03:38:00.000Z",
+          "time": {
+            "utc": "2026-10-11T03:38:00.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-11 11:38:00"
+          },
+          "question": "测试后续仍待自主选择",
+          "wait_for": null,
+          "next_review": "2026-10-12T03:38:00.000Z",
+          "condition": "unbound",
+          "wait_started_at": "2026-10-11T03:38:00.000Z",
+          "task_count": 4,
+          "notes": 2,
+          "outbox_count": 0
+        }
+      ],
+      "previous_behavior": "旧代码等待统一推迟四小时，并用等待理由覆盖原问题。",
+      "new_behavior": "按同一条半小时测记规则计算复查时间；保留原问题和结果出处，到期后仍由选择决定是否执行。",
+      "root": "task:cognitive:fixture:3:2026-10-11T03:34:00.000Z"
+    },
+    {
+      "id": "unanswered-message",
+      "title": "没人回复时，也能重新安排",
+      "kind": "rule_replay",
+      "rows": [
+        {
+          "label": "问题已经实际送达，尚无关联回应",
+          "at": "2026-10-01T02:00:30.000Z",
+          "time": {
+            "utc": "2026-10-01T02:00:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 10:00:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": null,
+          "next_review": "2026-10-02T02:00:30.000Z",
+          "condition": "unbound",
+          "wait_started_at": "2026-10-01T02:00:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        },
+        {
+          "label": "保存明确的回复条件",
+          "at": "2026-10-01T02:00:30.000Z",
+          "time": {
+            "utc": "2026-10-01T02:00:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 10:00:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": {
+            "kind": "reply",
+            "id": "sent:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          },
+          "next_review": "2026-10-01T03:00:30.000Z",
+          "condition": "waiting",
+          "wait_started_at": "2026-10-01T02:00:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        },
+        {
+          "label": "再次复查，等待起点保持不变",
+          "at": "2026-10-01T04:00:30.000Z",
+          "time": {
+            "utc": "2026-10-01T04:00:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 12:00:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": {
+            "kind": "reply",
+            "id": "sent:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          },
+          "next_review": "2026-10-01T05:00:30.000Z",
+          "condition": "waiting",
+          "wait_started_at": "2026-10-01T02:00:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        },
+        {
+          "label": "再次复查，等待起点保持不变",
+          "at": "2026-10-01T06:00:30.000Z",
+          "time": {
+            "utc": "2026-10-01T06:00:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 14:00:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": {
+            "kind": "reply",
+            "id": "sent:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          },
+          "next_review": "2026-10-01T07:00:30.000Z",
+          "condition": "waiting",
+          "wait_started_at": "2026-10-01T02:00:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        },
+        {
+          "label": "等待期限到了，仍未收到关联回复",
+          "at": "2026-10-01T08:01:30.000Z",
+          "time": {
+            "utc": "2026-10-01T08:01:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 16:01:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": {
+            "kind": "reply",
+            "id": "sent:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+          },
+          "next_review": "2026-10-01T07:00:30.000Z",
+          "condition": "review_required",
+          "wait_started_at": "2026-10-01T02:00:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        },
+        {
+          "label": "明确暂缓回复等待，保留原问题与经历",
+          "at": "2026-10-01T08:01:30.000Z",
+          "time": {
+            "utc": "2026-10-01T08:01:30.000Z",
+            "zone": "Asia/Shanghai",
+            "local": "2026-10-01 16:01:30"
+          },
+          "question": "想听听灯穗对余辉的看法",
+          "wait_for": null,
+          "next_review": "2026-10-01T12:01:30.000Z",
+          "condition": "unbound",
+          "wait_started_at": "2026-10-01T08:01:30.000Z",
+          "task_count": 1,
+          "notes": 0,
+          "outbox_count": 1
+        }
+      ],
+      "previous_behavior": "旧等待没有明确回复条件和固定复查期限，原问题会被等待理由覆盖。",
+      "new_behavior": "真实消息和关联回应分别核验；六小时是复查边界，不能靠重写理由续期。暂缓不扣兴趣，也不伪造对方承诺。",
+      "root": "task:cognitive:fixture:0:2026-10-01T02:00:00.000Z"
+    }
+  ],
+  "limits": [
+    "六小时是等待诊断与复查参数，尚待自然体验调校；不要求六小时内必须完成活动。",
+    "相同消息无新回应时拦截重复送达；不同措辞但语义重复仍需模型对照与人工评审。",
+    "回复收到不等于接受邀请，冷却到期也不保证其他材料和设施条件满足。",
+    "原始意图、主观解释和反思仍可能有语义错误；规则与时间视图不保证所有文字正确。",
+    "五案例的安排全部形成实际任务，但两个案例的后续/时间表达仍有疑点或错误；不作为长期生活达标结论。"
+  ],
+  "model": {
+    "note": "五个针对性虚构案例：重放第五阶段第一回合的实际选择/受阻尝试及其生成后续，再运行一次新模型安排和反馈。没有重建旧模型完整目标/需要状态；不是严格随机 A/B 或总体成功率。",
+    "cases": [
+      {
+        "id": "water-calm:repeat-1",
+        "title": "平静水岸",
+        "at": "2026-10-11T04:04:00.000Z",
+        "prior": "等满半小时后，再测一次浮铃的回声与水位读数，看风和水位变化时它怎么发声",
+        "before_action": "泉眼汲水净滤",
+        "after_action": "重测浮铃回声与水位",
+        "reason": "等满半小时的条件已经满足——上次测记在11:04，现在12:04，正好一小时。浮铃还挂在浮框上，水位从0.454降到0.4485，正是该重测对比的时候。目标就是测记回声与水位，我该做echo-read-bell，用WORK落到浮框上。",
+        "actual_fact": "喵呜的任务「测记自己的浮铃回声与水位」已实际完成。",
+        "success": true,
+        "not_executed": false,
+        "followup": "等满半小时后，再测一次浮铃的回声与水位读数，和刚才 12:08 的读数（水位 0.44815、共振 0.47222、音高 373）做对比，看水位微降时浮铃怎么发声",
+        "next_review_at": "2026-10-11T04:38:00.000Z",
+        "verdict": "到期完成正式复测，没有再因时区误判继续取水。",
+        "limit": "本例反馈的时间与实际读数相符。",
+        "error": null,
+        "latency_ms": 13418
+      },
+      {
+        "id": "night-open:repeat-1",
+        "title": "广场夜灯",
+        "at": "2026-10-11T14:43:30.000Z",
+        "prior": "等灯穗回复后，再决定是合上遮光片留住余辉，还是先拆下小灯回收托盘；想弄清遮光片和昼夜对小灯余辉的实际影响",
+        "before_action": "当面问灯穗余辉观察",
+        "after_action": "测记小灯余辉",
+        "reason": "灯穗就在场，回复还没到。我复查时限已到，不能再干等。小灯读数已从0.12降到0.0067，该测一次再决定合遮光片还是拆灯。",
+        "actual_fact": "喵呜的任务「测记自己小灯的余辉」已实际完成。",
+        "success": true,
+        "not_executed": false,
+        "followup": "把遮光片合上，做一次隔夜留辉的对照：明早再打开并测记小灯的余辉，看遮光片和昼夜实际影响多少。",
+        "next_review_at": "2026-10-11T15:16:30.000Z",
+        "verdict": "未收到意见时先实际测记自己的灯，推进原问题。",
+        "limit": "反馈说“明早”再读；复查时间在同日夜间。复查与下一步执行须继续区分，后续操作尚未验证。",
+        "error": null,
+        "latency_ms": 12130
+      },
+      {
+        "id": "night-closed:repeat-1",
+        "title": "合片余辉",
+        "at": "2026-10-11T12:45:30.000Z",
+        "prior": "等灯穗回应后，再决定是打开遮光片充光、还是合上遮光片继续测余辉衰减；先按实际时间等一次回应或至少半小时，再读一次自己小灯的余辉",
+        "before_action": "当面问灯穗灯的来由",
+        "after_action": "再测一次小灯余辉",
+        "reason": "一小时已到，灯穗仍未回应，等待无意义。小灯已可测记，条件不变（遮光片合着），此刻该取第二个衰减数据点，用WORK完成测记。",
+        "actual_fact": "喵呜的任务「测记自己小灯的余辉」已实际完成。",
+        "success": true,
+        "not_executed": false,
+        "followup": "等灯穗的回应；若到 21:18:30 仍没有回应，就再读一次自己小灯的余辉，取第三个时间点看衰减趋势，暂不开遮光片。",
+        "next_review_at": "2026-10-11T13:18:30.000Z",
+        "verdict": "按已到期窗口取第二份余辉数据，没有再次递送相同问题。",
+        "limit": "新后续仍提等回应，需继续观察会不会再次陷入等待；当前没有验证后续兑现。",
+        "error": null,
+        "latency_ms": 16606
+      },
+      {
+        "id": "care-hold:repeat-1",
+        "title": "苗圃缺水",
+        "at": "2026-10-05T06:03:00.000Z",
+        "prior": "继续照料苔圃苗床：先确认清水来源，再给苗床补水或整理苗木",
+        "before_action": "分取两份鲜苔芽备料",
+        "after_action": "前往回声水岸找清水",
+        "reason": "复查时间到了：苗床湿度从0.549降到0.493，育苗架清水仍为0，光等不会变出水来。唯一可用方法是glow-take-cuttings，但取苔芽不解决补水。既然等待无果，我该换个办法——去水岸看看能否取到清水，同时这也是探索的机会。",
+        "actual_fact": "喵呜的任务「前往回声水岸」已实际完成。",
+        "success": true,
+        "not_executed": false,
+        "followup": "在回声水岸的泉眼汲水净滤，把清水带回苔芽圃补给育苗架储水，再给苗床补水",
+        "next_review_at": "2026-10-05T06:24:00.000Z",
+        "verdict": "实际到达回声水岸，沿原找水问题改变办法。",
+        "limit": "只完成前往水岸；尚未取水、带回和补给，不能算缺水问题已解决。",
+        "error": null,
+        "latency_ms": 13972
+      },
+      {
+        "id": "water-wind:repeat-1",
+        "title": "风起水岸",
+        "at": "2026-10-11T04:09:00.000Z",
+        "prior": "等浮铃在新悬点（0.35）稳定后再做一次 echo-read-bell，看风 12 m/s 下入水更深时音调与共振是否继续按这次的方向走",
+        "before_action": "复测浮铃回声与水位",
+        "after_action": "复查浮铃0.35读数",
+        "reason": "浮铃降到0.35已经一小时，读数稳定了，正是复查的时候。现场无人可谈，也没有别处非去不可。我该做的是测记一次，和旧读数比对。",
+        "actual_fact": "喵呜的任务「测记自己的浮铃回声与水位」已实际完成。",
+        "success": true,
+        "not_executed": false,
+        "followup": "先做一次现场观察，记录浮铃在 0.35 悬点、风 12 m/s 下的入水深度与外观状态，作为 12:43 可测记前的稳定参照；到点后再做 echo-read-bell，与 11:04 的旧读数（height 0.5、tone 376、resonance 0.092）和 12:13 的调整瞬间读数（height 0.35、tone 439、resonance 0.034）比对。",
+        "next_review_at": "2026-10-11T04:43:00.000Z",
+        "verdict": "保留原复查方向并实际完成测记。",
+        "limit": "反馈把新测记称为“调整瞬间读数”，分类错误仍然保留；规则采用成功不等于文字全部可靠。",
+        "error": null,
+        "latency_ms": 16440
+      }
+    ],
+    "provider_calls": 43,
+    "upper_cny": 0.60846552,
+    "unknown_usage": 0,
+    "successful_actual_tasks": 5,
+    "feedback_failures": 0,
+    "complete_case_median_ms": 13972,
+    "complete_case_max_ms": 16606,
+    "version": "f36f09c2101f"
+  },
+  "world": {
+    "status": "设计草案，尚未实现新地图",
+    "candidate": "风语林（工作名）",
+    "idea": "从熟悉的镇边进入林深，在风和光叶之间观察、制作、留下标记，再带着旧问题返回。",
+    "areas": [
+      {
+        "name": "林间低地",
+        "purpose": "安静观察、休息、照料与复看"
+      },
+      {
+        "name": "风口棚",
+        "purpose": "比较收集架和风向，维护自己的造物"
+      },
+      {
+        "name": "归枝台",
+        "purpose": "整理材料、与居民交接、讨论不同解释"
+      }
+    ]
+  }
+}
