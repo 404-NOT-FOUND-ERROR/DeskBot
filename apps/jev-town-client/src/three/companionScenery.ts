@@ -10,6 +10,8 @@ import {createResonantLifeScene} from './resonantLifeScene.ts';
 import {createProjectScene} from './projectScene.ts';
 import {createWindleafScene} from './windleafScene.ts';
 import {shellVaultGeometry} from './moltedShellGeometry.ts';
+import {addShellHouse,architectureFrame,type ShellHouseKind} from './shapingArchitecture.ts';
+import {createWorkplaceDetails} from './workplaceDetails.ts';
 import {hasWindleaf,windleafHeightAt} from './windleafLayout.ts';
 
 const C = { wood:0x997052, dark:0x5e5142, cream:0xe8dfc3, teal:0x508e86, soil:0x765b40, leaf:0x7eab59, water:0x6eabb2, red:0xb6513c };
@@ -64,6 +66,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
   const fantasyEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createFantasyInquiryScene>>}[]=[];
   const resonantEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createResonantLifeScene>>}[]=[];
   const projectEffects:{locationId:string;effect:NonNullable<ReturnType<typeof createProjectScene>>}[]=[];
+  const workplaceDetails:NonNullable<ReturnType<typeof createWorkplaceDetails>>[]=[];
   const cloth:THREE.Group[]=[];
   const glowTexture=createSoftLightTexture();
   const stockSlots=new Map<string,THREE.Group[]>();
@@ -91,27 +94,22 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     m.ball(1.6,0,3,0,seed%2 ? 0x659057 : 0x89a85e);m.ball(1.2,.5,4,0,0x93b56d);m.finish("wind-canopy");
   }
   function cottage(m:Model,x:number,z:number,roof=0x718d84,w=6,wall=C.cream) {
-    const shell=shellVaultGeometry(w+.5,4.9,5.4,.28);
     const outside=new THREE.Color(0xf3edcf).lerp(new THREE.Color(roof),.24).getHex();
-    m.add(shell.outer,x,.3,z,outside);m.add(shell.inner,x,.3,z,0x588a91);m.add(shell.rim,x,.3,z,0xf2ddaf);
-    // A low rear wall, round openings and the old work courtyard remain usable.
-    m.box(w*.7,2.9,.25,x,.3,z-2.35,new THREE.Color(wall).lerp(new THREE.Color(0x9ac6be),.45).getHex());
-    m.box(1.1,2.1,.12,x,.3,z+2.55,C.dark);
-    for(const dx of [-w*.32,w*.32]) {
-      m.add(new THREE.TorusGeometry(.56,.13,4,12),x+dx,2.27,z+2.58,0xd7b880);
-      m.add(new THREE.CircleGeometry(.49,12),x+dx,2.27,z+2.59,0x477b87);
-      const glow=new THREE.Mesh(new THREE.CircleGeometry(.43,12),new THREE.MeshBasicMaterial({color:0xffdf99,transparent:true,opacity:0}));
-      glow.position.set(x+dx,2.27,z+2.65);glow.name='occupied-window';
+    const model=m.parent.userData.model;
+    const kinds:Record<string,ShellHouseKind>={nursery:'petal',workshop:'vault',courtyard:'split',home:'lantern',homes:x<0?'split':'petal'};
+    const architecture=addShellHouse(architectureFrame(m,x,.13,z),{kind:kinds[model]??'vault',width:w+.3,height:4.6,depth:4.9,color:outside,open:model==='workshop'});
+    m.parent.userData.architecture=kinds[model]??'vault';
+    for(const window of architecture.windows) {
+      const glow=new THREE.Mesh(new THREE.CircleGeometry(window.radius*.96,12),new THREE.MeshBasicMaterial({color:0xffdf99,transparent:true,opacity:0}));
+      glow.position.set(x+window.x,.13+window.y,z+window.z);glow.name='occupied-window';
       glow.userData={light_channel:'window',location_id:m.parent.userData.location_id,model:m.parent.userData.model,variation:lamps.length};m.parent.add(glow);lamps.push(glow);
-      // Mullions, sills, and lintels keep the window legible even with its room light off.
-      m.box(1.25,.15,.3,x+dx,1.62,z+2.59,C.wood);m.box(.09,1.15,.08,x+dx,1.7,z+2.69,C.cream);
-      m.box(1,.08,.08,x+dx,2.27,z+2.69,C.cream);
     }
+    void wall;
   }
-  function table(m:Model,x:number,z:number,w=4) {
+  function table(m:Model,x:number,z:number,w=4,benches=true) {
     m.box(w,.25,1.8,x,1.5,z,C.wood);
     for(const dx of [-w*.4,w*.4])m.box(.25,1.2,.25,x+dx,.3,z,C.dark);
-    for(const dz of [-1.4,1.4]) {m.box(w,.2,.55,x,.8,z+dz,C.wood);m.box(.25,.5,.55,x-w*.4,.3,z+dz,C.dark);m.box(.25,.5,.55,x+w*.4,.3,z+dz,C.dark);}
+    if(benches)for(const dz of [-1.4,1.4]) {m.box(w,.2,.55,x,.8,z+dz,C.wood);m.box(.25,.5,.55,x-w*.4,.3,z+dz,C.dark);m.box(.25,.5,.55,x+w*.4,.3,z+dz,C.dark);}
   }
   function pond(parent:THREE.Group,x:number,z:number,w:number,d:number) {
     const m=new Model(parent);m.box(w+.5,.25,d+.5,x,.32,z,0xbabfa1);m.finish("water-bank");
@@ -134,14 +132,18 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     };
     switch(binding.model) {
       case "nursery": {
-        // The user's red barn lot is retained, now a seed store beside a greenhouse.
+        // Preserve the functional seed-store lot while giving it the shell vocabulary.
         cottage(m,3,-3,0x5b4937,5.7,C.red);
-        m.box(2,2.6,.16,3,.3,-.42,0x893c2e);
-        for(const x of [-6,-1])for(const z of [-6,-1])m.box(.13,3.4,.13,x,.3,z,C.teal);
-        m.box(5.2,.15,.18,-3.5,3.65,-1,C.teal);m.box(5.2,.15,.18,-3.5,3.65,-6,C.teal);
-        m.roof(5.4,5.5,1.5,-3.5,3.7,-3.5,0x97c7b1);
-        const glass=new THREE.Mesh(new THREE.BoxGeometry(4.9,3.1,4.9),new THREE.MeshStandardMaterial({color:0x98d3cb,transparent:true,opacity:.27,depthWrite:false,roughness:.15}));
-        glass.position.set(-3.5,1.95,-3.5);group.add(glass);
+        for(let i=0;i<5;i++){
+          const v=i/4,taper=.78+.22*v;
+          const points=Array.from({length:15},(_,j)=>{const a=j/14*Math.PI;return new THREE.Vector3(Math.cos(a)*2.6*taper+Math.sin(v*Math.PI)*5.2*.065,Math.sin(a)*3.6*taper+.04,Math.sin(a)*.52*(1-v));});
+          const rib=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),16,.08,4,false);
+          m.add(rib,-3.5,.3,-6.1+i*1.3,0xe2c99e);
+        }
+        for(const x of [-6.1,-.9])m.box(.14,.25,5.5,x,.3,-3.5,C.teal);
+        const cover=shellVaultGeometry(5.2,3.6,5.2,.1);cover.inner.dispose();cover.rim.dispose();
+        const glass=new THREE.Mesh(cover.outer,new THREE.MeshStandardMaterial({color:0x9bd3c0,transparent:true,opacity:.24,depthWrite:false,roughness:.4,side:THREE.DoubleSide}));
+        glass.name='seed-house-glass';glass.position.set(-3.5,.3,-3.5);group.add(glass);
         fixture("garden-bed",(b,g)=>{
           const seedlings=new THREE.Group();seedlings.name="nursery-seedlings";seedlings.position.y=.83;g.add(seedlings);
           const plants=new Model(seedlings);
@@ -151,6 +153,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
             for(let i=0;i<10;i++)plants.ball(.27,-5.3+i*.95,.13+(i%3)*.07,z,C.leaf);
           }
           plants.finish("nursery-plant-bodies");soil.finish("soil-moisture");g.userData.visual_channels={growth:"nursery-seedlings",health:"nursery-plant-bodies",moisture:"soil-moisture",quantity:"nursery-seedlings"};
+          g.userData.workstations={'water-bed':{standing:[4.1,0,6.35],facing:[4.05,.9,3.7]}};
         });
         fixture("seedling-rack",(b,g)=>{for(const x of [-5.3,-1.7])b.box(.15,2.5,.15,x,.3,-3.2,C.wood);
           for(const y of [.7,1.6,2.4]) {b.box(3.8,.14,1.3,-3.5,y,-3.2,C.wood);for(let i=0;i<5;i++){b.box(.42,.35,.42,-5+i*.75,y+.14,-3.2,0xa77850);b.ball(.24,-5+i*.75,y+.7,-3.2,C.leaf);}}
@@ -239,12 +242,14 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
         cottage(m,0,-3,0xb8734e,7);m.box(.7,3,.7,2,3.5,-3,C.wood);
         fixture("trial-stove",(b,g)=>{b.box(2.4,1.2,1.8,-4,.3,3,0xb6865c);b.cylinder(.6,.15,-4,1.5,3,C.dark);b.box(.6,1.4,.6,-4,1.5,2.3,C.dark);
           g.userData.workstations=Object.fromEntries(['cook-moss','cook-grove-stew','soup-record-ratio','soup-cook-trial','soup-confirm-recipe','cook-leaf-soup'].map(id=>[id,{standing:[-4,0,5],facing:[-4,2,3]}]));});
-        fixture("shared-table",(b,g)=>{table(b,2,4,5);g.userData.workstations=Object.fromEntries(['share-meal','soup-serve-trial','soup-taste-trial'].map(id=>[id,{standing:[.7,0,5.55],facing:[.7,2,4]}]));});lamp(group,6,6);break;
+        fixture("shared-table",(b,g)=>{table(b,2,4,5);g.userData.workstations=Object.fromEntries(['share-meal','soup-serve-trial','soup-taste-trial'].map(id=>[id,{standing:[.7,0,5.55],facing:[2,2,4]}]));
+          g.userData.workstations['share-meal'].standing_by_slot=[2.45,5.55].flatMap(z=>[.25,2,3.75].map(x=>[x,0,z]));
+        });lamp(group,6,6);break;
       }
       case "workshop": {
-        cottage(m,0,-3,C.teal,8);m.box(3,2.7,.2,0,.3,-.35,C.dark);
-        fixture("repair-bench",(b,g)=>{table(b,-2,4,4);b.box(3.7,1.8,.15,-2,1.5,2.9,C.teal);for(let i=0;i<5;i++)b.box(.15,.8,.1,-3.3+i*.65,2,3,0xe3ddc9);
-          g.userData.workstations=Object.fromEntries(['pump-survey','pump-assemble'].map(id=>[id,{standing:[-2.1,0,5.65],facing:[-2.1,2.2,4]}]));});
+        cottage(m,0,-3,C.teal,8);
+        fixture("repair-bench",(b,g)=>{table(b,-2,4,4,false);b.box(3.7,1.8,.15,-2,1.5,2.9,C.teal);for(let i=0;i<5;i++)b.box(.15,.8,.1,-3.3+i*.65,2,3,0xe3ddc9);
+          g.userData.workstations=Object.fromEntries(['pump-survey','pump-assemble','repair-bench','craft-tray','craft-frame-kit'].map(id=>[id,{standing:[-2.1,0,5.65],facing:[-2.1,2.2,4]}]));});
         fixture("parts-drawers",(b)=>{b.box(2.4,2.5,1.1,4,.3,3,C.wood);for(let i=0;i<3;i++)for(let j=0;j<3;j++){b.box(.72,.72,.08,3.2+j*.8,.42+i*.8,3.6,0xbcb492);b.box(.2,.08,.12,3.2+j*.8,.72+i*.8,3.68,C.dark);}});lamp(group,6,6);break;
       }
       case "home": {
@@ -262,6 +267,7 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     lifeEffects.push({locationId:place.location_id,effect:createSceneLifeEffects(group,binding.model,glowTexture)});
     const supply=createResourceSupplyEffects(group,binding.model);if(supply)supplyEffects.push({locationId:place.location_id,effect:supply});
     const projects=createProjectScene(group,binding.model);if(projects)projectEffects.push({locationId:place.location_id,effect:projects});
+    const workplace=createWorkplaceDetails(group,binding.model);if(workplace)workplaceDetails.push(workplace);
     if(['workshop','market','nursery'].includes(binding.model)) {
       const sign=new THREE.Mesh(new THREE.PlaneGeometry(binding.model==='market'?1.3:2,.18),new THREE.MeshBasicMaterial({color:0xf3d79c,transparent:true,opacity:0,depthWrite:false}));
       sign.name='closing-store-light';sign.position.set(binding.model==='market'?-3.4:0,binding.model==='market'?2.5:3.2,binding.model==='market'?1.25:-.2);
@@ -283,7 +289,13 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
         for(let i=0;i<6;i++){const slot=new THREE.Group();slot.name=`stock:${id}:${resource}:${i}`;slot.position.set(spec.x+i*.58,spec.y,spec.z+row*.64);slot.visible=false;object.add(slot);
           const sm=new Model(slot);
           if(resource==='rations'){for(let bowl=0;bowl<4;bowl++){const item=new THREE.Group();item.name=`portion:${bowl}`;slot.add(item);const dish=new Model(item);dish.cylinder(.21,.12,0,bowl*.2,0,C.cream);dish.cylinder(.165,.025,0,.12+bowl*.2,0,0xc4c999);dish.ball(.045,.055,.16+bowl*.2,0,C.leaf);dish.finish('ready-meal-bowl');}}
-          else {sm.box(.46,.58,.46,0,0,0,stockColors[resource]!);sm.finish("stock-stack");}
+          else {
+            if(resource==='wood')for(let n=0;n<3;n++)sm.box(.45,.13,.38,n%2?.025:-.025,n*.17,0,stockColors[resource]!);
+            else if(resource==='cloth'){const roll=new THREE.CylinderGeometry(.21,.21,.42,8);roll.rotateZ(Math.PI/2);sm.add(roll,0,.25,0,stockColors[resource]!);sm.add(new THREE.TorusGeometry(.15,.025,3,8).rotateY(Math.PI/2),.215,.25,0,C.cream);}
+            else if(resource==='water') {sm.add(new THREE.CylinderGeometry(.20,.15,.53,8),0,.27,0,C.teal);sm.cylinder(.10,.08,0,.53,0,C.cream);}
+            else {sm.add(new THREE.CylinderGeometry(.25,.19,.40,8),0,.2,0,0xb59b72);sm.add(new THREE.TorusGeometry(.235,.025,3,8).rotateX(Math.PI/2),0,.41,0,C.cream);for(let n=0;n<3;n++)sm.ball(.09,Math.cos(n*2.1)*.11,.43,Math.sin(n*2.1)*.11,stockColors[resource]!);}
+            sm.finish("stock-stack");
+          }
           slots.push(slot);}
         stockSlots.set(`${id}:${resource}`,slots);
       });
@@ -296,6 +308,8 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     }
   }
   function applyState(next:readonly DeskBotLocation[]) {
+    // Missing objects in a newer snapshot must not leave stale task evidence.
+    for(const object of objects.values())delete object.userData.state;
     forest?.applyState(next);
     const states=new Map<string,DeskBotObjectState>();
     for(const place of next)for(const area of place.areas??[])for(const object of area.objects??[])if(object.state){states.set(object.object_id,object.state);const group=objects.get(object.object_id);if(group)group.userData.state_scope='persistent_living';}
@@ -351,5 +365,6 @@ export function buildCompanionScenery(locations: readonly DeskBotLocation[]): Co
     for(const {locationId,effect} of fantasyEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
     for(const {locationId,effect} of resonantEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
     for(const {locationId,effect} of projectEffects)effect.update(time,reducedMotion,context?{...context,activities:activitiesByLocation.get(locationId)??[]}:undefined);
+    for(const detail of workplaceDetails)detail.update(time,reducedMotion,context);
   }};
 }

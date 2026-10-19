@@ -4,8 +4,14 @@ export const SHAPING_RENDER_BOUNDS={min_x:-8,min_y:0,max_x:302,max_y:280};
 const clamp=(v:number)=>Math.max(-1,Math.min(1,v));
 function town(x:number,y:number){
   const u=clamp((x-58)/60),v=clamp((y-62)/60);
-  return {x:135+(x-58)*Math.sqrt(1-.30*v*v)+6*Math.sin((y-62)*.035),
-    y:140+(y-62)*Math.sqrt(1-.24*u*u)+4*Math.sin((x-58)*.035)};
+  // A bounded, low-frequency bend gives the settlement winding lanes rather
+  // than rotated square blocks. The same bijection moves paths, feet, labels
+  // and facilities; saved positions and admitted travel times stay canonical.
+  const envelope=Math.exp(-((x-60)**2+(y-69)**2)/6200);
+  const bendX=7.2*Math.sin((y-38)*.071)*envelope;
+  const bendY=6.3*Math.sin((x-28)*.067)*envelope;
+  return {x:135+(x-58)*Math.sqrt(1-.30*v*v)+6*Math.sin((y-62)*.035)+bendX,
+    y:140+(y-62)*Math.sqrt(1-.24*u*u)+4*Math.sin((x-58)*.035)+bendY};
 }
 /** Canonical coordinates remain stable persistence keys. This continuous,
  * non-square presentation puts the town in the centre and bends the existing
@@ -46,6 +52,22 @@ export function projectShapingScenery(root:THREE.Group){
     v.setFromMatrixPosition(before.get(node)!);projectVector(v);
     if(node.parent){node.parent.updateWorldMatrix(true,false);v.applyMatrix4(node.parent.matrixWorld.clone().invert());}
     node.position.copy(v);node.updateWorldMatrix(true,false);
+    // Work and inspection points are semantic geometry too. Leaving them in
+    // the old local space would put workers beside the newly bent workbench.
+    const remap=(point:readonly number[],owner:THREE.Object3D)=>{
+      const p=new THREE.Vector3(point[0],point[1],point[2]).applyMatrix4(before.get(owner)!);
+      projectVector(p).applyMatrix4(owner.matrixWorld.clone().invert());return p.toArray();
+    };
+    for(const key of ['work_anchor','inspection_anchor','arrival_anchor']){
+      if(Array.isArray(node.userData[key]))node.userData[key]=remap(node.userData[key],node);
+    }
+    if(node.userData.workstations&&node.parent){
+      node.userData.workstations=Object.fromEntries(Object.entries(node.userData.workstations).map(([id,entry])=>{
+        const point=entry as {standing:number[];facing:number[];standing_by_slot?:number[][]};
+        return [id,{...point,standing:remap(point.standing,node.parent!),facing:remap(point.facing,node.parent!),
+          ...(point.standing_by_slot?{standing_by_slot:point.standing_by_slot.map(p=>remap(p,node.parent!))}:{})}];
+      }));
+    }
     if(node instanceof THREE.InstancedMesh){instances.push({mesh:node,matrix:before.get(node)!,last:-1});continue;}
     if(!(node instanceof THREE.Mesh)||!node.geometry.getAttribute('position'))continue;
     const original=node.geometry,g=original.clone(),position=g.getAttribute('position'),inverse=node.matrixWorld.clone().invert();

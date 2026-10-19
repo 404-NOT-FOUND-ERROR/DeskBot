@@ -5,6 +5,14 @@ import type { SceneLifeContext } from './sceneLifeEffects.ts';
 import {createFloatingSeedbedArtifact,createWaterPumpArtifact,createRecipeArtifact} from './projectArtifacts.ts';
 
 const recipes:Record<string,{target:string;location:string;pose:string}>={
+  'waylight-build-open':{target:'floating-frame',location:'echo-waterside',pose:'craft'},
+  'waylight-build-hooded':{target:'floating-frame',location:'echo-waterside',pose:'craft'},
+  'waylight-craft-shade':{target:'repair-bench',location:'spare-parts-house',pose:'craft'},
+  'waylight-fit-shade':{target:'floating-frame',location:'echo-waterside',pose:'craft'},
+  'waylight-open':{target:'floating-frame',location:'echo-waterside',pose:'care'},
+  'waylight-shade':{target:'floating-frame',location:'echo-waterside',pose:'care'},
+  'waylight-repair':{target:'floating-frame',location:'echo-waterside',pose:'craft'},
+  'waylight-use':{target:'floating-frame',location:'echo-waterside',pose:'care'},
   'seedbed-survey':{target:'floating-frame',location:'echo-waterside',pose:'observe'},
   'seedbed-plant':{target:'floating-frame',location:'echo-waterside',pose:'care'},
   'seedbed-inspect':{target:'floating-frame',location:'echo-waterside',pose:'observe'},

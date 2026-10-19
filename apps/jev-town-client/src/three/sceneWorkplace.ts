@@ -15,7 +15,7 @@ export function sceneStandingSurfaceAt(object:THREE.Object3D,anchor:THREE.Vector
 }
 
 /** Resolve a committed task's visible workstation before the first render. */
-export function sceneWorkAnchor(object: THREE.Object3D, road: THREE.Vector3, activityId?: string): THREE.Vector3 {
+export function sceneWorkAnchor(object: THREE.Object3D, road: THREE.Vector3, activityId?: string, facilitySlot?:number): THREE.Vector3 {
   object.updateWorldMatrix(true, true);
   // Forest fixtures carry their own transform (including a raised deck and
   // a reversible frame); their local working point must not use the lot parent.
@@ -27,7 +27,8 @@ export function sceneWorkAnchor(object: THREE.Object3D, road: THREE.Vector3, act
     // so an overhead roof or a workbench cannot become a resident's floor.
     return sceneStandingSurfaceAt(object,anchor);
   }
-  const point = activityId ? object.userData.workstations?.[activityId]?.standing : undefined;
+  const station=activityId?object.userData.workstations?.[activityId]:undefined;
+  const point = (Number.isInteger(facilitySlot)?station?.standing_by_slot?.[facilitySlot!]:undefined)??station?.standing;
   if (point && object.parent) {
     const anchor = object.parent.localToWorld(new THREE.Vector3(...point as [number, number, number]));
     return anchor;

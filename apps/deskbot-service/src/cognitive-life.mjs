@@ -3,6 +3,14 @@ import {createCognitionBridge} from './cognition-bridge.mjs';
 import {cognitiveActorIds,cognitiveContext,cognitiveActualResult,cognitivePerson} from './cognitive-life-state.mjs';
 import {scheduleCognitiveActor,fairCognitiveQueue} from './cognitive-schedule.mjs';
 
+export function readCognitiveLifeStatus(world,{budget,at,clockScope='real_time',activeActors=[],maxPlans=4,enabled=true}={}) {
+  return {schema:'deskbot.cognitive-life.status.v2',clock_scope:clockScope,at,enabled,
+    engine:'Asamana Agent / Need / Decision / Memory / Reflection + Node authoritative tasks',max_plans_per_actor:maxPlans,active_actors:activeActors,
+    actors:cognitiveActorIds(world).map(id=>({actor_id:id,name:cognitivePerson(world,id)?.display_name??id,
+      location_id:cognitivePerson(world,id)?.location_id,location_name:world.locations.find(l=>l.location_id===cognitivePerson(world,id)?.location_id)?.name,life:world.cognition?.actors[id]??null})),
+    tasks:(world.tasks??[]).filter(t=>t.origin==='cognitive_life').slice(-20),budget};
+}
+
 export function createCognitiveLife({world,budget,now=()=>new Date(),clockScope='real_time',mode='real',bridge=null,maxPlans=4,maxConcurrent=2}={}){
   const transport=bridge??createCognitionBridge({workerFile:'life_worker.py',timeoutMs:180000,maxFrames:45,mode});
   const active=new Map();let closed=false;
@@ -71,11 +79,7 @@ export function createCognitiveLife({world,budget,now=()=>new Date(),clockScope=
       :run(item.actor_id,item.phase).catch(e=>({actor_id:item.actor_id,error:e.code??e.message})))));
     return results;
   }
-  function status(){const snapshot=world.get();return {schema:'deskbot.cognitive-life.status.v2',clock_scope:clockScope,at:now().toISOString(),
-    engine:'Asamana Agent / Need / Decision / Memory / Reflection + Node authoritative tasks',max_plans_per_actor:maxPlans,
-    active_actors:[...active.keys()],actors:cognitiveActorIds(snapshot).map(id=>({actor_id:id,name:cognitivePerson(snapshot,id)?.display_name??id,
-      location_id:cognitivePerson(snapshot,id)?.location_id,location_name:snapshot.locations.find(l=>l.location_id===cognitivePerson(snapshot,id)?.location_id)?.name,life:snapshot.cognition?.actors[id]??null})),
-    tasks:(snapshot.tasks??[]).filter(t=>t.origin==='cognitive_life').slice(-20),budget:budget.status()};}
+  function status(){return readCognitiveLifeStatus(world.get(),{budget:budget.status(),at:now().toISOString(),clockScope,activeActors:[...active.keys()],maxPlans});}
   for(const id of cognitiveActorIds(world.get())){const job=world.get().cognition?.actors[id]?.job;if(job?.status==='calling')mutate(id,'error',job.id,{error:'interrupted_on_restart'});}
   function configure(id,{enabled=true,continuous=true}={}){return mutate(id,'configure',`configure-${id}-${randomUUID()}`,{enabled,continuous});}
   return {run,tick,status,configure,close:async()=>{closed=true;transport.close();await Promise.allSettled([...active.values()].map(entry=>entry.promise));}};

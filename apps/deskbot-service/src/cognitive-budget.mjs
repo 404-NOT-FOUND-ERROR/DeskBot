@@ -25,7 +25,7 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
     return {approval,used_upper_cny:used,remaining_cny:approval.limit_cny===null?null:Math.max(0,approval.limit_cny-used),calls:calls.map(({response,...r})=>r),queued,
       billed_cost_cny:null,cost_note:'按峰时价格保守估算；失败且无用量的调用保留预留额度，不代表账户账单。',retrieval:'local lexical + recency; no paid embedding'};
   }
-  async function execute(callId,request){
+  async function execute(callId,request,enqueuedAt){
     if(closed)throw error('broker_closed');
     if(!Array.isArray(request.messages)||request.messages.length>12||request.messages.some(m=>!['user','system','assistant'].includes(m.role)||typeof m.content!=='string'))throw error('invalid_model_messages');
     const max_tokens=Math.min(1800,Math.max(256,Math.floor(request.max_tokens||900)));
@@ -47,8 +47,9 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
       persistence.put(NS,callId,row);
     };
     if(persistence.transaction)persistence.transaction(reserve);else reserve();
-    const reportUsage=()=>onUsage?.({call_id:callId,category:`cognition.${request.phase??request.stage??request.scene??'unknown'}`,scope:request.usage_scope??'isolated_experiment',model:'deepseek-flash',
-      status:row.status,started_at:row.started_at,usage:row.usage,latency_ms:row.latency_ms,error_code:row.error_code});
+    const queueMs=Math.round(performance.now()-enqueuedAt);
+    const reportUsage=()=>onUsage?.({call_id:callId,request_id:callId,provider_kind:testProvider?'fixture':'provider',category:`cognition.${request.phase??request.stage??request.scene??'unknown'}`,scope:request.usage_scope??'isolated_experiment',model:'deepseek-flash',
+      queue_ms:queueMs,request_elapsed_ms:Math.round(performance.now()-enqueuedAt),status:row.status,started_at:row.started_at,usage:row.usage,latency_ms:row.latency_ms,error_code:row.error_code});
     const started=performance.now();row.status='calling';persistence.put(NS,callId,row);reportUsage();
     try{
       let payload;
@@ -84,7 +85,7 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
   }
   function complete(id,request){
     if(queued>=12)return Promise.reject(error('model_queue_full'));
-    queued++;const promise=tail.then(()=>execute(id,request));tail=promise.catch(()=>{});
+    queued++;const enqueuedAt=performance.now(),promise=tail.then(()=>execute(id,request,enqueuedAt));tail=promise.catch(()=>{});
     return promise.finally(()=>queued--);
   }
   return {complete,status,close:async()=>{closed=true;await tail;}};

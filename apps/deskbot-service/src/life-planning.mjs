@@ -35,8 +35,13 @@ function materialPlanner(world, actorId) {
     } else if(resource==='frame_kit') {
       while(carried(projected,actorId,'frame_kit')<count)append('craft-frame-kit',depth+1);
     } else if(resource==='light_fruit') {
-      transfer('seedling-rack','light_fruit',Math.min(missing,Math.floor(stock(projected,'seedling-rack','light_fruit'))));
+      transfer('trial-stove','light_fruit',Math.min(missing,Math.floor(stock(projected,'trial-stove','light_fruit'))));
+      transfer('seedling-rack','light_fruit',Math.min(count-carried(projected,actorId,'light_fruit'),Math.floor(stock(projected,'seedling-rack','light_fruit'))));
       while(carried(projected,actorId,'light_fruit')<count)append('gather-light-fruit',depth+1);
+    } else if(resource==='light_leaf') {
+      while(carried(projected,actorId,'light_leaf')<count)append('leaf-gather',depth+1);
+    } else if(resource==='waylight_shade') {
+      while(carried(projected,actorId,'waylight_shade')<count)append('waylight-craft-shade',depth+1);
     } else if(resource==='moss') {
       transfer('seedling-rack','moss',Math.min(missing,Math.floor(stock(projected,'seedling-rack','moss'))));
       if(carried(projected,actorId,'moss')<count) {
@@ -114,11 +119,11 @@ export function seedSupplySteps(world,actorId,target=4) {
 export function cookAndStoreSteps(world,actorId) {
   const plan=materialPlanner(world,actorId);plan.tryCooking();plan.storeMeals();return plan.steps;
 }
-export function fruitSupplySteps(world,actorId,target=2) {
+export function fruitSupplySteps(world,actorId,target=2,destination='seedling-rack') {
   const plan=materialPlanner(world,actorId);
-  const missing=Math.max(0,Math.ceil(target-stock(plan.projected,'seedling-rack','light_fruit')));
+  const missing=Math.max(0,Math.ceil(target-stock(plan.projected,destination,'light_fruit')));
   while(carried(plan.projected,actorId,'light_fruit')<missing)plan.append('gather-light-fruit');
-  if(missing>0)plan.transfer('seedling-rack','light_fruit',missing,'store');return plan.steps;
+  if(missing>0)plan.transfer(destination,'light_fruit',missing,'store');return plan.steps;
 }
 export function depositSteps(world,actorId,objectId,resource) {
   const plan=materialPlanner(world,actorId);

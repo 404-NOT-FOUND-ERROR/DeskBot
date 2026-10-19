@@ -23,6 +23,7 @@ import { createFakeLlm, LlmProviderError } from './llm.mjs';
 import { createChatOrchestrator } from './chat-orchestrator.mjs';
 import { createLifeObservation } from './life-observation.mjs';
 import { createCognitiveRuntime } from './cognitive-runtime.mjs';
+import { createWorldObserver } from './world-observer.mjs';
 import { createCognitionStage1 } from './cognition-stage1.mjs';
 import { createEvidenceLedger } from './evidence-ledger.mjs';
 import { createOutputRouter, OutputRouterError } from './output-router.mjs';
@@ -191,6 +192,7 @@ export function createDeskBotServer({
   cognitiveBudgetFilename = undefined,
   cognitiveExperimentFilename = undefined,
   modelUsage = null,
+  runtimeProfile = null,
 } = {}) {
   const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
   function bodyContextForPeer(peer) {
@@ -248,7 +250,7 @@ export function createDeskBotServer({
   const lifeObservation = createLifeObservation({worldSnapshot:()=>persistentWorld.get(),persistence,now});
   let cognitionStage1 = configuredCognitionStage1;
   let cognitiveRuntime=configuredCognitiveRuntime;
-  const cognitiveLife=()=>cognitiveRuntime??=createCognitiveRuntime({world:persistentWorld,now,budgetFilename:cognitiveBudgetFilename,experimentFilename:cognitiveExperimentFilename,modelUsage});
+  const cognitiveLife=()=>cognitiveRuntime??=createCognitiveRuntime({world:persistentWorld,worldFilename:persistence?.filename,now,budgetFilename:cognitiveBudgetFilename,experimentFilename:cognitiveExperimentFilename,modelUsage});
   const cognitionLab = () => cognitionStage1 ??= createCognitionStage1({filename:cognitionStage1Filename});
   let lifeChoiceWorker;
   function tickAutonomousLife(options) {
@@ -258,6 +260,10 @@ export function createDeskBotServer({
   lifeChoiceWorker=createLifeChoiceWorker({world:persistentWorld,llm,now,
     reserved:reservedForLife,
     wake:id=>autonomousLife.tick({wakeId:id})});
+  const worldObserver = createWorldObserver({ persistentWorld, worldLife, roleEvolution, inputReadModel, now,
+    runtimeOptions: world => ({ autonomousLifeEnabled, worldLifeEnabled, cognitiveWorkerRunning: Boolean(configuredCognitiveRuntime),scope:runtimeProfile?.scope??'live',
+      modelConfigured: llm.id !== 'fake-llm-v0.1' && llm.status?.().configured === true,
+      reservedActors: world.npcs.filter(n => npcGoals.reserved(n.npc_id) || sharedLife.plans().some(p => !p.cancelled_at && p.steps.some(s => ['pending','waiting','failed'].includes(s.status) && (s.payload.npc?.npc_id ?? s.payload.npc_id) === n.npc_id))).map(n => n.npc_id) }) });
   const orchestrator = chatOrchestrator ?? createChatOrchestrator({
     inputStore,
     stateEngine,
@@ -498,8 +504,8 @@ export function createDeskBotServer({
         return result;
       } });
   }
-  function inputReadModel(world = persistentWorld.get()) {
-    const view = refractionReadModel(world, { now: now() });
+  function inputReadModel(world = persistentWorld.get(), at = now()) {
+    const view = refractionReadModel(world, { now: at });
     if (!view) return view;
     const connections = inputRuntime.status().sources.filter(s => sourceAdapters.has(s.source_id));
     if (connections.length) view.source_status = view.source_status.filter(s => s.id !== 'external');
@@ -561,11 +567,19 @@ export function createDeskBotServer({
 
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
+    if(request.method==='GET'&&url.pathname==='/api/life/model-usage'){
+      const scope=url.searchParams.get('scope')??'all';
+      if(!['all','live','lab','unclassified'].includes(scope)){sendJson(response,400,{error:{code:'invalid_usage_scope'}});return;}
+      sendJson(response,200,modelUsage?.status({scope,run_id:url.searchParams.get('run')==='current'?runtimeProfile?.run_id??null:null})??{available:false,note:'此服务未安装调用观测。'});return;
+    }
+    if(request.method==='GET'&&url.pathname==='/api/runtime/observability'){
+      sendJson(response,200,{schema:'deskbot.runtime-observability.v1',profile:runtimeProfile?{scope:runtimeProfile.scope,run_id:runtimeProfile.run_id,clock_scope:runtimeProfile.clock_scope,started_at:runtimeProfile.started_at}:null,
+        storage:persistence?.storageStats?.()??null,read_only:true});return;
+    }
     if(url.pathname.startsWith('/api/life/cognitive-life/') && request.method!=='OPTIONS'){
       const reportError=e=>sendJson(response,e.code==='cognitive_actor_busy'?409:422,{error:{code:e.code??'cognitive_life_failed',message:e.message}});
       try{
         if(request.method==='GET'&&url.pathname==='/api/life/cognitive-life/status'){sendJson(response,200,cognitiveLife().status());return;}
-        if(request.method==='GET'&&url.pathname==='/api/life/model-usage'){sendJson(response,200,modelUsage?.status()??{schema:'deskbot.model-usage.v1',available:false,note:'此服务未安装调用观测。'});return;}
         if(request.method==='POST'&&url.pathname==='/api/life/cognitive-life/run'){
           readJson(request,4096).then(body=>{
             if(Object.keys(body).some(k=>!['scope','actor_id','phase'].includes(k)))throw Object.assign(new Error('Only scope, actor_id and phase allowed.'),{code:'invalid_cognitive_request'});
@@ -1740,6 +1754,12 @@ export function createDeskBotServer({
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/world/snapshot') {
+      try { sendJson(response, 200, worldObserver.snapshot({ worldId: url.searchParams.get('world_id') ?? undefined, characterId: url.searchParams.get('character_id') ?? undefined })); }
+      catch (error) { sendJson(response, error.statusCode ?? 500, { error: error.code ?? 'world_snapshot_failed', message: error.message }); }
+      return;
+    }
+
     // The map is a read model derived from canonical world state. Travel is
     // intentionally funneled through the normal world.mutation ingestion path
     // so adjacency, event blocking, time costs, and idempotency stay server-owned.
@@ -1887,6 +1907,19 @@ export function createDeskBotServer({
             message: expected ? error.message : 'travel request failed',
           });
         });
+      return;
+    }
+
+    if(request.method==='GET'&&['/api/world/operations','/api/world/replay'].includes(url.pathname)) {
+      try {
+        const worldId=url.searchParams.get('world_id')??undefined;
+        if(worldId&&!persistentWorld.get(worldId))throw Object.assign(new Error('world not found'),{statusCode:404,code:'world_not_found'});
+        if(url.pathname==='/api/world/replay'&&!url.searchParams.has('sequence'))throw Object.assign(new Error('sequence required'),{statusCode:400,code:'invalid_history_cursor'});
+        const result=url.pathname==='/api/world/operations'
+          ? persistentWorld.listOperations({worldId,cursor:url.searchParams.get('cursor'),limit:url.searchParams.get('limit')??20,order:url.searchParams.get('order')??'asc'})
+          : persistentWorld.replayAt({worldId,sequence:url.searchParams.get('sequence')});
+        sendJson(response,200,result);
+      }catch(error){sendJson(response,error.statusCode??500,{error:error.code??'history_read_failed',message:error.statusCode?error.message:'历史读取失败。'});}
       return;
     }
 

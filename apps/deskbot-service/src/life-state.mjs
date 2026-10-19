@@ -23,7 +23,7 @@ export function syncLifeNeeds(world, at) {
 export function finishLifeTask(world, task, at) {
   const state = world.autonomy?.actors[task.actor_id];
   if (!state || task.status !== 'completed') return;
-  if (task.activity_id === 'share-meal') state.appetite = clamp(state.appetite - .65);
+  if (task.activity_id === 'share-meal') {state.appetite = clamp(state.appetite - .65);state.last_meal_at=at;state.meal_wait_started_at=null;state.meal_need=null;}
   // Queue checks are quiet waiting. Elapsed needs still settle above, but a
   // three-minute check must not cost as much effort as a real care activity.
   if (task.life_action !== 'rest' && !(task.life_goal === 'wait-meal' && task.life_action === 'observe'))

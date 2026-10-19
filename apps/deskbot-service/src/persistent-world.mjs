@@ -9,6 +9,7 @@ import { applyLifeChoice } from './autonomous-life.mjs';
 import { WorldMapError, loadWorldMapContent, installWorldMapContent, upgradeAuthoredScene, upgradeCommunitySupplyMap, upgradeWindleafMap, setPassageAccess, worldHopAccess, findWorldPath, passageFor, presentationRouteFor } from './world-map-content.mjs';
 import {installWindleafLife} from './windleaf-life.mjs';
 import {installWindleafStory} from './windleaf-story.mjs';
+import {installWaylightLife} from './waylight-life.mjs';
 import { getWorldEnvironment } from './world-environment.mjs';
 import { installRefraction, refractInput, refractionReadModel } from './input-refraction.mjs';
 import { installResidentLife } from './resident-life.mjs';
@@ -19,6 +20,9 @@ import { respondSocialInvitation, socialReadModel, SocialLifeError } from './soc
 import { advanceAutonomousLife, controlAutonomy, autonomyReadModel, AutonomousLifeError } from './autonomous-life.mjs';
 import { LivingResourceError, installLivingResources, installResourceRenewal, installCommunitySupply, advanceLivingResources, setLivingWeatherWindow, transferLivingResource, livingObjectReadModel, livingReadModel } from './living-resources.mjs';
 import { createHash } from 'node:crypto';
+import {DELTA_SCHEMA, diffWorld, worldHash} from './world-delta.mjs';
+import {createWorldHistory} from './world-history.mjs';
+import {traceWorldOperation} from './world-operation-trace.mjs';
 import { RealTimeWorldError, activeWorldTask, applyRealTimeClock, localWorldDate, startTravelTask, startActivityTask, controlWorldTask, advanceWorldTask } from './realtime-world.mjs';
 
 import {
@@ -155,27 +159,6 @@ function stableStringify(value) {
 
 function valuesEqual(left, right) {
   return stableStringify(left) === stableStringify(right);
-}
-
-function diffValues(before, after, path = '') {
-  if (valuesEqual(before, after)) return [];
-
-  const beforeObject = before && typeof before === 'object';
-  const afterObject = after && typeof after === 'object';
-  if (!beforeObject || !afterObject || Array.isArray(before) || Array.isArray(after)) {
-    return [{
-      field_path: path || '/',
-      old_value: clone(before),
-      new_value: clone(after),
-    }];
-  }
-
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-  return keys.flatMap((key) => diffValues(
-    before[key],
-    after[key],
-    `${path}/${key}`,
-  ));
 }
 
 function fingerprint(value) {
@@ -624,6 +607,7 @@ function migrateWorldToCurrentSetting(world, now) {
   }
   if(installWindleafLife(next,timestamp)){changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'windleaf-life-v1',applied_at:timestamp,scope:'additive_finite_forest_life',past_events_created:0,preserved_existing_stocks:true}];}
   if(installWindleafStory(next,timestamp)){changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'windleaf-old-light-v1',applied_at:timestamp,scope:'additive_authored_lore_and_finite_wind_trace',past_events_created:0,preserved_existing_stocks:true}];}
+  if(installWaylightLife(next,timestamp)){changed=true;next.world_revision++;next.schema_migrations=[...(next.schema_migrations??[]),{id:'waterside-waylight-v1',applied_at:timestamp,scope:'empty_shared_fixture_and_finite_daily_uses',past_events_created:0,preserved_existing_stocks:true}];}
 
   const initialField = createInitialShapingField(
     typeof next.shaping_field?.shaping_time === 'string' ? next.shaping_field.shaping_time : timestamp,
@@ -1465,12 +1449,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     installResonantLife(initial,initial.created_at);
     installWindleafLife(initial,initial.created_at);
     installWindleafStory(initial,initial.created_at);
+    installWaylightLife(initial,initial.created_at);
     worlds.set(initial.world_id, initial);
     persistence?.put('canonical-world.states', initial.world_id, initial);
   }
 
   const lazyMutationHistory = Boolean(persistence?.listMetadata && persistence?.get);
-  const mutationIndexFields = ['mutation_id', 'event_id', 'world_id', 'sequence'];
+  const mutationIndexFields = ['mutation_id', 'event_id', 'world_id', 'sequence', 'schema'];
   const storedMutations = lazyMutationHistory
     ? persistence.listMetadata('canonical-world.mutations', mutationIndexFields)
     : persistence?.list('canonical-world.mutations') ?? [];
@@ -1492,6 +1477,8 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     if (!value) throw new PersistentWorldError(500, 'missing_mutation_history', `missing stored mutation ${index.mutation_id}`);
     return value;
   }
+
+  const history=createWorldHistory({persistence,indexes:()=>storedMutations,readMutation});
 
   function get(worldId = DEFAULT_WORLD_ID) {
     const world = worlds.get(worldId);
@@ -1518,8 +1505,9 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       .map(index => clone(readMutation(index)));
   }
 
-  function persistCommit(world, mutation, countedTurn = null, archiveEntries=[]) {
+  function persistCommit(world, mutation, countedTurn = null, archiveEntries=[], checkpoint=null) {
     const operation = () => {
+      history.persist(checkpoint);
       if(archiveEnabled)persistCognitiveArchive(persistence,archiveEntries);
       persistence?.put('canonical-world.states', world.world_id, world);
       if (persistence?.insert) {
@@ -1790,13 +1778,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
     if(observationAccepted){syncLivedMemory(projection.next,now().toISOString());settlePracticalTrials(projection.next,now().toISOString());settleBodyPerception(projection.next,now().toISOString());}
     const next = observationAccepted ? finalizeWorld(projection.next, now) : clone(world);
     const archiveEntries=prepareCognitiveArchive(next,{enabled:archiveEnabled});
-    const changes = diffValues(world, next).filter((change) => change.field_path !== '/updated_at');
+    const changes = diffWorld(world, next);
     for (const change of changes) {
       change.source_layer = 'L3';
       change.layer = 'world';
     }
     const mutation = {
-      schema: 'foundry.world-mutation-record.v0.1',
+      schema: 'foundry.world-mutation-record.v0.2',
       mutation_id: `mutation-${eventId}`,
       sequence: nextSequence,
       world_id: next.world_id,
@@ -1834,7 +1822,13 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
       committed_at: now().toISOString(),
     };
 
-    persistCommit(next, mutation, countedTurn,archiveEntries);
+    const previousSequence=storedMutations.findLast(m=>m.world_id===world.world_id)?.sequence??0;
+    const beforeHash=worldHash(world),checkpoint=history.prepare(world,mutation,previousSequence,beforeHash);
+    mutation.replay={schema:DELTA_SCHEMA,base_checkpoint_id:checkpoint.base_checkpoint_id,
+      previous_sequence:previousSequence,before_hash:beforeHash,after_hash:worldHash(next)};
+    mutation.operation_trace=traceWorldOperation(world,next,mutation);
+    persistCommit(next, mutation, countedTurn,archiveEntries,checkpoint.checkpoint);
+    checkpoint.commit(mutation.replay.after_hash);
     worlds.set(next.world_id, next);
     const mutationIndex = lazyMutationHistory
       ? Object.fromEntries(mutationIndexFields.map(field => [field, mutation[field]]))
@@ -1889,8 +1883,15 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
   return {
     get,
     cognitionView,
+    readSnapshot({ worldId } = {}) {
+      const world = get(worldId);
+      const sequence = world ? (storedMutations.findLast(m => m.world_id === world.world_id)?.sequence ?? 0) : 0;
+      return { world, sequence };
+    },
     ingest,
     listMutations,
+    listOperations(options={}) {return history.page({...options,worldId:options.worldId??DEFAULT_WORLD_ID});},
+    replayAt(options={}) {return history.replayAt({...options,worldId:options.worldId??DEFAULT_WORLD_ID});},
     syncWallClock,
     syncTasks,
   };
@@ -1898,7 +1899,7 @@ export function createPersistentWorld({ now = () => new Date(), persistence = nu
 
 // Derived read model for map clients. It never becomes a second source of
 // truth: every value is rebuilt from the canonical snapshot on each request.
-export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) {
+export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID, now = new Date() } = {}) {
   if (!world || typeof world !== 'object') return null;
   const protagonist = world.protagonist || {};
   const currentLocationId = canonicalLocationId(protagonist.location_id);
@@ -1973,7 +1974,7 @@ export function getWorldMap(world, { characterId = DEFAULT_CHARACTER_ID } = {}) 
     world_revision: world.world_revision,
     logical_time: clone(world.logical_time),
     clock: clone(world.clock ?? { mode: 'simulation' }),
-    environment: getWorldEnvironment(world),
+    environment: getWorldEnvironment(world, { now }),
     living: livingReadModel(world),
     autonomy: autonomyReadModel(world),
     memory: memoryReadModel(world),

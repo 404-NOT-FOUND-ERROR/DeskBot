@@ -1,6 +1,7 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync,statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import {encodeRecord,decodeRecord} from './storage-codec.mjs';
 
 function requireName(value, field) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -66,13 +67,13 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
       requireName(namespace, 'namespace'),
       requireName(recordId, 'recordId'),
     );
-    return row ? JSON.parse(row.payload_json) : null;
+    return row ? decodeRecord(row.payload_json) : null;
   }
 
   function list(namespace) {
     return listStatement
       .all(requireName(namespace, 'namespace'))
-      .map((row) => JSON.parse(row.payload_json));
+      .map((row) => decodeRecord(row.payload_json));
   }
 
   // Project small scalar fields without materializing large historical payloads.
@@ -89,7 +90,7 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
     putStatement.run(
       requireName(namespace, 'namespace'),
       requireName(recordId, 'recordId'),
-      JSON.stringify(value),
+      encodeRecord(namespace,value),
       now().toISOString(),
     );
     return value;
@@ -99,7 +100,7 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
     insertStatement.run(
       requireName(namespace, 'namespace'),
       requireName(recordId, 'recordId'),
-      JSON.stringify(value),
+      encodeRecord(namespace,value),
       now().toISOString(),
     );
     return value;
@@ -115,9 +116,18 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
   function page(namespace,{afterId='',limit=100}={}) {
     return database.prepare('SELECT record_id,payload_json FROM records WHERE namespace=? AND record_id>? ORDER BY record_id LIMIT ?')
       .all(requireName(namespace,'namespace'),afterId,Math.min(200,Math.max(1,limit)))
-      .map(row=>({id:row.record_id,value:JSON.parse(row.payload_json)}));
+      .map(row=>({id:row.record_id,value:decodeRecord(row.payload_json)}));
   }
   function count(namespace){return database.prepare('SELECT count(*) AS n FROM records WHERE namespace=?').get(namespace).n;}
+  function storageStats({logical=false}={}) {
+    const bytes=path=>{try{return statSync(path).size;}catch(e){if(e.code==='ENOENT')return 0;throw e;}};
+    const pages=database.prepare('PRAGMA page_count').get().page_count,free=database.prepare('PRAGMA freelist_count').get().freelist_count,
+      pageSize=database.prepare('PRAGMA page_size').get().page_size;
+    return {schema:'deskbot.storage-stats.v1',sampled_at:now().toISOString(),database_bytes:bytes(databasePath),wal_bytes:bytes(databasePath+'-wal'),shm_bytes:bytes(databasePath+'-shm'),
+      allocated_bytes:pages*pageSize,freelist_bytes:free*pageSize,
+      ...(logical?{namespaces:database.prepare('SELECT namespace,count(*) AS records,sum(length(CAST(payload_json AS BLOB))) AS json_bytes FROM records GROUP BY namespace').all()}:{}),
+      note:'WAL 是尚未合并或复用的日志文件，不等于新增人生内容；此读取不清理或压缩存档。'};
+  }
   function indexMemory(namespace,id,memory){
     database.prepare('INSERT INTO cognitive_memory_index VALUES (?,?,?,?,?) ON CONFLICT(namespace,record_id) DO UPDATE SET search_text=excluded.search_text, importance=excluded.importance, occurred_at=excluded.occurred_at')
       .run(namespace,id,String(memory.payload.stored_content??memory.payload.raw_content??''),memory.payload.importance??0,memory.occurred_at??memory.interpreted_at??'');
@@ -153,7 +163,7 @@ export function createSqlitePersistence({ filename, now = () => new Date() } = {
     kind: 'sqlite',
     list,
     listMetadata,
-    page,count,indexMemory,searchMemory,
+    page,count,indexMemory,searchMemory,storageStats,
     put,
     remove,
     transaction,

@@ -1,6 +1,8 @@
 import { ACTIVITIES, transferLivingResource } from './living-resources.mjs';
 import { findWorldPath } from './world-map-content.mjs';
-import { activeWorldTask, startTravelTask, startActivityTask, localWorldDate } from './realtime-world.mjs';
+import { activeWorldTask, startTravelTask, startActivityTask, controlWorldTask, localWorldDate } from './realtime-world.mjs';
+import {installMealCoordination,freeDiningSeats} from './meal-coordination.mjs';
+import {syncMealNeeds,compareMealNeeds,mealPolicyEnabled,mealSupplyReadModel,hasProviderMeal} from './meal-policy.mjs';
 import { AUTONOMY_VERSION, installAutonomy, syncLifeNeeds, lifeNote } from './life-state.mjs';
 
 import { activitySteps, waterSupplySteps, seedSupplySteps, depositSteps, cookAndStoreSteps, fruitSupplySteps } from './life-planning.mjs';
@@ -16,6 +18,7 @@ import { activityTopic, developmentFacetsReadModel } from './development-facets.
 import { practicalTrialCandidates, practicalTrialPlanMayContinue, recordPracticalTrialTask } from './role-practical-trials.mjs';
 import { roleStageLifeProfile, roleStageCandidates } from './role-stages.mjs';
 import { syncLifeRhythm, lifeFollowupCandidates, readFollowupSite } from './life-rhythm.mjs';
+import {waylightCandidates} from './waylight-life.mjs';
 const MINUTE = 60000;
 const PROFILE = {
   'shaping-001': { interests: ['care', 'craft', 'explore'], places: ['moss-sprout-garden', 'spare-parts-house', 'backlit-grove'], rest: 'shaping-field-desk', quiet: '把今天的小事理一理' },
@@ -35,22 +38,56 @@ const SUPPLY_TARGETS=new Set(['trial-stove','light-fruit-bough','garden-bed']);
 function supplyClaims(world,at,exceptId) {
   return Object.values(world.autonomy?.actors??{}).filter(s=>s.actor_id!==exceptId&&!s.paused&&['planned','executing'].includes(s.plan?.status))
     .filter(s=>{const task=activeWorldTask(world,s.actor_id);return task?.status!=='paused'&&(task||Date.parse(at)-Date.parse(s.plan.created_at)<120*MINUTE);})
-    .flatMap(s=>s.plan.steps.slice(s.plan.index).filter(step=>step.kind==='activity').map(step=>({actor_id:s.actor_id,plan_id:s.plan.plan_id,
-      activity_id:step.activity_id,target:ACTIVITIES.find(recipe=>recipe.activity_id===step.activity_id)?.target})))
+    .flatMap(s=>{
+      const current=world.tasks.find(t=>t.task_id===s.plan.task_id);
+      const steps=s.plan.steps.slice(s.plan.index+(current?.status==='completed'?1:0));
+      return steps.filter(step=>step.kind==='activity').map(step=>({actor_id:s.actor_id,plan_id:s.plan.plan_id,
+        activity_id:step.activity_id,target:ACTIVITIES.find(recipe=>recipe.activity_id===step.activity_id)?.target,
+        ready:!mealPolicyEnabled(world)||steps[0]===step||current?.status==='running'&&current.activity_id===step.activity_id}));
+    })
+    // A distant future cooking step cannot monopolize an idle stove. Only the
+    // next executable activity claims it; actual occupancy still validates every start.
+    .filter(claim=>claim.target!=='trial-stove'||claim.ready)
     .filter(claim=>SUPPLY_TARGETS.has(claim.target));
 }
 function checkSupplyClaim(world,at,id,steps) {
   const targets=new Set(steps.filter(step=>step.kind==='activity').map(step=>ACTIVITIES.find(recipe=>recipe.activity_id===step.activity_id)?.target).filter(target=>SUPPLY_TARGETS.has(target)));
   const peer=supplyClaims(world,at,id).find(claim=>targets.has(claim.target));
-  if(peer)throw planError(`${actor(world,peer.actor_id).display_name}已经在准备这项补给，等实际结果或另选一件事。`);
+  if(peer)throw Object.assign(planError(`${actor(world,peer.actor_id).display_name}已经在准备这项补给，等实际结果或另选一件事。`),{blocker_code:'supply_promised',blocking_actor_id:peer.actor_id,target_object_id:peer.target});
   return steps;
+}
+function mealQueue(world,{includeWaiters=false,reserved=[]}={}) {
+  const lastMeal=personId=>Date.parse(world.autonomy.actors[personId].last_meal_at??'')||world.tasks.filter(task=>task.actor_id===personId&&task.activity_id==='share-meal'&&task.status==='completed').reduce((latest,task)=>Math.max(latest,Date.parse(task.finished_at??task.due_at)),0);
+  return Object.values(world.autonomy.actors).filter(s=>{
+    const task=activeWorldTask(world,s.actor_id);
+    return !s.paused&&!world.cognition?.actors?.[s.actor_id]?.enabled&&s.appetite>.6&&actor(world,s.actor_id)?.location_id==='warm-pot-courtyard'
+      &&(!task||includeWaiters&&task.origin==='autonomous_life'&&task.status==='running'&&task.life_goal==='wait-meal'&&['rest','observe'].includes(task.life_action)&&s.plan?.task_id===task.task_id&&s.plan?.goal==='wait-meal')
+      &&!reservedSocialActors(world).includes(s.actor_id)&&!reserved.includes(s.actor_id);
+  })
+    .sort((a,b)=>mealPolicyEnabled(world)?compareMealNeeds(a,b):b.appetite-a.appetite||lastMeal(a.actor_id)-lastMeal(b.actor_id)||a.actor_id.localeCompare(b.actor_id));
 }
 function mealTurn(world,id) {
   if(actor(world,id).location_id!=='warm-pot-courtyard')return true;
-  const lastMeal=personId=>world.tasks.filter(task=>task.actor_id===personId&&task.activity_id==='share-meal'&&task.status==='completed').reduce((latest,task)=>Math.max(latest,Date.parse(task.finished_at??task.due_at)),0);
-  const people=Object.values(world.autonomy.actors).filter(s=>!s.paused&&s.appetite>.6&&actor(world,s.actor_id)?.location_id==='warm-pot-courtyard'&&!activeWorldTask(world,s.actor_id)&&!reservedSocialActors(world).includes(s.actor_id))
-    .sort((a,b)=>b.appetite-a.appetite||lastMeal(a.actor_id)-lastMeal(b.actor_id)||a.actor_id.localeCompare(b.actor_id));
-  return !people.length||people[0].actor_id===id;
+  if(hasProviderMeal(world,id,world.clock.synced_at)&&stock(world,'shared-table','rations')>0&&freeDiningSeats(world)>0)return true;
+  const people=mealQueue(world,{includeWaiters:mealPolicyEnabled(world)}),places=Math.min(Math.floor(stock(world,'shared-table','rations')),freeDiningSeats(world));
+  return people.slice(0,places).some(s=>s.actor_id===id);
+}
+function wakeMealWaiters(world,at,reserved) {
+  if(!world.living.coordination?.wake_waiters)return [];
+  const available=Math.min(Math.floor(stock(world,'shared-table','rations')),freeDiningSeats(world));
+  const queue=mealQueue(world,{includeWaiters:true,reserved}).slice(0,available);
+  for(const state of queue) {
+    const task=activeWorldTask(world,state.actor_id);
+    if(task) {
+      // Only this engine's interruptible queue wait can be superseded. User
+      // pauses, travel, work, social promises and cognition are never cancelled.
+      controlWorldTask(world,{task_id:task.task_id,operation:'cancel'},at);
+      task.wait_wakeup={reason:'portion_and_seat_available',at,plan_id:state.plan?.plan_id??null};
+      if(state.plan?.goal==='wait-meal'){state.plan.status='superseded';state.plan.finished_at=at;state.plan.task_id=null;}
+    }
+    state.next_decision_at=at;delete state.cooldowns.meal;
+  }
+  return queue.map(s=>s.actor_id);
 }
 
 const observationTopic=(destination,profile)=>destination==='moss-sprout-garden'?'care'
@@ -101,23 +138,24 @@ function candidates(world, state, at) {
   function add(goal,title,reason,score,build) {
     if(Date.parse(state.cooldowns[goal]??'')>Date.parse(at))return;
     try { result.push({goal,title,reason,score,steps:checkSupplyClaim(world,at,id,build()),available:true}); }
-    catch(error) { result.push({goal,title,reason,score,available:false,blocked_reason:error.message}); }
+    catch(error) { result.push({goal,title,reason,score,available:false,blocked_reason:error.message,blocked_code:error.blocker_code??error.code??'unknown',blocking_actor_id:error.blocking_actor_id??null,target_object_id:error.target_object_id??null}); }
   }
   function activity(goal,id,reason,score){add(goal,ACTIVITIES.find(r=>r.activity_id===id).title,reason,score,()=>activitySteps(world,state.actor_id,id));
     const candidate=result.find(c=>c.goal===goal);if(candidate)Object.assign(candidate,{activity_id:id,development_topic:activityTopic(id)});}
   const night=minute>=1380||minute<360;
   if(state.energy<.4 || night) add('rest','休息一会儿',night?'天晚了，先留出休息的时间。':'有些累了，先恢复精神。',state.energy<.2?150:night?115:100,()=>{
     // Exhausted residents recover where they are before undertaking a walk.
-    const destination=state.energy<.2?actor(world,id).location_id:world.locations.some(l=>l.location_id===profile.rest)?profile.rest:actor(world,id).location_id;
+    const destination=state.energy<.2||mealPolicyEnabled(world)&&state.appetite>.9?actor(world,id).location_id:world.locations.some(l=>l.location_id===profile.rest)?profile.rest:actor(world,id).location_id;
     const reachable=findWorldPath(world,actor(world,id).location_id,destination);
-    const duration=night?Math.min(21600,Math.max(3600,((minute<360?360:1800)-minute)*60))
+    let duration=night?Math.min(21600,Math.max(3600,((minute<360?360:1800)-minute)*60))
       :Math.min(10800,Math.max(2700,Math.ceil((.65-state.energy)/.22*3600)));
+    if(mealPolicyEnabled(world)&&state.appetite>.6)duration=Math.min(duration,Math.max(900,Math.floor((.9-state.appetite)/.025*3600)));
     return [...(reachable&&destination!==actor(world,id).location_id?[{kind:'travel',location_id:destination}]:[]),{kind:'rest',duration_seconds:duration,title:'休息一会儿'}];
   });
   if(carried(world,id,'rations')>0&&stock(world,'shared-table','rations')<(objects['shared-table'].capacity??24))
     add('store-meals','把做好的饭留到长桌','先把随身袋里的饭放上长桌，让回来的人都找得到。',145,()=>depositSteps(world,id,'shared-table','rations'));
   if(state.appetite>.6) add('meal','在长桌吃一份饭','想吃点东西，先确认长桌或厨房还有什么。',state.appetite>.9?140:95,()=>{
-    if(stock(world,'shared-table','rations')>0&&!mealTurn(world,id))throw planError('先让同桌更饿、上次吃饭更早的人拿到一份。');
+  if(stock(world,'shared-table','rations')>0&&!mealTurn(world,id))throw Object.assign(planError('先让用餐需要更早到期、等得更久的人拿到一份。'),{blocker_code:'meal_queue',target_object_id:'shared-table'});
     return activitySteps(world,id,'share-meal');
   });
   if(bed.quantity>0 && bed.moisture<.32)activity('water','water-bed','苗床正在失水，想先照看这一批苗。',bed.moisture<.18?110:70);
@@ -136,16 +174,19 @@ function candidates(world, state, at) {
   if(profile.interests.includes('craft') && stock(world,'seedling-rack','trays')+carried(world,id,'trays')<2) add('tray','做一只育苗托盘','想试着做点苗圃能用上的东西。',35,()=>[...activitySteps(world,id,'craft-tray'),{kind:'travel',location_id:object(world,'seedling-rack').location_id},{kind:'transfer',object_id:'seedling-rack',resource:'trays',count:1,operation:'store'}]);
   const hungry=Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id)&&s.appetite>.6).length;
   const mealReserve=Math.min(10,Math.max(4,hungry+2));
-  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')<mealReserve)
+  const supply=mealSupplyReadModel(world,at);
+  const pipeline=world.living.coordination?.parallel_preparation&&supply.uncovered_needs>0&&supply.potential_portions>0
+    &&!supply.commitments.some(c=>c.ingredient_units>0);
+  if(profile.interests.includes('cook') && stock(world,'shared-table','rations')+(mealPolicyEnabled(world)?supply.potential_portions:0)<mealReserve)
     add('cook','做一锅饭放到长桌','先看苗圃和林间实际采回的食材，做成一锅，再把每一份放到长桌。',hungry?90:65,()=>cookAndStoreSteps(world,id));
-  if(objects['light-fruit-bough']&&stock(world,'shared-table','rations')<mealReserve&&stock(world,'seedling-rack','light_fruit')<2) {
+  if(objects['light-fruit-bough']&&stock(world,'shared-table','rations')<mealReserve&&stock(world,'seedling-rack','light_fruit')+stock(world,'trial-stove','light_fruit')<2) {
     if(carried(world,id,'light_fruit')>0)add('store-fruit','把光果带回共用育苗架','让厨房能看到已经采到的食材，回来的人也能取用。',88,()=>depositSteps(world,id,'seedling-rack','light_fruit'));
     else if(profile.interests.includes('care')||profile.interests.includes('explore')||profile.interests.includes('trade'))
-      add('fruit-supply','采一篮光果送回苗圃','林间果枝有成熟光果时，采下实际的一篮，送到公共食材架。',hungry?86:62,()=>fruitSupplySteps(world,id));
+      add('fruit-supply',pipeline?'采一篮光果直接送到厨房':'采一篮光果送回苗圃',pipeline?'这一锅仍不够大家吃，趁备餐时采下一篮，直接送到灶边接上下一锅。':'林间果枝有成熟光果时，采下实际的一篮，送到公共食材架。',pipeline&&!(stock(world,'shared-table','rations')>0&&mealTurn(world,id))?(state.appetite>.9?141:96):hungry?86:62,()=>fruitSupplySteps(world,id,2,pipeline?'trial-stove':'seedling-rack'));
   }
   const blockedMeal=result.find(choice=>choice.goal==='meal'&&!choice.available);
   if(!blockedMeal)state.meal_wait_started_at=null;
-  if(blockedMeal&&(stock(world,'shared-table','rations')>0||world.tasks.some(task=>['running','paused'].includes(task.status)&&task.target_object_id==='shared-table')||supplyClaims(world,at,id).some(claim=>claim.target==='trial-stove')))
+  if(blockedMeal&&(stock(world,'shared-table','rations')>0||world.tasks.some(task=>['running','paused'].includes(task.status)&&task.target_object_id==='shared-table')||supplyClaims(world,at,id).some(claim=>claim.target==='trial-stove')||mealPolicyEnabled(world)&&supply.commitments.length>0))
     add('wait-meal','在饭桌附近等一小会儿','已有饭或有人正在做这餐，先过去等空位，三分钟后再看真实结果。',state.appetite>.9?139:94,()=>{
       if(!findWorldPath(world,actor(world,id).location_id,'warm-pot-courtyard'))throw planError('到饭桌的路暂时不通。');
       const longer=Date.parse(at)-Date.parse(state.meal_wait_started_at??at)>=15*MINUTE;
@@ -153,6 +194,11 @@ function candidates(world, state, at) {
         {kind:longer?'rest':'observe',title:longer?'在长桌旁歇歇，稍后再看这餐':'等长桌和厨房空下来',duration_seconds:longer?900:180}];
     });
   const waiting=result.find(c=>c.goal==='wait-meal');
+  if(waiting)waiting.wait_context={code:blockedMeal.blocked_code,reason:blockedMeal.blocked_reason,
+    blocking_actor_id:blockedMeal.blocking_actor_id??null,target_object_id:blockedMeal.target_object_id??null,
+    available_portions:stock(world,'shared-table','rations'),free_seats:freeDiningSeats(world),
+    supply_promises:supplyClaims(world,at,id).filter(c=>c.target==='trial-stove'),
+    need:state.meal_need??null,supply};
   if(waiting?.steps?.some(s=>s.kind==='rest'))waiting.reason='这餐还在准备或等空位，先在旁边歇十五分钟，再核验饭桌和厨房的实际结果。';
   for(const project of projectCandidates(world,id,at)) {
     if(!project.available) result.push(project);
@@ -161,6 +207,18 @@ function candidates(world, state, at) {
     if(choice)Object.assign(choice,{project_id:project.project_id,project_stage_id:project.project_stage_id,activity_id:project.activity_id});
   }
   updateProjectScheduling(world,id,at,result.filter(c=>c.project_id));
+  for(const opportunity of waylightCandidates(world,id,at)) {
+    const recipe=ACTIVITIES.find(r=>r.activity_id===opportunity.activity_id),goal=`waylight:${recipe.activity_id}`;
+    add(goal,recipe.title,opportunity.reason,opportunity.score,()=>{
+      const steps=activitySteps(world,id,recipe.activity_id);
+      if(opportunity.delivery_target)steps.push({kind:'travel',location_id:object(world,opportunity.delivery_target).location_id},
+        {kind:'transfer',object_id:opportunity.delivery_target,resource:'water',count:4,operation:'store'});
+      return steps;
+    });
+    const candidate=result.find(c=>c.goal===goal);
+    if(candidate)Object.assign(candidate,{activity_id:recipe.activity_id,development_topic:activityTopic(recipe.activity_id)});
+    // Authored opportunity/need is not evidence of a freely chosen stable interest.
+  }
   for(const trial of practicalTrialCandidates(world,state,at)) {
     try { result.push({...trial,steps:checkSupplyClaim(world,at,id,trial.steps)}); }
     catch(error) { result.push({...trial,available:false,blocked_reason:error.message}); }
@@ -210,15 +268,23 @@ function executeStep(world,state,at,eventId) {
   if(step.kind==='travel' && actor(world,id).location_id===step.location_id){plan.index++;return;}
   if(step.kind==='transfer') {
     const transferred=transferLivingResource(world,{...step,actor_id:id},at);plan.index++;
+    if(mealPolicyEnabled(world)&&step.operation==='store'&&step.object_id==='shared-table'&&step.resource==='rations')
+      state.meal_delivery={at,portions:step.count,plan_id:plan.plan_id,used:false};
     feedback(world,state,at,'transfer',transferred.text,{plan_id:plan.plan_id});return;
   }
   let task;
+  if(mealPolicyEnabled(world)&&step.activity_id==='share-meal'&&!mealTurn(world,id))
+    throw Object.assign(planError('饭食到达后重新核验排队，这一份先让给更早需要的人。'),{code:'meal_queue'});
   if(step.kind==='travel') {
     const path=findWorldPath(world,actor(world,id).location_id,step.location_id);
     if(!path?.[1])throw planError('当前通路无法到达原定地点。');
     task=startTravelTask(world,{eventId:actionId,at,actorId:id,locationId:path[1],destinationId:step.location_id,reason:plan.reason}).task;
   } else task=startActivityTask(world,{actor_id:id,task_id:`life-${actionId}`,...(step.kind==='activity'?{activity_id:step.activity_id}:{kind:'care',title:step.title,duration_seconds:step.duration_seconds})},{eventId:actionId,at}).task;
   const stored=world.tasks.find(t=>t.task_id===task.task_id);stored.origin='autonomous_life';stored.life_plan_id=plan.plan_id;stored.life_action=step.kind;stored.life_goal=plan.goal;stored.life_source_ids=plan.source_ids??[];
+  if(step.activity_id==='share-meal') {
+    stored.meal_admission={need:structuredClone(state.meal_need??null),basis:hasProviderMeal(world,id,at)?'actual_batch_provider':'need_queue',at};
+    if(state.meal_delivery)state.meal_delivery.used=true;
+  }
   // Preserve the bounded choice and its input references at execution time.
   // Later plans and short-lived input records must not rewrite this task's cause.
   stored.life_decision={source:plan.decision?.source??'rules',at:plan.created_at,
@@ -246,19 +312,23 @@ function executeStep(world,state,at,eventId) {
 export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budget=8}={}) {
   reservedActors=[...reservedActors,...Object.values(world.cognition?.actors??{}).filter(a=>a.enabled).map(a=>a.actor_id)];
   if(world.clock?.mode!=='real_time' || world.living?.recovery.pending || at<world.clock.synced_at || world.tasks.some(t=>t.status==='running'&&t.due_at<=at))return {accepted:false,reason:'life_waiting_for_recovery'};
-  installAutonomy(world,at);syncLifeNeeds(world,at);
+  installAutonomy(world,at);installMealCoordination(world,at);syncLifeNeeds(world,at);
+  syncMealNeeds(world,at);
   syncLifeRhythm(world,at);
   settleResidentProjects(world,at);
   settleRefraction(world,at);
   if(world.social)advanceSocialLife(world,at,{eventId,reservedActors});
   deliverCognitiveSocialResults(world,at);
   const socialReserved=reservedSocialActors(world);
+  const mealReady=wakeMealWaiters(world,at,[...reservedActors,...socialReserved]);
   const states=Object.values(world.autonomy.actors).filter(s=>actor(world,s.actor_id));
   const rotate=(Math.floor(Date.parse(at)/MINUTE)*Math.min(8,budget))%Math.max(1,states.length);
   const rotation=[...states.slice(rotate),...states.slice(0,rotate)];
   const ready=rotation.filter(s=>['ready','fallback'].includes(world.memory?.planner.requests[s.actor_id]?.status));
   const remaining=rotation.filter(s=>!ready.includes(s));
-  const ordered=[...ready,...remaining.filter(s=>!s.paused),...remaining.filter(s=>s.paused)].slice(0,Math.min(8,budget));
+  const priority=[...mealReady.map(id=>states.find(s=>s.actor_id===id)),...ready,...remaining.filter(s=>!s.paused),...remaining.filter(s=>s.paused)];
+  const unique=[...new Map(priority.map(s=>[s.actor_id,s])).values()];
+  const ordered=(world.living.coordination?.chain_instant_steps?unique.filter(s=>!activeWorldTask(world,s.actor_id)):unique).slice(0,Math.min(8,budget));
   for(const entry of ordered) {
     const state=world.autonomy.actors[entry.actor_id];
     const current=activeWorldTask(world,state.actor_id);
@@ -277,7 +347,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
     }
     if(state.paused || reservedActors.includes(state.actor_id) || socialReserved.includes(state.actor_id))continue;
     if(Date.parse(state.next_decision_at)>Date.parse(at))continue;
-    if(!state.plan || ['completed','failed','cancelled'].includes(state.plan.status)) {
+    if(!state.plan || ['completed','failed','cancelled','superseded'].includes(state.plan.status)) {
       const choices=candidates(world,state,at);state.last_candidates=choices.map(({steps,...choice})=>choice).slice(0,12);
       const selection=prepareLifeChoice(world,state,choices,at);if(selection.waiting)continue;
       const choice=selection.choice;if(!choice)continue;
@@ -285,6 +355,7 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
       state.sequence++;
       state.plan={plan_id:`life-plan:${state.actor_id}:${state.sequence}`,goal:choice.goal,title:choice.title,reason:choice.reason,steps:choice.steps,index:0,status:'planned',task_id:null,created_at:at};
       state.plan.source_ids=choice.source_ids??[];state.plan.decision=selection.decision;
+      if(choice.wait_context)state.plan.wait_context=structuredClone(choice.wait_context);
       const invited=(world.refraction?.records??[]).some(r=>choice.source_ids?.includes(r.id)&&r.attested===true&&['dialogue','user','agent'].includes(r.category));
       state.plan.motivation={kind:invited?'invited':choice.goal.startsWith('interest:')||choice.discretionary_practice?'self_continuation':'need',
         basis_score:choice.score-(choice.memory_bonus??0),facet_root_ids:[...(choice.facet_root_ids??[])].slice(-16)};
@@ -299,10 +370,15 @@ export function advanceAutonomousLife(world, at, {eventId,reservedActors=[],budg
     }
     try {
       const trial=structuredClone(world);
-      executeStep(trial,trial.autonomy.actors[state.actor_id],at,eventId);
+      const staged=trial.autonomy.actors[state.actor_id];
+      for(let instant=0;instant<(world.living.coordination?.chain_instant_steps?8:1);instant++) {
+        executeStep(trial,staged,at,eventId);
+        if(activeWorldTask(trial,state.actor_id)||!['planned','executing'].includes(staged.plan?.status))break;
+      }
       Object.assign(world,trial);
     }
-    catch(error){if(!error.code)throw error;abandon(world,state,at,error.message);}
+    catch(error){if(!error.code)throw error;abandon(world,state,at,error.message);
+      if(error.code==='meal_queue'){delete state.cooldowns.meal;state.next_decision_at=at;}}
   }
   world.autonomy.last_cycle_slot=Math.floor(Date.parse(at)/MINUTE);
   settleRefraction(world,at);

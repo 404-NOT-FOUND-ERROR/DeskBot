@@ -436,3 +436,28 @@
 .life-facility-projects strong { font-size: 11px; color: #5d7b66; }.life-facility-projects span,.life-facility-projects small { font-size: 10px; color: #85917b; margin: 0; }
 .life-facility-projects--compact { margin: 5px 0 0; padding: 5px 0 0 7px; border-left: 2px solid #aec8b1; border-radius: 0; background: transparent; }
 .life-facility-projects--compact strong { color: #49644f; }.life-facility-projects--compact span { color: #526a58; }
+.world-runtime{margin:0 0 12px;padding:10px 16px;background:#f4f3ec;border:1px solid #dbded2;border-radius:14px;color:#43504b;font-size:13px;line-height:1.65}
+.world-runtime summary{display:flex;align-items:center;gap:10px;cursor:pointer;flex-wrap:wrap}
+.world-runtime summary>span:last-child{margin-left:auto;color:#64736e;font-variant-numeric:tabular-nums}
+.world-runtime__dot{width:7px;height:7px;border-radius:50%;background:#b78955;flex-shrink:0}
+.world-runtime__dot.is-ready{background:#4f8d79}
+.world-runtime__actors{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:0;list-style:none}
+.world-runtime__actors li{display:grid;gap:2px;background:#ffffff8c;padding:9px 12px;border-radius:8px}
+.world-runtime__actors small{color:#66756e}
+.world-runtime button{border:1px solid #bdcbbf;border-radius:8px;background:#fffdf7;color:inherit;padding:5px 12px;cursor:pointer}
+
+.world-operation-history { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line, #dfe3d5); }
+.world-operation-history h3 { margin: 0 0 .5rem; font-size: 1rem; }
+.world-operation-history > ol { padding: 0; list-style: none; max-height: 28rem; overflow: auto; }
+.world-operation-history > ol > li { margin: .6rem 0; padding: .6rem .8rem; border: 1px solid #dfe3d5; border-radius: .7rem; }
+.world-operation-history summary { cursor: pointer; padding: .3rem 0; }
+.world-operation-history ul { padding-left: 1.1rem; }
+.world-operation-history ul li { margin: .7rem 0; }
+.world-operation-history li span { display: block; color: #58665b; overflow-wrap: anywhere; }
+.world-operation-history button { margin: .25rem .5rem .25rem 0; }
+.runtime-diagnostics{margin-top:1.2rem;padding-top:1rem;border-top:1px solid #dfe3d5;overflow-wrap:anywhere}
+.runtime-diagnostics h3{font-size:1rem;margin:0 0 .5rem}
+.runtime-diagnostics__filters{display:flex;gap:.5rem;flex-wrap:wrap}
+.runtime-diagnostics button[aria-pressed=true]{background:#dce9df;border-color:#8ba596}
+.runtime-diagnostics small{display:block;color:#66756e;line-height:1.6}
+.waylight-story .deskbot-mode__header-actions{margin-top:16px}.waylight-story details{margin-top:12px}.waylight-story details summary{cursor:pointer}.waylight-story a{color:inherit}

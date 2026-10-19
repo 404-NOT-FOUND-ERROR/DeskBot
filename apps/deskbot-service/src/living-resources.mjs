@@ -4,6 +4,8 @@ import { PROJECT_ACTIVITIES, projectActivityReason, projectActivityBinding, proj
 import {FANTASY_ACTIVITIES,fantasyActivityReason,fantasyActivityBinding,applyFantasyActivity,advanceFantasyInquiry} from './fantasy-inquiry.mjs';
 import {RESONANT_ACTIVITIES,resonantActivityReason,resonantActivityBinding,applyResonantActivity,advanceResonantLife} from './resonant-life.mjs';
 import {WINDLEAF_ACTIVITIES,windleafActivityReason,windleafActivityBinding,applyWindleafActivity,advanceWindleafLife} from './windleaf-life.mjs';
+import {diningSeats,nextDiningSlot} from './meal-coordination.mjs';
+import {WAYLIGHT_ACTIVITIES,waylightActivityReason,waylightActivityBinding,applyWaylightActivity,advanceWaylightLife} from './waylight-life.mjs';
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
 export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
 export const SPRING_UNITS_PER_HOUR = .75;
@@ -19,7 +21,7 @@ export class LivingResourceError extends Error {
   constructor(code, message, statusCode = 409) { super(message); this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, status) => { throw new LivingResourceError(code, message, status); };
-export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', light_fruit: '林间光果', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '日常饭食', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤', shade_hood:'可拆遮风罩', echo_bell:'回声浮铃', glow_lens:'带出处的余辉标本',light_leaf:'光叶',leaf_frame_kit:'可拆光叶架' });
+export const RESOURCES = Object.freeze({ raw_water: '泉水原水', water: '清水', seeds: '苔芽种子', moss: '鲜苔芽', light_fruit: '林间光果', wood: '木料', cloth: '布料', fasteners: '紧固件', frame_kit: '浮框修补包', trays: '育苗托盘', rations: '日常饭食', pump_kit: '旧件小泵套件', trial_soup: '叶芽试汤', shade_hood:'可拆遮风罩', echo_bell:'回声浮铃', glow_lens:'带出处的余辉标本',light_leaf:'光叶',leaf_frame_kit:'可拆光叶架',waylight_shade:'归途灯罩' });
 const INITIAL = {
   'floating-frame': { kind: 'waterside', water_level: .46, condition: .67, stock: { raw_water: 12 }, capacity: 24 },
   'garden-bed': { kind: 'plant_bed', moisture: .58, health: .88, growth: .25, quantity: 10 },
@@ -50,7 +52,7 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
   { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
   { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
-  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES, ...WINDLEAF_ACTIVITIES,
+  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES, ...WINDLEAF_ACTIVITIES, ...WAYLIGHT_ACTIVITIES,
 ]);
 function definition(world, objectId) {
   const object = world.map_catalog?.objects?.find(o => o.object_id === objectId);
@@ -187,6 +189,7 @@ function step(world, start, end, daylight) {
   advanceResonantLife(world,start,end,{daylight,rain,wind:fresh?weather.wind_mps:0});
   advanceWindleafLife(world,start,end,{daylight,rain,evaporation,wind:fresh?weather.wind_mps:0,
     weather_source:fresh?{trusted:true,event_id:weather.event_id,from:weather.from,until:weather.until}:null});
+  advanceWaylightLife(world,start,end,{daylight,rain,evaporation,wind:fresh?weather.wind_mps:0});
   for (const id of ['floating-frame', 'seedling-rack', 'repair-bench', 'market-canopy', 'trial-stove']) {
     const item = l.objects[id]; if (!item) continue;
     const exposed = ['floating-frame', 'market-canopy'].includes(id);
@@ -233,9 +236,14 @@ function activityBlocker(world, recipe, actorId, { completion = false, taskId = 
   if (!target || !state) return blocked('facility_missing', 'condition', '这个设施还没有安装。');
   if (actor.location_id !== target.location_id) return blocked('activity_location_changed', 'route', '需要先到这个地点。');
   if (!canUse(world, target, actorId)) return blocked('permission_required', 'coordination', '需要住户同意。');
-  if ((world.tasks ?? []).some(t => ['running', 'paused'].includes(t.status) && t.task_id !== taskId && (t.actor_id === actorId || t.target_object_id === recipe.target))) return blocked('facility_busy', 'coordination', '有人正在使用这个设施，或还有未完成的活动。');
+  const active=(world.tasks??[]).filter(t=>['running','paused'].includes(t.status)&&t.task_id!==taskId);
+  if(active.some(t=>t.actor_id===actorId))return blocked('actor_busy','coordination','自己还有未完成的活动。');
+  const peers=active.filter(t=>t.target_object_id===recipe.target),slots=recipe.activity_id==='share-meal'?diningSeats(world):1;
+  // A meal uses one seat, not the entire table. Paused meals retain their seat
+  // and reserved portion; a different use of the table remains exclusive.
+  if(peers.length>=slots||peers.some(t=>recipe.activity_id==='share-meal'&&t.activity_id!=='share-meal'))return blocked('facility_busy','coordination',recipe.activity_id==='share-meal'?'长桌座位已满，等一位居民用完餐。':'有人正在使用这个设施，或还有未完成的活动。');
   if (!completion && world.living.recovery.pending) return blocked('world_recovery_pending', 'condition', '世界正在补算此前经过的时间。');
-  const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task })??fantasyActivityReason(world,recipe,actorId,at,{completion,task})??resonantActivityReason(world,recipe,actorId,at,{completion,task})??windleafActivityReason(world,recipe,actorId,at,{completion,task});
+  const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task })??fantasyActivityReason(world,recipe,actorId,at,{completion,task})??resonantActivityReason(world,recipe,actorId,at,{completion,task})??windleafActivityReason(world,recipe,actorId,at,{completion,task})??waylightActivityReason(world,recipe,actorId,at,{completion,task});
   if (projectReason) return blocked('project_conditions_changed', 'condition', projectReason);
   const bed = world.living.objects['garden-bed'];
   if (recipe.activity_id === 'harvest-bed' && (!bed || bed.quantity === 0 || bed.growth < .85 || bed.health < .35)) return blocked('crop_not_harvestable', 'condition', '苔芽还未成熟，或苗况不适合收获。');
@@ -262,15 +270,16 @@ function eligibility(world, recipe, actorId, options) { return activityBlocker(w
 export function prepareLivingActivity(world, activityId, actorId, at) {
   const recipe = ACTIVITIES.find(a => a.activity_id === activityId);
   if (!recipe) fail('activity_unknown', '没有这项生活活动。', 400);
-  const reason = eligibility(world, recipe, actorId, { at });
-  if (reason) fail('activity_unavailable', reason);
+  const blocker = activityBlocker(world, recipe, actorId, { at });
+  if (blocker) throw Object.assign(new LivingResourceError('activity_unavailable',blocker.reason),{blocker_code:blocker.code,classification:blocker.classification,target_object_id:recipe.target});
   const projectBinding = projectActivityBinding(world, recipe);
   const reserved = recipe.inputs.map(input => ({ ...input, container: input.container === 'bag' ? `bag:${actorId}` : input.container }));
   for (const input of recipe.inputs) container(world, input.container, actorId).stock[input.resource] -= input.count;
   world.living.revision += 1;
   note(world, at, `${person(world, actorId).display_name ?? '居民'}开始${recipe.title}。`, { kind: 'activity_started', activity_id: activityId, actor_id: actorId });
   return { activity_id: activityId, target_object_id: recipe.target, title: recipe.title, kind: recipe.kind, duration_seconds: recipe.seconds,
-    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved }, ...projectBinding, ...fantasyActivityBinding(world,recipe,actorId),...resonantActivityBinding(world,recipe,actorId),...windleafActivityBinding(world,recipe,actorId) };
+    completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved,
+      ...(activityId==='share-meal'?{facility_slot:nextDiningSlot(world)}:{}) }, ...projectBinding, ...fantasyActivityBinding(world,recipe,actorId),...resonantActivityBinding(world,recipe,actorId),...windleafActivityBinding(world,recipe,actorId),...waylightActivityBinding(world,recipe) };
 }
 export function releaseLivingReservation(world, task, at) {
   if (task.reservation?.status !== 'held') return;
@@ -304,7 +313,7 @@ export function completeLivingActivity(world, task, at) {
     }
     case 'repair-frame': case 'repair-bench': case 'repair-rack': case 'repair-stove': case 'stitch-canopy': target.condition = clamp(target.condition + .35); break;
   }
-  const fantasyResult=applyFantasyActivity(world,recipe,task,at)??applyResonantActivity(world,recipe,task,at)??applyWindleafActivity(world,recipe,task,at);
+  const fantasyResult=applyFantasyActivity(world,recipe,task,at)??applyResonantActivity(world,recipe,task,at)??applyWindleafActivity(world,recipe,task,at)??applyWaylightActivity(world,recipe,task,at);
   const projectResult = applyProjectActivityEffect(world, recipe, task, at);
   if (projectResult) changes.push(...projectResult.stock_changes);
   if (recipe.output) {

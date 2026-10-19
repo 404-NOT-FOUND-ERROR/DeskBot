@@ -5,6 +5,7 @@ import {PALETTE} from './palette.ts';
 import {WINDLEAF_BLUEPRINT as B,windleafHeightAt,windleafTerrainHeightAt,windleafStreamAt,windleafPathDistanceAt} from './windleafLayout.ts';
 import {shapingCoastDistance} from './shapingLandform.ts';
 import {shapingTerrainVertex,clipShapingCoast} from './shapingSurface.ts';
+import {shapingGroundColor} from './shapingGroundPalette.ts';
 
 type Point={x:number,y:number};
 const hash=(n:number)=>{const v=Math.sin(n*127.1+13.1)*43758.5;return v-Math.floor(v);};
@@ -50,13 +51,12 @@ export function windleafRouteSurfaceSamples(){
   return B.passages.map(p=>({passageId:p.passage_id,points:routeSamples(p.presentation_points).filter(p=>p.x>=110)}));
 }
 function terrainColor(x:number,y:number){
-  const stream=windleafStreamAt(x,y),height=windleafHeightAt(x,y),color=new THREE.Color(C.grass);
+  const stream=windleafStreamAt(x,y),height=windleafHeightAt(x,y),color=shapingGroundColor(x,y,height);
+  const interior=clamp((x-114)/18)*clamp(y/12)*clamp((120-y)/12);
   const patch=clamp((Math.sin(x*.16+y*.09)+Math.cos(x*.04-y*.17))*.18+.3);
-  color.lerp(new THREE.Color(0xbddd83),patch);
-  if(height>1)color.lerp(new THREE.Color(0xc9de87),clamp((height-1)/9)*.4);
-  if(shapingCoastDistance(x,y)<8)color.lerp(new THREE.Color(0xe8df9a),clamp((8-shapingCoastDistance(x,y))/8)*.8);
-  if(Math.hypot(x-150,y-30)<20)color.lerp(new THREE.Color(0x87a788),.22);
-  if(stream.distance<stream.width+4)color.lerp(new THREE.Color(0xb9baa0),clamp((stream.width+4-stream.distance)/4)*.6);
+  color.lerp(new THREE.Color(0x8cbb85),patch*interior*.5);
+  if(Math.hypot(x-150,y-30)<20)color.lerp(new THREE.Color(0x87a788),.22*interior);
+  if(stream.distance<stream.width+4)color.lerp(new THREE.Color(0xb9baa0),clamp((stream.width+4-stream.distance)/4)*.6*interior);
   return color;
 }
 
@@ -70,9 +70,10 @@ export function createWindleafLandscape(){
     for(const p of plants)cover=Math.max(cover,clamp(1-Math.hypot(x-p.x,y-p.y)/(2.8+p.size*1.5)));
     // Mottled moss/leaf litter under actual stands, continuous across the former
     // map boundary; this is surface colour, not a simulated resource or event.
-    color.lerp(new THREE.Color(0x68a88a),cover*.33);
+    const interior=clamp((x-114)/14)*clamp(y/8)*clamp((120-y)/8);
+    color.lerp(new THREE.Color(0x68a88a),cover*.33*interior);
     const litter=clamp(Math.sin(x*.73+y*.61)*Math.cos(y*.49-x*.38));
-    return color.lerp(new THREE.Color(0x928159),litter*cover*.18);
+    return color.lerp(new THREE.Color(0x928159),litter*cover*.18*interior);
   }
   const terrainPositions:number[]=[],terrainColors:number[]=[];
   // An indexed-looking faceted tessellation, represented as one vertex-colour mesh.

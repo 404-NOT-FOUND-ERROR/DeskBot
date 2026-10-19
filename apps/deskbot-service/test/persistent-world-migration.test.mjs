@@ -92,7 +92,9 @@ test('legacy world snapshot migrates to 聚形域 without losing its accumulated
   assert.equal(migrated.locations[0].settlement_id, 'morrowmere');
   assert.equal(migrated.locations[0].location_kind, 'home');
   assert.equal(migrated.shaping_field.measurement_status, 'unmeasured');
-  assert.equal(migrated.world_revision, 17); // Existing rules, forest geography, finite life and the authored old-light/trace layer.
+  assert.equal(migrated.world_revision, 18); // Existing rules plus the additive empty waylight installation.
+  assert.equal(migrated.living.objects['floating-frame'].waylight, null);
+  assert.deepEqual(migrated.waylight_life.records, []);
   assert.ok(migrated.schema_migrations.some(item => item.id === 'windleaf-old-light-v1' && item.past_events_created === 0));
   assert.ok(migrated.schema_migrations.some(item => item.id === 'shaping-glow-moss-v1'));
   assert.equal(migrated.living.migration.id, 'morrowmere-living-resources-v1');

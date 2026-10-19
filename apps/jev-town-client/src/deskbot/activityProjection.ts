@@ -15,6 +15,7 @@ export interface SceneLifeActivity {
   lifeAction?: string;
   activityId?: string;
   targetObjectId?: string;
+  facilitySlot?: number;
   status: "running" | "paused";
   startedAt?: string;
   dueAt: string;
@@ -57,6 +58,7 @@ export function projectSceneActivities(map: DeskBotWorldMap | null | undefined):
         lifeAction: task.life_action,
         activityId: task.activity_id,
         targetObjectId: task.target_object_id,
+        facilitySlot: task.reservation?.facility_slot??undefined,
         status: task.status as "running" | "paused",
         startedAt: task.segment_started_at ?? task.started_at,
         dueAt: task.due_at,

@@ -69,7 +69,8 @@ test('actual batch cooking shares leftovers and hunger changes only after the ea
   assert.equal(w.autonomy.actors[OWN].appetite,.95);
   for(let i=0;i<50&&!h.completed.size;i++)h.advance(1);
   assert.equal(h.completed.values().next().value.activity_id,'cook-grove-stew');
-  assert.equal(h.world.living.objects['shared-table'].stock.rations,3);assert.equal(bag(h.world,OWN,'rations'),0);
+  const held=h.world.tasks.filter(t=>t.reservation?.status==='held').flatMap(t=>t.reservation.inputs).filter(i=>i.container==='shared-table'&&i.resource==='rations').reduce((sum,i)=>sum+i.count,0);
+  assert.equal(h.world.living.objects['shared-table'].stock.rations+held,3,'the same dispatch may reserve the cook\'s portion; all three actual portions remain accounted for');assert.equal(bag(h.world,OWN,'rations'),0);
   assert.ok(h.world.autonomy.actors[OWN].appetite>.95);
   for(let i=0;i<30&&!Array.from(h.completed.values()).some(t=>t.activity_id==='share-meal');i++)h.advance(1);
   assert.equal(h.world.living.objects['shared-table'].stock.rations,2);
@@ -109,7 +110,7 @@ test('an active peer preparation is a soft claim; paused and stale idle plans re
   w.autonomy.actors[OWN].appetite=.99;
   w.living.objects['shared-table'].stock.rations=0;
   w.living.objects['light-fruit-bough'].stock.light_fruit=2;
-  w.autonomy.actors[id].plan={status:'planned',created_at:iso(START),index:0,plan_id:'peer-prepare',steps:[{kind:'activity',activity_id:'gather-light-fruit'},{kind:'activity',activity_id:'cook-grove-stew'}]};
+  w.autonomy.actors[id].plan={status:'planned',created_at:iso(START),index:0,plan_id:'peer-prepare',steps:[{kind:'activity',activity_id:'gather-light-fruit'},{kind:'activity',activity_id:'cook-grove-stew'},{kind:'transfer',operation:'store',object_id:'shared-table',resource:'rations',count:3}]};
   w.autonomy.actors[id].next_decision_at=iso(START+60*MINUTE);
   h.tick();assert.equal(w.autonomy.actors[OWN].plan.goal,'wait-meal');
   assert.equal(w.living.objects['light-fruit-bough'].stock.light_fruit,2,'a promise does not reserve the ecological source');

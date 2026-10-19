@@ -502,8 +502,7 @@ export function createRoleEvolution({
     });
   }
 
-  function wishView({ characterId = activeCharacter, at = now() } = {}) {
-    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+  function wishView({ characterId = activeCharacter, at = now(), world = typeof worldSnapshot === 'function' ? worldSnapshot() : null } = {}) {
     const model = roleWishReadModel(world, { actorId: characterKey(characterId), at: new Date(at).toISOString() });
     const currentDirectionIds = canonicalCurrentDirectionIds(world, model.character_id, at);
     return { ...model, directions: model.directions.map(direction => ({ ...direction,
@@ -516,9 +515,9 @@ export function createRoleEvolution({
     return Object.values(model.current ?? {}).filter(Boolean).map(stage => stage.direction_id);
   }
 
-  function currentStages({ characterId = activeCharacter, limit = 10 } = {}) {
-    const actorId = characterKey(characterId, activeCharacter), world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
-    const model = roleStagesReadModel(world, { actorId, at: now().toISOString() });
+  function currentStages({ characterId = activeCharacter, limit = 10, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null, at = now() } = {}) {
+    const actorId = characterKey(characterId, activeCharacter);
+    const model = roleStagesReadModel(world, { actorId, at: new Date(at).toISOString() });
     const current = Object.values(model.current ?? {}).filter(Boolean).map(stage => ({ ...clone(stage),
       schema: 'deskbot.role-state.v1', origin: 'canonical_role_stage', character_id: stage.actor_id,
       life: stage.label, stage_history: clone(stage.history ?? []),
@@ -529,16 +528,16 @@ export function createRoleEvolution({
     return selected.slice(0, Math.min(Math.max(Number(limit) || 10, 1), 10));
   }
 
-  function wishProposals({ characterId = activeCharacter, status = null, limit = 50 } = {}) {
+  function wishProposals({ characterId = activeCharacter, status = null, limit = 50, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null, at = now() } = {}) {
     return roles.list({ characterId, status, limit }).map(proposal => {
       if (proposal.origin !== 'lived_wish') return proposal;
-      const model = wishView({ characterId: proposal.character_id });
+      const model = wishView({ characterId: proposal.character_id, world, at });
       const direction = model.directions.find(item => item.direction_id === proposal.direction_id);
       return projectPracticalTrial({ ...proposal,
         current_gate: clone(direction?.readiness ?? { eligible: false, barriers: [{ id: 'direction_unavailable', label: '这个方向当前没有可用的生活依据', scope: 'evidence' }], checks: [] }),
         proposal_gate: clone(direction?.proposal_gate ?? null),
         current_authored_reason: direction?.authored_reason ?? null,
-      });
+      }, world, at);
     });
   }
 
@@ -551,15 +550,15 @@ export function createRoleEvolution({
       proposal_gate: clone(direction?.proposal_gate ?? null), current_authored_reason: direction?.authored_reason ?? null });
   }
 
-  function projectPracticalTrial(proposal) {
-    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
-    const trial = practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
+  function projectPracticalTrial(proposal, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null, at = now()) {
+    const capturedAt = new Date(at).toISOString();
+    const trial = practicalTrialReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: capturedAt });
     const registered = world?.protagonist?.character_id === proposal.character_id || world?.npcs?.some(item => item.npc_id === proposal.character_id);
     const available = proposal.status === 'prepared' && proposal.user_choice === 'try' && registered
       && Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time'
       && ['wetland_frog', 'workshop_maker', 'chef'].includes(proposal.direction_id) && !trial;
-    const roleStage = roleStageReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: now().toISOString() });
-    const preview = roleStagePreview(world, { proposal, at: now().toISOString() });
+    const roleStage = roleStageReadModel(world, { proposalId: proposal.proposal_id, actorId: proposal.character_id, at: capturedAt });
+    const preview = roleStagePreview(world, { proposal, at: capturedAt });
     return { ...proposal, practical_trial: trial, practical_trial_connected: Boolean(trial), practical_trial_available: Boolean(available),
       role_stage: roleStage, role_stage_preview: preview };
   }
@@ -775,11 +774,11 @@ export function createRoleEvolution({
     return [...ids].map((characterId) => sync({ characterId, limit }));
   }
 
-  function snapshot({ characterId = null, limit = 50 } = {}) {
+  function snapshot({ characterId = null, limit = 50, world = typeof worldSnapshot === 'function' ? worldSnapshot() : null, at = now() } = {}) {
     const bounded = Math.min(Math.max(Number(limit) || 50, 1), MAX_CANDIDATES);
-    const world = typeof worldSnapshot === 'function' ? worldSnapshot() : null;
+    const capturedAt = new Date(at).toISOString();
     const development = roleDevelopmentReadModel(world, { actorId: characterKey(characterId, activeCharacter) });
-    const wishes = wishView({ characterId: characterKey(characterId, activeCharacter) });
+    const wishes = wishView({ characterId: characterKey(characterId, activeCharacter), world, at });
     const candidateList = [...candidates.values()]
       .filter((item) => !characterId || item.character_id === characterId)
       .slice(-bounded)
@@ -807,9 +806,9 @@ export function createRoleEvolution({
       character_id: characterId,
       development,
       wishes,
-      practical_trials: { ...practicalTrialsReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: now().toISOString() }),
+      practical_trials: { ...practicalTrialsReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: capturedAt }),
         available: Boolean(world?.memory?.development?.facets) && world?.clock?.mode === 'real_time' },
-      role_stages: roleStagesReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: now().toISOString() }),
+      role_stages: roleStagesReadModel(world, { actorId: characterKey(characterId, activeCharacter), at: capturedAt }),
       evidence: evidenceList,
       pulls: pullList,
       candidates: candidateList,

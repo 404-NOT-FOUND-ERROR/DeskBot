@@ -3,6 +3,7 @@ import { findWorldPath } from './world-map-content.mjs';
 import { transferLivingResource, RESOURCES } from './living-resources.mjs';
 import { activitySteps } from './life-planning.mjs';
 import { RESIDENTS, residentDesign } from './resident-life.mjs';
+import {waylightSocialOffers} from './waylight-life.mjs';
 
 const M=60000, LIVE=['proposed','accepted','meeting','working'];
 export class SocialLifeError extends Error { constructor(code,text){super(text);this.code=code;this.statusCode=409;} }
@@ -50,7 +51,7 @@ function propose(w,at,definition) {
   const key=definition.key??`${definition.kind}:${pair(definition.actors)}`;
   if(Date.parse(w.social.cooldowns[key]??'')>Date.parse(at)||w.social.commitments.some(c=>LIVE.includes(c.status)&&(c.key===key||c.actors.some(id=>definition.actors.includes(id)))))return null;
   const c={id:`social:${++w.social.sequence}`,key,...definition,status:'proposed',created_at:at,updated_at:at,
-    respond_after:new Date(Date.parse(at)+5*M).toISOString(),deadline_at:new Date(Date.parse(at)+90*M).toISOString(),
+    respond_after:new Date(Date.parse(at)+5*M).toISOString(),deadline_at:new Date(Date.parse(at)+(definition.produce_activity==='waylight-craft-shade'?180:90)*M).toISOString(),
     responses:Object.fromEntries(definition.actors.map((id,index)=>[id,index===0?'join':'pending'])),
     arrivals:{},tasks:{},phase:'meeting',step_index:0,worker_steps:null,changes:[],delay_count:0,last_note:'邀请已经发出，尚未见面。'};
   w.social.commitments.push(c);
@@ -221,7 +222,7 @@ function publishFact(w,c,at) {
 }
 function offers(w,at) {
   const own=w.protagonist.character_id,grower='wetland-grower-001',mender='spare-mender-001',cook='pot-cook-001';
-  const definitions=[];
+  const definitions=[...waylightSocialOffers(w)];
   const hungry=Object.values(w.autonomy?.actors??{}).filter(s=>s.appetite>.85)
     .sort((a,b)=>b.appetite-a.appetite||a.actor_id.localeCompare(b.actor_id));
   const donors=Object.values(w.autonomy?.actors??{}).filter(s=>s.appetite<.6&&quantity(w,s.actor_id,'rations')>=1);
@@ -289,7 +290,7 @@ export function respondCognitiveCommitment(w,at,id,actorId,operation,{revision,m
     if(operation==='delay') {
       if(!Number.isSafeInteger(delayMinutes)||delayMinutes<15||delayMinutes>240||(c.negotiation_rounds??0)>=2)fail('invalid_negotiated_delay','最多协商两轮，每次延后15至240分钟。');
       c.negotiation_rounds=(c.negotiation_rounds??0)+1;c.terms_revision++;c.not_before_at=new Date(Date.parse(at)+delayMinutes*M).toISOString();
-      c.deadline_at=new Date(Date.parse(c.not_before_at)+90*M).toISOString();c.responses=Object.fromEntries(c.actors.map(id=>[id,id===actorId?'join':'pending']));
+      c.deadline_at=new Date(Date.parse(c.not_before_at)+(c.produce_activity==='waylight-craft-shade'?180:90)*M).toISOString();c.responses=Object.fromEntries(c.actors.map(id=>[id,id===actorId?'join':'pending']));
       record(w,c,at,'counteroffer',`${person(w,actorId).display_name}提出延后${delayMinutes}分钟，尚待对方确认。`);
     } else if(operation==='decline') {c.responses[actorId]='decline';close(w,c,at,'declined',`${person(w,actorId).display_name}明确拒绝这次安排。`);}
     else {c.responses[actorId]='join';c.status=c.actors.every(id=>c.responses[id]==='join')?'accepted':'proposed';record(w,c,at,'accepted','双方明确确认同一版条件；实际执行仍需到场、时间和材料。');}

@@ -9,6 +9,7 @@ import {fantasyPersonalContext} from './fantasy-inquiry.mjs';
 import {windleafPersonalContext} from './windleaf-life.mjs';
 import {localWindleafLore} from './windleaf-story.mjs';
 import {resonantPersonalContext} from './resonant-life.mjs';
+import {waylightPersonalContext} from './waylight-life.mjs';
 import {cognitiveDestinations,resolveCognitiveRoute} from './cognitive-travel.mjs';
 import {cognitiveSocialContext,cognitiveSpeechEvidence,compileCognitiveMessage,commitCognitiveMessage,adoptCognitiveRelationViews} from './cognitive-social.mjs';
 import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink,attachCognitiveTrial} from './cognitive-development.mjs';
@@ -45,6 +46,7 @@ export function cognitiveContext(world,id,at,phase='plan'){
     location:{id:p.location_id,name:world.locations.find(l=>l.location_id===p.location_id)?.name??p.location_id,description:'伴生于现实的聚形域；虚拟观察只能读取现场公开状态。'},
     objects:objects.map((o,i)=>({object_index:i+1,id:o.object_id,name:o.name??o.object_id,description:o.description??'实际生活对象',state:copy(o)})),
     local_lore:{places:localWindleafLore(world,p.location_id),rule:'作者背景可以描述地方，居民初始观点不是现场发言；假说尚未证实。读到这些内容不等于亲历过去、接到请求或验证结论，不能改写为任务、承诺或私人经历。'},
+    waylight:waylightPersonalContext(world,id),
     visible_people:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id).map(other=>({actor_id:other.character_id??other.npc_id,name:other.display_name})),
     development:cognitiveDevelopmentContext(world,id,at),social,speech_evidence:cognitiveSpeechEvidence(world,id,at,objects.map(o=>({id:o.object_id,name:o.name??o.object_id,state:o}))),
     inventory:copy(world.living?.inventories[id]??{stock:{},capacity:24}),inquiry:fantasyPersonalContext(world,id),windleaf_inquiry:windleafPersonalContext(world,id),resonant_inquiry:resonantPersonalContext(world,id),capabilities:{activities:catalogue.map((a,i)=>({...a,activity_index:i+1})),travel:{destinations:cognitiveDestinations(world,p.location_id).map((p,i)=>({...p,destination_index:i+1})),rule:'虚拟化身按通路和实际时间行走；到达以后才能使用当地设施。这里只知道公开地理，不知道远处库存和私人活动。'},observe:{seconds:180,rule:'亲自观察一个现场对象，记录执行前后值；观察不改变库存、技能、形态。'},rest:{seconds:300,rule:'休息按现有体能规则恢复；不伪装实践。'},

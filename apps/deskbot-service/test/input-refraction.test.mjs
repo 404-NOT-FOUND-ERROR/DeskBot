@@ -66,6 +66,7 @@ test('sleep overrides a suggestion; tasks including user-paused tasks are never 
 });
 test('wet bed and missing resources defer ideas without creating stock',t=>{
   const h=fixture(t);h.save(w=>{w.living.objects['garden-bed'].moisture=.72;w.living.objects['seedling-rack'].stock.water=0;w.living.objects['parts-drawers'].stock.wood=0;});const stock=structuredClone(h.world.get().living.objects);
+  stock['trial-stove'].stock.light_fruit??=0; // R1C installs an empty kitchen handoff shelf.
   h.event('water','user.preference.life',{suggestion:'water'});h.event('tray','user.preference.life',{suggestion:'tray'});h.tick();const w=h.world.get();assert.equal(w.refraction.records[0].status,'deferred');assert.match(w.refraction.records[0].last_note,/不缺水/);assert.equal(w.refraction.records[1].status,'deferred');assert.ok(!w.tasks.some(x=>x.activity_id==='water-bed'||x.activity_id==='craft-tray'));assert.deepEqual(w.living.objects,stock);
 });
 test('closed passages prevent a suggested visit from becoming travel',t=>{
@@ -101,8 +102,12 @@ test('new installation receives cached current weather once without replaying it
   const expectedLiving=structuredClone(before.living);
   assert.equal(Object.hasOwn(expectedLiving.objects['shared-table'].stock,'trial_soup'),false);
   expectedLiving.objects['shared-table'].stock.trial_soup=0;
+  expectedLiving.objects['trial-stove'].stock.light_fruit??=0;
   const assertNoReplay=w=>{
-    assert.deepEqual(w.living,expectedLiving,'installation only adds an empty trial-soup slot; all stocks, environmental cursors and resource history remain unchanged');
+    const living=structuredClone(w.living),coordination=living.coordination;delete living.coordination;
+    assert.equal(coordination.schema,'morrowmere-meal-coordination-v3');
+    assert.equal(coordination.preserves_stocks_and_durations,true);
+    assert.deepEqual(living,expectedLiving,'installation adds coordination metadata and empty food/ingredient slots; all stock amounts, environmental cursors and resource history remain unchanged');
     assert.deepEqual(w.weather,before.weather);
   };
   const connector={status:()=>({enabled:true,configured:true,provider:'sample',ttl_ms:1800000}),refresh:async()=>({event,cached:true,connector:{provider:'sample'}})};

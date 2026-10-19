@@ -55,6 +55,13 @@ describe("canonical scene activity projection", () => {
       {...map.tasks![0]!,kind:'care',life_action:'activity',activity_id:'share-meal'}];
     expect(projectSceneActivities(changed).map(task=>task.kind)).toEqual(['craft','eat']);
   });
+  it('uses the committed dining seat rather than re-numbering actors when another meal finishes',()=>{
+    const changed=structuredClone(map);
+    changed.tasks=[{...map.tasks![0]!,kind:'care',activity_id:'share-meal',reservation:{status:'held',inputs:[],facility_slot:4}}];
+    expect(projectSceneActivities(changed)[0]!.facilitySlot).toBe(4);
+    changed.tasks.unshift({...changed.tasks[0]!,task_id:'settled',status:'completed',reservation:{status:'consumed',inputs:[],facility_slot:1}});
+    expect(projectSceneActivities(changed).map(a=>a.facilitySlot)).toEqual([4]);
+  });
   it('projects actual carried water from the same actor snapshot rather than future recipe output', () => {
     const changed = structuredClone(map);
     changed.living = { schema: 'deskbot.world-living.v1', simulated_until: '2026-10-05T04:05:00Z', revision: 1,

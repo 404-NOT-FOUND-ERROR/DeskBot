@@ -36,6 +36,17 @@ export function shapingPathDistance(x:number,y:number){
   }
   return distance;
 }
+/** Width changes belong to the rendered lane, never to the navigation graph.
+ * All admitted centre lines remain inside, with broad arrivals at public lots. */
+export function shapingPathHalfWidth(x:number,y:number){
+  let width=1.32+.18*Math.sin(x*.19+y*.09)+.12*Math.cos(y*.23-x*.11);
+  for(const place of catalog.locations){
+    const p=place.presentation?.point;if(!p)continue;
+    const opening=smooth(1-Math.hypot(x-p.x,y-p.y)/6.8);
+    width=Math.max(width,1.45+opening*(place.presentation.model==='square'?2.25:1));
+  }
+  return width;
+}
 /** The same irregular coast clips ground and vegetation. All functional
  * places stay inside; this boundary grants no new simulation territory. */
 export function shapingCoastDistance(x:number,y:number){
@@ -74,8 +85,10 @@ function baseHeight(x:number,y:number){
 export function shapingTownHeightAt(x:number,y:number) {
   let base=baseHeight(x,y),clear=Infinity;
   for(const p of townLots){
-    const d=Math.max(Math.abs(x-p.x),Math.abs(y-p.y)),weight=smooth((13-d)/4.4);
-    clear=Math.min(clear,d-8.6);base=base*(1-weight)+baseHeight(p.x,p.y)*weight;
+    // Rounded terraces contain the full working footprint, including corners,
+    // while avoiding a repeated square plateau around every building.
+    const d=(Math.abs(x-p.x)**4+Math.abs(y-p.y)**4)**.25,weight=smooth((14-d)/4.7);
+    clear=Math.min(clear,d-9.3);base=base*(1-weight)+baseHeight(p.x,p.y)*weight;
   }
   const safe=smooth((shapingPathDistance(x,y)-2.1)/3.7)*smooth(clear/4.5);
   const hill=(cx:number,cy:number,rx:number,ry:number,h:number)=>h*smooth(1-Math.hypot((x-cx)/rx,(y-cy)/ry));

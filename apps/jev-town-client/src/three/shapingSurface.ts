@@ -6,9 +6,14 @@ export function shapingTerrainVertex(x:number,y:number):SurfacePoint{
   return {x:x+Math.sin(x*37.1+y*13.7)*.58,y:y+Math.cos(y*31.3-x*17.9)*.58};
 }
 export function clipShapingCoast(points:SurfacePoint[]):SurfacePoint[][]{
+  return clipSurfacePolygon(points,shapingCoastDistance);
+}
+/** Clip a tiny terrain triangle against a signed field. Shared vertices use
+ * identical intersections so road borders are continuous, not square tiles. */
+export function clipSurfacePolygon(points:SurfacePoint[],distance:(x:number,y:number)=>number):SurfacePoint[][]{
   const polygon:SurfacePoint[]=[];
   for(let i=0;i<points.length;i++){
-    const a=points[i]!,b=points[(i+1)%points.length]!,da=shapingCoastDistance(a.x,a.y),db=shapingCoastDistance(b.x,b.y);
+    const a=points[i]!,b=points[(i+1)%points.length]!,da=distance(a.x,a.y),db=distance(b.x,b.y);
     if(da>=0)polygon.push(a);
     if((da>=0)!==(db>=0)){
       const t=da/(da-db);polygon.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});

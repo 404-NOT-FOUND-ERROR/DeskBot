@@ -10,6 +10,7 @@ import {createCognitiveLife} from '../src/cognitive-life.mjs';
 import {cognitiveContext,cognitiveActualResult,cognitiveRelevantKey,cognitiveDialogueContext} from '../src/cognitive-life-state.mjs';
 import {advanceAutonomousLife} from '../src/autonomous-life.mjs';
 import {createCognitiveRuntime} from '../src/cognitive-runtime.mjs';
+import {bindRuntimeStore} from '../src/runtime-profile.mjs';
 
 function fixture(t){
  const dir=mkdtempSync(join(tmpdir(),'deskbot-cognitive-v2-')),closers=[];
@@ -138,7 +139,7 @@ test('a receiver leaving before completion produces no delivery or false deliver
 
 test('isolated test time survives restart and never rewinds to an older world clock',async t=>{
  const f=fixture(t),filename=join(f.dir,'experiment.sqlite'),budgetFilename=join(f.dir,'budget.sqlite');
- const lab=createSqlitePersistence({filename});const seed=f.world.get();
+ const lab=createSqlitePersistence({filename});bindRuntimeStore(lab,{scope:'lab',kind:'cognition_world'});const seed=f.world.get();
  seed.cognition={schema:'deskbot.cognitive-life.v2',actors:Object.fromEntries(['shaping-001','wetland-grower-001','lamp-keeper-001'].map(id=>[id,{actor_id:id,plan_count:4,history:[],enabled:false}]))};
  seed.clock.synced_at='2026-10-10T02:00:00Z';seed.tasks=[{status:'completed',finished_at:'2026-10-11T02:12:30Z'}];
  lab.put('canonical-world.states',seed.world_id,seed);lab.close();

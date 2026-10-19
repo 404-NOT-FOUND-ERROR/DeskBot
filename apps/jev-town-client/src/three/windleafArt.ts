@@ -6,6 +6,7 @@ import {LowPolyBatch} from './lowPolyBatch.ts';
 import {hasWindleaf, windleafHeightAt} from './windleafLayout.ts';
 import {createWindleafLandscape} from './windleafLandscape.ts';
 import {addWindleafPlaceDetails} from './windleafPlaceDetails.ts';
+import {attachForestArrivalAnchors} from './forestArrival.ts';
 
 const C={wood:0xa17b54,dark:0x554b3e,cream:0xe7dec4,teal:0x628e83,stone:0xa6afa0,jade:0xbde7b4};
 const clamp=(n:number)=>Math.max(0,Math.min(1,n));
@@ -105,6 +106,7 @@ export function createWindleafScene(locations:readonly DeskBotLocation[]){
   const stores=stockResources.map((resource,i)=>{const g=new THREE.Group();g.name=`return-stock:${resource}`;g.position.set(-1.1+i*.55,1.63,0);table.add(g);const m=new LowPolyBatch();m.box(.43,.35,.7,0,0,0,[C.wood,C.teal,0x929c97,0xa4bf83,C.cream][i]!);m.finish(g,'finite-stored-material');return {group:g,resource};});
   const signs=new LowPolyBatch();signs.cylinder(.16,3,0,0,0,C.dark);signs.box(2.4,.55,.18,0,2.2,0,C.wood);signs.box(.6,.55,.2,1.15,2.2,0,C.teal);signs.box(.15,.55,.2,-.65,2.2,0,C.cream);signs.finish(waymarker,'repaired-waymarker');
   addWindleafPlaceDetails(objects);
+  attachForestArrivalAnchors(objects);
 
   // These visibly old guide posts are authored background, never stock or a new route.
   const guide=new LowPolyBatch();for(const [x,y] of [[116,47.3],[121,53],[129,53],[141,92]]){const p=mapToWorld(x!,y!),h=windleafHeightAt(x!,y!);guide.box(.7,1.7,.65,p.x,h,p.z,0xa9af99);guide.box(.16,.4,.07,p.x+.1,h+1.1,p.z+.34,C.dark);guide.box(.35,.09,.07,p.x,h+1.35,p.z+.34,C.teal);}guide.finish(root,'authored-old-light-guide-posts');

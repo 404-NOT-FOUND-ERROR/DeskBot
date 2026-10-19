@@ -9,11 +9,13 @@ import { createVoiceSidecarClient } from './voice-sidecar-client.mjs';
 import { createWeatherConnector } from './weather-connector.mjs';
 import { loadBodyDeviceProfiles } from './body-device-config.mjs';
 import { createModelUsage } from './model-usage.mjs';
+import {resolveRuntimeProfile,bindRuntimeStore} from './runtime-profile.mjs';
 
 const host = process.env.DESKBOT_HOST ?? '127.0.0.1';
 const port = Number.parseInt(process.env.DESKBOT_PORT ?? '4311', 10);
 const serviceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const databasePath = process.env.DESKBOT_DB_PATH ?? resolve(serviceRoot, 'data', 'deskbot.sqlite');
+const runtimeProfile=resolveRuntimeProfile({defaultDatabase:resolve(serviceRoot,'data','deskbot.sqlite')});
+const databasePath=runtimeProfile.database;
 const voiceSidecarUrl = process.env.DESKBOT_VOICE_SIDECAR_URL?.trim() || null;
 const websocketPath = process.env.DESKBOT_WS_PATH?.trim() || '/ws';
 
@@ -22,10 +24,11 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 
 const persistence = createSqlitePersistence({ filename: databasePath });
-const modelUsage=createModelUsage({persistence});
+bindRuntimeStore(persistence,{scope:runtimeProfile.scope,allowLegacy:runtimeProfile.scope==='live'});
+const modelUsage=createModelUsage({persistence,runId:runtimeProfile.run_id,defaultScope:runtimeProfile.scope});
 const llm = process.env.DESKBOT_LLM_PROVIDER === 'deepseek'
-  ? createReloadableLlm({ configPath: process.env.DESKBOT_LLM_CONFIG ?? resolve(serviceRoot, '../../config/llm_config.json'),onUsage:modelUsage.record })
-  : createConfiguredLlm({onUsage:modelUsage.record});
+  ? createReloadableLlm({ configPath: process.env.DESKBOT_LLM_CONFIG ?? resolve(serviceRoot, '../../config/llm_config.json'),onUsage:modelUsage.record,usageScope:runtimeProfile.scope })
+  : createConfiguredLlm({onUsage:modelUsage.record,usageScope:runtimeProfile.scope});
 const voiceClient = voiceSidecarUrl
   ? createVoiceSidecarClient({
     baseUrl: voiceSidecarUrl,
@@ -47,7 +50,7 @@ const refractionSources = createExternalConnectors({ persistence,
     return result.text;
   } : null });
 const server = createDeskBotServer({ persistence, llm, voiceClient, weatherConnector, websocketPath, worldLifeEnabled: true, autonomousLifeEnabled: true,
-  residentLifeEnabled: true, livedMemoryEnabled: process.env.DESKBOT_MEMORY_ENABLED !== '0', timeMode, timeZone, refractionSources, bodyDeviceProfiles,modelUsage });
+  residentLifeEnabled: true, livedMemoryEnabled: process.env.DESKBOT_MEMORY_ENABLED !== '0', timeMode, timeZone, refractionSources, bodyDeviceProfiles,modelUsage,runtimeProfile });
 
 server.listen(port, host, () => {
   console.log(`DeskBot Service v0.1.0 listening on http://${host}:${port}`);

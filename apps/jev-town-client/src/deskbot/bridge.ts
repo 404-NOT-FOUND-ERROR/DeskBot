@@ -1,3 +1,4 @@
+import {fetchWorldSnapshot} from './worldObserver.ts';
 import type {
   DeskBotActionCandidate,
   DeskBotLifeWorld,
@@ -72,11 +73,8 @@ export async function fetchDeskBotWorld(baseUrl = deskbotBaseUrl()): Promise<{
   map: DeskBotWorldMap;
   life: DeskBotLifeWorld;
 }> {
-  const [map, life] = await Promise.all([
-    getJson<DeskBotWorldMap>(baseUrl, "/api/world/map"),
-    getJson<DeskBotLifeWorld>(baseUrl, "/api/life/world"),
-  ]);
-  return { map, life };
+  const snapshot=await fetchWorldSnapshot(baseUrl);
+  return {map:snapshot.map,life:snapshot.life};
 }
 
 export function buildNpcCandidates(map: DeskBotWorldMap, npc: DeskBotNpc): DeskBotActionCandidate[] {

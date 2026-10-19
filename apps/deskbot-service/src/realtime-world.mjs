@@ -170,6 +170,7 @@ export function startActivityTask(world, payload, { eventId, at }) {
     completion_effect: authored?.completion_effect ?? 'record_activity_only', ...(authored ? { activity_id: authored.activity_id, target_object_id: authored.target_object_id, reservation: authored.reservation, ...(authored.fantasy_rule?{life_action:authored.activity_id==='glow-read-pair'?'observe':authored.kind,fantasy_rule:authored.fantasy_rule,fantasy_trial_id:authored.fantasy_trial_id}:{}),
       ...(authored.resonant_rule?{resonant_rule:authored.resonant_rule,resonant_asset_id:authored.resonant_asset_id,life_action:authored.activity_id.includes('-read-')?'observe':authored.kind}:{}),
       ...(authored.windleaf_rule?{windleaf_rule:authored.windleaf_rule,windleaf_frame_id:authored.windleaf_frame_id,life_action:['leaf-read','leaf-observe-lowland'].includes(authored.activity_id)?'observe':authored.kind}:{}),
+      ...(authored.waylight_rule?{waylight_rule:authored.waylight_rule,waylight_asset_id:authored.waylight_asset_id,life_action:authored.kind}:{}),
       ...(authored.project_id ? { project_id: authored.project_id, project_stage_id: authored.project_stage_id, project_attempt: authored.project_attempt, project_version: authored.project_version,
         ...(authored.project_batch_id ? { project_batch_id: authored.project_batch_id } : {}) } : {}) } : {}),
     finished_at: null, failure_reason: null, completion: null, history: [],

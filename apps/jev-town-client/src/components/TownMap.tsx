@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useCallback, useRef, useState } from "react";
 import { ACTIONS, ACTION_GLYPH, ACTION_LABEL, type Action } from "@shared/actions.ts";
 import { CITIZENS } from "@shared/citizens.ts";
 import { PLACES } from "@shared/town.ts";
@@ -15,6 +15,9 @@ import { isWebglAvailable } from "../three/webgl.ts";
 import { CitizenSprite } from "./CitizenSprite.tsx";
 
 export interface TownMapProps {
+  snapshotId?:string;
+  onSnapshotRendered?:(id:string)=>void;
+  onSceneUnavailable?:()=>void;
   sceneLocations?: readonly DeskBotLocation[];
   environment?: DeskBotEnvironment;
   activities?: readonly SceneLifeActivity[];
@@ -51,8 +54,9 @@ function TownFallback() {
   );
 }
 
-export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
+export function TownMap({ snapshotId,onSnapshotRendered,onSceneUnavailable,citizens = CITIZENS, shapingAppearances,labels, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, confidences, focusedAction, onFocusAction, onPlaceClick,onCitizenClick, travelVisual, routePreview }: TownMapProps) {
   const [supportsWebgl, setSupportsWebgl] = useState<boolean>(() => isWebglAvailable());
+  useEffect(()=>{if(!supportsWebgl)onSceneUnavailable?.();},[supportsWebgl,onSceneUnavailable,snapshotId]);
   const [zoom, setZoom] = useState(1);
   const [showDecisions, setShowDecisions] = useState(true);
   const sceneRef = useRef<TownScene3DHandle | null>(null);
@@ -80,6 +84,8 @@ export function TownMap({ citizens = CITIZENS, shapingAppearances,labels, sceneL
           <Suspense fallback={<p className="town-map__loading">正在搭建小镇…</p>}>
             <TownScene3D
               ref={sceneRef}
+              snapshotId={snapshotId}
+              onSnapshotRendered={onSnapshotRendered}
               citizens={citizens}
               shapingAppearances={shapingAppearances}
               labels={labels}

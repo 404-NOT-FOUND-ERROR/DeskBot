@@ -496,10 +496,8 @@ export function createWorldLife({
     }
   }
 
-  function snapshot() {
-    const world = worldSnapshot();
+  function snapshot(world = worldSnapshot(), { stages = roleContext() } = {}) {
     const currentLocationId = world.protagonist.location_id;
-    const stages = roleContext();
     return {
       schema: 'deskbot.world-life.v0.3',
       enabled,

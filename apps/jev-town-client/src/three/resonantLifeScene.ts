@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import type {DeskBotObjectState} from '../deskbot/types';
 import type {SceneLifeContext} from './sceneLifeEffects';
 import {createSoftLightTexture} from './sceneLifeEffects';
+import {createWaylightScene} from './waylightScene';
 export function createResonantLifeScene(parent:THREE.Group){
  const frame=parent.getObjectByName('object:floating-frame'),board=parent.getObjectByName('object:square-noticeboard');
  const target=frame??board;if(!target)return null;
+ const waylight=frame?createWaylightScene(parent):null;
  const root=new THREE.Group();root.name=frame?'actual-echo-bells':'actual-night-lanterns';target.add(root);
  const material=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.72});
  function box(group:THREE.Group,name:string,size:number[],pos:number[],color:number){const mesh=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),material(color));mesh.name=name;mesh.position.set(pos[0]!,pos[1]!,pos[2]!);mesh.castShadow=true;group.add(mesh);return mesh;}
@@ -45,6 +47,7 @@ export function createResonantLifeScene(parent:THREE.Group){
   return {group,pendulum:null,cloth:null,ripple:null,core,shutter,inlay,pool};
  });
  return {root,update(seconds:number,reducedMotion:boolean,_context?:SceneLifeContext){
+  waylight?.update(seconds,reducedMotion);
   const state=target.userData.state as DeskBotObjectState|undefined;
   slots.forEach((slot,i)=>{
    if(frame){const asset=state?.echo_bells?.[i];slot.group.visible=Boolean(asset);if(!asset)return;

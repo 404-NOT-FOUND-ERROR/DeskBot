@@ -79,6 +79,7 @@ export function createOpenAiCompatibleLlm({
   thinking = null,
   max_tokens = null,
   onUsage = null,
+  usageScope = 'live',
 } = {}) {
   const endpoint = completionUrl(baseUrl);
   const secret = requireText(apiKey, 'api_key');
@@ -93,13 +94,15 @@ export function createOpenAiCompatibleLlm({
   return {
     id: 'openai-compatible-v0.1',
     async complete({ prompt, purpose }) {
+      const requestId=`request:${randomUUID()}`,requestStarted=performance.now();
       const promptText = requireText(prompt, 'prompt');
       const choosing=purpose==='life_choice';
       const attempts = choosing?1:Math.max(0, Number(emptyResponseRetries)) + 1;
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         const callId=`llm:${randomUUID()}`,started=performance.now();
-        const usage=(status,extra={})=>onUsage?.({call_id:callId,category:purpose??'chat',scope:'live',model:modelId,attempt:attempt+1,status,latency_ms:Math.round(performance.now()-started),...extra});
+        const usage=(status,extra={})=>onUsage?.({call_id:callId,request_id:requestId,category:purpose??'chat',scope:usageScope,model:modelId,attempt:attempt+1,status,queue_ms:0,
+          latency_ms:Math.round(performance.now()-started),request_elapsed_ms:Math.round(performance.now()-requestStarted),...extra});
         usage('calling');
         let response;
         try {
@@ -174,7 +177,7 @@ export function createOpenAiCompatibleLlm({
 // Read the local file on each request so saving a key or changing the model
 // takes effect without restarting the persistent world. Never fall back to
 // generated test text when a real provider is unavailable.
-export function createReloadableLlm({ env = process.env, configPath, fetchImpl, now = () => new Date(),onUsage=null } = {}) {
+export function createReloadableLlm({ env = process.env, configPath, fetchImpl, now = () => new Date(),onUsage=null,usageScope='live' } = {}) {
   let verified = null;
   let failure = null;
   const read = () => loadLlmConfiguration({ env: { ...env, DESKBOT_LLM_PROVIDER: 'deepseek' }, configPath });
@@ -201,7 +204,7 @@ export function createReloadableLlm({ env = process.env, configPath, fetchImpl, 
       }
       const key = signature(c);
       try {
-        const result = await createOpenAiCompatibleLlm({ ...c, fetchImpl,onUsage }).complete(input);
+        const result = await createOpenAiCompatibleLlm({ ...c, fetchImpl,onUsage,usageScope }).complete(input);
         verified = { signature: key, at: now().toISOString() };
         failure = null;
         return { ...result, provider: this.id };
@@ -222,6 +225,7 @@ export function createConfiguredLlm(options = {}) {
       temperature: options.temperature ?? process.env.DESKBOT_LLM_TEMPERATURE ?? 0.55,
       fetchImpl: options.fetchImpl,
       onUsage: options.onUsage,
+      usageScope: options.usageScope,
     });
 }
 

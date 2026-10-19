@@ -19,7 +19,7 @@ type LeafInlay={active:boolean;installed_at:string;expires_at:string;strength:nu
 const samples=(fixtureData as unknown as {samples:Record<string,Fixture>}).samples;
 const TIMES=[['day','白天',840],['dusk','傍晚',1110],['midnight','午夜',90]] as const;
 const WEATHER=[['clear','晴'],['wind','风'],['rain','雨']] as const;
-const SITES=[['windleaf-edge','林缘'],['windleaf-lowland','留风树'],['windleaf-shelter','风口棚'],['windleaf-return-platform','归枝台'],['fog-lamp-square','旧夜灯 · 广场']] as const;
+const SITES=[['windleaf-edge','林缘'],['windleaf-lowland','留风树'],['windleaf-shelter','风口棚'],['windleaf-return-platform','归枝台'],['fog-lamp-square','旧夜灯 · 广场'],['moss-sprout-garden','苗圃'],['spare-parts-house','零件屋'],['echo-waterside','水岸']] as const;
 const WORLD_URL='/?mode=deskbot&deskbotUrl=http%3A%2F%2F127.0.0.1%3A4311';
 function firstSample(){const id=new URLSearchParams(location.search).get('sample');return id==='live'||(id&&samples[id])?id:'installed';}
 function percent(value:number|undefined){return typeof value==='number'?`${Math.round(value*100)}%`:'尚无记录';}
@@ -31,12 +31,26 @@ function Review(){
   const [place,setPlace]=useState<string|null>(null),[focusRequest,setFocusRequest]=useState(1);
   const [detailObject,setDetailObject]=useState<string|null>(null);
   const [time,setTime]=useState('day'),[weather,setWeather]=useState('clear'),[metrics,setMetrics]=useState<Metrics|null>(null);
+  const [pose,setPose]=useState('actual');
   const isLive=sample==='live';
   useEffect(()=>{const abort=new AbortController();setLoading(true);setError('');void fetch('http://127.0.0.1:4311/api/world/map',{signal:abort.signal,cache:'no-store'}).then(r=>{if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();}).then(setLive).catch(e=>{if(e.name!=='AbortError')setError(String(e));}).finally(()=>{if(!abort.signal.aborted)setLoading(false);});return ()=>abort.abort();},[refresh]);
   useEffect(()=>{const listener=(e:Event)=>setMetrics((e as CustomEvent<Metrics>).detail);window.addEventListener('deskbot-scene-metrics',listener);return ()=>window.removeEventListener('deskbot-scene-metrics',listener);},[]);
   const item=samples[isLive?lastReplay:sample]??samples.installed!,map=isLive?live:item.map;
   const minute=TIMES.find(t=>t[0]===time)?.[2]??840;
-  const cast=useMemo(()=>map?sceneReviewCast(map,'actual',minute,false):null,[map,minute]);
+  const staged=!isLive&&pose!=='actual';
+  const cast=useMemo(()=>{
+    if(!map)return null;
+    const view=sceneReviewCast(map,staged?'routine':'actual',minute,false);
+    // The art cast has no resource admission/occupancy manager. Give the two
+    // nursery demonstrators distinct stations instead of overlapping bodies.
+    if(staged)for(const activity of view.activities){
+      if(activity.actorId===map.protagonist.character_id&&activity.activityId==='water-bed'){
+        activity.activityId='save-seeds';activity.targetObjectId='seedling-rack';activity.title='动作编排演示 · 留种';
+      }
+    }
+    if(staged&&pose==='paused')view.activities=view.activities.map(a=>({...a,status:'paused'}));
+    return view;
+  },[map,minute,staged,pose]);
   const environment:DeskBotEnvironment={schema:'deskbot.world-environment.v1',projected_at:new Date().toISOString(),time:{mode:'simulation',time_zone:'Asia/Shanghai',minute_of_day:minute,phase:sceneTimePhaseAt(minute).id,synced_at:null,lighting_convention:'fixed-local-dawn-dusk-v1'},weather:{status:'fresh',location:'独立画面预览',provider:'local-preview',condition:weather==='rain'?'雨':weather==='wind'?'风':'晴',observed_at:new Date().toISOString(),expires_at:new Date(Date.now()+3600000).toISOString(),temperature_c:20,wind_mps:weather==='wind'?12:weather==='rain'?8:1.5,precipitation:weather==='rain'?'rain':'none',cloud_cover:weather==='rain'?.8:.15,intensity:weather==='rain'?.7:0}};
   const labels=map?.locations.map(p=>{const point=p.presentation?.lot??canonicalPointForLocation(p),w=mapToWorld(point.x,point.y);return {id:p.location_id,label:p.name,x:w.x,z:w.z,height:8,kind:'landmark' as const};})??[];
   const rack=map?.objects?.find(o=>o.object_id==='windleaf-rack')?.state,frame=rack?.leaf_frames?.[0];
@@ -47,7 +61,7 @@ function Review(){
   const inlays=nightLights.flatMap(l=>{const inlay=(l as typeof l&{leaf_inlay?:LeafInlay}).leaf_inlay;return inlay?[inlay]:[];});
   const selectedPlace=map?.locations.find(p=>p.location_id===place);
   const focus=(id:string|null)=>{setPlace(id);setDetailObject(null);setFocusRequest(n=>n+1);};
-  const inspect=()=>{const ids:Record<string,string>={'windleaf-edge':'windleaf-waymarker','windleaf-lowland':'windleaf-canopy','windleaf-shelter':'windleaf-rack','windleaf-return-platform':'windleaf-return-table','fog-lamp-square':'square-noticeboard'};if(place){setDetailObject(ids[place]??null);setFocusRequest(n=>n+1);}};
+  const inspect=()=>{const ids:Record<string,string>={'windleaf-edge':'windleaf-waymarker','windleaf-lowland':'windleaf-canopy','windleaf-shelter':'windleaf-rack','windleaf-return-platform':'windleaf-return-table','fog-lamp-square':'square-noticeboard','moss-sprout-garden':'garden-bed','spare-parts-house':'repair-bench','echo-waterside':'floating-frame'};if(place){setDetailObject(ids[place]??null);setFocusRequest(n=>n+1);}};
   const selectSample=(id:string)=>{setSample(id);if(id!=='live')setLastReplay(id);setMetrics(null);};
   const placeLabel=place?SITES.find(s=>s[0]===place)?.[1]??selectedPlace?.name??'聚落':'中央聚落与环绕地貌';
   const publicObjects=map?.objects?.filter(o=>map.areas?.some(a=>a.area_id===o.area_id&&a.location_id===(place??'windleaf-lowland')))??[];
@@ -62,13 +76,14 @@ function Review(){
       <nav className='windleaf-review__places' aria-label='查看空间'><button onClick={()=>focus(null)} aria-pressed={!place}>全景</button>{SITES.map(([id,label])=><button key={id} disabled={!map?.locations.some(p=>p.location_id===id)} aria-pressed={place===id} onClick={()=>focus(id)}>{label}</button>)}</nav>
       <section className='deskbot-mode__stage windleaf-review__stage' aria-label='聚形域运行场景'>
         {map&&cast?<TownMap sceneLocations={map.locations} labels={labels} environment={environment} activities={cast.activities} citizens={cast.citizens} positions={cast.positions} durations={new Map()} actions={new Map()} confidences={new Map()} focusedAction={null} onFocusAction={()=>{}} onPlaceClick={focus} focusLocationId={place} focusRequest={focusRequest} focusObjectId={detailObject}/>:<p className='windleaf-review__loading' role='status'>{error?'正式世界暂时无法读取，请检查服务后重试。':'正在读取世界…'}</p>}
-        <div className='windleaf-review__caption'><span>{placeLabel}</span><strong>{isLive?'正式存档 · 只读':item.label}</strong><small>{isLive?'读取的物件状态 + 预览光照':'隔离执行回放 · 不写入正式世界'}</small></div>
+        <div className='windleaf-review__caption'><span>{placeLabel}</span><strong>{staged?'动作编排 · '+(pose==='paused'?'暂停':'工作中'):isLive?'正式存档 · 只读':item.label}</strong><small>{staged?'用于核对动作，不是真实任务；库存保持原样':isLive?'读取的物件状态 + 预览光照':'隔离执行回放 · 不写入正式世界'}</small></div>
       </section><div className='windleaf-review__world-note'><span>拖动平移 · 滚轮缩放 · Shift + 拖动旋转</span>{place&&<button className='windleaf-review__inspect' onClick={inspect}>近看物件</button>}<span>中心聚落 · 旧壳脊 / 折光湿地 / 风语林 / 星屑台地</span></div>
     </div><aside className='windleaf-review__panel' aria-label='场景核对'>
       <section className='windleaf-review__source'><div className='windleaf-review__section-heading'><span>01</span><h2>正在看什么</h2></div><div className='windleaf-review__modes' role='group' aria-label='世界数据来源'><button aria-pressed={!isLive} onClick={()=>selectSample(lastReplay)}>隔离回放</button><button aria-pressed={isLive} onClick={()=>selectSample('live')}>正式世界</button></div>
         {!isLive?<><label htmlFor='windleaf-sample'>生活阶段</label><select id='windleaf-sample' value={sample} onChange={e=>selectSample(e.target.value)}>{Object.entries(samples).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select><p>{item.description}</p></>:<><p>只读取已保存的位置、活动和物件。光照预览不会推进时间或改变存档。</p><button className='windleaf-review__refresh' disabled={loading} onClick={()=>setRefresh(n=>n+1)}>{loading?'读取中…':'重新读取此刻'}</button>{error&&<p className='windleaf-review__error' role='alert'>读取失败。已有画面可能是上一次读取的状态。{error}</p>}</>}
       </section>
       <section><div className='windleaf-review__section-heading'><span>02</span><h2>换个天色看</h2></div><div className='windleaf-review__choices' role='group' aria-label='画面时间'>{TIMES.map(([id,label])=><button key={id} aria-pressed={time===id} onClick={()=>setTime(id)}>{label}</button>)}</div><div className='windleaf-review__choices' role='group' aria-label='画面天气'>{WEATHER.map(([id,label])=><button key={id} aria-pressed={weather===id} onClick={()=>setWeather(id)}>{label}</button>)}</div><small>预览光照、风和雨。物件的积水、磨损和纹路仍来自所选生活阶段。</small></section>
+      {!isLive&&<section><div className='windleaf-review__section-heading'><span>◇</span><h2>动作与场地核对</h2></div><label>动作来源<select value={pose} onChange={e=>setPose(e.target.value)}><option value='actual'>所选回放里的实际任务</option><option value='working'>工作动作编排</option><option value='paused'>暂停动作编排</option></select></label><small>{staged?'美术核对用编排：不会执行任务，不会改变库存、经历和兴趣。':'只显示该回放已经存在的任务。'} 可从上方进入苗圃、零件屋和水岸近看。</small></section>}
       <section><div className='windleaf-review__section-heading'><span>03</span><h2>物件留下的变化</h2></div><div className='windleaf-review__object-title'><h3>风口棚 · 光叶架</h3><button onClick={()=>focus('windleaf-shelter')}>靠近看</button></div>
         {frame?<dl><div><dt>遮片</dt><dd>{({open:'展开',half:'半合',closed:'合上'})[frame.shutter]}</dd></div><div><dt>朝向</dt><dd>{frame.exposure==='windward'?'迎风':'避风'}</dd></div><div><dt>布片完好</dt><dd>{percent(frame.condition)}</dd></div><div><dt>纹路</dt><dd>{percent(frame.pattern)}</dd></div><div><dt>修补</dt><dd>{frame.patches} 处</dd></div><div><dt>测记</dt><dd>{frame.read_count} 次</dd></div></dl>:<p className='windleaf-review__quiet'>现场尚未安置光叶架。</p>}
         <p className='windleaf-review__basin'>雨盆水位 <strong>{percent(basin?.water_level)}</strong><small>雨盆积水不会记入清水库存。</small></p>

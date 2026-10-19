@@ -61,7 +61,7 @@ export function hasSceneTaskEffect(effect: SceneTaskEffect, activities: readonly
     irrigation: ['water-bed'],
     sparks: ['repair-bench', 'repair-frame', 'repair-rack', 'repair-stove', 'craft-tray', 'craft-frame-kit'],
     stitch: ['stitch-canopy'],
-    'water-collection': ['collect-water'],
+    'water-collection': ['collect-water','waylight-use'],
     'seed-saving': ['save-seeds'],
   };
   const target = effect === 'water-collection' ? 'floating-frame' : effect === 'seed-saving' ? 'seedling-rack' : effect === 'steam' ? 'trial-stove' : null;

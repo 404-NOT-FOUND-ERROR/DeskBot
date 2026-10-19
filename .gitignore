@@ -23,6 +23,7 @@ venv/
 **/data/*.sqlite-*
 **/*.sqlite
 **/*.sqlite-*
+**/*.sqlite.gz
 **/audio-artifacts/
 *.wav
 *.mp3

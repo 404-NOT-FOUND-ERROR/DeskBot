@@ -17,6 +17,8 @@ export function cognitiveSocialContext(w,id,at) {
       options.push({option_id:'give-tray',kind:'exchange',title:'送出一只现有托盘',location_id:own.location_id,reason:'只交接自己确实拥有的一只托盘',actor_order:'initiator_receiver',offers:[{resource:'trays',count:1,from:'initiator',to:'receiver'}]});
     if(own.location_id==='moss-sprout-garden')
       options.push({option_id:'ask-tray-help',kind:'cooperate',title:'商量制作一只苗圃托盘',location_id:own.location_id,reason:'请对方沿实际通路备料制作，回来交接一只托盘',actor_order:'receiver_initiator',produce_activity:'craft-tray',resource:'trays'});
+    if(own.location_id==='echo-waterside'&&w.living?.objects['floating-frame']?.waylight&&!w.living.objects['floating-frame'].waylight.has_hood)
+      options.push({option_id:'ask-waylight-shade',kind:'cooperate',title:'商量给归途灯加一片罩',location_id:own.location_id,reason:'请对方备料缝罩，实际交接后由我安装；也可以拒绝或延期',actor_order:'receiver_initiator',produce_activity:'waylight-craft-shade',resource:'waylight_shade',use_activity:'waylight-fit-shade'});
   }
   const commitments=(w.social?.commitments??[]).filter(c=>c.control==='cognitive'&&c.actors.includes(id)).slice(-16).map(c=>({
     id:c.id,terms_revision:c.terms_revision,title:c.title,kind:c.kind,status:c.status,actors:copy(c.actors),initiator_id:c.initiator_id,

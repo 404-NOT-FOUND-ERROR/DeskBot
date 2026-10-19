@@ -45,6 +45,7 @@ export interface DeskBotObjectState {
   glow_moss?:{rule_version:string;charge:number;cohesion:number;brightness:number;updated_at:string};
   glow_trials?:GlowTrial[];glow_studies?:GlowStudy[];
   echo_bells?:EchoBell[];night_lanterns?:NightLantern[];
+  waylight?:Waylight|null;
   leaf_frames?:WindleafFrame[];charge?:number;pattern?:number;
   wind_trace?:WindTrace;place_story?:PlaceStory;
   project_assets?: {
@@ -54,6 +55,12 @@ export interface DeskBotObjectState {
   project_drafts?:Record<string,{project_id:string;recorded_at:string;inputs:{resource:string;count:number}[];yield_count:number}>;
   recipe_book?:Record<string,{project_id:string;name:string;accepted_at:string;inputs:{resource:string;count:number}[];yield_count:number;feedback?:unknown[]}>;
   project_batches?:Record<string,{batch_id:string;status:'carried'|'served'|'awaiting_taste'|'tasted'|'expired';prepared_at:string;served_at?:string|null;expires_at:string;feedback?:unknown[];remaining_portions:number}>;
+}
+export interface Waylight {
+  asset_id:string;setup_root:string;owner_id:string;created_at:string;updated_at:string;changed_at:string;
+  mode:'open'|'hooded';has_hood:boolean;charge:number;condition:number;brightness:number;moisture:number;
+  patches:number;use_count:number;lit_hours:number;dark_bank_hours:number;
+  last_use:{actor_id:string;at:string;root_outcome_id:string;water_units:number}|null;
 }
 export interface DeskBotLivingActivity {
   activity_id: string; title: string; kind: "care"|"craft"; target_object_id: string; location_id: string;
@@ -291,7 +298,7 @@ export interface DeskBotWorldTask {
   role_trial?:{trial_id:string;proposal_id:string;direction_id:string;axis:'form'|'vocation';attempt_id:string;step_role:'primary'|'support';primary_activity_id:string};
   target_object_id?: string;
   completion?: { effect:string; result?:{ success:boolean; text?:string; reason?:string } }|null;
-  reservation?: { status: 'held'|'consumed'|'returned'; inputs: { container:string; resource:string; count:number }[] };
+  reservation?: { status: 'held'|'consumed'|'returned'; facility_slot?:number|null; inputs: { container:string; resource:string; count:number }[] };
 }
 
 export interface DeskBotWorldRouteLocation {

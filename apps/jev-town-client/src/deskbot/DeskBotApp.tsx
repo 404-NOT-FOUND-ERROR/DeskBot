@@ -7,8 +7,8 @@ import { TownMap } from "../components/TownMap.tsx";
 import type { LabelSpec } from "../three/sceneSpec.ts";
 import { buildRoutePreview, buildTravelVisual, resolveTravelRoute, type DeskBotTravelVisual } from "./routeVisual.ts";
 import { canonicalPointForLocation, canonicalRouteBetween } from "./canonicalGeometry.ts";
-import { buildNpcCandidates, controlWorldTask, controlAutonomousLife, respondSocialInvitation, suggestLifeIdea, deskbotBaseUrl, executeCandidate, fetchDeskBotWorld, fetchRoleWishes, respondRoleWish, createPracticalTrialController, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation, startLivingActivity, transferResource } from "./bridge.ts";
-import type { DeskBotActionCandidate, DeskBotInteractionIntent, DeskBotLifeWorld, DeskBotNpc, DeskBotNpcInteractionResponse, DeskBotWorldMap, DeskBotWorldRouteResponse, DeskBotRoleWishSnapshot, DeskBotRoleWishChoice, DeskBotPracticalTrialOperation } from "./types.ts";
+import { buildNpcCandidates, controlWorldTask, controlAutonomousLife, respondSocialInvitation, suggestLifeIdea, deskbotBaseUrl, executeCandidate, respondRoleWish, createPracticalTrialController, fetchWorldRoute, interactWithNpc, sendChat, travelRouteToLocation, startLivingActivity, transferResource } from "./bridge.ts";
+import type { DeskBotActionCandidate, DeskBotInteractionIntent, DeskBotNpc, DeskBotNpcInteractionResponse, DeskBotWorldRouteResponse, DeskBotRoleWishChoice, DeskBotPracticalTrialOperation } from "./types.ts";
 import "./deskbot.css";
 import { LifeSidebar } from "./LifeSidebar.tsx";
 import {projectSceneActivities} from './activityProjection.ts';
@@ -23,6 +23,9 @@ import type {DeskBotRoleStageOperation} from './types.ts';
 import type {ShapingAppearance} from '../three/shapingAppearance.ts';
 import {LifeObservation} from './LifeObservation.tsx';
 import {Conversation,mergeConversation,type ConversationLine} from './Conversation.tsx';
+import {createWorldObserverClient,fetchWorldSnapshot,type ObserverState} from './worldObserver.ts';
+import {WorldRuntimeStatus} from './WorldRuntimeStatus.tsx';
+import {WaylightLife} from './WaylightLife.tsx';
 
 const INTERACTION_ACTIONS: { intent: DeskBotInteractionIntent; label: string }[] = [
   { intent: "observe", label: "观察" },
@@ -64,9 +67,26 @@ export function DeskBotApp() {
   const [npcSelectionRequest,setNpcSelectionRequest]=useState(0);
   const suggestionRetry=useRef<{fingerprint:string;id:string}|null>(null);
   const socialRetry=useRef<{fingerprint:string;id:string}|null>(null);
-  const [map, setMap] = useState<DeskBotWorldMap | null>(null);
-  const [life, setLife] = useState<DeskBotLifeWorld | null>(null);
-  const [roleWishes,setRoleWishes]=useState<DeskBotRoleWishSnapshot|null>(null);
+  const [observer,setObserver]=useState<ObserverState>({snapshot:null,status:'connecting',error:null});
+  const observerClient=useRef<ReturnType<typeof createWorldObserverClient>|null>(null);
+  const map=observer.snapshot?.map??null,life=observer.snapshot?.life??null,roleWishes=observer.snapshot?.role_wishes??null;
+  const [renderedId,setRenderedId]=useState<string|null>(null);
+  const [renderUnavailable,setRenderUnavailable]=useState(false);
+  const [renderTimedOut,setRenderTimedOut]=useState(false);
+  const acknowledgeScene=useCallback((id:string)=>{setRenderedId(id);setRenderUnavailable(false);},[]);
+  const unavailableScene=useCallback(()=>setRenderUnavailable(true),[]);
+  const refresh=useCallback(()=>observerClient.current?.refresh()??Promise.resolve(null),[]);
+  useEffect(()=>{
+    const client=createWorldObserverClient({read:signal=>fetchWorldSnapshot(baseUrl,signal),onChange:next=>{setObserver(next);if(next.snapshot)setMessage(current=>current==='正在连接雾灯镇…'?'小镇近况已同步。':current);}});
+    observerClient.current=client;void client.refresh();
+    const timer=window.setInterval(()=>void client.refresh(),15000);
+    const reconnect=()=>{if(document.visibilityState==='visible')void client.refresh();};
+    window.addEventListener('online',reconnect);document.addEventListener('visibilitychange',reconnect);
+    return()=>{client.stop();if(observerClient.current===client)observerClient.current=null;window.clearInterval(timer);window.removeEventListener('online',reconnect);document.removeEventListener('visibilitychange',reconnect);};
+  },[baseUrl]);
+  useEffect(()=>{setRenderTimedOut(false);if(!observer.snapshot||renderedId===observer.snapshot.snapshot_id||renderUnavailable)return;
+    const timer=window.setTimeout(()=>setRenderTimedOut(true),8000);return()=>window.clearTimeout(timer);
+  },[observer.snapshot?.snapshot_id,renderedId,renderUnavailable]);
   const [body, setBody] = useState<DeskBotBodyPerception | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<DeskBotActionCandidate | null>(null);
@@ -121,25 +141,6 @@ export function DeskBotApp() {
     observedTask.current = currentTask ? { id: currentTask.task_id, status: currentTask.status } : task ? { id: task.task_id, status: task.status } : previous;
   }, [map, currentTask]);
 
-  // Async reads can finish out of order (especially while a travel animation
-  // is running). Never let an older canonical revision roll the scene back.
-  const applyMap = useCallback((next: DeskBotWorldMap) => {
-    setMap((current) => (
-      current
-      && current.world_id === next.world_id
-      && next.world_revision < current.world_revision
-        ? current
-        : next
-    ));
-  }, []);
-  const applyLife = useCallback((next: DeskBotLifeWorld) => {
-    setLife((current) => (
-      current
-      && current.world_revision > next.world_revision
-        ? current
-        : next
-    ));
-  }, []);
   const handlePlaceClick = useCallback((locationId: string) => {
     setSelectedPlaceId(locationId);
     setPlaceFocusRequest(request=>request+1);
@@ -176,24 +177,6 @@ export function DeskBotApp() {
   async function changePracticalTrial(id:string,operation:DeskBotPracticalTrialOperation,variant?:string){setBusy(true);try{const result=await practicalTrialControl(id,operation,variant);await refresh();setMessage(result.practical_trial.next_step);}catch(error){setMessage(error instanceof Error?error.message:'实际试做未更新');}finally{setBusy(false);}}
   async function changeRoleStage(id:string,operation:DeskBotRoleStageOperation,binding:string){setBusy(true);try{const result=await stageControl(id,operation,binding);await refresh();setMessage(operation==='accept'?`已采用${result.role_stage.label}方向，新的生活选项与虚拟形象已保存。`:'已经回退这一轴的虚拟阶段，实际经历与关系仍会保留。');}catch(error){await refresh();setMessage(error instanceof Error?error.message:'角色阶段未更新');}finally{setBusy(false);}}
 
-  const refresh = useCallback(async () => {
-    try {
-      const snapshot = await fetchDeskBotWorld(baseUrl);
-      applyMap(snapshot.map);
-      applyLife(snapshot.life);
-      try {const next=await fetchRoleWishes(snapshot.map.protagonist.character_id,baseUrl);setRoleWishes(current=>(current?.evolution.role_stages?.revision??0)>(next.evolution.role_stages?.revision??0)?current:next);} catch {setRoleWishes(null);}
-      setMessage("小镇的近况已更新。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "无法读取 DeskBot 世界");
-    }
-  }, [applyLife, applyMap, baseUrl]);
-
-  useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 15000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
-
   useEffect(()=>{
     const controller=new AbortController();
     let active=true;
@@ -226,7 +209,7 @@ export function DeskBotApp() {
       .then((result) => {
         if (!active || requestId !== routeRequest.current) return;
         if (result.world_revision !== map.world_revision) {
-          applyMap(result.map);
+          void refresh();
           setSelectedRoute(null);
           return;
         }
@@ -240,7 +223,7 @@ export function DeskBotApp() {
         if (active && requestId === routeRequest.current) setRouteBusy(false);
       });
     return () => { active = false; };
-  }, [applyMap, baseUrl, map?.world_id, map?.world_revision, selectedPlaceId]);
+  }, [refresh, baseUrl, map?.world_id, map?.world_revision, selectedPlaceId]);
 
   // A refresh or another world mutation invalidates any in-flight visual and
   // route preview. Keeping either would make a current map look like it is
@@ -373,9 +356,7 @@ export function DeskBotApp() {
         ? `喵呜回应了 · ${result.expressionIntent.mode}${result.expressionIntent.pace ? ` · ${result.expressionIntent.pace}` : ""}`
         : "喵呜回应了；世界状态仍由 DeskBot 确认。 ");
       try {
-        const snapshot = await fetchDeskBotWorld(baseUrl);
-        applyMap(snapshot.map);
-        applyLife(snapshot.life);
+        if(!await refresh())throw Error('世界近况暂未同步');
       } catch {
         setMessage("对话已完成；世界面板暂时没有刷新，稍后会自动重读。");
       }
@@ -428,17 +409,17 @@ export function DeskBotApp() {
             stepMap.world_revision,
           );
           setTravelVisual(visual);
-          applyMap(stepMap);
+          await refresh();
           setMessage(`喵呜正在前往${selectedPlace.name} · 第 ${step}/${total} 段，下一站是${destinationName}……`);
           await new Promise<void>((resolve) => window.setTimeout(resolve, visual.durationMs));
           setTravelVisual(null);
           return;
         }
-        applyMap(stepMap);
+        await refresh();
         setMessage(`喵呜正在前往${selectedPlace.name} · 第 ${step}/${total} 段，下一站是${destinationName}……`);
       });
       travelRetry.current = null;
-      applyMap(result.map);
+      await refresh();
       setSelectedRoute(null);
       setSelectedPlaceId(null);
       if (result.pending) {
@@ -454,9 +435,7 @@ export function DeskBotApp() {
       setTravelVisual(null);
       setMessage(result.completed ? `已抵达${selectedPlace.name}，路线共 ${result.stepsCompleted} 段。` : "旅行已暂停，请重新规划。 ");
       try {
-        const snapshot = await fetchDeskBotWorld(baseUrl);
-        applyMap(snapshot.map);
-        applyLife(snapshot.life);
+        if(!await refresh())throw Error('世界近况暂未同步');
       } catch {
         setMessage(`已抵达${selectedPlace.name}；场景面板稍后自动刷新。`);
       }
@@ -493,15 +472,12 @@ export function DeskBotApp() {
       }, baseUrl);
       interactionRetry.current = null;
       setLastInteraction(result);
-      applyLife(result.life);
       appendStoryLine({ id: result.interaction_id, speaker: result.npc.display_name, text: result.response });
       if (intent === "suggest") setIdea("");
       setMessage(result.duplicate
         ? "DeskBot 确认这是已记录互动的安全重试，没有重复增加关系。"
         : "NPC 已回应；这段共同经历已写入 DeskBot 世界。");
-      const snapshot = await fetchDeskBotWorld(baseUrl);
-      applyMap(snapshot.map);
-      applyLife(result.life);
+      await refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "NPC 互动没有完成；可以重试同一项互动。");
     } finally {
@@ -514,11 +490,10 @@ export function DeskBotApp() {
     setBusy(true);
     try {
       const result = await executeCandidate(candidate, baseUrl);
-      applyMap(result.map);
+      await refresh();
       setCandidate(null);
       setMessage(result.duplicate ? "这条事件已经执行过，DeskBot 返回了幂等结果。" : `行动已由 DeskBot 接受，canonical revision 现在是 ${result.map.world_revision}。`);
-      const snapshot = await fetchDeskBotWorld(baseUrl);
-      applyLife(snapshot.life);
+
     } catch (error) {
       setCandidate(null);
       setMessage(error instanceof Error ? error.message : "行动没有执行");
@@ -552,11 +527,15 @@ export function DeskBotApp() {
         </div>
       </header>
 
+      <WorldRuntimeStatus state={observer} renderedId={renderedId} renderUnavailable={renderUnavailable} renderTimedOut={renderTimedOut} onRetry={()=>void refresh()} baseUrl={baseUrl}/>
       <BodyStatus body={body}/>
 
       <main className="deskbot-mode__grid">
         <section className="deskbot-mode__stage">
           <TownMap
+            snapshotId={observer.snapshot?.snapshot_id}
+            onSnapshotRendered={acknowledgeScene}
+            onSceneUnavailable={unavailableScene}
             citizens={citizens}
             shapingAppearances={shapingAppearances}
             labels={labels}
@@ -588,6 +567,7 @@ export function DeskBotApp() {
             {lastInteraction?.role_evidence?.direction ? <small className="deskbot-mode__story-note">角色方向线索：{lastInteraction.role_evidence.direction.label} · 观察中，尚未改变身份或外壳</small> : null}
           </details>
 
+          <WaylightLife map={map} onPlace={handlePlaceClick}/>
           {selectedPlace ? (
             <section className="deskbot-mode__place-card" aria-label={`${selectedPlace.name} 地点信息`}>
               <button className="deskbot-mode__place-close" type="button" aria-label="关闭地点信息" onClick={() => { setSelectedPlaceId(null); setSelectedRoute(null); }}>×</button>

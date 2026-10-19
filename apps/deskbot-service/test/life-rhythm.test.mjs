@@ -79,14 +79,25 @@ test('a chosen follow-up completes through the existing task executor and shares
  assert.equal(lifeFollowupCandidates(w,w.autonomy.actors[OWN],due,{travel:()=>[],practice:()=>[]}).length,0);
  const restored=JSON.parse(JSON.stringify(w));assert.deepEqual(lifeRhythmReadModel(restored),lifeRhythmReadModel(w));
 });
-test('waiting does not use recipe effort and exhausted residents recover in place with real elapsed time',()=>{
+test('waiting costs no recipe effort; an exhausted hungry resident rests locally and reconsiders soon without free food',()=>{
  const w=fixture(),s=w.autonomy.actors[OWN];s.energy=.7;
  finishLifeTask(w,{actor_id:OWN,status:'completed',kind:'care',life_action:'observe',life_goal:'wait-meal'},START);assert.equal(s.energy,.7);
  s.energy=.02;s.appetite=.95;w.protagonist.location_id='warm-pot-courtyard';
  advanceAutonomousLife(w,START,{eventId:'rest:choose'});
  const task=w.tasks.find(t=>t.status==='running'&&t.actor_id===OWN);assert.equal(task.life_action,'rest');assert.equal(task.location_id,'warm-pot-courtyard');
- assert.ok(task.duration_ms>2*3600000);assert.equal(w.autonomy.actors[OWN].energy,.02,'planning grants no instant recovery');
+ assert.ok(task.duration_ms>=15*60000&&task.duration_ms<=60*60000,'urgent food need limits the next rest interval');assert.equal(w.autonomy.actors[OWN].energy,.02,'planning grants no instant recovery');
  advanceLivingResources(w,task.due_at,{force:true});applyRealTimeClock(w,task.due_at);
  advanceWorldTask(w,{task_id:task.task_id,expected_task_revision:task.revision},task.due_at);
- assert.ok(w.autonomy.actors[OWN].energy>=.64);assert.equal(w.autonomy.actors[OWN].appetite,1,'rest grants no free food');
+ assert.ok(Math.abs(w.autonomy.actors[OWN].energy-(.02+task.duration_ms/3600000*.22))<1e-8,'recovery is proportional to actual resting time');
+ assert.ok(Math.abs(w.autonomy.actors[OWN].appetite-(.95+task.duration_ms/3600000*.025))<1e-8,'rest grants no free food');
+});
+
+test('a resident without an urgent meal need retains a long restorative rest',()=>{
+ const w=fixture(),s=w.autonomy.actors[OWN];s.energy=.02;s.appetite=.2;
+ advanceAutonomousLife(w,START,{eventId:'ordinary-rest'});
+ const task=w.tasks.find(t=>t.status==='running'&&t.actor_id===OWN);
+ assert.equal(task.life_action,'rest');assert.ok(task.duration_ms>2*3600000);
+ advanceLivingResources(w,task.due_at,{force:true});applyRealTimeClock(w,task.due_at);
+ advanceWorldTask(w,{task_id:task.task_id,expected_task_revision:task.revision},task.due_at);
+ assert.ok(w.autonomy.actors[OWN].energy>=.64);assert.ok(w.autonomy.actors[OWN].appetite>.2);
 });

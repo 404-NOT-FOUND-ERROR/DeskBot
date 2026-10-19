@@ -34,6 +34,8 @@ import {isProjectActivity,projectActivityView} from './projectScene.ts';
 import {shapingAppearanceKey,type ShapingAppearance} from './shapingAppearance.ts';
 
 export interface TownScene3DProps {
+  snapshotId?:string;
+  onSnapshotRendered?:(id:string)=>void;
   sceneLocations?: readonly DeskBotLocation[];
   environment?: DeskBotEnvironment;
   activities?: readonly SceneLifeActivity[];
@@ -218,7 +220,7 @@ interface CitizenEntry {
  * onto their DOM nodes each frame, so camera motion never re-renders React.
  */
 export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(function TownScene3D(
-  { citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
+  { snapshotId,onSnapshotRendered,citizens, shapingAppearances,labels = LABEL_SPECS, sceneLocations, environment, activities, focusLocationId, focusRequest, focusObjectId, positions, durations, actions, focusedAction, showDecisions, getHotspot, onPlaceClick, travelVisual, routePreview, onZoomChange, onContextLost },
   ref,
 ) {
   // World revisions replace object identities frequently. Scene construction is
@@ -228,6 +230,7 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
   const labelKey = labels.map((label) => `${label.id}:${label.label}:${label.x}:${label.z}:${label.height}`).join("|");
   const sceneryKey=JSON.stringify(sceneLocations?.map(place=>[place.location_id,place.presentation,place.areas?.map(a=>a.objects?.map(o=>o.object_id))]));
   const sceneLocationsRef=useRef(sceneLocations);sceneLocationsRef.current=sceneLocations;
+  const renderReceipt=useRef<{id?:string;callback?: (id:string)=>void;sent?:string}>({});
   const environmentRef=useRef(environment);environmentRef.current=environment;
   const activitiesRef=useRef(activities);activitiesRef.current=activities;
   const focusObjectRef=useRef(focusObjectId);focusObjectRef.current=focusObjectId;
@@ -668,12 +671,13 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
         let workAnchor:THREE.Vector3|undefined;
         let workTarget:THREE.Vector3|null = null;
         if(activity && !admittedTravel && activity.targetObjectId) {
-          workAnchor = workAnchors.get(activity.taskId);
+          const anchorKey=`${activity.taskId}:${activity.facilitySlot??'legacy'}`;
+          workAnchor = workAnchors.get(anchorKey);
           const facility = scenery.companion?.objects.get(activity.targetObjectId);
           const object=activity.targetObjectId==='windleaf-rack'?facility?.children.find(child=>child.userData.owner_id===activity.actorId)??facility:facility;
           if(!workAnchor && object) {
-            workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z), activity.activityId);
-            workAnchors.set(activity.taskId,workAnchor);
+            workAnchor = sceneWorkAnchor(object, new THREE.Vector3(world.x,0,world.z), activity.activityId,activity.facilitySlot);
+            workAnchors.set(anchorKey,workAnchor);
             if(workAnchors.size>64)workAnchors.delete(workAnchors.keys().next().value!);
           }
           if (object) workTarget = sceneWorkTarget(object, activity.activityId);
@@ -824,6 +828,8 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
       renderer.render(scene, camera);
       if(measure&&++measuredFrames%60===0&&frameTimes.length){const sorted=[...frameTimes].sort((a,b)=>a-b);window.dispatchEvent(new CustomEvent('deskbot-scene-metrics',{detail:{frames:frameTimes.length,p50_ms:sorted[Math.floor(sorted.length*.5)],p95_ms:sorted[Math.floor(sorted.length*.95)],draw_calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}));}
       labelRenderer.render(scene, camera);
+      const receipt=renderReceipt.current;
+      if(receipt.id&&receipt.sent!==receipt.id){receipt.sent=receipt.id;receipt.callback?.(receipt.id);}
       if (cameraDirty || citizensMoving || tween) positionHotspots();
       cameraDirty = false;
 
@@ -966,6 +972,12 @@ export const TownScene3D = forwardRef<TownScene3DHandle, TownScene3DProps>(funct
     }
     requestFrameRef.current();
   }, [actions, focusedAction, showDecisions]);
+
+  // After the position/action effects, arm this commit's first rendered frame.
+  useEffect(()=>{
+    renderReceipt.current={id:snapshotId,callback:onSnapshotRendered};
+    requestFrameRef.current();
+  },[snapshotId,onSnapshotRendered,citizenKey,labelKey,sceneryKey]);
 
   return <div ref={containerRef} className="town-map__canvas-host" />;
 });

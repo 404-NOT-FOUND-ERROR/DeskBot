@@ -11,11 +11,17 @@ const placements:readonly [string,string,[number,number,number]][]=[
   ['windleaf-shelter','windleaf-rack',[0,0,3.3]],
   ['windleaf-return-platform','windleaf-return-table',[4.7,0,1.3]],
 ];
+/** Store arrivals alongside work anchors so terrain projection transforms them
+ * with the geometry, rather than applying an old offset after deformation. */
+export function attachForestArrivalAnchors(objects:ReadonlyMap<string,THREE.Group>){
+  for(const [,id,local] of placements){const object=objects.get(id);if(object)object.userData.arrival_anchor=[...local];}
+}
 export function forestArrivalAnchors(objects:ReadonlyMap<string,THREE.Group>|undefined,locations:readonly DeskBotLocation[]|undefined){
   return placements.flatMap(([id,objectId,local])=>{
     const object=objects?.get(objectId),place=locations?.find(p=>p.location_id===id);if(!object||!place)return [];
     object.updateWorldMatrix(true,true);
-    return [{point:canonicalPointForLocation(place),standing:sceneStandingSurfaceAt(object,object.localToWorld(new THREE.Vector3(...local)))}];
+    const offset=(object.userData.arrival_anchor??local) as [number,number,number];
+    return [{point:canonicalPointForLocation(place),standing:sceneStandingSurfaceAt(object,object.localToWorld(new THREE.Vector3(...offset)))}];
   });
 }
 export function forestIdleArrivalAt(anchors:ReturnType<typeof forestArrivalAnchors>,point:{x:number;y:number},walking:boolean,travelling:boolean){

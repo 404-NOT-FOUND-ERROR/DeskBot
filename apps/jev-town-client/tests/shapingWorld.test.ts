@@ -5,13 +5,26 @@ import {createShapingRender} from '../src/three/shapingRender.ts';
 import {createMoltedShellLandscape} from '../src/three/moltedShellLandscape.ts';
 import {canonicalPointForLocation,canonicalRouteBetween} from '../src/deskbot/canonicalGeometry.ts';
 import {buildTownScenery,disposeObject} from '../src/three/buildScene.ts';
-import {sceneWorkAnchor} from '../src/three/sceneWorkplace.ts';
+import {sceneWorkAnchor,sceneWorkTarget} from '../src/three/sceneWorkplace.ts';
+import {forestArrivalAnchors} from '../src/three/forestArrival.ts';
 import {windleafHeightAt} from '../src/three/windleafLayout.ts';
 import samples from '../src/deskbot/windleafReviewFixtures.json';
 import type {DeskBotWorldMap} from '../src/deskbot/types.ts';
 const map=(samples as unknown as {samples:{installed:{map:DeskBotWorldMap}}}).samples.installed.map;
 
 describe('central settlement and surrounding terrain projection',()=>{
+  it('keeps six reserved dining positions distinct and attached to the same table after terrain projection',()=>{
+    const scene=buildTownScenery(map.locations),table=scene.companion!.objects.get('shared-table')!;
+    const seats=Array.from({length:6},(_,i)=>sceneWorkAnchor(table,new THREE.Vector3(),'share-meal',i));
+    expect(new Set(seats.map(p=>p.toArray().join(','))).size).toBe(6);
+    for(let i=0;i<6;i++)for(let j=i+1;j<6;j++)expect(seats[i]!.distanceTo(seats[j]!)).toBeGreaterThan(1.5);
+    projectShapingScenery(scene.root);
+    seats.forEach((p,i)=>{
+      const expected=shapingWorldPoint(p.x+60,p.z+60),actual=sceneWorkAnchor(table,new THREE.Vector3(),'share-meal',i);
+      expect(actual.x).toBeCloseTo(expected.x,5);expect(actual.z).toBeCloseTo(expected.z,5);expect(actual.y).toBeCloseTo(p.y,5);
+    });
+    scene.dispose();
+  });
   it('round-trips all live places and their routes, including both sides of the old boundary',()=>{
     const before=JSON.stringify(map);
     for(const place of map.locations){
@@ -47,6 +60,22 @@ describe('central settlement and surrounding terrain projection',()=>{
     const seed=objects.get('seedling-rack')!,townAnchor=sceneWorkAnchor(seed,new THREE.Vector3(),'save-seeds');
     expect(townAnchor.y).toBeGreaterThan(.5);expect(townAnchor.y).toBeCloseTo(windleafHeightAt(20,100),4);
     scene.dispose();
+  });
+  it('bends working, facing and arrival points with their facilities, preserving canonical tasks',()=>{
+    const scene=buildTownScenery(map.locations),objects=scene.companion!.objects;
+    const before=JSON.stringify(map);
+    const stations=[['seedling-rack','save-seeds'],['garden-bed','water-bed'],['repair-bench','craft-tray'],['trial-stove','cook-moss'],['floating-frame','collect-water']] as const;
+    const originals=stations.map(([id,activity])=>({standing:sceneWorkAnchor(objects.get(id)!,new THREE.Vector3(),activity),facing:sceneWorkTarget(objects.get(id)!,activity)!}));
+    const arrivals=forestArrivalAnchors(objects,map.locations).map(a=>a.standing.clone());
+    projectShapingScenery(scene.root);
+    stations.forEach(([id,activity],i)=>{
+      const current=[sceneWorkAnchor(objects.get(id)!,new THREE.Vector3(),activity),sceneWorkTarget(objects.get(id)!,activity)!];
+      [originals[i]!.standing,originals[i]!.facing].forEach((p,n)=>{
+        const expected=shapingWorldPoint(p.x+60,p.z+60);expect(current[n]!.x).toBeCloseTo(expected.x,5);expect(current[n]!.z).toBeCloseTo(expected.z,5);
+      });
+    });
+    forestArrivalAnchors(objects,map.locations).forEach((a,i)=>{const p=arrivals[i]!,expected=shapingWorldPoint(p.x+60,p.z+60);expect(a.standing.x).toBeCloseTo(expected.x,5);expect(a.standing.z).toBeCloseTo(expected.z,5);});
+    expect(JSON.stringify(map)).toBe(before);scene.dispose();
   });
 });
 
