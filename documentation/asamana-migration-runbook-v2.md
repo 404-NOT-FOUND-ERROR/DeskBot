@@ -131,7 +131,10 @@ rollback_result:
 
 ## G. 当前首项执行卡
 
-首项建议：`M6b-C-chat-handler-replay`。当前状态是 `partial`，已有受控用户 handler
-fixture 证据，但仍缺 assistant 分支、独立 TTS fixture、success/error 全组合和全服务
-原入口回放。完成前不得将 M6b 宣传为全服务完成，也不得打开全局
+当前首项：`M6b-R-http-route-operation-context`。目录状态仍为 `partial`；角色阶段
+accept/rollback、部分 life/world/research route 已有共享 domain seam 和专项回放，
+但 proposal/trial/practical-trial 等原业务 HTTP 入口尚未全部纳入统一 operation
+envelope，也缺少完整的 fresh/restart/duplicate/fail-closed/replay 证据。先完成该项
+自身的 G0–G5/G7，再进入 voice、worker 和 device ACK；不得用 M6b-C 已通过的 chat
+fixture 结果替代本项，也不得在全服务覆盖完成前将 M6b 宣传为完成或打开全局
 `requireOperationContext`。

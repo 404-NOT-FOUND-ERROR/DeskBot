@@ -1,8 +1,12 @@
 # Asamana 迁移管线 v1
 
+> 历史兼容管线（不再是当前执行入口）。新迁移必须遵循
+> [管线 v2](asamana-migration-pipeline-v2.md) 的逐项顺序、G0–G7 门和证据回写规则；
+> 本文保留早期波次的背景与结果，不能覆盖 catalog 中的当前状态。
+
 > v6.4 增量（2026-10-14）：本轮完成 input-runtime I4/I7 原业务入口 replay（2/2），服务端广套 861/861；下一波次为其余直接 route/worker 接缝，不能将本轮受控 fixture 结果写成 M6b 全服务完成。
 
-目标：把 Asamana 已验证的编排和可观察性机制，迁移到 DeskBot 的“长期共同生活的桌面潮玩生命体”闭环，同时保留聚形域、喵呜、多源输入、角色阶段和受控世界事实边界。逐项的目标、代码映射、依赖、验收门和状态以 [正式迁移矩阵](asamana-migration-matrix-v1.md) 为准；执行字段和回滚证据见 [迁移作业单](asamana-migration-runbook-v1.md)。
+目标：把 Asamana 已验证的编排和可观察性机制，迁移到 DeskBot 的“长期共同生活的桌面潮玩生命体”闭环，同时保留聚形域、喵呜、多源输入、角色阶段和受控世界事实边界。历史波次的目标、代码映射、依赖、验收门和状态以 [v1 矩阵](asamana-migration-matrix-v1.md) 为准；当前逐项执行、回滚和证据字段见 [v2 作业单](asamana-migration-runbook-v2.md)。
 
 ## 阶段门
 

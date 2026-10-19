@@ -1021,9 +1021,21 @@ export async function replayServiceCapture({ directory, targetDatabase, runtimeF
     .filter(operation => operation.event?.source === 'world-candidate-bridge')
     .map(operation => operation.event?.event_id)
     .filter(Boolean));
+  // These routes enter the canonical writer internally.  Their nested
+  // ingress is already reproduced by replaying the original route handler;
+  // treating the same event as a second standalone ingress would change the
+  // route result from first-apply to duplicate and can double-count the
+  // operation envelope.  Keep ordinary HTTP/event ingresses independent.
+  const nestedRouteEventIds = new Set((tape.routes ?? [])
+    .filter(route => route.route_id === 'life.input' || route.route_id === 'life.social' || route.route_id === 'life.autonomy'
+      || route.route_id === 'role.stage.accept' || route.route_id === 'role.stage.rollback'
+      || /^role\.practical\.(start|pause|resume|adjust|exit)$/.test(route.route_id))
+    .map(route => route.request?.event_id ?? route.request?.eventId)
+    .filter(value => typeof value === 'string' && value.length > 0));
   const records = [
     ...(tape.input_runs ?? []).map(item => ({ kind: 'input-runtime', item })),
-    ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id) && !candidateAcceptedEventIds.has(item.event_id))
+    ...tape.ingresses.filter(item => !inputEventIds.has(item.event_id) && !candidateAcceptedEventIds.has(item.event_id)
+      && !nestedRouteEventIds.has(item.event_id))
       .map(item => ({ kind: 'ingress', item })),
     ...tape.chats.map(item => ({ kind: 'chat', item })),
     ...(tape.voices ?? []).map(item => ({ kind: 'voice', item })),

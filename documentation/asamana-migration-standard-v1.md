@@ -1,5 +1,11 @@
 # Asamana 迁移标准 v1
 
+> 历史兼容文档（不再是当前执行入口）。当前逐项迁移以
+> [迁移标准 v2](asamana-migration-standard-v2.md)、[迁移管线 v2](asamana-migration-pipeline-v2.md)、
+> [迁移作业单 v2](asamana-migration-runbook-v2.md) 和机器可读目录
+> `documentation/asamana-migration-catalog-v1.json` 为准。本文中的分支名、测试数字和
+> 状态只保留为当时的发布证据；不得用来证明当前分支已经完成相同门。
+
 > M6b-R 增量（2026-10-14）：`codex/asamana-m6b-r-public-release-2026-10-14` 已完成受控 input-runtime/chat、voice transcribe/tts 原入口 replay 接缝，并把 worker operation 纳入验收；服务端广套和其余 route/worker/device 覆盖以本分支证据为准，M6b 全服务仍为 `partial`。
 
 状态：`adopted`（迁移标准）。具体迁移项的唯一状态表见 [正式迁移矩阵](asamana-migration-matrix-v1.md)；本文保留权威边界、共同合同和迁移范围说明。逐项执行与证据字段见 [迁移作业单](asamana-migration-runbook-v1.md)。

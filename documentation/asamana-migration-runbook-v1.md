@@ -1,6 +1,10 @@
 # Asamana → DeskBot 迁移作业单 v1
 
-状态：`active`。当前公开发布分支为 `codex/asamana-m6b-r-public-release-2026-10-14`；`codex/asamana-m6b-r-release-2026-10-14` 作为上一版 operation-context preview，`codex/asamana-m6b-r-public-release` 作为更早 M6b-R 基线保留，`codex/asamana-m6b-v6-4-public-release`（历史 v6.4）、`codex/asamana-m6b-v6-4-release`、v6.3/v6.2 记录保留为历史基线。本文是每一项迁移的执行与验收标准；能力状态仍以[正式迁移矩阵](asamana-migration-matrix-v1.md)为唯一事实源。它不把上游代码直接复制进 DeskBot，也不把受控 fixture 的通过结果写成自然长期生活。关联标准、管线与接缝合同见 [迁移标准](asamana-migration-standard-v1.md)、[迁移管线](asamana-migration-pipeline-v1.md) 和 [M6b 接缝合同](asamana-m6b-seam-contract-v1.md)。
+> 历史兼容作业单（不再是当前执行入口）。当前执行请复制并遵循
+> [作业单 v2](asamana-migration-runbook-v2.md)；本文中的分支、证据和命令结果只代表
+> 当时快照，不能替代目录、证据 schema v2 或当前分支验收。
+
+状态：`historical`。本文只记录 v1 快照的执行与验收格式；能力状态和当前分支以 v2 标准、v2 管线、v2 作业单及 catalog 为准。它不把上游代码直接复制进 DeskBot，也不把受控 fixture 的通过结果写成自然长期生活。关联历史标准、管线与接缝合同见 [迁移标准 v1](asamana-migration-standard-v1.md)、[迁移管线 v1](asamana-migration-pipeline-v1.md) 和 [M6b 接缝合同](asamana-m6b-seam-contract-v1.md)。
 
 ## 1. 迁移单元
 

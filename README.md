@@ -4,20 +4,20 @@
 
 DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体。喵呜生活在伴生于现实的奇幻空间「聚形域」：现实时间、天气、新闻、主人互动和身体感知经过分级，影响它的处境与选择。它有自己的需要、经历、兴趣和关系，通过生活探索下一种形态、身份和生活方式。当前软件面向 ESP 喵伴本体与旋转底座开展实验。
 
-**当前产品基线：v0.6.2 · M6b-R route / worker replay · Asamana migration program v2（2026-10-14）。** 本版发布在 [`codex/asamana-m6b-route-worker-replay-2026-10-14`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-route-worker-replay-2026-10-14)，从 worker replay 开发快照派生，保留 `main` 与历史发布分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本版新增角色阶段 accept/rollback 原入口 replay，并继续收口 life/role HTTP route、scheduler worker、voice fixture 和 chat fixture 的 SQLite 重启恢复与幂等边界。该分支仍是迁移开发快照，不代表 P4 或长期自然共同生活已经完成：真实模型跨日目标追求、全入口生产归档、device/ASR-cancel、7–14 日人工观察以及真实 TTS、实体 ACK、外壳机械实现仍在后续范围内；各软件包版本和接口版本独立管理。
+**当前产品基线：v0.6.3 · M6b-R role-route replay · Asamana migration program v2（2026-10-19）。** 本版发布在 [`codex/asamana-m6b-role-route-replay-2026-10-19`](https://github.com/404-NOT-FOUND-ERROR/DeskBot/tree/codex/asamana-m6b-role-route-replay-2026-10-19)，从 route / worker replay 快照派生，保留 `main` 与历史发布分支。已接通持续生活、共同经历、兴趣与能力、角色愿望、实际试做，以及可预览、可组合、可回退的虚拟角色阶段；本版把角色 proposal、trial、practical-trial 的 HTTP 写入口统一到可捕获、可重演的原 domain handler，并继续收口其余 life/role HTTP route、scheduler worker、voice fixture 和 chat fixture 的 SQLite 重启恢复与幂等边界。该分支仍是迁移开发快照，不代表 P4 或长期自然共同生活已经完成：真实模型跨日目标追求、全入口生产归档、device/ASR-cancel、7–14 日人工观察以及真实 TTS、实体 ACK、外壳机械实现仍在后续范围内；各软件包版本和接口版本独立管理。
 
 ### 本版发布亮点
 
 - 迁移目录现在由 `scripts/validate-migration-catalog.mjs` 机器校验，运行时会先检查 18 个迁移项的唯一性、状态、依赖、证据和 freshness。
 - voice `transcribe/tts` 在受控 replay 模式下可从私有 fixture 完整重入原 route，fresh/restart、缺失、篡改和错误 fixture 会 fail closed；这不等同于真实语音模型或 ASR/cancel 的完整生产归档。
 - worker scheduler operation 已有稳定 operation ID、SQLite 重启恢复、原 worker 入口 replay 和 canonical mutation/role-run 去重验收；旧 archive/runtime 缺少 worker seam 时仍能安全消费只读 worker 记录。
-- route、worker、voice fixture、chat fixture replay 专项合计 **15/15 通过**；服务端全量回归 **877/877 通过**。本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
-- README、发布记录和运行截图与本分支一致；本版主要是后端回放与验收硬化，UI 视觉基线保持不变。
+- route、worker、voice fixture、chat fixture replay 的既有基线保持可复用；本版新增角色 route 接缝，专项与完整回归以本地验证命令和发布证据为准，不沿用未在本轮重跑的旧数字。
+- 本版主要是后端角色 route 捕获/重演与文档收口，UI 视觉基线保持不变；效果图是本机真实运行快照，不是 P4 或长期自然生活验收。
 
 ### 本次迁移程序分支新增
 
 - 迁移标准、管线、作业单和 evidence schema v2：每个 Asamana 机制按合同、权限、正/负向、幂等、重启、原入口回放和交付复核逐项升级，不把邻近模块或 fixture 的通过结果写成全部迁移完成。
-- 第一批 HTTP route 已接入 `deskbot.service-operation.v1` operation context：`role.evolution.run`、`world.candidate.preview/accept/dismiss` 和研究场景入口可做 fresh/restart/replay 验收，重演使用独立 SQLite 且不调用 provider。
+- 第一批 HTTP route 已接入 `deskbot.service-operation.v1` operation context：`role.evolution.run`、`world.candidate.preview/accept/dismiss`、研究场景入口以及角色 proposal/trial/practical-trial 写入口可做 fresh/restart/replay 验收，重演使用独立 SQLite 且不调用 provider。
 - scheduler worker 记录进入版本化 `deskbot.replay-capture-worker.v1` tape；重演调用原 worker/domain 入口，旧版 voice/chat runtime 没有 worker seam 时只允许无 canonical 写入的兼容消费，避免重复生成角色演化记录。
 - 增加受限 authored world-event package：现实观察先匹配雾灯镇（Morrowmere）内容包，再生成合法 world candidate，经 preview/accept 后才由 `persistentWorld.ingest` 写入 canonical world；内容包不能提交任意地点、资源或 mutation。
 - 这批能力是服务端与验收层更新，地图、居民面板和生活侧栏沿用已验收的真实运行截图；截图不会被用来宣称 P4 全量或 7–14 日自然生活。
@@ -31,7 +31,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 - 增加 operation-journal、chat 和 input-runtime 合同测试，覆盖 namespace 白名单、上下文跨异步边界、重复/篡改检测、SQLite 重启恢复与敏感请求不落盘。
 - 将 voice ASR、transcribe、TTS、cancel 路由和 WebSocket device bridge 纳入 operation scope 第一批接缝，使用稳定 `voice.*` / `device.*` operation ID；其中 transcribe/tts 已有私有 archive/replay 原入口闭环，这不表示真实语音模型或固件已接入。
 - M6b 仍按迁移矩阵逐项推进：input-runtime 的受控 fixture replay 已完成 I0–I7 验收（见 [I4/I7 记录](documentation/asamana-input-runtime-replay-v1.md)）；本迁移程序分支只新增第一批直接 HTTP domain route 接缝，完整 assistant 分支、worker、WebSocket 和生产归档仍按目录逐项收口，不把当前 partial 状态写成完整生产归档。
-- 视觉效果沿用已验收的雾灯镇实时小镇与往事面板；本版再次核对 2026-10-14 本机运行页面，新增能力主要位于服务端 chat/input-runtime replay 和回放审计，不伪装成新的 UI 改版。
+- 视觉效果沿用已验收的雾灯镇实时小镇与居民面板；本版再次核对本机运行页面，新增能力主要位于服务端 role route replay 和回放审计，不伪装成新的 UI 改版。
 
 ## 本版本更新
 
@@ -71,9 +71,9 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 
 聚形域的居民是光粒凝聚的造物。虚拟形象保留种子眼、梨形体、胸前光核、短足与光粒等识别锚点，允许形态与职业配件组合。
 
-![雾灯镇完整 3D 地图与喵呜成长面板：沿用的实际运行视觉基线（2026-10-14）](documentation/images/asamana-m6b-r-worker-replay-2026-10-14/live-town-3d.jpg)
+![雾灯镇 3D 地图、居民面板与喵呜生活侧栏：本版沿用的实际运行视觉基线](documentation/images/asamana-m6b-r/deskbot-world-npc-panel.png)
 
-> 首图沿用本机 `5173` 客户端连接 `4311` 服务、完整渲染 3D 地图的实际运行截图。本版没有改动视觉层；图片用于说明可体验的产品形态，不作为 worker replay 或 7–14 天自然长期生活的验收证据。
+> 首图是本机 `5173` 客户端连接 `4311` 服务的真实运行截图，集中展示 3D 地图、居民面板、共同经历和生活侧栏。本版没有改动视觉层；图片用于说明可体验的产品形态，不作为 role-route replay、P4 或 7–14 天自然长期生活的验收证据。
 
 ![v6.4 M6b-C2/C3/I4/I7 本机发布快照：实时小镇与小镇往事面板（页面实际运行截图，2026-10-14）](documentation/images/asamana-v6-4/live-town-history.jpg)
 
@@ -104,7 +104,7 @@ DeskBot 的目标是一个存在于奇幻持续世界中的桌面潮玩生命体
 需要 Node.js 24+ 与 Git。首次下载本版分支，在仓库根目录准备本机配置并安装 3D 客户端依赖：
 
 ```powershell
-git clone --branch codex/asamana-m6b-route-worker-replay-2026-10-14 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
+git clone --branch codex/asamana-m6b-role-route-replay-2026-10-19 https://github.com/404-NOT-FOUND-ERROR/DeskBot.git
 Set-Location DeskBot
 Copy-Item config\llm_config.example.json config\llm_config.json
 notepad config\llm_config.json
@@ -116,7 +116,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps
 
 在本地配置中填写自己的 DeepSeek 密钥。天气可以使用 Open-Meteo 或和风天气；本机上海配置保存在不提交的 `config/weather.local.env`，新下载的仓库需自行设置城市。新闻和区域空气质量连接器由启动脚本默认开启。配置方法见 [本地配置](config/README.md)。
 
-已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-route-worker-replay-2026-10-14`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
+已有仓库可以在保存本地改动后运行 `git fetch origin`，再 `git switch --track origin/codex/asamana-m6b-role-route-replay-2026-10-19`。启动脚本自动检测本机 Clash `7897`，已有代理环境变量优先；Git 网络可使用 `git -c http.proxy=http://127.0.0.1:7897 fetch origin`。
 
 | 入口 | 用途 |
 | --- | --- |
