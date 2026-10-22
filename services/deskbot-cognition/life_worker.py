@@ -17,7 +17,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent / 'vendor/asamana'))
 from agent.agent import Agent
-from agent.decision import DecisionEngine, _ACTION_SPACE
+from agent.decision import DecisionEngine, ActionCandidate, _ACTION_SPACE
 from agent.goals import GoalEntity, GoalStatus, GoalOrigin
 from agent.memory import MemorySystem, memory_collection_name
 from agent.memory_types import MemoryStream
@@ -31,13 +31,15 @@ from core.interfaces.llm import LLMProvider, LLMResponse, LLMRouter, LLMScene, L
 from core.interfaces.perception import SpatialPerception, LocationView, ReachableLocation, VisibleEntity, AmbientEvent, PerceivedPresence, PerceivedIdentity
 from core.interfaces.agent_store import AgentRelation
 from core.interfaces.message import Message
-from core.context import get_log_context, observe_stage
+from core.context import get_log_context, observe_stage, note_active_call_adoption
 from providers.agent_store.in_memory import InMemoryAgentStore
 from providers.vector_store.in_memory import InMemoryVectorStore
 from input_refraction import interpret_inputs, external_goals
 from relationship_review import review_relationships
 from continuation_contract import continuation_errors, CONTINUATION_CONTRACT
 from context_projection import BODY_BOUNDARY, stage_context
+from contact_contract import (CONTACT_CONTRACT, contact_readiness, contact_intent_errors,
+    bind_contact_intent, compiled_contact_errors, social_contact_errors)
 
 
 class AbortJob(BaseException):
@@ -95,14 +97,64 @@ class BoundedPersonality(PersonalityLayer):
 
 
 class BoundedDecision(DecisionEngine):
+    def __init__(self, *args, context, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.context=context; self.contact=None; self.contact_errors=[]; self.attempts=0
+
     def _build_decision_prompt(self, personality, packet, candidates):
         system, user, facts = super()._build_decision_prompt(personality, packet, candidates)
         menu = ', '.join(f'{i}={a.action_type.value}' for i,a in enumerate(candidates))
         boundary = '\n本轮 selected_index 只在基础动作菜单中选择：'+menu+'。生活活动 activity_id 不是这个编号；选择具体测记/照料/制作时用 WORK 或有目标的 PHYSICAL，并把具体方法写进 action_description。后续编译器才会绑定 activity_id。不能把活动序号填到 selected_index。'
-        return system+boundary, user+boundary, facts
+        boundary+='\n'+CONTACT_CONTRACT
+        readiness=prompt_json(contact_readiness(self.context),self.context)
+        return system+boundary, user+'\n【本次联系可行性】\n'+readiness+boundary, facts
+
+    async def _attempt_selection(self, personality, packet, candidates, system_prompt, user_prompt, given_facts):
+        repair=self.attempts>0; self.attempts+=1
+        if self.contact_errors:user_prompt+='\n上次选择未采用：'+'；'.join(self.contact_errors)+'。重新自主选择可行的方法，不把旧话改名，不声称已经执行。'
+        with observe_stage('decision_repair' if repair else 'decision'):
+            return await super()._attempt_selection(personality,packet,candidates,system_prompt,user_prompt,given_facts)
+
+    def _parse_llm_selection(self, content, candidates, packet=None):
+        self.contact=None
+        selection=super()._parse_llm_selection(content,candidates,packet)
+        if selection is None:return None
+        if selection.action_type.value=='send_message':
+            payload=content if isinstance(content,dict) else extract_json(content)
+            choice=payload.get('contact_intent')
+            self.contact_errors=contact_intent_errors(choice,selection.target.acted_on_agents,self.context)
+            if self.contact_errors:
+                note_active_call_adoption(False,'contact_intent_invalid: '+';'.join(self.contact_errors))
+                return None
+            self.contact=bind_contact_intent(choice,selection.target.acted_on_agents)
+        else:self.contact_errors=[]
+        return selection
 
     async def decide(self, *, personality, packet):
-        return await self._llm_select(personality,packet,[a for a in _ACTION_SPACE if a.action_type.value in ('send_message','work','physical','rest','move')])
+        self.contact=None; self.contact_errors=[]; self.attempts=0
+        # Keep upstream's type/target semantics while describing DeskBot's actual
+        # executor. In particular, it cannot broadcast, summon, or hand over by prose.
+        descriptions={
+            'send_message':'向当前可联系的一人或多人递送异步留言。可表达问题，或由我选择一个人的正式邀请/约定回应；不是当面同步对话，不能以话语交付物品。按contact_intent声明具体方式。',
+            'move':'虚拟化身沿给定通路到相邻地点，耗费实际旅途时间；到达后才能使用那里的设施，不能带走别人。',
+            'work':'从给定生活活动中选择具体实践、测记、制作或照料；按材料、时段、冷却执行。保留失败可能，不能凭描述创建未提供的活动。',
+            'physical':'对现场物件做给定活动，或只观察一个物件。对人交接必须先以SEND_MESSAGE商量正式约定；不能强制拿走物品或替别人答应。',
+            'rest':'按实际体能规则休息，暂时搁置事情，不制造实践或研究结果。',
+        }
+        candidates=[ActionCandidate(a.action_type,descriptions[a.action_type.value]) for a in _ACTION_SPACE if a.action_type.value in descriptions]
+        return await self._llm_select(personality,packet,candidates)
+
+
+class BoundedMemory(MemorySystem):
+    """Asamana's inner monologue bypasses Personality.to_prompt_context."""
+    def __init__(self,*args,context,**kwargs):
+        super().__init__(*args,**kwargs); self.context=context
+
+    async def _complete_memory_prompt(self,system_prompt,user_prompt,*,max_tokens):
+        grounding=prompt_json(self.context.get('grounding',{}),self.context)
+        return await super()._complete_memory_prompt(
+            system_prompt+'\n物品名和归属使用下列现场词义；若叙述过去，仍以该事件原文为准。主观独白写具体在意之处和感受，库存数字和客观过程已在事实流，不再翻写一遍。不能把猜测写成他人的需要、承诺或成果。',
+            '【现场词义与归属，非新事件】\n'+grounding+'\n'+user_prompt,max_tokens=max_tokens)
 
 
 def hydrate(data, actor_id, location_id):
@@ -236,25 +288,6 @@ def valid_source_binding(value,context):
     return all(s in {i['id'] for i in context.get('inputs',[])} for s in value.get('source_ids',[]))
 
 
-def social_contact_errors(value,context):
-    if value.get('operation')!='share' or value.get('reply_to') or value.get('social'): return []
-    social=context.get('social',{})
-    current=context.get('continuation',{}).get('current') or {}
-    issue=value.get('followup_id') or current.get('followup_id')
-    if not issue: return []
-    receivers=context.get('capabilities',{}).get('share',{}).get('receivers',[])
-    peers={receivers[n-1]['actor_id'] for n in value.get('receiver_indices',[]) if type(n) is int and 0<n<=len(receivers)}
-    basis=next((b for b in social.get('issue_bases',[]) if b['followup_id']==issue),social.get('contact_basis',{}))
-    for old in social.get('unanswered_issues',[]):
-        if basis.get('schema')=='deskbot.issue-contact.v1':
-            novel=bool(set(basis.get('evidence_ids',[])).difference(old.get('evidence_ids',[])) or
-                set(value.get('source_ids',[])).intersection(basis.get('related_source_ids',[])).difference(old.get('input_ids',[])))
-        else:
-            novel=old.get('substantive_root')!=basis.get('substantive_root') or bool(set(value.get('source_ids',[])).difference(old.get('input_ids',[])))
-        if old.get('followup_id')==issue and peers.intersection(old.get('receiver_ids',[])) and not novel:
-            return ['同一问题尚无关联回复或相关新依据。无关走动/消息不算新进展；不要换措辞、缩减收件人重问。可实际行动或暂缓；若本人确实愿意提出有条款的正式约定，必须自己选一个收件人，receiver_indices只能有一个编号，不能向两人发同一份物品。']
-    return []
-
 
 def valid_social_compilation(value,context):
     import re
@@ -335,7 +368,7 @@ async def run(context):
     personality=BoundedPersonality(soul,state,context)
     store=InMemoryAgentStore(); vectors=InMemoryVectorStore(); embedding=LexicalRetrieval()
     await restore_relations(store,saved,context['world_id'],actor['actor_id'])
-    memory=MemorySystem(router,embedding,vectors,world_id=context['world_id'],agent_id=actor['actor_id'],is_main_character=actor['actor_id']=='shaping-001',
+    memory=BoundedMemory(router,embedding,vectors,context=context,world_id=context['world_id'],agent_id=actor['actor_id'],is_main_character=actor['actor_id']=='shaping-001',
                         seconds_per_step=3600,world_start_second_of_day=start,time_label_for=time_label)
     await memory.ensure_collections()
     for entry in saved.get('memories',[]):
@@ -345,7 +378,8 @@ async def run(context):
     # Upstream counter is process-local. Node namespaces every new memory by job; old IDs preserved.
     memory._seq=int(saved.get('memory_sequence',0))
     need=NeedEngine(router,seconds_per_step=3600,world_start_second_of_day=start)
-    agent=Agent(world_id=context['world_id'],agent_id=actor['actor_id'],personality=personality,decision_engine=BoundedDecision(router,seconds_per_step=3600,world_start_second_of_day=start),
+    decision=BoundedDecision(router,context=context,seconds_per_step=3600,world_start_second_of_day=start)
+    agent=Agent(world_id=context['world_id'],agent_id=actor['actor_id'],personality=personality,decision_engine=decision,
                 memory_system=memory,need_engine=need,relation_system=RelationSystem(store,world_id=context['world_id'],agent_id=actor['actor_id']),agent_store=store,llm_router=router,
                 is_main_character=actor['actor_id']=='shaping-001',seconds_per_step=3600,world_start_second_of_day=start)
     restore_continuity(agent,memory,saved)
@@ -379,6 +413,7 @@ async def run(context):
                long_term_goals=plan.need_evaluation.long_term_goals,short_term_goal_entities=plan.need_evaluation.short_term_goal_entities)
         output['needs']=plain(plan.need_evaluation)
         output['action']=plain(plan.action)
+        output['decision_contact']=plain(decision.contact)
         if plan.action:
             await agent.begin_ongoing_step(plan=plan,estimated_steps=1)
             compile_prompt={'speaker':{'id':actor['actor_id'],'name':actor['name']},'at':context['at'],'intent':plain(plan.action),'capabilities':context['capabilities'],'objects':context['objects'],'prior_followup':saved.get('followup'),
@@ -393,11 +428,18 @@ async def run(context):
             compile_prompt['time']=context.get('time')
             compile_prompt['continuation']=context.get('continuation')
             compile_prompt['waylight']=context.get('waylight')
+            compile_prompt['grounding']=context.get('grounding')
+            compile_prompt['decision_contact']=decision.contact
+            compile_prompt['decision_contact_contract']='decision_contact是本人在决策阶段已选好的联系方式、收件人、事项及来源。只把receiver_ids换成receiver_indices；其他字段保留原选择。它为null时不能新增share。不能把普通问话修复成邀请或改变约定内容；编译失败不等于本人改了主意。'
             compile_prompt['continuation_contract']=CONTINUATION_CONTRACT+'wait的review_after_minutes为10至240整数，已经ready或超时的等待不可自动续期；可解除等待或改办法。'
             compile_prompt['development_contract']='interest_choice 和 wish_choice 是输出JSON顶层字段，不可再套development对象。通常两者填 null。确实决定改变当前投入时可填 interest_choice:{topic:给定主题,decision:continue|pause|drop|revisit,reason:具体原因,root_ids:该主题给定active_roots或recent_success_roots的非空子集}；只表达选择，不凭话增加喜欢或实践。如果我确实想提出或暂缓某个新角色，可填 wish_choice:{direction_id:给定方向,decision:consider|propose|defer,reason:具体原因}；propose仅在eligible为true时可用，仍不改变外观。不同于“可以提出”，“我现在愿意提出”需要我自己的选择。不为满足进度强行换角色。'
             compile_prompt['speech_contract']+='message_parts、reply_to、social都是输出JSON顶层字段，与operation同级，不能放进speech对象。证据段简化为{kind:evidence,evidence_id:给定ID}即可，不需要quote字段，服务器会逐字插入带来源的完整原文。若仍填写quote必须与speech_evidence.text完全一致，不能只抄social.replies.text。'
-            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context),stage='compile')
-        else: output['compiled']={'operation':'wait','reason':'本回合没有可采用的行动。','followup_decision':'postpone'}
+            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context) and not compiled_contact_errors(value,context,decision.contact),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context)+'；'.join(compiled_contact_errors(value,context,decision.contact)),stage='compile')
+        else:
+            current=context.get('continuation',{}).get('current')
+            output['compiled']={'operation':'wait','reason':'本人本回合决定暂不行动。','followup_decision':'postpone' if current else 'none',
+                'followup_id':current['followup_id'] if current else None,'motivation':'need','source_ids':[],
+                'review_after_minutes':60,'next_step':None}
     elif context['phase']=='reflect':
         output['reflection']=plain(await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step))
     elif context['phase']=='relate':
@@ -416,7 +458,7 @@ async def run(context):
             output['reflection']=plain(reflection)
         output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
              LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
-              'now':context.get('time',context['at']),'continuation':context.get('continuation'),'issue_contract':CONTINUATION_CONTRACT,
+              'now':context.get('time',context['at']),'continuation':context.get('continuation'),'grounding':context.get('grounding'),'issue_contract':CONTINUATION_CONTRACT,
               'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup')
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()

@@ -26,6 +26,7 @@ const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-co
   'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
   'apps/deskbot-service/src/cognitive-social.mjs',
   'apps/deskbot-service/src/cognitive-issue-evidence.mjs','services/deskbot-cognition/context_projection.py',
+  'apps/deskbot-service/src/cognitive-grounding.mjs','services/deskbot-cognition/contact_contract.py',
   'apps/deskbot-service/src/cognitive-budget.mjs',
   'apps/deskbot-service/src/cognitive-continuation.mjs','apps/deskbot-service/src/cognitive-schedule.mjs',
   'apps/deskbot-service/src/social-life.mjs','services/deskbot-cognition/continuation_contract.py',

@@ -32,7 +32,15 @@ export function cognitiveWorkingState(life,query=''){
   let bytes=0;
   // Include insight dependencies together. Omit a large group rather than severing its provenance.
   for(const candidate of candidates){
-    const group=new Map();const visit=m=>{if(!m||group.has(m.id)||selected.has(m.id))return;group.set(m.id,m);for(const key of m.payload.source_ids??[])visit(byId.get(key));};visit(candidate);
+    const group=new Map();const visit=m=>{
+      if(!m||group.has(m.id)||selected.has(m.id))return;group.set(m.id,m);
+      for(const key of m.payload.source_ids??[])visit(byId.get(key));
+      // Keep an event's objective anchor with its feeling when both survive in the
+      // archive. A vivid old impression must not evict the facts it interprets.
+      if(m.payload.stream==='experiential'&&m.payload.event_group_id)
+        for(const fact of all)if(fact.payload.stream==='factual'&&fact.payload.agent_id===m.payload.agent_id
+          &&fact.payload.event_group_id===m.payload.event_group_id)visit(fact);
+    };visit(candidate);
     const size=JSON.stringify([...group.values()]).length;if(bytes+size>96000||selected.size+group.size>80)continue;
     for(const [key,value]of group)selected.set(key,value);bytes+=size;
   }

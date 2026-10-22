@@ -1,4 +1,4 @@
-import {proposeCognitiveCommitment,respondCognitiveCommitment} from './social-life.mjs';
+import {proposeCognitiveCommitment,respondCognitiveCommitment,cognitiveInvitationAvailable} from './social-life.mjs';
 import {unansweredCognitiveContacts} from './cognitive-continuation.mjs';
 import {issueContactBases} from './cognitive-issue-evidence.mjs';
 
@@ -45,6 +45,9 @@ export function cognitiveSocialContext(w,id,at,inputs=[],activities=[]) {
     .sort((a,b)=>String(b.finished_at??b.completion?.due_at??b.due_at).localeCompare(String(a.finished_at??a.completion?.due_at??a.due_at)))[0];
   const substantiveRoot=lastTask?(lastTask.root_outcome_id??`task:${lastTask.task_id}`):null;
   return {options,commitments,relation_evidence:relationEvidence.slice(-8),personal_views:copy(life.relation_views??[]),replies:(life.inbox??[]).slice(-12).map(m=>({message_id:m.message_id,sender_id:m.sender_id,text:m.text,reply_to:m.reply_to??null,at:m.at})),
+    invitation_availability:options.flatMap(o=>[w.protagonist,...w.npcs].filter(p=>(p.character_id??p.npc_id)!==id&&p.location_id===own.location_id)
+      .map(p=>({option_id:o.option_id,receiver_id:p.character_id??p.npc_id,
+        available:cognitiveInvitationAvailable(w,at,{...o,actors:[id,p.character_id??p.npc_id]})}))),
     contact_basis:{substantive_root:substantiveRoot,input_ids:inputs.map(input=>input.id)},
     issue_bases:issueContactBases(w,id,inputs,activities),
     unanswered_issues:unansweredCognitiveContacts(w,id).slice(0,16),

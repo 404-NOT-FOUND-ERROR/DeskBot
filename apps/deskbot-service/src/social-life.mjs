@@ -51,7 +51,7 @@ function close(w,c,at,status,text) {
 function propose(w,at,definition) {
   if(definition.actors.some(id=>!person(w,id)))return null;
   const key=definition.key??`${definition.kind}:${pair(definition.actors)}`;
-  if(Date.parse(w.social.cooldowns[key]??'')>Date.parse(at)||w.social.commitments.some(c=>LIVE.includes(c.status)&&(c.key===key||c.actors.some(id=>definition.actors.includes(id)))))return null;
+  if(!cognitiveInvitationAvailable(w,at,definition))return null;
   const c={id:`social:${++w.social.sequence}`,key,...definition,status:'proposed',created_at:at,updated_at:at,
     respond_after:new Date(Date.parse(at)+5*M).toISOString(),deadline_at:new Date(Date.parse(at)+(definition.produce_activity==='waylight-craft-shade'?180:90)*M).toISOString(),
     responses:Object.fromEntries(definition.actors.map((id,index)=>[id,index===0?'join':'pending'])),
@@ -61,6 +61,12 @@ function propose(w,at,definition) {
   w.social.commitments=[...w.social.commitments.filter(c=>!LIVE.includes(c.status)).slice(-60),...w.social.commitments.filter(c=>LIVE.includes(c.status))];
   record(w,c,at,'invited',`${person(w,c.actors[0]).display_name}发出邀请：${c.title}。${c.reason}`);
   return c;
+}
+/** Same finite invitation gate for affordance reads and actual admission. No private motives. */
+export function cognitiveInvitationAvailable(w,at,definition) {
+  const key=definition.key??`${definition.kind}:${pair(definition.actors)}`;
+  return !definition.actors.some(id=>!person(w,id))&&!(Date.parse(w.social?.cooldowns[key]??'')>Date.parse(at))
+    &&!(w.social?.commitments??[]).some(c=>LIVE.includes(c.status)&&(c.key===key||c.actors.some(id=>definition.actors.includes(id))));
 }
 export function respondSocialInvitation(w,at,id,operation) {
   const c=w.social?.commitments.find(c=>c.id===id),own=w.protagonist.character_id;
