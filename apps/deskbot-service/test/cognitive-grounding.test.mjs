@@ -73,3 +73,14 @@ test('invitation affordances use the same pending agreement and cooldown gate as
   assert.equal(cognitiveInvitationAvailable(w,at,definition),false);
   assert.equal(cognitiveInvitationAvailable(w,'2026-10-20T13:00:00.000Z',definition),true);
 });
+
+test('external signed input and an actual resident receipt have distinct response routes',()=>{
+  const w=fixture(cases.find(c=>c.id==='invitation-3-on')),at=w.clock.synced_at;
+  w.cognition.actors[own].inbox=[{message_id:'received:real-peer',sender_id:peer,sender_name:'苔团',text:'你准备怎样试？',at}];
+  const context=cognitiveContext(w,own,at),external=context.inputs.find(i=>i.id.startsWith('refraction:'));
+  assert.equal(external.response_route.kind,'no_reply_address');
+  assert.notEqual(external.sender_id,'lamp-keeper-001');
+  const receipt=context.inputs.find(i=>i.id==='received:real-peer');
+  assert.deepEqual(receipt.response_route,{kind:'local_message',message_id:'received:real-peer',sender_actor_id:peer});
+  assert.deepEqual(context.social.replies.map(r=>r.message_id),['received:real-peer']);
+});

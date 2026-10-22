@@ -8,7 +8,9 @@ export function cognitiveInputs(world,id,at){
   for(const message of life.inbox??[]){
     inputs.push({id:message.message_id??`message:${message.task_id}:${id}`,category:'agent',sender_id:message.sender_id,
       sender_name:message.sender_name??'居民',sender_is_agent:message.source_kind!=='joint_result',content:message.text,occurred_at:message.at,
-      root_outcome_id:message.root_outcome_id,attested:true,epistemic:message.source_kind==='joint_result'?'shared_result':'heard',authority:'information',reply_to:message.reply_to??null});
+      root_outcome_id:message.root_outcome_id,attested:true,epistemic:message.source_kind==='joint_result'?'shared_result':'heard',authority:'information',reply_to:message.reply_to??null,
+      response_route:message.source_kind==='joint_result'?{kind:'no_reply_address',reason:'共同结果通知，不是人物发来的问话'}:
+        {kind:'local_message',message_id:message.message_id??`message:${message.task_id}:${id}`,sender_actor_id:message.sender_id}});
   }
   // Device/user sources belong to the desk companion; residents learn them only through actual delivery.
   if(id===world.protagonist.character_id)for(const record of world.refraction?.records??[]){
@@ -18,7 +20,8 @@ export function cognitiveInputs(world,id,at){
       sender_name:record.source_label??'外界消息',sender_is_agent:false,content:text,occurred_at:record.observed_at??record.received_at,
       received_at:record.received_at,expires_at:record.expires_at,attested:true,epistemic:record.category==='body'?'body_observation':'reported',
       authority:record.category==='weather'?'environment_reference':'information',meaning:record.meaning,suggestion:record.suggestion,
-      event_id:record.event_id,origin_id:record.origin_id,source_url:record.source_url,body:copy(record.body??null)});
+      event_id:record.event_id,origin_id:record.origin_id,source_url:record.source_url,body:copy(record.body??null),
+      response_route:{kind:'no_reply_address',reason:'经外界接入口收到的信息，没有镇内消息回信地址；正文署名不自动绑定某位居民。可据内容自行做事或另向可联系的人确认，不可把来源ID当reply_to。'}});
   }
   return inputs.slice(-48);
 }

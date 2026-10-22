@@ -18,7 +18,7 @@ def contact_readiness(context):
 CONTACT_CONTRACT = '''选择 SEND_MESSAGE 时，必须额外返回 contact_intent 对象；其他动作填 null。
 基本字段 {kind:message|reply|invite|respond, followup_id:current/deferred 中本次关联的问题ID或无事项时null, source_ids:实际影响此选择的外来输入ID数组}。
 message 是普通留言；没有关联新依据的同一事项不能改称当面/缩减收件人重问，时间流逝、我着急了不算新依据。
-reply 还需 reply_to:已收到消息ID。invite 还需 option_id:social.options的精确ID；respond 还需 commitment_id、response:accept|decline|delay|withdraw，delay另需delay_minutes（15至240）。
+reply 还需 reply_to:social.replies中已收到的镇内消息ID。外界inputs的来源ID不能当reply_to；正文署名不等于此人在场向我发话。若想讨论这条外界信息，可自主选择message并引用source_ids，或按内容行动。invite 还需 option_id:social.options的精确ID；respond 还需 commitment_id、response:accept|decline|delay|withdraw，delay另需delay_minutes（15至240）。
 invite/respond 必须由我自己选恰好一人，在 person_indices 指定。库存充足只表示可以商量，不表示对方需要、接受或已交付。
 我的选择会原样约束编译器：它不能把普通问话改成邀请，不能替我挑选接收者或改约定。
 有当前事项时请明确关联 current/deferred 的一个ID；想离开这个问题可以先自己行动、暂缓、休息或探索。不要为了通过校验改写旧问题的身份。
@@ -48,7 +48,10 @@ def contact_intent_errors(choice, receiver_ids, context):
             'receiver_indices':[allowed.index(r)+1 for r in receiver_ids]},context)
     if kind=='reply':
         reply=next((r for r in social.get('replies',[]) if r['message_id']==choice.get('reply_to')),None)
-        if not reply or receiver_ids!=[reply['sender_id']]:return ['reply须回复给定消息的实际发送者']
+        if not reply:
+            allowed=[r['message_id'] for r in social.get('replies',[])]
+            return [f"reply_to={choice.get('reply_to')}不是镇内已收消息，可回复ID只有{allowed}。外界inputs只提供信息，不提供回信地址；如本人想继续讨论，可选择message并保留相关source_ids，向可联系的人确认。不能自造回复关联或认定署名者就是在场本人。"]
+        if receiver_ids!=[reply['sender_id']]:return ['reply须回复这条镇内消息的实际发送者']
         if any(m.get('reply_to')==reply['message_id'] for m in context.get('saved',{}).get('outbox',[])):return ['此条消息已实际回复过']
     else:
         if len(receiver_ids)!=1:return ['invite/respond只接受一个收件人；自己选择，不自动拆分物品或改成群发']

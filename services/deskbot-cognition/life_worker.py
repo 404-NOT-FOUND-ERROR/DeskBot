@@ -17,7 +17,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent / 'vendor/asamana'))
 from agent.agent import Agent
-from agent.decision import DecisionEngine, ActionCandidate, _ACTION_SPACE
+from agent.decision import DecisionEngine, ActionCandidate, _ACTION_SPACE, _message_roster
 from agent.goals import GoalEntity, GoalStatus, GoalOrigin
 from agent.memory import MemorySystem, memory_collection_name
 from agent.memory_types import MemoryStream
@@ -102,12 +102,35 @@ class BoundedDecision(DecisionEngine):
         self.context=context; self.contact=None; self.contact_errors=[]; self.attempts=0
 
     def _build_decision_prompt(self, personality, packet, candidates):
-        system, user, facts = super()._build_decision_prompt(personality, packet, candidates)
-        menu = ', '.join(f'{i}={a.action_type.value}' for i,a in enumerate(candidates))
-        boundary = '\n本轮 selected_index 只在基础动作菜单中选择：'+menu+'。生活活动 activity_id 不是这个编号；选择具体测记/照料/制作时用 WORK 或有目标的 PHYSICAL，并把具体方法写进 action_description。后续编译器才会绑定 activity_id。不能把活动序号填到 selected_index。'
-        boundary+='\n'+CONTACT_CONTRACT
-        readiness=prompt_json(contact_readiness(self.context),self.context)
-        return system+boundary, user+'\n【本次联系可行性】\n'+readiness+boundary, facts
+        # Upstream's generic output instructions also describe synchronous TALK,
+        # broadcasts, errands and forced handovers. Appending a narrower menu is
+        # contradictory: use one executor-specific prompt while retaining its
+        # needs, personality, memories, relations, target parser and feedback loop.
+        awareness=packet.internal_context
+        allowed={r['actor_id'] for r in self.context.get('capabilities',{}).get('share',{}).get('receivers',[])}
+        people=[{'person_index':i,'actor_id':aid,'name':who.name,'contactable':aid in allowed}
+            for i,(aid,who) in enumerate(_message_roster(packet),1)]
+        view={'self':personality.to_prompt_context(),
+            'direction':plain(getattr(awareness,'need_evaluation',None)),
+            'current_emotion':plain(getattr(awareness,'emotion',None)),
+            'own_recall':{k:plain(getattr(awareness,k,[])) for k in ('factual_memories','experiential_memories','insights','period_summaries','insight_sources','recent_foiled_attempts')},
+            'own_relations':plain(getattr(awareness,'relevant_relations',[])),
+            'visible_objects':self.context.get('objects',[]),'visible_or_known_people':people,
+            'received_inputs':self.context.get('inputs',[]),'current_signals':self.context.get('signals',[]),
+            'contact_readiness':contact_readiness(self.context),
+            'action_menu':[{'selected_index':i,'type':a.action_type.value,'meaning':a.description} for i,a in enumerate(candidates)]}
+        system='''你是聚形域中正在生活的这个角色。结合自己的需要、性格、经历、关系与尚未完成的问题，自主决定眼下的一步。
+先看实际可行性，再表达意愿。个人回忆中的感受不是客观证据；信息的署名、邀请和你的计划均不等于已发生或已接受。
+有不同可行选择时按自己的理由权衡，不必为了完成故事或交付进度去行动。可以休息、换一件事或暂缓。
+当前已经留言而对方未回应时，换措辞、改称当面、时间已过均不构成新行动。新相关依据、正式约定和实际回复各走自己的通道。
+只选择action_menu中一项；selected_index是基础动作编号，不是activity_index。WORK/PHYSICAL的具体方法应匹配capabilities中的活动；observe只看现场，不代替正式测记或生产。材料、时段、冷却以实际条件为准。
+联系只可选contactable=true的人，person_indices使用visible_or_known_people的person_index；看到或记得某人不保证现在能联系。MOVE用capabilities.travel.destinations中的destination_index；PHYSICAL只能用visible_objects中的object_index填physical_entity_index。
+本地只有异步递话和明确约定，消息本身不能当作同步对话、物品交接或他人答应。实际耗时以执行器为准，estimated_steps填1。
+返回一个简短JSON：{inner_monologue:20至60字的选择理由,act:true或false,selected_index:动作编号,action_description:具体打算,expected_outcome:期望而非事实,estimated_steps:1}。
+act=false时仅保留inner_monologue和act；不要为了填满回合硬编行动。
+SEND_MESSAGE另填person_indices、message_content、contact_intent、urgency(low|normal|high|critical)。MOVE另填destination_index。PHYSICAL另填physical_entity_index。其余不相关字段省略。
+'''+CONTACT_CONTRACT
+        return system,prompt_json(view,self.context),[prompt_json({'objects':view['visible_objects'],'inputs':view['received_inputs']},self.context)]
 
     async def _attempt_selection(self, personality, packet, candidates, system_prompt, user_prompt, given_facts):
         repair=self.attempts>0; self.attempts+=1

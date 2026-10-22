@@ -45,6 +45,31 @@ class ContactGroundingTests(unittest.TestCase):
         c['social']['invitation_availability']=[{'option_id':'give-water','receiver_id':'b','available':False}]
         self.assertTrue(contact_intent_errors(choice,['b'],c));self.assertEqual(choice,before)
 
+    def test_external_named_invitation_has_no_local_reply_address(self):
+        c=self.context();c['social']['unanswered_issues']=[];c['social']['replies']=[]
+        choice={'kind':'reply','followup_id':'lamp','source_ids':['related'],'reply_to':'related'}
+        errors=contact_intent_errors(choice,['b'],c)
+        self.assertTrue(errors);self.assertIn('不是镇内已收消息',errors[0]);self.assertIn('只有[]',errors[0])
+        # The actor may choose to discuss received information, but code does not
+        # relabel it as a direct reply or identify an external signature as a peer.
+        self.assertEqual(contact_intent_errors({**choice,'kind':'message'},['b'],c),[])
+        self.assertEqual(choice['kind'],'reply')
+
+    def test_prompt_has_one_supported_action_contract_and_marks_noncontactable_people(self):
+        c=self.context(); engine=BoundedDecision(None,context=c)
+        spatial=SpatialPerception(location_id='bank',location_view=LocationView('岸边','现场'),world_time_label='2026-10-22 09:00',current_step=1,
+            visible_agents={aid:PerceivedPresence(identity=PerceivedIdentity(name=name)) for aid,name in [('seen','波果'),('a','苔团')]})
+        packet=SimpleNamespace(agent_id='me',spatial=spatial,inbox=[],internal_context=SimpleNamespace(relevant_relations=[]))
+        soul=SoulLayer(name='喵呜',agent_id='me',role='居民',core_traits=('好奇',),core_values=('可靠',))
+        personality=PersonalityLayer(soul,StateLayer(agent_id='me'))
+        system,user,_=engine._build_decision_prompt(personality,packet,[ActionCandidate(ActionType.SEND_MESSAGE,'留言')])
+        import json
+        view=json.loads(user)
+        self.assertEqual([(p['person_index'],p['contactable']) for p in view['visible_or_known_people']],[(1,False),(2,True)])
+        for unsupported in ('TALK','ERRAND','message_announce','physical_recipient_index'):
+            self.assertNotIn(unsupported,system)
+        self.assertIn('own_recall',view);self.assertIn('direction',view);self.assertIn('自己的需要',system)
+
     def test_recorded_reask_is_rejected_at_upstream_selection_and_not_rewritten_as_an_offer(self):
         c=self.context(); engine=BoundedDecision(None,context=c)
         spatial=SpatialPerception(location_id='bank',location_view=LocationView('岸边','现场'),world_time_label='2026-10-22 09:00',current_step=1,
