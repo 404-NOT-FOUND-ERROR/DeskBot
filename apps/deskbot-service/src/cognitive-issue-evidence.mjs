@@ -4,7 +4,7 @@ import {interpretationWindow} from './cognitive-refraction.mjs';
 export const followupIdentity=f=>f?.followup_id??f?.origin_root_outcome_id??f?.from_root_outcome_id??null;
 const root=t=>t.root_outcome_id??`task:${t.task_id}`;
 const success=t=>t.status==='completed'&&t.completion?.result?.success!==false;
-export function completionTargets(w,id,activities=[],socialOptions=[]){
+export function completionTargets(w,id,activities=[],socialOptions=[],recipientIds=null){
  const lamp=w.living?.objects?.['floating-frame']?.waylight;
  const targets=activities.filter(a=>a.target_object_id).map(a=>({
   id:`activity:${a.activity_id}`,kind:'activity',title:`实际完成「${a.title}」这一步`,actor_id:id,
@@ -13,7 +13,8 @@ export function completionTargets(w,id,activities=[],socialOptions=[]){
  }));
  // Public offers are not proof. The criterion is an actual handoff to this named peer.
  const own=[w.protagonist,...w.npcs].find(p=>(p.character_id??p.npc_id)===id);
- const peers=[w.protagonist,...w.npcs].filter(p=>(p.character_id??p.npc_id)!==id&&p.location_id===own?.location_id);
+ const peers=[w.protagonist,...w.npcs].filter(p=>(p.character_id??p.npc_id)!==id&&p.location_id===own?.location_id
+  &&(!recipientIds||recipientIds.includes(p.character_id??p.npc_id)));
  for(const option of socialOptions.filter(o=>o.kind==='exchange'))for(const offer of option.offers??[]){
   if(offer.from!=='initiator'||offer.to!=='receiver')continue;
   for(const peer of peers){const peerId=peer.character_id??peer.npc_id;
@@ -26,20 +27,30 @@ export function completionTargets(w,id,activities=[],socialOptions=[]){
 export function issueResolutionEvidence(w,id,issue){
  const target=issue?.completion_target,bound=Date.parse(issue?.target_bound_at);
  if(!target||target.actor_id!==id||!Number.isFinite(bound))return [];
- if(target.kind==='activity')return w.tasks.filter(t=>t.actor_id===id&&success(t)
+ const retained=(issue.completion_proofs??[]).filter(p=>p.target_key===JSON.stringify(target)&&p.bound_at===issue.target_bound_at).map(p=>p.evidence_id);
+ if(target.kind==='activity')return [...new Set([...retained,...w.tasks.filter(t=>t.actor_id===id&&success(t)
   &&Date.parse(t.started_at)>=bound&&t.activity_id===target.activity_id&&t.target_object_id===target.object_id
   &&(!target.asset_id||t.completion?.result?.after?.waylight?.asset_id===target.asset_id
    &&(!target.requires_hood||t.completion.result.after.waylight.has_hood===true)))
-  .map(root);
- if(target.kind==='handoff')return (w.social?.commitments??[]).filter(c=>c.actors?.includes(id)
+  .map(root)])];
+ if(target.kind==='handoff')return [...new Set([...retained,...(w.social?.commitments??[]).filter(c=>c.actors?.includes(id)
   &&c.actors.includes(target.recipient_id)&&c.status==='completed'
   &&(c.changes??[]).some(change=>Date.parse(change.at)>=bound&&(change.offers??[]).some(o=>
    o.from===id&&o.to===target.recipient_id&&o.resource===target.resource&&o.count>=target.count)))
-  .map(c=>`commitment:${c.id}`);
+  .map(c=>`commitment:${c.id}`)])];
  return [];
 }
+// Written only at executor settlement, before bounded task/contract history rotates.
+// Snapshot reads do not write proofs; generated feedback cannot supply these fields.
+export function captureIssueResolutionEvidence(w,id){
+ const life=w.cognition?.actors[id];if(!life)return;
+ for(const issue of [life.followup,...(life.deferred_followups??[]),life.pending].filter(Boolean)){
+  const evidence=issueResolutionEvidence(w,id,issue);
+  if(evidence.length)issue.completion_proofs=evidence.slice(-4).map(evidence_id=>({evidence_id,target_key:JSON.stringify(issue.completion_target),bound_at:issue.target_bound_at}));
+ }
+}
 function issueObjects(w,issue,activities){
- const ids=new Set([issue?.completion_target?.object_id].filter(Boolean));
+ const ids=new Set([...(issue?.object_scope_ids??[]),issue?.completion_target?.object_id].filter(Boolean));
  for(const r of [issue?.origin_root_outcome_id,issue?.from_root_outcome_id]){
   const task=w.tasks.find(t=>root(t)===r);
   if(task?.target_object_id&&task.cognitive_operation!=='share')ids.add(task.target_object_id);
@@ -49,6 +60,7 @@ function issueObjects(w,issue,activities){
  }
  return ids;
 }
+export const issueObjectIds=(w,issue,activities=[])=>[...issueObjects(w,issue,activities)];
 // Incidental timestamps do not turn the same observation into fresh evidence.
 function observationKey(task){
  const stable=JSON.stringify(task.cognitive_observation?.objects?.find(o=>o.id===task.target_object_id)?.state, (key,value)=>

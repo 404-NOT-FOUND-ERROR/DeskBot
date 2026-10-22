@@ -17,6 +17,7 @@ type Issue={followup_id?:string;question?:string;original_question?:string;statu
 type R3A={version:string;status:string;summary:string;completed_windows:number;observed_windows:number;planned_windows:number;repairs:number;
   usage:{calls:number;cost_cny:number;input:number;output:number;unknown:number};stages:{stage:string;calls:number;input:number;output:number;cost_cny:number;p50_ms:number|null;p95_ms:number|null}[];
   window_p50_ms:number|null;window_p95_ms:number|null;replay:{summary:string;status:string}|null;
+  local_revision?:{version:string;checks:string;changes:string[];real_retested:boolean}|null;
   findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;elapsed_ms:number;note:string;
     turns:{turn:number;at:string;action:string;actual_text:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
       issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
@@ -27,6 +28,7 @@ function R3AView({data}:{data:R3A}){return <section className="experiment" aria-
   <span className="badge">R3-A · {data.version} · 隔离样本</span><h2>{data.status}</h2><p>{data.summary}</p>
   <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
   {data.findings.map(f=><p key={f}>{f}</p>)}
+  {data.local_revision&&<div className="actual"><b>实验后的本地修正 · {data.local_revision.version}</b><p>{data.local_revision.checks}</p><ul>{data.local_revision.changes.map(c=><li key={c}>{c}</li>)}</ul><p>{data.local_revision.real_retested?'已重新进行真实验证':'尚未追加真实模型复验；下面仍是原冻结版本的结果。'}</p></div>}
   <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?'缺材料时怎样接着生活':'收到装罩邀请以后'}</b><small>{c.id}</small></div>
     <p>{c.note}</p>{c.error&&<p className="error">本例停止：{c.error_detail??c.error}。失败窗口保留，未计作完成。</p>}
     {c.turns.map(t=><section className="turn" key={t.turn}><div className="turn-number">0{t.turn}<span>{new Date(t.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时间</span></div>

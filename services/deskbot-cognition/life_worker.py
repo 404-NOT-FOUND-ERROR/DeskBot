@@ -252,7 +252,7 @@ def social_contact_errors(value,context):
         else:
             novel=old.get('substantive_root')!=basis.get('substantive_root') or bool(set(value.get('source_ids',[])).difference(old.get('input_ids',[])))
         if old.get('followup_id')==issue and peers.intersection(old.get('receiver_ids',[])) and not novel:
-            return ['同一问题尚无关联回复或相关新依据。无关走动/消息不算新进展；不要换措辞、缩减收件人重问。可实际行动、暂缓，或确有意愿时提出有条款的约定。']
+            return ['同一问题尚无关联回复或相关新依据。无关走动/消息不算新进展；不要换措辞、缩减收件人重问。可实际行动或暂缓；若本人确实愿意提出有条款的正式约定，必须自己选一个收件人，receiver_indices只能有一个编号，不能向两人发同一份物品。']
     return []
 
 
@@ -295,6 +295,8 @@ def compilation_repair(value,context):
     hints=['只修复意图编译JSON，不加status/delay_hours。activity使用精确activity_id。证据段仅写kind/evidence_id。']
     hints.extend(continuation_errors(value,context))
     hints.extend(social_contact_errors(value,context))
+    if value.get('operation')=='share' and value.get('social') and len(value.get('receiver_indices',[]))!=1:
+        hints.append('正式social约定的receiver_indices必须恰好一个收件人；不可同时邀请多人。由本人选择一个给定编号，或放弃此次约定并选择其他行动，不自动拆分或替别人接受。')
     if value.get('operation')=='share' and not isinstance(value.get('message_parts'),list):
         hints.append('缺少顶层message_parts数组。message_parts和reply_to必须与operation同级，不可放入speech对象；删除speech外层，保留原段落含义。share只送达留言，不能把物品交付写成已完成。')
     invalid=[s for s in value.get('source_ids',[]) if s not in {i['id'] for i in context.get('inputs',[])}]
@@ -386,7 +388,7 @@ async def run(context):
             compile_prompt['social']=context.get('social',{})
             compile_prompt['speech_evidence']=context.get('speech_evidence',[])
             compile_prompt['speech_contract']='share必须用message_parts数组（最多3段），message填空字符串，不直接发自由事实叙述。每段为{kind:evidence,evidence_id:给定证据ID}或{kind:question|hypothesis|intention|greeting,text:最多160字}。事实仅选择speech_evidence编号，由服务端呈现完整原文，系统会标注观察/听闻/实际结果。猜想和打算各自标注未核验/未执行；自由文本不许声称已完成、别人已答应或已经证实。greeting只允许你好、谢谢你、回头见、早上好、晚上好。若是在回复消息，reply_to填social.replies中的精确message_id，否则null。正式邀请需social:{operation:invite,option_id:可用选项ID}；回复约定需social:{operation:respond,commitment_id:自己的约定ID,response:accept|decline|delay|withdraw,delay_minutes:延期15至240整数}。正式时间只写在social.delay_minutes，系统据此表达；附言不要写时刻或时长，避免两套时间冲突。没有正式社交命令则social:null。只邀请一个人，不能从话语推断对方答应。'
-            compile_prompt['format_limits']='只返回一个简短 JSON 对象，不复述上下文。title最多40字，reason最多160字，message最多180字。motivation、source_ids（无来源填[]）、prior_root_id（无则null）、followup_decision 均不可省略。不得加入解释段落。没有本人已完成任务证据，不说刚忙完、刚照料完、刚到达；问候可直接开始。'
+            compile_prompt['format_limits']='只返回一个简短 JSON 对象，不复述上下文。title最多40字，reason最多160字，message最多180字。motivation、source_ids（无来源填[]）、prior_root_id（无则null）、followup_decision、followup_id（继续原问题必须精确引用current/deferred ID，无关联填null）均不可省略。source_ids只选available_sources的外来输入ID，不放本人task结果、sent留言或现场observation ID；自己的旧事放prior_root_id。不得加入解释段落。没有本人已完成任务证据，不说刚忙完、刚照料完、刚到达；问候可直接开始。'
             compile_prompt['development']=context.get('development')
             compile_prompt['time']=context.get('time')
             compile_prompt['continuation']=context.get('continuation')
@@ -415,7 +417,7 @@ async def run(context):
         output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
              LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
               'now':context.get('time',context['at']),'continuation':context.get('continuation'),'issue_contract':CONTINUATION_CONTRACT,
-              'contract':'必须返回status、question、reason、delay_hours四个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1}。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup')
+              'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup')
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['state']=plain(personality.state); output['memory_sequence']=memory._seq

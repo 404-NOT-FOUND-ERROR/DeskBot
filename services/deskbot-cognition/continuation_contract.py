@@ -10,8 +10,8 @@ def continuation_errors(value, context):
     if view.get('schema') not in ('deskbot.cognitive-continuation.v2', 'deskbot.cognitive-continuation.v3'):
         return []  # Replay of an earlier context keeps its earlier contract.
     errors = []
-    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids')):
-        errors.append('completion_target/target_bound_at/resolution_evidence_ids是执行器只读字段；只可选择completion_target_id')
+    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids', 'completion_proofs', 'object_scope_ids', 'related_object_ids')):
+        errors.append('completion_target/target_bound_at/resolution_evidence_ids/completion_proofs是执行器只读字段；只可选择completion_target_id')
     current = view.get('current')
     issues = [f for f in [current, *view.get('deferred', [])] if f]
     reference = value.get('followup_id')

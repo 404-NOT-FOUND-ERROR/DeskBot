@@ -4,7 +4,7 @@ import {GLOW_LAW} from './fantasy-inquiry.mjs';
 import {RESONANT_REVIEW_SECONDS} from './resonant-life.mjs';
 import {WINDLEAF_LAW} from './windleaf-life.mjs';
 import {WAYLIGHT_LAW} from './waylight-life.mjs';
-import {completionTargets,issueResolutionEvidence,hasNewIssueEvidence} from './cognitive-issue-evidence.mjs';
+import {completionTargets,issueResolutionEvidence,hasNewIssueEvidence,issueObjectIds} from './cognitive-issue-evidence.mjs';
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
 const ms=value=>Date.parse(value);
@@ -12,8 +12,9 @@ const iso=value=>new Date(value).toISOString();
 const active=f=>f&&['continue','postpone'].includes(f.status);
 const issueId=f=>f?.followup_id??f?.origin_root_outcome_id??f?.from_root_outcome_id??null;
 const issueRoots=f=>[f?.origin_root_outcome_id,f?.from_root_outcome_id].filter(Boolean);
+const SERVER_FIELDS=['completion_target','target_bound_at','resolution_evidence_ids','completion_proofs','object_scope_ids','related_object_ids'];
 export function validateFollowupTransition(value,context){
- if(['completion_target','target_bound_at','resolution_evidence_ids'].some(k=>Object.hasOwn(value,k)))fail('followup_server_fields');
+ if(SERVER_FIELDS.some(k=>Object.hasOwn(value,k)))fail('followup_server_fields');
  validateNextStep(value,context);
  const current=context.current,selected=value.followup_id==null?current:
   [current,...(context.deferred??[])].find(f=>issueId(f)===value.followup_id);
@@ -55,6 +56,8 @@ export function prepareCognitiveFollowup(life,compiled,context,at){
 }
 function prepareFollowupDraft(life,compiled,context,at){
  const selected=validateFollowupTransition(compiled,context),current=life.followup;
+ if(current&&context.current)current.object_scope_ids=copy(context.current.related_object_ids??current.object_scope_ids??[]);
+ if(selected)selected.object_scope_ids=copy(selected.related_object_ids??selected.object_scope_ids??[]);
  if(selected&&issueId(selected)!==issueId(current)&&compiled.followup_closure){
   life.followup=copy(selected);archiveCognitiveFollowup(life,at,compiled.followup_closure.reason,compiled.followup_closure);
   life.followup=current;
@@ -105,7 +108,7 @@ function methodReadyAt(w,id,activity){
  return {};
 }
 const selectedOption=(options,value)=>options.find(o=>o.kind===value?.kind&&o.id===value?.id);
-export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[],socialOptions=[]){
+export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[],socialOptions=[],recipientIds=null){
  const life=w.cognition?.actors[id]??{},zone=w.clock?.time_zone??'Asia/Shanghai';
  const options=activities.map(a=>{
   const timing=methodReadyAt(w,id,a.activity_id);
@@ -128,8 +131,8 @@ export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[
  const pendingTask=w.tasks?.find(t=>t.task_id===life.pending?.task_id);
  const result=pendingTask?.status==='completed'?{success:true,root_outcome_id:life.pending.root_outcome_id}:life.last_result;
  const completionEvidence=[...(result?.success?[result.root_outcome_id]:[]),...commitments.filter(c=>c.status==='completed').map(c=>`commitment:${c.id}`)];
- const withEvidence=f=>({...copy(f),followup_id:issueId(f),resolution_evidence_ids:issueResolutionEvidence(w,id,f)});
- const targets=completionTargets(w,id,activities,socialOptions);
+ const withEvidence=f=>({...copy(f),followup_id:issueId(f),related_object_ids:issueObjectIds(w,f,activities),resolution_evidence_ids:issueResolutionEvidence(w,id,f)});
+ const targets=completionTargets(w,id,activities,socialOptions,recipientIds);
  for(const issue of [f,...(life.deferred_followups??[])])if(issue?.completion_target&&!targets.some(t=>t.id===issue.completion_target.id))targets.push(copy(issue.completion_target));
  return {schema:'deskbot.cognitive-continuation.v3',now:cognitiveTime(at,zone),wait_options:options,
   completion_targets:targets,deferred_capacity:{limit:8,used:life.deferred_followups?.length??0},
@@ -183,11 +186,12 @@ export function cognitiveWaitFollowup(life,compiled,context,at){
   reason:compiled.reason,original_question:same?old.original_question??old.question:compiled.reason,followup_id:same?(issueId(old)??`followup:${since}`):`followup:${at}`,
   from_root_outcome_id:same?old.from_root_outcome_id??null:null,created_at:same?old.created_at??since:at,wait_started_at:since,
   wait_for:waitFor,next_step:copy(compiled.next_step??old?.next_step??null),wait_count:(same?old.wait_count??0:0)+1,last_reviewed_at:at,
-  ...(same&&old.completion_target?{completion_target:copy(old.completion_target),target_bound_at:old.target_bound_at}:compiled.completion_target_id?{completion_target:copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id)),target_bound_at:at}:{}),
+  object_scope_ids:copy(same?old.object_scope_ids??[]:[]),
+  ...(same&&old.completion_target?{completion_target:copy(old.completion_target),target_bound_at:old.target_bound_at,completion_proofs:copy(old.completion_proofs??[])}:compiled.completion_target_id?{completion_target:copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id)),target_bound_at:at}:{}),
   next_review_at:reviewAt(at,minutes,waitFor,context,since)};
 }
 export function cognitiveResultFollowup(life,followup,context,at,root,decision=null){
- if(followup&&['completion_target','target_bound_at','resolution_evidence_ids'].some(k=>Object.hasOwn(followup,k)))fail('followup_server_fields');
+ if(followup&&SERVER_FIELDS.some(k=>Object.hasOwn(followup,k)))fail('followup_server_fields');
  if(followup?.completion_target_id!=null)fail('followup_target_requires_plan');
  if(!followup||!['continue','postpone','drop','none'].includes(followup.status)||typeof followup.question!=='string'||typeof followup.reason!=='string'||!Number.isSafeInteger(followup.delay_hours)||followup.delay_hours<1||followup.delay_hours>48)fail('followup_invalid');
  const waitFor=validateWaitFor(followup.wait_for,context);
@@ -204,7 +208,7 @@ export function cognitiveResultFollowup(life,followup,context,at,root,decision=n
  const same=Boolean(waitFor&&JSON.stringify(waitFor)===JSON.stringify(old?.wait_for)&&['continue','postpone'].includes(old?.status));
  const since=same?(old.wait_started_at??old.created_at??at):at;
  const target=sameIssue?old.completion_target:life.pending?.completion_target;
- return {...copy(followup),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
+ return {...copy(followup),object_scope_ids:copy((sameIssue?old:life.pending)?.object_scope_ids??[]),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at,completion_proofs:copy((sameIssue?old:life.pending).completion_proofs??[])}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
   origin_root_outcome_id:sameIssue?old.origin_root_outcome_id??old.from_root_outcome_id??root:root,
   from_root_outcome_id:root,wait_count:same?old.wait_count??0:0,next_review_at:reviewAt(at,minutes,waitFor,context,since)};
 }

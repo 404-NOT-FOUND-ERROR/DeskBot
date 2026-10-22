@@ -13,6 +13,13 @@ function bind(w,target){
  prepareCognitiveFollowup(life,{followup_decision:'continue',completion_target_id:target},cognitiveContext(w,OWNER,w.clock.synced_at).continuation,w.clock.synced_at);
  return life.followup;
 }
+test('an open issue keeps its observed object scope after its originating hot task rotates out',()=>{
+ const w=fixture(cases.find(c=>c.id==='resources-1-on')),life=w.cognition.actors[OWNER];
+ prepareCognitiveFollowup(life,{followup_decision:'continue'},cognitiveContext(w,OWNER,w.clock.synced_at).continuation,w.clock.synced_at);
+ assert.ok(life.followup.object_scope_ids.includes('floating-frame'));
+ w.tasks=[];
+ assert.ok(issueContactBasis(w,OWNER,life.followup).object_ids.includes('floating-frame'));
+});
 test('closure certifies the bound installation on the exact asset, not a delivered message or older work',()=>{
  const w=fixture(cases.find(c=>c.id==='invitation-3-on')),issue=bind(w,'activity:waylight-fit-shade');
  const before=structuredClone(w.cognition.actors[OWNER]);
@@ -29,6 +36,8 @@ test('closure certifies the bound installation on the exact asset, not a deliver
 test('handoff needs actual conserved transfer to the named peer, with the declared amount',()=>{
  const w=fixture(cases.find(c=>c.id==='resources-1-on')),peer='wetland-grower-001';
  w.living.inventories[OWNER].stock.water=4;
+ const context=cognitiveContext(w,OWNER,w.clock.synced_at);
+ assert.ok(context.continuation.completion_targets.filter(t=>t.kind==='handoff').every(t=>context.capabilities.share.receivers.some(r=>r.actor_id===t.recipient_id)));
  const issue=bind(w,`handoff:give-water:${peer}`),c={id:'gift',actors:[OWNER,peer],status:'completed',location_id:w.protagonist.location_id,changes:[],offers:[{from:OWNER,to:peer,resource:'water',count:4}]};
  w.social.commitments.push(c);
  assert.deepEqual(issueResolutionEvidence(w,OWNER,issue),[]); // Status/terms alone are insufficient.
@@ -66,6 +75,11 @@ test('a bound target survives a task result and serialization without accepting 
  assert.throws(()=>prepareCognitiveFollowup(current,{followup_decision:'continue',completion_target_id:'activity:tend-bed'},view,w.clock.synced_at),{code:'followup_target_changed'});
  assert.throws(()=>cognitiveResultFollowup(current,{status:'none',question:'',reason:'',delay_hours:1,completion_target:{}},view,BASE,'task:new'),{code:'followup_server_fields'});
  assert.ok(issueResolutionEvidence(JSON.parse(JSON.stringify(w)),OWNER,current.followup).length);
+ const expected=issueResolutionEvidence(w,OWNER,current.followup);
+ w.tasks=[]; // Simulate bounded hot-task retention after many later tasks.
+ const reloaded=JSON.parse(JSON.stringify(w));
+ assert.deepEqual(issueResolutionEvidence(reloaded,OWNER,reloaded.cognition.actors[OWNER].followup),expected);
+ assert.throws(()=>validateFollowupTransition({completion_proofs:[{evidence_id:'forged'}]},view),{code:'followup_server_fields'});
 });
 test('unrelated work and new unrelated sources cannot refresh an unanswered issue',()=>{
  const w=developmentFixture(),issue=bind(w,'activity:water-bed');

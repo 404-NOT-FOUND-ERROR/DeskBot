@@ -4,6 +4,7 @@ import { transferLivingResource, RESOURCES } from './living-resources.mjs';
 import { activitySteps } from './life-planning.mjs';
 import { RESIDENTS, residentDesign } from './resident-life.mjs';
 import {waylightSocialOffers} from './waylight-life.mjs';
+import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
 
 const M=60000, LIVE=['proposed','accepted','meeting','working'];
 export class SocialLifeError extends Error { constructor(code,text){super(text);this.code=code;this.statusCode=409;} }
@@ -44,6 +45,7 @@ function refusal(w,id,definition=null) {
 function close(w,c,at,status,text) {
   c.status=status;c.finished_at=at;record(w,c,at,status,text);
   if(status==='completed'||status==='failed')relation(w,c,at,status,text);
+  if(status==='completed')for(const id of c.actors)captureIssueResolutionEvidence(w,id);
   w.social.cooldowns[c.key]=new Date(Date.parse(at)+(status==='failed'?360:status==='completed'?240:90)*M).toISOString();
 }
 function propose(w,at,definition) {

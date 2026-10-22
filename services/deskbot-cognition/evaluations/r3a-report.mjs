@@ -7,17 +7,18 @@ const optional=name=>existsSync(join(dir,name))?JSON.parse(readFileSync(join(dir
 const audit=optional('semantic-audit.json'),replay=optional('replay-check.json');
 const calls=raw.budget?.calls??[],quantile=(values,q)=>values.length?[...values].sort((a,b)=>a-b)[Math.max(0,Math.ceil(values.length*q)-1)]:null;
 function usage(rows){return {calls:rows.length,input:rows.reduce((n,r)=>n+(r.usage?.prompt_tokens??0),0),output:rows.reduce((n,r)=>n+(r.usage?.completion_tokens??0),0),
- cost_cny:rows.reduce((n,r)=>n+r.held_cny,0),unknown:rows.filter(r=>r.uncertain).length,failed:rows.filter(r=>r.status!=='completed').length,
+ cost_cny:rows.reduce((n,r)=>n+r.held_cny,0),unknown:rows.filter(r=>r.uncertain).length,provider_failed:rows.filter(r=>r.status!=='completed').length,
  p50_ms:quantile(rows.map(r=>r.latency_ms).filter(Number.isFinite),.5),p95_ms:quantile(rows.map(r=>r.latency_ms).filter(Number.isFinite),.95),
  queue_ms:rows.reduce((n,r)=>n+(r.queue_ms??0),0),input_chars:rows.reduce((n,r)=>n+(r.input_chars??0),0)};}
 const report={schema:'deskbot.r3a-review.v1',version:raw.version,status:audit?.status??'真实调用已保存，语义审查未完成',
  summary:audit?.summary??'尚未判定行为达标。',usage:usage(calls),repairs:calls.filter(c=>c.stage.endsWith('_repair')).length,
  stages:[...new Set(calls.map(c=>c.stage))].map(stage=>({stage,...usage(calls.filter(c=>c.stage===stage))})),
+ protocol_or_execution_failures:raw.results.filter(r=>r.error).length,
  completed_windows:raw.results.flatMap(r=>r.turns).filter(t=>t.followup&&!t.truncated).length,
  observed_windows:raw.results.reduce((n,r)=>n+r.turns.length,0),planned_windows:8,
  window_p50_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.5),
  window_p95_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.95),
- replay,checks:optional('local-validation.json'),findings:audit?.findings??[],
+ replay,checks:optional('local-validation.json'),local_revision:optional('local-followup.json'),findings:audit?.findings??[],
  cases:raw.results.map(r=>({id:r.id,error:r.error??null,error_detail:r.error_detail??null,elapsed_ms:r.latency_ms,note:audit?.cases?.[r.id]?.note??'待逐例审查',
   turns:r.turns.map(t=>({turn:t.turn,at:t.at,action:t.task?.title??t.compiled?.operation??'未采用计划',activity:t.task?.activity_id??null,
    operation:t.compiled?.operation??null,reason:t.reason??null,result:t.actual_result?.effects??null,

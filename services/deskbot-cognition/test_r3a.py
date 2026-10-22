@@ -2,13 +2,22 @@ import unittest
 from copy import deepcopy
 from continuation_contract import continuation_errors
 from context_projection import stage_context, BODY_BOUNDARY
-from life_worker import BoundedPersonality, social_contact_errors, contract_json
+from life_worker import BoundedPersonality, social_contact_errors, contract_json, compilation_repair, valid_social_compilation
 from agent.personality import SoulLayer, StateLayer
 from core.context import observe_stage, get_log_context
 from core.interfaces.llm import LLMResponse
 import asyncio
 
 class R3ATests(unittest.TestCase):
+    def test_recorded_two_recipient_handoff_failure_points_to_the_exact_field(self):
+        context={'actor':{'name':'喵呜'},'inputs':[], 'social':{'options':[{'option_id':'give-water'}]}}
+        value={'operation':'share','receiver_indices':[1,2],'source_ids':[], 'message_parts':[],
+               'social':{'operation':'invite','option_id':'give-water'}}
+        self.assertFalse(valid_social_compilation(value,context))
+        self.assertIn('receiver_indices必须恰好一个',compilation_repair(value,context))
+        self.assertTrue(valid_social_compilation({**value,'receiver_indices':[1]},context))
+        self.assertEqual(value['receiver_indices'],[1,2]) # Diagnostic does not choose for the actor.
+
     def view(self):
         return {'phase':'plan','continuation':{'schema':'deskbot.cognitive-continuation.v3',
             'current':{'followup_id':'i','resolution_evidence_ids':['task:matching']},

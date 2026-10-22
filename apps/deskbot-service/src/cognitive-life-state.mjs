@@ -15,6 +15,7 @@ import {cognitiveSocialContext,cognitiveSpeechEvidence,compileCognitiveMessage,c
 import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink,attachCognitiveTrial} from './cognitive-development.mjs';
 import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor,prepareCognitiveFollowup} from './cognitive-continuation.mjs';
 import {cognitiveOpportunityKey} from './cognitive-schedule.mjs';
+import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
 
 export const COGNITIVE_ACTORS=['shaping-001','wetland-grower-001','lamp-keeper-001'];
 export const cognitiveActorIds=world=>[...new Set([...COGNITIVE_ACTORS,...(world.cognition?.admitted_actors??[])])].filter(id=>cognitivePerson(world,id));
@@ -38,7 +39,7 @@ export function cognitiveContext(world,id,at,phase='plan'){
   const perceptions=inputs.filter(s=>!seen.has(s.id)).slice(0,id===world.protagonist.character_id?5:3);
   const social=cognitiveSocialContext(world,id,at,inputs,catalogue);
   return {schema:COGNITIVE_CONTEXT_VERSION,phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
-    time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments,social.options),
+    time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments,social.options,cognitiveActorIds(world)),
     actor:{actor_id:id,name:p.display_name??'喵呜',role:role?.role??'聚形域伴生个体',traits:id==='shaping-001'?['好奇','有自己的节奏','先观察再判断']:[role?.temperament??'关心自己的生活'],
       values:id==='lamp-keeper-001'?['可靠','把光照与安全联系起来']:id==='wetland-grower-001'?['照料生命','在实际苗况中调整方法']:['具体可靠','愿意探索'],
       background:role?JSON.stringify({desires:role.desires,likes:role.likes,flaws:role.flaws}):'现实桌边的光粒造物，虚拟化身生活在聚形域。',
@@ -252,7 +253,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     landed.followup_archive=followupPreview.followup_archive??[];
     adoptCognitiveDevelopment(world,id,compiled,refs,at,{task,blocked});
     landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,inventory_before:copy(context.inventory),from_location_id:refs.location_id,blocked,created_at:at,followup_decision:followupTransition.preserved_current?'postpone':compiled.followup_decision??null,
-      completion_target:copy((refs.continuation?.completion_targets??[]).find(t=>t.id===compiled.completion_target_id)??null),target_bound_at:at};
+      completion_target:copy((refs.continuation?.completion_targets??[]).find(t=>t.id===compiled.completion_target_id)??null),target_bound_at:at,object_scope_ids:task?.target_object_id?[task.target_object_id]:[]};
     adoptPersonalContinuity(world,id,landed,proposal,at);landed.retry=null;
     if(compiled.operation==='wait'){
       landed.pending=null;landed.followup=waiting;
@@ -364,6 +365,7 @@ export function settleCognitiveTask(world,task,at){
   // including inventory, rather than replacing it with a later live state.
   task.cognitive_observation??={at,objects:cognitiveContext(world,task.actor_id,at).objects,
     inventory:copy(world.living?.inventories[task.actor_id]??{stock:{},capacity:24})};
+  captureIssueResolutionEvidence(world,task.actor_id);
 }
 
 export function cognitiveDialogueContext(world,id){
