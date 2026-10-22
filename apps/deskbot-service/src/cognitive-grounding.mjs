@@ -1,4 +1,5 @@
 import {RESOURCES} from './living-resources.mjs';
+import {isDeepStrictEqual} from 'node:util';
 
 /** A read-only vocabulary for the already visible world, not a second world model. */
 export function cognitiveGrounding(world, actorId, objects, activities) {
@@ -24,6 +25,25 @@ export function cognitiveGrounding(world, actorId, objects, activities) {
     quantities:assets.length?{'waylight.charge':'光叶凝聚的蓄光量（0至1），不是电池电量',
       'waylight.brightness':'当前照明强度；不等同蓄光量','waylight.moisture':'灯具湿润程度'}:{},
     rule:'名称与归属依据此处和事件原始事实。原水与清水是不同资源；净滤产出看实际 effects 和背包 after。旧回忆描述当时，现场状态描述现在，二者不能互相覆盖。主观理解可以改变，不改写物品、所有权、数量、是否履约；感受不是事实证据。'};
+}
+
+/** Production is an opportunity, not proof that more stock is needed. No peer inventories. */
+export function cognitiveUseContext(world,actorId,activities,at){
+ const stock=world.living?.inventories[actorId]?.stock??{};
+ return {assessed_at:at,production:activities.filter(a=>a.output).map(a=>({activity_id:a.activity_id,
+  resource:a.output.resource,name:RESOURCES[a.output.resource]??a.output.resource,output_count:a.output.count,
+  already_held:stock[a.output.resource]??0,
+  accepted_outgoing:(world.social?.commitments??[]).filter(c=>c.actors?.includes(actorId)&&['accepted','meeting','working'].includes(c.status))
+   .flatMap(c=>(c.offers??[]).filter(o=>o.from===actorId&&o.resource===a.output.resource).map(o=>({commitment_id:c.id,count:o.count}))),
+ })),rule:'可生产不代表需要再生产。先看已经持有多少、真实用途和已接受的责任；未回复不是需求，无限备货不是默认后续。可有自己的备用或探索理由，也可用已有物品、做别的、休息或放下，不强制送出。没有货币或工钱机制，不把谈价当作已存在的交易。'};
+}
+
+export function validateDecisionIssue(proposal){
+ if(!Object.hasOwn(proposal,'decision_issue')||proposal.decision_issue===null)return;
+ const c=proposal.compiled,d=proposal.decision_issue;
+ if(!d||['followup_id','completion_target_id','followup_closure'].some(k=>!isDeepStrictEqual(c[k]??null,d[k]??null))
+  ||c.followup_decision!==d.followup_decision)
+  throw Object.assign(Error('decision_issue_changed_by_compiler'),{code:'decision_issue_changed_by_compiler',statusCode:409});
 }
 
 /** The compiler must implement, not silently replace, the actor's communication choice. */

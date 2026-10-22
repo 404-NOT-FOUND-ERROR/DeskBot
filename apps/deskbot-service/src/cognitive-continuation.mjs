@@ -12,7 +12,7 @@ const iso=value=>new Date(value).toISOString();
 const active=f=>f&&['continue','postpone'].includes(f.status);
 const issueId=f=>f?.followup_id??f?.origin_root_outcome_id??f?.from_root_outcome_id??null;
 const issueRoots=f=>[f?.origin_root_outcome_id,f?.from_root_outcome_id].filter(Boolean);
-const SERVER_FIELDS=['completion_target','target_bound_at','resolution_evidence_ids','completion_proofs','object_scope_ids','related_object_ids'];
+const SERVER_FIELDS=['completion_target','target_bound_at','resolution_evidence_ids','completion_proofs','object_scope_ids','related_object_ids','current_conditions'];
 export function validateFollowupTransition(value,context){
  if(SERVER_FIELDS.some(k=>Object.hasOwn(value,k)))fail('followup_server_fields');
  validateNextStep(value,context);
@@ -131,10 +131,18 @@ export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[
  const pendingTask=w.tasks?.find(t=>t.task_id===life.pending?.task_id);
  const result=pendingTask?.status==='completed'?{success:true,root_outcome_id:life.pending.root_outcome_id}:life.last_result;
  const completionEvidence=[...(result?.success?[result.root_outcome_id]:[]),...commitments.filter(c=>c.status==='completed').map(c=>`commitment:${c.id}`)];
- const withEvidence=f=>({...copy(f),followup_id:issueId(f),related_object_ids:issueObjectIds(w,f,activities),resolution_evidence_ids:issueResolutionEvidence(w,id,f)});
+ const withEvidence=f=>{
+  const evidence=issueResolutionEvidence(w,id,f),next=selectedOption(options,f.next_step),wait=selectedOption(options,f.wait_for);
+  return {...copy(f),followup_id:issueId(f),related_object_ids:issueObjectIds(w,f,activities),resolution_evidence_ids:evidence,
+   // Current executor readings are distinct from the actor's dated last appraisal.
+   current_conditions:{assessed_at:at,next_step:copy(next??null),wait_for:copy(wait??null),
+    target_status:f.completion_target?(evidence.length?'achieved':'not_yet_proven'):'not_bound',
+    rule:'这里是此刻重新核验的条件。旧question/reason是上次的判断，不是当前阻碍；冷却为0不代表材料、光照等其他条件也满足。目标已完成可据证据收束这一步，是否继续研究由本人决定。'},
+  };
+ };
  const targets=completionTargets(w,id,activities,socialOptions,recipientIds);
  for(const issue of [f,...(life.deferred_followups??[])])if(issue?.completion_target&&!targets.some(t=>t.id===issue.completion_target.id))targets.push(copy(issue.completion_target));
- return {schema:'deskbot.cognitive-continuation.v3',now:cognitiveTime(at,zone),wait_options:options,
+ return {schema:'deskbot.cognitive-continuation.v3',decision_contract:'issue-choice-v1',now:cognitiveTime(at,zone),wait_options:options,
   completion_targets:targets,deferred_capacity:{limit:8,used:life.deferred_followups?.length??0},
   completion_evidence_ids:completionEvidence, // References certify a result, not arbitrary prose about it.
   next_options:[...options.map(o=>({kind:o.kind,id:o.id,title:o.title})),...socialOptions.map(o=>({kind:'social',id:o.option_id,title:o.title}))],
@@ -163,6 +171,7 @@ export function validateNextStep(value,context){
  if(wait?.kind==='commitment'&&(step.kind!=='commitment'||step.id!==wait.id))fail('followup_wait_step_mismatch');
  if(wait?.kind==='reply'&&step.kind==='commitment'
   &&selectedOption(context.wait_options,wait)?.commitment_id!==step.id)fail('followup_wait_step_mismatch');
+ if(wait?.kind==='reply'&&step.kind!=='commitment'&&(step.kind!=='reply'||step.id!==wait.id))fail('followup_wait_step_mismatch');
 }
 function reviewAt(at,minutes,waitFor,context,since){
  let next=ms(at)+minutes*60000;const option=selectedOption(context.wait_options,waitFor);
@@ -185,7 +194,7 @@ export function cognitiveWaitFollowup(life,compiled,context,at){
  return {status:decision==='drop'?'drop':decision==='none'?'none':'postpone',question:same?old.question:compiled.reason,
   reason:compiled.reason,original_question:same?old.original_question??old.question:compiled.reason,followup_id:same?(issueId(old)??`followup:${since}`):`followup:${at}`,
   from_root_outcome_id:same?old.from_root_outcome_id??null:null,created_at:same?old.created_at??since:at,wait_started_at:since,
-  wait_for:waitFor,next_step:copy(compiled.next_step??old?.next_step??null),wait_count:(same?old.wait_count??0:0)+1,last_reviewed_at:at,
+  wait_for:waitFor,next_step:copy(Object.hasOwn(compiled,'next_step')?compiled.next_step:old?.next_step??null),wait_count:(same?old.wait_count??0:0)+1,last_reviewed_at:at,
   object_scope_ids:copy(same?old.object_scope_ids??[]:[]),
   ...(same&&old.completion_target?{completion_target:copy(old.completion_target),target_bound_at:old.target_bound_at,completion_proofs:copy(old.completion_proofs??[])}:compiled.completion_target_id?{completion_target:copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id)),target_bound_at:at}:{}),
   next_review_at:reviewAt(at,minutes,waitFor,context,since)};
@@ -208,7 +217,7 @@ export function cognitiveResultFollowup(life,followup,context,at,root,decision=n
  const same=Boolean(waitFor&&JSON.stringify(waitFor)===JSON.stringify(old?.wait_for)&&['continue','postpone'].includes(old?.status));
  const since=same?(old.wait_started_at??old.created_at??at):at;
  const target=sameIssue?old.completion_target:life.pending?.completion_target;
- return {...copy(followup),object_scope_ids:copy((sameIssue?old:life.pending)?.object_scope_ids??[]),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at,completion_proofs:copy((sameIssue?old:life.pending).completion_proofs??[])}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
+ return {...copy(followup),last_reviewed_at:at,object_scope_ids:copy((sameIssue?old:life.pending)?.object_scope_ids??[]),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at,completion_proofs:copy((sameIssue?old:life.pending).completion_proofs??[])}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
   origin_root_outcome_id:sameIssue?old.origin_root_outcome_id??old.from_root_outcome_id??root:root,
   from_root_outcome_id:root,wait_count:same?old.wait_count??0:0,next_review_at:reviewAt(at,minutes,waitFor,context,since)};
 }

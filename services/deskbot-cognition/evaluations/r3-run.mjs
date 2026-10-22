@@ -12,6 +12,7 @@ import {advanceAutonomousLife,applyLifeChoice} from '../../../apps/deskbot-servi
 import {lifeChoicePrompt} from '../../../apps/deskbot-service/src/life-choice.mjs';
 import {cases,personaCases,fixture,hash,plus,tick,settle,digest,opportunity} from './r3-fixtures.mjs';
 import {interestCases,interestFixture} from './r3-interest-fixtures.mjs';
+import {recordedCalls} from './recorded-calls.mjs';
 
 const arg=n=>process.argv.find(a=>a.startsWith(`--${n}=`))?.slice(n.length+3);
 const dir=resolve(arg('output')??'../runtime/r3-20261020'),real=process.argv.includes('--real'),replay=process.argv.includes('--replay');
@@ -21,7 +22,7 @@ if(!Number.isSafeInteger(turns)||turns<2||turns>6)throw Error('turns_must_be_2_t
 if(!Number.isSafeInteger(maxCalls)||maxCalls<1||maxCalls>900)throw Error('max_calls_must_be_1_to_900');
 mkdirSync(dir,{recursive:true});
 const base=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
-const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs',
+const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs','services/deskbot-cognition/evaluations/recorded-calls.mjs',
   'apps/deskbot-service/src/cognitive-life-state.mjs','apps/deskbot-service/src/cognitive-continuity.mjs',
   'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
   'apps/deskbot-service/src/cognitive-social.mjs',
@@ -79,19 +80,10 @@ function save(){
   if(budget)report.budget=budget.status();
   const temp=file+'.tmp';writeFileSync(temp,JSON.stringify(report,null,2));renameSync(temp,file);
 }
-let processed=0,consecutiveFailures=0,cached=0,network=0;
+let processed=0,consecutiveFailures=0;
+const recorded=recordedCalls({directory:join(runDir,'calls'),mode:real?'real':'replay',complete:(id,request)=>budget.complete(id,request)});
 const failureLimit=process.argv.includes('--stop-on-error')?1:2;
-async function call(id,request){
-  const key=hash(id),path=join(runDir,'calls',key+'.json.gz'),fingerprint=hash(request);
-  if(existsSync(path)){
-    const item=JSON.parse(gunzipSync(readFileSync(path)));
-    if(item.id!==id||item.fingerprint!==fingerprint)throw Error('replay_request_mismatch');
-    cached++;return item.response;
-  }
-  if(replay||!real)throw Error('replay_cache_missing');
-  const response=await budget.complete(id,request);
-  network++;writeFileSync(path,gzipSync(JSON.stringify({id,fingerprint,request,response})));return response;
-}
+const call=recorded.call;
 async function cognitive(w,c,record,turn){
   async function phase(phase){
     const at=w.clock.synced_at,job=`r3:${version}:${c.id}:${turn}:${phase}`;
@@ -186,9 +178,9 @@ try{
       episode.latency_ms=Math.round(performance.now()-started);
       episode.final_hash=hash(w);episode.final=digest(w,c.actor);
       writeFileSync(join(runDir,'worlds',hash(key)+(replay?'-replay':'')+'.json.gz'),gzipSync(JSON.stringify(w)));
-      report.results.push(episode);processed++;report.cache={hits:cached,provider_returns:network};save();
+      report.results.push(episode);processed++;report.cache={...recorded.stats};save();
     }
   }
 }finally{bridge.close();if(budget)await budget.close();save();ledger?.close();}
-console.log(JSON.stringify({runDir,version,processed,consecutiveFailures,cached,network,report:file}));
+console.log(JSON.stringify({runDir,version,processed,consecutiveFailures,cached:recorded.stats.hits,terminal_hits:recorded.stats.terminal_hits,network:recorded.stats.provider_returns,report:file}));
 if(consecutiveFailures>=failureLimit)process.exitCode=2;

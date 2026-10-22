@@ -10,7 +10,7 @@ def continuation_errors(value, context):
     if view.get('schema') not in ('deskbot.cognitive-continuation.v2', 'deskbot.cognitive-continuation.v3'):
         return []  # Replay of an earlier context keeps its earlier contract.
     errors = []
-    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids', 'completion_proofs', 'object_scope_ids', 'related_object_ids')):
+    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids', 'completion_proofs', 'object_scope_ids', 'related_object_ids', 'current_conditions')):
         errors.append('completion_target/target_bound_at/resolution_evidence_ids/completion_proofs是执行器只读字段；只可选择completion_target_id')
     current = view.get('current')
     issues = [f for f in [current, *view.get('deferred', [])] if f]
@@ -64,12 +64,44 @@ def continuation_errors(value, context):
         else:
             wait = value.get('wait_for') or {}
             if wait.get('kind') in ('activity', 'commitment') and step != wait:
-                errors.append('wait_for与next_step不一致；想交接物品不能绑定等待取水，须等实际消息/交接约定或换办法')
+                errors.append('wait_for与next_step不一致；等待activity或commitment时，next_step必须同kind/id或null。邀请已送出就等已有约定，不再选social重新提议；想交接不能等取水')
             if wait.get('kind') == 'reply' and step['kind'] == 'commitment':
                 option = next((o for o in view.get('wait_options', []) if o['kind'] == 'reply' and o['id'] == wait['id']), {})
                 if option.get('commitment_id') != step['id']:
                     errors.append('等回复必须属于这个实际约定')
+            if wait.get('kind') == 'reply' and step['kind'] != 'commitment' and step != wait:
+                errors.append('等回复的next_step只可用同一reply、关联commitment或null；不是重新提议')
     return errors
+
+
+def issue_choice_errors(choice, context):
+    if context.get('continuation', {}).get('decision_contract') != 'issue-choice-v1' and choice is None:
+        return []
+    if not isinstance(choice, dict) or set(choice) != {'followup_decision', 'followup_id', 'completion_target_id', 'followup_closure'}:
+        return ['issue_choice需四字段followup_decision、followup_id、completion_target_id、followup_closure；没有的填null']
+    if choice['followup_decision'] not in ('continue', 'postpone', 'new', 'none', 'drop'):
+        return ['issue_choice.followup_decision取continue/postpone/new/none/drop']
+    return continuation_errors(choice, context)
+
+
+def compiled_issue_errors(value, choice):
+    if choice is None:
+        return []  # Prior callers and deliberate no-action keep their existing path.
+    if any(value.get(k) != choice.get(k) for k in ('followup_decision', 'followup_id', 'completion_target_id', 'followup_closure')):
+        return ['编译必须保留本人issue_choice的四字段，不能替本人放下、换问题或选择完成标准']
+    return []
+
+
+ISSUE_CHOICE_CONTRACT = (
+    'act=true时另填issue_choice:{followup_decision:continue|postpone|new|none|drop,followup_id:本人问题ID或null,completion_target_id:目标ID或null,followup_closure:null或结案对象}。'
+    '本人先选择怎样对待原问题，编译器不替你选择。继续原研究不强制继续同一方法。'
+    '想验证一个明确的小步骤，可在行动前选completion_targets中的目标；开放研究可不绑定。'
+    '已有小目标不能偷偷换成另一个；current_conditions.target_status=achieved时可用resolution_evidence_ids收束这一步。'
+    '主动结束需followup_decision=drop、followup_closure:{followup_id,kind:resolved|satisfied|abandoned,reason,evidence_ids:[]}。'
+    'resolved只证明事先绑定的一步；自己觉得了解够了用satisfied，不想继续用abandoned，不等同客观成果。'
+    '可以继续、暂缓或恢复，不为达到实验进度而强行结案。SEND_MESSAGE的contact_intent.followup_id与issue_choice保持一致。'
+    'act=false仅表示眼下不行动，不自动关闭或改写原问题。'
+)
 
 
 CONTINUATION_CONTRACT = (
@@ -82,6 +114,10 @@ CONTINUATION_CONTRACT = (
     '觉得暂时了解够了用satisfied（个人收束），选择放下用abandoned；二者不声称物质任务完成。'
     '已有完成条件不可换成较容易的目标。暂存最多8项，满时先处理旧事；允许恢复后换方法。'
     '暂缓不等于放弃兴趣。next_step选择next_options的{kind,id}或null；'
-    'wait_for若等待activity必须与next_step完全一致，不能想送水却等取水。'
-    '送水先选social的give-water提议，再等给定reply/commitment，对方可拒绝，尚未交接的水仍在自己背包。'
+    'wait_for选择activity或commitment时，next_step必须同kind/id或null；等待reply时可选该reply、其关联commitment或null。'
+    'social只表示尚未发出的新提议；一旦发出邀请，等待已有约定用commitment及其真实ID，不能再次选social提议。'
+    '例如已发出邀请c：next_step和wait_for均为{kind:commitment,id:c}，而非social/give-water；明确没有下一步可填next_step:null。'
+    '送水先提议，再等给定reply/commitment，对方可拒绝，尚未交接的水仍在自己背包。'
+    '旧question/reason只说明上次为何惦记，current_conditions和wait_options说明现在；逐次重估，已到时的冷却不可再作为阻碍。'
+    '反馈时可根据绑定目标的resolution_evidence_ids填写status:drop及followup_closure；不能事后补绑目标。'
 )
