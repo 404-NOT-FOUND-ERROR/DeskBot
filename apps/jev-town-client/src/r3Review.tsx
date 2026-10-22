@@ -18,22 +18,25 @@ type R3A={version:string;status:string;summary:string;completed_windows:number;o
   usage:{calls:number;cost_cny:number;input:number;output:number;unknown:number};stages:{stage:string;calls:number;input:number;output:number;cost_cny:number;p50_ms:number|null;p95_ms:number|null}[];
   window_p50_ms:number|null;window_p95_ms:number|null;replay:{summary:string;status:string}|null;
   local_revision?:{version:string;checks:string;changes:string[];real_retested:boolean}|null;
-  findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;elapsed_ms:number;note:string;
+  findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;stop_kind?:'budget'|'error'|null;elapsed_ms:number;note:string;
     turns:{turn:number;at:string;action:string;actual_text:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
+      decision_contact?:{kind:string;receiver_ids:string[]}|null;recollections?:{feeling:string;fact:string|null}[];
       issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
-const stageNames:Record<string,string>={perception:'感知',motivation:'动机与目标',decision:'行动选择',feedback:'结果反馈',memory:'记忆',compile:'意图编译',compile_repair:'编译修复',followup:'后续选择',followup_repair:'后续修复',directive:'来源折射等指令'};
+const stageNames:Record<string,string>={perception:'感知',motivation:'动机与目标',decision:'行动选择',decision_repair:'选择修复',feedback:'结果反馈',memory:'记忆',compile:'意图编译',compile_repair:'编译修复',followup:'后续选择',followup_repair:'后续修复',directive:'来源折射等指令'};
 const issueStatus=(f:Issue)=>f.resolution?({resolved:'具体目标已完成',satisfied:'个人收束',abandoned:'明确放下'}[f.resolution.kind]??f.resolution.kind):({continue:'继续惦记',postpone:'暂缓',none:'暂无新后续',drop:'已收束'}[f.status??'']??'等待复查');
 function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.original_question??issue.question}</p>{issue.completion_target&&<p>绑定的小目标：{issue.completion_target.title}</p>}<small>事项 {issue.followup_id??'尚未绑定'}</small>{issue.resolution&&<p>{issue.resolution.reason}</p>}</div>;}
-function R3AView({data}:{data:R3A}){return <section className="experiment" aria-label="R3-A 当前冻结复验">
+function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return <section className="experiment" aria-label={historical?`R3-A 历史复验 ${data.version}`:'R3-A 当前冻结复验'}>
   <span className="badge">R3-A · {data.version} · 隔离样本</span><h2>{data.status}</h2><p>{data.summary}</p>
-  <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
+  <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次选择或合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
   {data.findings.map(f=><p key={f}>{f}</p>)}
   {data.local_revision&&<div className="actual"><b>实验后的本地修正 · {data.local_revision.version}</b><p>{data.local_revision.checks}</p><ul>{data.local_revision.changes.map(c=><li key={c}>{c}</li>)}</ul><p>{data.local_revision.real_retested?'已重新进行真实验证':'尚未追加真实模型复验；下面仍是原冻结版本的结果。'}</p></div>}
   <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?'缺材料时怎样接着生活':'收到装罩邀请以后'}</b><small>{c.id}</small></div>
-    <p>{c.note}</p>{c.error&&<p className="error">本例停止：{c.error_detail??c.error}。失败窗口保留，未计作完成。</p>}
+    <p>{c.note}</p>{c.error&&<p className="error">{c.stop_kind==='budget'?'已达本批调用上限，停止追加。最后一次行动已执行，后续反馈尚未采用；该窗口未计作完整完成。':`本例停止：${c.error_detail??c.error}。失败窗口保留，未计作完成。`}</p>}
     {c.turns.map(t=><section className="turn" key={t.turn}><div className="turn-number">0{t.turn}<span>{new Date(t.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时间</span></div>
       <h3>{t.action}</h3><div className="actual">{t.actual_text??'这一窗口没有已完成的物件结果。'}</div>
       {t.audit&&<p className="audit">{t.audit.verdict} · {t.audit.note}</p>}
+      {t.decision_contact&&<p>本人选择：{({message:'递送留言',reply:'回复镇内消息',invite:'提出正式邀请',respond:'回应约定'} as Record<string,string>)[t.decision_contact.kind]??t.decision_contact.kind} → {t.decision_contact.receiver_ids.map(id=>actors[id]??id).join('、')}</p>}
+      {!!t.recollections?.length&&<details><summary>它怎样记住这件事 · 个人理解需核对</summary>{t.recollections.map((m,i)=><div key={i}><blockquote>{m.feeling}</blockquote><details><summary>对应事实原文</summary><p style={{overflowWrap:'anywhere'}}>{m.fact??'此片段未附事实原文，不将感受作为完成证据。'}</p></details></div>)}</details>}
       {t.followup&&<IssueView issue={t.followup}/>}
       {t.issues&&<details><summary>暂存 {t.issues.deferred.length} 项 · 历史收束 {t.issues.closed.length} 项</summary>{[...t.issues.deferred,...t.issues.closed].map((f,i)=><IssueView key={`${f.followup_id}:${i}`} issue={f}/>)}</details>}
       <small>窗口耗时 {sec(t.latency_ms)}</small></section>)}
@@ -56,14 +59,17 @@ function App(){
   const [data,setData]=useState<Report|null>(null),[error,setError]=useState(''),[group,setGroup]=useState('weather'),[arm,setArm]=useState('cognition'),[repeat,setRepeat]=useState(1);
   const [revision,setRevision]=useState<Revision|null>(null);
   const [r3a,setR3a]=useState<R3A|null>(null);
+  const [r3aHistory,setR3aHistory]=useState<R3A[]>([]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-review.json',{signal:controller.signal}).then(r=>{if(!r.ok)throw Error(`实验报告读取失败（${r.status}）`);return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-hardening.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setRevision).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3a-review.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setR3a).catch(()=>{});return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
   const episodes=data?.episodes.filter(e=>e.group===group&&e.arm===arm&&e.repeat===repeat)??[];
   return <main>
     <header><div className="kicker">THE SHAPING FIELD / R3</div><h1>同一盏灯，不同来由</h1><p>它听到了什么，又真正做了什么？</p>
       <nav><a href="/?mode=deskbot&deskbotUrl=http%3A%2F%2F127.0.0.1%3A4311">回到正式生活 ↗</a><a href="/waylight-review.html">看看归途灯 ↗</a></nav></header>
     {r3a&&<R3AView data={r3a}/>}
+    {!!r3aHistory.length&&<details><summary>此前 R3-A 失败记录 · 保留原版本与费用</summary>{r3aHistory.filter(h=>h.version!==r3a?.version).map(h=><R3AView key={h.version} data={h} historical/>)}</details>}
     {revision&&<section className="intro" aria-label="此前代码修正"><span className="badge">此前 R3 修正记录 · 保留历史结果</span>
       <h2>{revision.status}</h2><ul>{revision.changes.map(change=><li key={change}>{change}</li>)}</ul>
       <p>{revision.checks}</p><p>{revision.experiment}</p><p>{revision.boundary}</p>
