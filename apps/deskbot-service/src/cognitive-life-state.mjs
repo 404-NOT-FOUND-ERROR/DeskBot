@@ -36,7 +36,7 @@ export function cognitiveContext(world,id,at,phase='plan'){
   const catalogue=livingReadModel(world,id,{at})?.activities.filter(a=>a.location_id===p.location_id)??[];
   const inputs=cognitiveInputs(world,id,at),seen=new Set((saved.perception_receipts??[]).map(r=>r.source_id));
   const perceptions=inputs.filter(s=>!seen.has(s.id)).slice(0,id===world.protagonist.character_id?5:3);
-  const social=cognitiveSocialContext(world,id,at,inputs);
+  const social=cognitiveSocialContext(world,id,at,inputs,catalogue);
   return {schema:COGNITIVE_CONTEXT_VERSION,phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
     time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments,social.options),
     actor:{actor_id:id,name:p.display_name??'喵呜',role:role?.role??'聚形域伴生个体',traits:id==='shaping-001'?['好奇','有自己的节奏','先观察再判断']:[role?.temperament??'关心自己的生活'],
@@ -181,14 +181,16 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     // Validate optional choices before reserving resources or changing personal state.
     adoptCognitiveDevelopment(copy(world),id,compiled,refs,at);
     const followupPreview=copy(life);
-    prepareCognitiveFollowup(followupPreview,compiled,refs.continuation??context.continuation,at);
+    const followupTransition=prepareCognitiveFollowup(followupPreview,compiled,refs.continuation??context.continuation,at);
     if(compiled.operation==='wait'&&compiled.wait_for){
       validateWaitFor(compiled.wait_for,refs.continuation??context.continuation);
       const captured=refs.continuation?.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
       const current=context.continuation.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
       if(captured?.asset_id&&captured.asset_id!==current?.asset_id)fail('cognitive_context_changed');
     }
-    const waiting=compiled.operation==='wait'?cognitiveWaitFollowup(followupPreview,compiled,context.continuation,at):null;
+    const waiting=compiled.operation==='wait'?(followupTransition.preserved_current&&followupPreview.followup
+      ?{...copy(followupPreview.followup),next_review_at:followupPreview.followup.next_review_at??new Date(Date.parse(at)+3600000).toISOString()}
+      :cognitiveWaitFollowup(followupPreview,compiled,context.continuation,at)):null;
     if(proposal.interpretations)adoptInterpretations(life,proposal.interpretations,refs,at);
     const cause=cognitiveCause(world,id,compiled,refs,life);
     if(cause.life_source_context.some(s=>s.expires_at&&s.expires_at<=at))fail('cognitive_source_expired');
@@ -249,7 +251,8 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     landed.deferred_followups=followupPreview.deferred_followups??[];
     landed.followup_archive=followupPreview.followup_archive??[];
     adoptCognitiveDevelopment(world,id,compiled,refs,at,{task,blocked});
-    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,inventory_before:copy(context.inventory),from_location_id:refs.location_id,blocked,created_at:at,followup_decision:compiled.followup_decision??null};
+    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,inventory_before:copy(context.inventory),from_location_id:refs.location_id,blocked,created_at:at,followup_decision:followupTransition.preserved_current?'postpone':compiled.followup_decision??null,
+      completion_target:copy((refs.continuation?.completion_targets??[]).find(t=>t.id===compiled.completion_target_id)??null),target_bound_at:at};
     adoptPersonalContinuity(world,id,landed,proposal,at);landed.retry=null;
     if(compiled.operation==='wait'){
       landed.pending=null;landed.followup=waiting;

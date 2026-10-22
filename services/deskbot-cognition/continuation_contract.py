@@ -7,9 +7,11 @@ def issue_id(issue):
 
 def continuation_errors(value, context):
     view = context.get('continuation') or {}
-    if view.get('schema') != 'deskbot.cognitive-continuation.v2':
+    if view.get('schema') not in ('deskbot.cognitive-continuation.v2', 'deskbot.cognitive-continuation.v3'):
         return []  # Replay of an earlier context keeps its earlier contract.
     errors = []
+    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids')):
+        errors.append('completion_target/target_bound_at/resolution_evidence_ids是执行器只读字段；只可选择completion_target_id')
     current = view.get('current')
     issues = [f for f in [current, *view.get('deferred', [])] if f]
     reference = value.get('followup_id')
@@ -19,18 +21,29 @@ def continuation_errors(value, context):
     if context.get('phase') == 'feedback' and reference and reference != issue_id(current):
         errors.append('结果反馈不能另换问题ID；先完成本次已绑定问题的反馈，下一计划才能恢复别的问题')
     decision = value.get('followup_decision')
+    target = value.get('completion_target_id')
+    if target is not None:
+        if not any(t['id'] == target for t in view.get('completion_targets', [])):
+            errors.append('completion_target_id只能选给定客观小目标；开放探索可填null')
+        if decision not in ('new', 'none') and selected and selected.get('completion_target') and selected['completion_target']['id'] != target:
+            errors.append('已有问题的完成条件不能改成另一个容易目标；新目标需明确另开问题')
+        if value.get('followup_closure') or context.get('phase') == 'feedback':
+            errors.append('完成条件需先在计划绑定；反馈/结案时不能临时改标准')
+    capacity = view.get('deferred_capacity', {})
+    if current and decision in ('new', 'none') and not value.get('followup_closure') and capacity.get('used', 0) >= capacity.get('limit', 8):
+        errors.append('暂存队列已满，先继续或恢复一个问题，或明确个人收束/放下；不能静默丢弃旧问题')
     if decision in ('continue', 'postpone', 'drop') and selected and reference != issue_id(selected):
         errors.append('继续、暂缓或放下已有问题时，必须填写该问题精确的followup_id')
     closure = value.get('followup_closure')
     if closure is not None:
         if (not isinstance(closure, dict) or not selected or closure.get('followup_id') != issue_id(selected)
-            or closure.get('kind') not in ('resolved', 'abandoned')
+            or closure.get('kind') not in ('resolved', 'abandoned', 'satisfied')
             or not isinstance(closure.get('reason'), str) or not 0 < len(closure['reason'].strip()) <= 240
             or not isinstance(closure.get('evidence_ids'), list)):
-            errors.append('followup_closure需本人问题ID、resolved或abandoned、明确reason和evidence_ids数组')
+            errors.append('followup_closure需本人问题ID、resolved/satisfied/abandoned、明确reason和evidence_ids数组')
         elif closure['kind'] == 'resolved' and (not closure['evidence_ids'] or
-                any(r not in view.get('completion_evidence_ids', []) for r in closure['evidence_ids'])):
-            errors.append('resolved需要给定completion_evidence_ids中的实际完成证据；留言送达不证明所说的活动完成')
+                any(r not in (selected.get('resolution_evidence_ids', []) if view.get('schema') == 'deskbot.cognitive-continuation.v3' else view.get('completion_evidence_ids', [])) for r in closure['evidence_ids'])):
+            errors.append('resolved只能引用该问题resolution_evidence_ids，证明事先绑定的具体小目标。留言/无关任务不证明完成；个人了解够了用satisfied，不把主观判断说成客观目标达成')
         if decision in ('continue', 'postpone') or value.get('status') in ('continue', 'postpone'):
             errors.append('已结案不能同时continue/postpone；暂时不做请保留问题而非结案')
     if selected and decision == 'drop' and not closure:
@@ -63,8 +76,11 @@ CONTINUATION_CONTRACT = (
     'followup_id绑定当前或deferred中的本人问题；没有关联问题填null。'
     'followup_decision=continue/postpone保持同一问题，不能因为换了方法就new。'
     'new/none表示做另一件事，原问题会暂存，可后来按ID恢复，不是关闭。'
-    'drop或认为问题解决时必须明确followup_closure:{followup_id,kind:abandoned|resolved,reason,evidence_ids:[]}；'
-    'resolved须引用completion_evidence_ids实际证据且确实解决问题，送出提议不代表履约。'
+    'drop或收束需followup_closure:{followup_id,kind:abandoned|satisfied|resolved,reason,evidence_ids:[]}。'
+    '若有客观小目标，先在计划填completion_target_id，从completion_targets选择；开放探索可不绑定。'
+    'resolved仅引用此问题resolution_evidence_ids证明此前绑定的一步，不能把交谈说成安装、把取水说成交水，也不宣称整个研究完成。'
+    '觉得暂时了解够了用satisfied（个人收束），选择放下用abandoned；二者不声称物质任务完成。'
+    '已有完成条件不可换成较容易的目标。暂存最多8项，满时先处理旧事；允许恢复后换方法。'
     '暂缓不等于放弃兴趣。next_step选择next_options的{kind,id}或null；'
     'wait_for若等待activity必须与next_step完全一致，不能想送水却等取水。'
     '送水先选social的give-water提议，再等给定reply/commitment，对方可拒绝，尚未交接的水仍在自己背包。'

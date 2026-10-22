@@ -25,6 +25,8 @@ const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-co
   'apps/deskbot-service/src/cognitive-life-state.mjs','apps/deskbot-service/src/cognitive-continuity.mjs',
   'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
   'apps/deskbot-service/src/cognitive-social.mjs',
+  'apps/deskbot-service/src/cognitive-issue-evidence.mjs','services/deskbot-cognition/context_projection.py',
+  'apps/deskbot-service/src/cognitive-budget.mjs',
   'apps/deskbot-service/src/cognitive-continuation.mjs','apps/deskbot-service/src/cognitive-schedule.mjs',
   'apps/deskbot-service/src/social-life.mjs','services/deskbot-cognition/continuation_contract.py',
   'apps/deskbot-service/src/autonomous-life.mjs','apps/deskbot-service/src/life-choice.mjs'];
@@ -77,6 +79,7 @@ function save(){
   const temp=file+'.tmp';writeFileSync(temp,JSON.stringify(report,null,2));renameSync(temp,file);
 }
 let processed=0,consecutiveFailures=0,cached=0,network=0;
+const failureLimit=process.argv.includes('--stop-on-error')?1:2;
 async function call(id,request){
   const key=hash(id),path=join(runDir,'calls',key+'.json.gz'),fingerprint=hash(request);
   if(existsSync(path)){
@@ -111,6 +114,7 @@ async function cognitive(w,c,record,turn){
   if(life.pending){record.actual_result=cognitiveActualResult(w,c.actor,w.clock.synced_at);await phase('feedback');}
   life=w.cognition.actors[c.actor];
   record.followup=structuredClone(life.followup??null);
+  record.issues={current:structuredClone(life.followup??null),deferred:structuredClone(life.deferred_followups??[]),closed:structuredClone(life.followup_archive??[])};
 }
 async function oldPolicy(w,c,record,turn,arm){
   w.memory.planner.enabled=arm==='bounded';
@@ -153,7 +157,7 @@ try{
     if(arg('cases')&&!arg('cases').split(',').includes(c.id))continue;
     for(const arm of arms){
       const key=`${arm}:${c.id}`;
-      if(report.results.some(r=>r.key===key)||processed>=Number(arg('take')??1000)||consecutiveFailures>=2)continue;
+      if(report.results.some(r=>r.key===key)||processed>=Number(arg('take')??1000)||consecutiveFailures>=failureLimit)continue;
       const w=seed(c),episode={...c,key,arm,initial_hash:hash(w),initial:digest(w,c.actor),turns:[]},started=performance.now();
       try{
         for(let turn=1;turn<=turns;turn++){
@@ -186,4 +190,4 @@ try{
   }
 }finally{bridge.close();if(budget)await budget.close();save();ledger?.close();}
 console.log(JSON.stringify({runDir,version,processed,consecutiveFailures,cached,network,report:file}));
-if(consecutiveFailures>=2)process.exitCode=2;
+if(consecutiveFailures>=failureLimit)process.exitCode=2;

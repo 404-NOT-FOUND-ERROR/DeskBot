@@ -124,8 +124,8 @@ test('saved R3 paraphrase pattern cannot reset an unanswered issue by narrowing 
 });
 
 test('new actual observation permits a renewed contact but failed attempts and rest do not',()=>{
- const w=fixture();perform(w,{operation:'observe',object_index:1});
- w.cognition.actors[own].followup={status:'continue',followup_id:'observation-question',question:'一起看观察结果',created_at:BASE};
+ const w=fixture(),observed=perform(w,{operation:'observe',object_index:1});
+ w.cognition.actors[own].followup={status:'continue',followup_id:'observation-question',question:'一起看观察结果',from_root_outcome_id:observed.root_outcome_id,created_at:BASE};
  const fields={followup_decision:'continue',followup_id:w.cognition.actors[own].followup.followup_id};
  const first=share(w,own,other,{...fields,message_parts:[{kind:'question',text:'一起看看水边吗？'}]});finish(w,first);feedback(w,own);
  perform(w,{operation:'rest'});

@@ -31,12 +31,13 @@ from core.interfaces.llm import LLMProvider, LLMResponse, LLMRouter, LLMScene, L
 from core.interfaces.perception import SpatialPerception, LocationView, ReachableLocation, VisibleEntity, AmbientEvent, PerceivedPresence, PerceivedIdentity
 from core.interfaces.agent_store import AgentRelation
 from core.interfaces.message import Message
-from core.context import get_log_context
+from core.context import get_log_context, observe_stage
 from providers.agent_store.in_memory import InMemoryAgentStore
 from providers.vector_store.in_memory import InMemoryVectorStore
 from input_refraction import interpret_inputs, external_goals
 from relationship_review import review_relationships
 from continuation_contract import continuation_errors, CONTINUATION_CONTRACT
+from context_projection import BODY_BOUNDARY, stage_context
 
 
 class AbortJob(BaseException):
@@ -86,10 +87,11 @@ class LexicalRetrieval(EmbeddingProvider):
 
 
 class BoundedPersonality(PersonalityLayer):
-    def __init__(self, soul, state, constraints):
-        super().__init__(soul,state); self.constraints = constraints
+    def __init__(self, soul, state, context):
+        super().__init__(soul,state); self.context = context
     def to_prompt_context(self, *args, **kwargs):
-        return super().to_prompt_context(*args,**kwargs) + '\n聚形域执行边界：\n' + self.constraints
+        projected=stage_context(self.context,get_log_context().get('stage',self.context.get('phase','plan')))
+        return super().to_prompt_context(*args,**kwargs) + '\n执行边界：'+BODY_BOUNDARY+'\n本阶段实际条件：\n' + prompt_json(projected,self.context)
 
 
 class BoundedDecision(DecisionEngine):
@@ -129,9 +131,10 @@ def hydrate_action(data):
     return AgentAction(**data)
 
 
-async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None):
+async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None,stage='contract'):
     for attempt in range(2):
-        reply=await router.complete(LLMScene.DIRECTIVE,messages,max_tokens=max_tokens,json_mode=True)
+        with observe_stage(stage if attempt == 0 else stage+'_repair'):
+            reply=await router.complete(LLMScene.DIRECTIVE,messages,max_tokens=max_tokens,json_mode=True)
         value=extract_json(reply.content)
         if isinstance(value,dict) and validator(value): return value
         if not isinstance(value,dict): value={}
@@ -241,12 +244,15 @@ def social_contact_errors(value,context):
     if not issue: return []
     receivers=context.get('capabilities',{}).get('share',{}).get('receivers',[])
     peers={receivers[n-1]['actor_id'] for n in value.get('receiver_indices',[]) if type(n) is int and 0<n<=len(receivers)}
-    basis=social.get('contact_basis',{})
+    basis=next((b for b in social.get('issue_bases',[]) if b['followup_id']==issue),social.get('contact_basis',{}))
     for old in social.get('unanswered_issues',[]):
-        if old.get('followup_id')==issue and old.get('substantive_root')==basis.get('substantive_root') \
-           and peers.intersection(old.get('receiver_ids',[])) \
-           and not set(value.get('source_ids',[])).difference(old.get('input_ids',[])):
-            return ['同一问题的留言尚无关联回复，也没有新实际结果或本次选择引用的新来源。不要换措辞、缩减收件人或改称当面来续期；可选择实际观察/活动、暂缓，或确有意愿时提出有条款的正式约定，不能伪造新来源。']
+        if basis.get('schema')=='deskbot.issue-contact.v1':
+            novel=bool(set(basis.get('evidence_ids',[])).difference(old.get('evidence_ids',[])) or
+                set(value.get('source_ids',[])).intersection(basis.get('related_source_ids',[])).difference(old.get('input_ids',[])))
+        else:
+            novel=old.get('substantive_root')!=basis.get('substantive_root') or bool(set(value.get('source_ids',[])).difference(old.get('input_ids',[])))
+        if old.get('followup_id')==issue and peers.intersection(old.get('receiver_ids',[])) and not novel:
+            return ['同一问题尚无关联回复或相关新依据。无关走动/消息不算新进展；不要换措辞、缩减收件人重问。可实际行动、暂缓，或确有意愿时提出有条款的约定。']
     return []
 
 
@@ -317,32 +323,14 @@ async def run(context):
     time_label=lambda n: (at if n==step else epoch+timedelta(hours=n)).astimezone(zone).strftime('%Y-%m-%d %H:%M:%S')+' '+str(zone)
     lock=asyncio.Lock()
     router=LLMRouter({s:PipeProvider(s.value,context['mode'],lock) for s in LLMScene})
-    capability_names=json.loads(json.dumps(context['capabilities']))
-    for activity in capability_names.get('activities',[]): activity.pop('activity_index',None)
-    constraints='现实身体无摄像头、不能走动，仅圆屏、声音、触摸、单轴转头。虚拟化身可在聚形域按真实任务行动。\n' + prompt_json(capability_names,context)
-    constraints += '\n时间：当前 '+time_label(step)+'。原始记录中以 Z 结尾的是 UTC 时间，上海时间需加八小时，不能混作同一时区。'
-    constraints += '\n只知道给定现场和自己的记录；不能声明库存、技能、角色或外壳已改变。所有方法必须由 Node 核验。\n未完成事项：'+prompt_json(saved.get('followup'),context)
-    constraints += '\n后续与等待的实际条件：'+prompt_json(context.get('continuation'),context)
-    constraints += '\n等待应绑定具体条件，已经可测记不能误当尚需等待。未收到回复可以先自己观察、改办法、明确暂缓或收束；不反复发送相同问题。条件期限到达后需重新考虑，而不是靠重写理由续期。现场数值不是已完成的测记；没有实际记录时不能说已测得或已经证实。'
-    constraints += '\n我的实际随身材料：'+json.dumps(context.get('inventory'),ensure_ascii=False)
-    constraints += '\n我的实际测记：'+prompt_json(context.get('inquiry'),context)
-    constraints += '\n我的回声与余辉记录：'+prompt_json(context.get('resonant_inquiry'),context)
-    constraints += '\n我的风语林造物与实际测记：'+prompt_json(context.get('windleaf_inquiry'),context)
-    constraints += '\n归途灯的实际规律、现场物件和我的初始取向：'+prompt_json(context.get('waylight'),context)
-    constraints += '\n后续的身份与边界：'+CONTINUATION_CONTRACT
-    constraints += '\n我的实际兴趣、机会、愿望和试做：'+json.dumps(context.get('development'),ensure_ascii=False)
-    constraints += '\n第一次自选探索还不能证明稳定爱好。需要实际返回，受邀劳动也不自动成为兴趣。已有试做可选对应的实际活动，不必每天做；条件受阻可以暂缓或换方法。'
-    constraints += '\n我的明确约定与可商量事项：'+json.dumps(context.get('social'),ensure_ascii=False)
-    constraints += '\n交流不能替对方答应，普通问候没有关系奖励。可回复一条实际收到的消息，可明确邀请、答应、拒绝、商量延期或退出。已接受的安排保留在世界事务中，不因目标队列变化而消失。'
-    constraints += '\n现场数字以当前实际记录为准。别人的留言属于未核验说法，不能当作实际任务结果。没有自己的已完成记录，不要声称刚浇过水、做过照料或收获；可以提出想做或询问。'
     weights=actor.get('need_weights',{})
     soul=SoulLayer(name=actor['name'],agent_id=actor['actor_id'],role=actor['role'],core_traits=actor['traits'],core_values=actor['values'],
-                   background=actor.get('background',''),hard_constraints=(constraints,),
+                   background=actor.get('background',''),hard_constraints=(BODY_BOUNDARY,),
                    innate_needs=tuple(NeedState(t,t.value,.35,weight=weights.get(t.value,1)) for t in NeedType))
     state=hydrate(saved.get('state',{}),actor['actor_id'],context['location']['id'])
     # Actual energy/appetite is a read-only physiological input, not generated evidence.
     state.need_intensities['physiological']=max(actor.get('appetite',.2),1-actor.get('energy',.8))
-    personality=BoundedPersonality(soul,state,constraints)
+    personality=BoundedPersonality(soul,state,context)
     store=InMemoryAgentStore(); vectors=InMemoryVectorStore(); embedding=LexicalRetrieval()
     await restore_relations(store,saved,context['world_id'],actor['actor_id'])
     memory=MemorySystem(router,embedding,vectors,world_id=context['world_id'],agent_id=actor['actor_id'],is_main_character=actor['actor_id']=='shaping-001',
@@ -406,7 +394,7 @@ async def run(context):
             compile_prompt['continuation_contract']=CONTINUATION_CONTRACT+'wait的review_after_minutes为10至240整数，已经ready或超时的等待不可自动续期；可解除等待或改办法。'
             compile_prompt['development_contract']='interest_choice 和 wish_choice 是输出JSON顶层字段，不可再套development对象。通常两者填 null。确实决定改变当前投入时可填 interest_choice:{topic:给定主题,decision:continue|pause|drop|revisit,reason:具体原因,root_ids:该主题给定active_roots或recent_success_roots的非空子集}；只表达选择，不凭话增加喜欢或实践。如果我确实想提出或暂缓某个新角色，可填 wish_choice:{direction_id:给定方向,decision:consider|propose|defer,reason:具体原因}；propose仅在eligible为true时可用，仍不改变外观。不同于“可以提出”，“我现在愿意提出”需要我自己的选择。不为满足进度强行换角色。'
             compile_prompt['speech_contract']+='message_parts、reply_to、social都是输出JSON顶层字段，与operation同级，不能放进speech对象。证据段简化为{kind:evidence,evidence_id:给定ID}即可，不需要quote字段，服务器会逐字插入带来源的完整原文。若仍填写quote必须与speech_evidence.text完全一致，不能只抄social.replies.text。'
-            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context))
+            output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context),stage='compile')
         else: output['compiled']={'operation':'wait','reason':'本回合没有可采用的行动。','followup_decision':'postpone'}
     elif context['phase']=='reflect':
         output['reflection']=plain(await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step))
@@ -425,9 +413,9 @@ async def run(context):
             reflection=await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step)
             output['reflection']=plain(reflection)
         output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
-             LLMMessage('user',prompt_json({'personality':personality.to_prompt_context(),'actual_result':result,'prior_followup':saved.get('followup'),
+             LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
               'now':context.get('time',context['at']),'continuation':context.get('continuation'),'issue_contract':CONTINUATION_CONTRACT,
-              'contract':'必须返回status、question、reason、delay_hours四个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1}。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context))
+              'contract':'必须返回status、question、reason、delay_hours四个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1}。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup')
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['state']=plain(personality.state); output['memory_sequence']=memory._seq

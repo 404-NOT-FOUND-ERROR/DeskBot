@@ -13,6 +13,33 @@ type Report={version:string;status:string;scope:string;limitations:string[];gate
     remediation:{title:string;text:string}[];cost:{calls:number;upper_cny:number;batches:{label:string;calls:number;upper_cny:number}[]}}|null};
 type Revision={status:string;changes:string[];checks:string;experiment:string;boundary:string;
   batch?:{version:string;calls:number;upper_cny:number;completed_windows:number;cases:{title:string;result:string;note:string}[]}};
+type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;completion_target?:{title:string};resolution?:{kind:string;reason:string}};
+type R3A={version:string;status:string;summary:string;completed_windows:number;observed_windows:number;planned_windows:number;repairs:number;
+  usage:{calls:number;cost_cny:number;input:number;output:number;unknown:number};stages:{stage:string;calls:number;input:number;output:number;cost_cny:number;p50_ms:number|null;p95_ms:number|null}[];
+  window_p50_ms:number|null;window_p95_ms:number|null;replay:{summary:string;status:string}|null;
+  findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;elapsed_ms:number;note:string;
+    turns:{turn:number;at:string;action:string;actual_text:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
+      issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
+const stageNames:Record<string,string>={perception:'感知',motivation:'动机与目标',decision:'行动选择',feedback:'结果反馈',memory:'记忆',compile:'意图编译',compile_repair:'编译修复',followup:'后续选择',followup_repair:'后续修复',directive:'来源折射等指令'};
+const issueStatus=(f:Issue)=>f.resolution?({resolved:'具体目标已完成',satisfied:'个人收束',abandoned:'明确放下'}[f.resolution.kind]??f.resolution.kind):({continue:'继续惦记',postpone:'暂缓',none:'暂无新后续',drop:'已收束'}[f.status??'']??'等待复查');
+function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.original_question??issue.question}</p>{issue.completion_target&&<p>绑定的小目标：{issue.completion_target.title}</p>}<small>事项 {issue.followup_id??'尚未绑定'}</small>{issue.resolution&&<p>{issue.resolution.reason}</p>}</div>;}
+function R3AView({data}:{data:R3A}){return <section className="experiment" aria-label="R3-A 当前冻结复验">
+  <span className="badge">R3-A · {data.version} · 隔离样本</span><h2>{data.status}</h2><p>{data.summary}</p>
+  <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
+  {data.findings.map(f=><p key={f}>{f}</p>)}
+  <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?'缺材料时怎样接着生活':'收到装罩邀请以后'}</b><small>{c.id}</small></div>
+    <p>{c.note}</p>{c.error&&<p className="error">本例停止：{c.error_detail??c.error}。失败窗口保留，未计作完成。</p>}
+    {c.turns.map(t=><section className="turn" key={t.turn}><div className="turn-number">0{t.turn}<span>{new Date(t.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时间</span></div>
+      <h3>{t.action}</h3><div className="actual">{t.actual_text??'这一窗口没有已完成的物件结果。'}</div>
+      {t.audit&&<p className="audit">{t.audit.verdict} · {t.audit.note}</p>}
+      {t.followup&&<IssueView issue={t.followup}/>}
+      {t.issues&&<details><summary>暂存 {t.issues.deferred.length} 项 · 历史收束 {t.issues.closed.length} 项</summary>{[...t.issues.deferred,...t.issues.closed].map((f,i)=><IssueView key={`${f.followup_id}:${i}`} issue={f}/>)}</details>}
+      <small>窗口耗时 {sec(t.latency_ms)}</small></section>)}
+    <p>本例总耗时 {sec(c.elapsed_ms)}（包含未完成部分）</p></article>)}</div>
+  <details><summary>成本、延迟与缓存回放</summary><p>完整窗口中位 {sec(data.window_p50_ms)} / P95 {sec(data.window_p95_ms)}。输入 {data.usage.input.toLocaleString()} / 输出 {data.usage.output.toLocaleString()} tokens。</p>
+    <div style={{overflowX:'auto'}}><table><thead><tr><th>阶段</th><th>调用</th><th>输入</th><th>输出</th><th>估算费用</th><th>中位 / P95</th></tr></thead><tbody>{data.stages.map(s=><tr key={s.stage}><td>{stageNames[s.stage]??s.stage}</td><td>{s.calls}</td><td>{s.input.toLocaleString()}</td><td>{s.output.toLocaleString()}</td><td>¥{s.cost_cny.toFixed(3)}</td><td>{sec(s.p50_ms)} / {sec(s.p95_ms)}</td></tr>)}</tbody></table></div>
+    <p>{data.replay?.summary??'尚未完成同版本缓存回放'}</p></details>
+  {data.limitations.map(l=><p key={l}><small>{l}</small></p>)}</section>;}
 const names:Record<string,string>={weather:'风雨',advice:'主人建议',knowledge:'公开知识',invitation:'他者邀请',touch:'头部轻触',resources:'材料短缺',persona:'人物交换'};
 const arms:Record<string,string>={cognition:'新认知',bounded:'旧模型选择',rules:'生活规则'};
 const actors:Record<string,string>={'shaping-001':'喵呜','lamp-keeper-001':'灯穗','wetland-grower-001':'苔团'};
@@ -26,13 +53,16 @@ function LampReadings({before,after}:{before:Lamp;after:Lamp|null}){
 function App(){
   const [data,setData]=useState<Report|null>(null),[error,setError]=useState(''),[group,setGroup]=useState('weather'),[arm,setArm]=useState('cognition'),[repeat,setRepeat]=useState(1);
   const [revision,setRevision]=useState<Revision|null>(null);
+  const [r3a,setR3a]=useState<R3A|null>(null);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-review.json',{signal:controller.signal}).then(r=>{if(!r.ok)throw Error(`实验报告读取失败（${r.status}）`);return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-hardening.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setRevision).catch(()=>{});return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();fetch('/r3a-review.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setR3a).catch(()=>{});return()=>controller.abort();},[]);
   const episodes=data?.episodes.filter(e=>e.group===group&&e.arm===arm&&e.repeat===repeat)??[];
   return <main>
     <header><div className="kicker">THE SHAPING FIELD / R3</div><h1>同一盏灯，不同来由</h1><p>它听到了什么，又真正做了什么？</p>
       <nav><a href="/?mode=deskbot&deskbotUrl=http%3A%2F%2F127.0.0.1%3A4311">回到正式生活 ↗</a><a href="/waylight-review.html">看看归途灯 ↗</a></nav></header>
-    {revision&&<section className="intro" aria-label="本轮代码修正"><span className="badge">R3 修正批次 · 先验证代码，再做小批实验</span>
+    {r3a&&<R3AView data={r3a}/>}
+    {revision&&<section className="intro" aria-label="此前代码修正"><span className="badge">此前 R3 修正记录 · 保留历史结果</span>
       <h2>{revision.status}</h2><ul>{revision.changes.map(change=><li key={change}>{change}</li>)}</ul>
       <p>{revision.checks}</p><p>{revision.experiment}</p><p>{revision.boundary}</p>
     </section>}

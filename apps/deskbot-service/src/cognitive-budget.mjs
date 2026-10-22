@@ -38,7 +38,8 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
     // UTF-8 byte ceiling plus per-message/chat framing allowance. No tokenizer estimate billed as truth.
     const inputCeiling=Buffer.byteLength(JSON.stringify(body.messages),'utf8')+body.messages.length*256+1024;
     const reserved=testProvider?0:(inputCeiling*2+max_tokens*8)/1e6;
-    let row={call_id:callId,fingerprint,scene:request.scene,stage:request.stage??request.scene,usage_source:testProvider?'test_fixture':'provider',mode:testProvider?'mock':'real',status:'reserved',held_cny:reserved,
+    let row={call_id:callId,fingerprint,scene:request.scene,stage:request.stage??request.scene,phase:request.phase??null,
+      input_chars:request.messages.reduce((n,m)=>n+m.content.length,0),usage_source:testProvider?'test_fixture':'provider',mode:testProvider?'mock':'real',status:'reserved',held_cny:reserved,
       reserved_cny:reserved,input_token_ceiling:inputCeiling,output_token_ceiling:max_tokens,started_at:now().toISOString(),usage:null,latency_ms:null,uncertain:false};
     const reserve=()=>{
       if(persistence.get(NS,callId))throw error('call_not_replayable');
@@ -47,7 +48,7 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
       persistence.put(NS,callId,row);
     };
     if(persistence.transaction)persistence.transaction(reserve);else reserve();
-    const queueMs=Math.round(performance.now()-enqueuedAt);
+    const queueMs=Math.round(performance.now()-enqueuedAt);row.queue_ms=queueMs;
     const reportUsage=()=>onUsage?.({call_id:callId,request_id:callId,provider_kind:testProvider?'fixture':'provider',category:`cognition.${request.phase??request.stage??request.scene??'unknown'}`,scope:request.usage_scope??'isolated_experiment',model:'deepseek-flash',
       queue_ms:queueMs,request_elapsed_ms:Math.round(performance.now()-enqueuedAt),status:row.status,started_at:row.started_at,usage:row.usage,latency_ms:row.latency_ms,error_code:row.error_code});
     const started=performance.now();row.status='calling';persistence.put(NS,callId,row);reportUsage();

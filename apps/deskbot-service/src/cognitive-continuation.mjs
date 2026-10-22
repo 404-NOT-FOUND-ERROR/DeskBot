@@ -4,6 +4,7 @@ import {GLOW_LAW} from './fantasy-inquiry.mjs';
 import {RESONANT_REVIEW_SECONDS} from './resonant-life.mjs';
 import {WINDLEAF_LAW} from './windleaf-life.mjs';
 import {WAYLIGHT_LAW} from './waylight-life.mjs';
+import {completionTargets,issueResolutionEvidence,hasNewIssueEvidence} from './cognitive-issue-evidence.mjs';
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
 const ms=value=>Date.parse(value);
@@ -12,16 +13,24 @@ const active=f=>f&&['continue','postpone'].includes(f.status);
 const issueId=f=>f?.followup_id??f?.origin_root_outcome_id??f?.from_root_outcome_id??null;
 const issueRoots=f=>[f?.origin_root_outcome_id,f?.from_root_outcome_id].filter(Boolean);
 export function validateFollowupTransition(value,context){
+ if(['completion_target','target_bound_at','resolution_evidence_ids'].some(k=>Object.hasOwn(value,k)))fail('followup_server_fields');
  validateNextStep(value,context);
  const current=context.current,selected=value.followup_id==null?current:
   [current,...(context.deferred??[])].find(f=>issueId(f)===value.followup_id);
  if(value.followup_id!=null&&!selected)fail('followup_issue_unknown');
+ const target=value.completion_target_id;
+ if(target!=null){
+  if(context.schema!=='deskbot.cognitive-continuation.v3'||!(context.completion_targets??[]).some(t=>t.id===target))fail('followup_target_unknown');
+  if(!['new','none'].includes(value.followup_decision)&&selected?.completion_target&&selected.completion_target.id!==target)fail('followup_target_changed');
+  if(value.followup_closure||value.status!==undefined)fail('followup_target_requires_plan');
+ }
  const closure=value.followup_closure;
  if(closure!=null){
-  if(!selected||closure.followup_id!==issueId(selected)||!['resolved','abandoned'].includes(closure.kind)
+  if(!selected||closure.followup_id!==issueId(selected)||!['resolved','abandoned','satisfied'].includes(closure.kind)
    ||typeof closure.reason!=='string'||!closure.reason.trim()||closure.reason.length>240
    ||!Array.isArray(closure.evidence_ids))fail('followup_closure_invalid');
-  if(closure.kind==='resolved'&&(!closure.evidence_ids.length||closure.evidence_ids.some(id=>!(context.completion_evidence_ids??[]).includes(id))))fail('followup_resolution_without_result');
+  const evidence=context.schema==='deskbot.cognitive-continuation.v3'?selected.resolution_evidence_ids??[]:context.completion_evidence_ids??[];
+  if(closure.kind==='resolved'&&(!closure.evidence_ids.length||closure.evidence_ids.some(id=>!evidence.includes(id))))fail('followup_resolution_without_result');
  }
  // A model's own causal claim cannot simultaneously erase that same issue.
  if(selected&&value.motivation==='self_continuation'&&issueRoots(selected).includes(value.prior_root_id)
@@ -41,7 +50,18 @@ function deferIssue(life,issue,at){
 }
 /** Switching attention parks an unresolved issue. Only an explicit closure archives it. */
 export function prepareCognitiveFollowup(life,compiled,context,at){
+ const draft=copy(life),result=prepareFollowupDraft(draft,compiled,context,at);
+ Object.assign(life,draft);return result;
+}
+function prepareFollowupDraft(life,compiled,context,at){
  const selected=validateFollowupTransition(compiled,context),current=life.followup;
+ if(selected&&issueId(selected)!==issueId(current)&&compiled.followup_closure){
+  life.followup=copy(selected);archiveCognitiveFollowup(life,at,compiled.followup_closure.reason,compiled.followup_closure);
+  life.followup=current;
+  life.deferred_followups=(life.deferred_followups??[]).filter(f=>issueId(f)!==issueId(selected));
+  if(compiled.followup_decision==='new'){deferIssue(life,current,at);life.followup=null;return {preserved_current:false};}
+  return {preserved_current:true};
+ }
  if(selected&&issueId(selected)!==issueId(current)){
   life.deferred_followups=(life.deferred_followups??[]).filter(f=>issueId(f)!==issueId(selected));
   deferIssue(life,current,at);
@@ -54,6 +74,11 @@ export function prepareCognitiveFollowup(life,compiled,context,at){
   deferIssue(life,life.followup,at);
   life.followup=null;
  }
+ if(compiled.completion_target_id!=null&&life.followup&&!life.followup.completion_target){
+  life.followup.completion_target=copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id));
+  life.followup.target_bound_at=at;
+ }
+ return {preserved_current:false};
 }
 export function cognitiveTime(at,zone='Asia/Shanghai'){
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(at)).map(p=>[p.type,p.value]));
@@ -103,17 +128,21 @@ export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[
  const pendingTask=w.tasks?.find(t=>t.task_id===life.pending?.task_id);
  const result=pendingTask?.status==='completed'?{success:true,root_outcome_id:life.pending.root_outcome_id}:life.last_result;
  const completionEvidence=[...(result?.success?[result.root_outcome_id]:[]),...commitments.filter(c=>c.status==='completed').map(c=>`commitment:${c.id}`)];
- return {schema:'deskbot.cognitive-continuation.v2',now:cognitiveTime(at,zone),wait_options:options,
+ const withEvidence=f=>({...copy(f),followup_id:issueId(f),resolution_evidence_ids:issueResolutionEvidence(w,id,f)});
+ const targets=completionTargets(w,id,activities,socialOptions);
+ for(const issue of [f,...(life.deferred_followups??[])])if(issue?.completion_target&&!targets.some(t=>t.id===issue.completion_target.id))targets.push(copy(issue.completion_target));
+ return {schema:'deskbot.cognitive-continuation.v3',now:cognitiveTime(at,zone),wait_options:options,
+  completion_targets:targets,deferred_capacity:{limit:8,used:life.deferred_followups?.length??0},
   completion_evidence_ids:completionEvidence, // References certify a result, not arbitrary prose about it.
   next_options:[...options.map(o=>({kind:o.kind,id:o.id,title:o.title})),...socialOptions.map(o=>({kind:'social',id:o.option_id,title:o.title}))],
-  deferred:copy((life.deferred_followups??[]).map(f=>({...f,followup_id:issueId(f)}))),
-  current:isActive?{...copy(f),followup_id:issueId(f),condition,waiting_since:since,wait_deadline_at:deadline,
+  deferred:(life.deferred_followups??[]).map(withEvidence),
+  current:isActive?{...withEvidence(f),condition,waiting_since:since,wait_deadline_at:deadline,
    next_review_time:f.next_review_at?cognitiveTime(f.next_review_at,zone):null,
    elapsed_minutes:since?Math.max(0,Math.floor((ms(at)-ms(since))/60000)):0,
    note:condition==='review_required'?'尚未收到关联回复；等待期限到了，需要自己决定换办法、暂缓或收束。期限不能靠重新措辞续期。':condition==='ready'?'所等条件已有实际依据；复查是否仍想继续，不把等待当成完成。':condition==='waiting'?'所等条件尚未满足；仍可做其他可行事务。':'后续未绑定具体条件，复查时需要自己说明下一步。'}:null,
   urgent_review:Boolean(isActive&&f.wait_for&&['ready','review_required'].includes(condition)),
   review_key:isActive&&option?JSON.stringify([issueId(f),option.kind,option.id,condition,option.asset_id??null,option.reply_ids??[],option.status??null]):null,
-  rule:'继续原问题请绑定followup_id。new/none仅另做事情，旧问题暂存而不结案；放下或解决需followup_closure明确理由，解决还需完成证据。可从deferred恢复原问题。方法可用不代表已执行；回复只能来自关联消息。等待不增加实践或兴趣。'};
+  rule:'继续原问题请绑定followup_id。new/none暂存旧问题，最多8项；满时继续/恢复或明确收束。客观小目标先在计划选择completion_target_id，绑定后不可换成容易的目标；resolved只能引用该问题resolution_evidence_ids，证明指定一步而非整个研究。个人觉得了解够了用satisfied，选择放下用abandoned，均不声称物质任务完成。方法可用不代表已执行；等待不增加实践或兴趣。'};
 }
 export function validateWaitFor(value,context){
  if(value===undefined||value===null)return null;
@@ -154,9 +183,12 @@ export function cognitiveWaitFollowup(life,compiled,context,at){
   reason:compiled.reason,original_question:same?old.original_question??old.question:compiled.reason,followup_id:same?(issueId(old)??`followup:${since}`):`followup:${at}`,
   from_root_outcome_id:same?old.from_root_outcome_id??null:null,created_at:same?old.created_at??since:at,wait_started_at:since,
   wait_for:waitFor,next_step:copy(compiled.next_step??old?.next_step??null),wait_count:(same?old.wait_count??0:0)+1,last_reviewed_at:at,
+  ...(same&&old.completion_target?{completion_target:copy(old.completion_target),target_bound_at:old.target_bound_at}:compiled.completion_target_id?{completion_target:copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id)),target_bound_at:at}:{}),
   next_review_at:reviewAt(at,minutes,waitFor,context,since)};
 }
 export function cognitiveResultFollowup(life,followup,context,at,root,decision=null){
+ if(followup&&['completion_target','target_bound_at','resolution_evidence_ids'].some(k=>Object.hasOwn(followup,k)))fail('followup_server_fields');
+ if(followup?.completion_target_id!=null)fail('followup_target_requires_plan');
  if(!followup||!['continue','postpone','drop','none'].includes(followup.status)||typeof followup.question!=='string'||typeof followup.reason!=='string'||!Number.isSafeInteger(followup.delay_hours)||followup.delay_hours<1||followup.delay_hours>48)fail('followup_invalid');
  const waitFor=validateWaitFor(followup.wait_for,context);
  validateNextStep(followup,context);
@@ -171,7 +203,8 @@ export function cognitiveResultFollowup(life,followup,context,at,root,decision=n
   return {...copy(old),status:'postpone',reason:followup.reason,last_reviewed_at:at,next_review_at:reviewAt(at,minutes,old.wait_for,context,old.wait_started_at??at)};
  const same=Boolean(waitFor&&JSON.stringify(waitFor)===JSON.stringify(old?.wait_for)&&['continue','postpone'].includes(old?.status));
  const since=same?(old.wait_started_at??old.created_at??at):at;
- return {...copy(followup),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
+ const target=sameIssue?old.completion_target:life.pending?.completion_target;
+ return {...copy(followup),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
   origin_root_outcome_id:sameIssue?old.origin_root_outcome_id??old.from_root_outcome_id??root:root,
   from_root_outcome_id:root,wait_count:same?old.wait_count??0:0,next_review_at:reviewAt(at,minutes,waitFor,context,since)};
 }
@@ -211,8 +244,8 @@ export function duplicateUnansweredMessage(w,id,message){
  const life=w.cognition?.actors[id]??{},basis=message.contact_basis;
  if(basis?.followup_id&&!message.reply_to&&!message.social_command){
   const repeated=unansweredCognitiveContacts(w,id).some(old=>old.followup_id===basis.followup_id
-   &&old.substantive_root===basis.substantive_root
-   &&!(basis.source_ids??[]).some(input=>!(old.input_ids??[]).includes(input))
+   &&(basis.schema==='deskbot.issue-contact.v1'?!hasNewIssueEvidence(basis,old):old.substantive_root===basis.substantive_root
+   &&!(basis.source_ids??[]).some(input=>!(old.input_ids??[]).includes(input)))
    &&old.receiver_ids.some(peer=>message.receiver_ids.includes(peer)));
   if(repeated)return '同一问题已向这些收件人送达，尚无关联回应、新的实际观察/活动结果或新来源；换措辞、改称当面、缩减收件人都不能重发续期。可以自己行动、暂缓，或提出不同的明确约定。';
  }

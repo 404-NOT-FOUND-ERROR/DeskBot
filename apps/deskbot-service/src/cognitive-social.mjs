@@ -1,5 +1,6 @@
 import {proposeCognitiveCommitment,respondCognitiveCommitment} from './social-life.mjs';
 import {unansweredCognitiveContacts} from './cognitive-continuation.mjs';
+import {issueContactBases} from './cognitive-issue-evidence.mjs';
 
 const copy=structuredClone;
 const person=(w,id)=>w.protagonist.character_id===id?w.protagonist:w.npcs.find(p=>p.npc_id===id);
@@ -8,7 +9,7 @@ const live=c=>['proposed','accepted','meeting','working'].includes(c.status);
 const lifeFor=(w,id)=>w.cognition.actors[id]??={actor_id:id,version:0,state:{},memories:[],history:[],enabled:false,plan_count:0,followup:null};
 
 /** Public shared terms only. A partner's needs, bag and private memory are absent. */
-export function cognitiveSocialContext(w,id,at,inputs=[]) {
+export function cognitiveSocialContext(w,id,at,inputs=[],activities=[]) {
   const own=person(w,id),life=w.cognition?.actors[id]??{},options=[];
   if(w.social&&own) {
     options.push({option_id:'visit',kind:'visit',title:'一起聊一会儿',location_id:own.location_id,reason:'留一段双方都愿意的时间交流',actor_order:'initiator_receiver'});
@@ -45,6 +46,7 @@ export function cognitiveSocialContext(w,id,at,inputs=[]) {
   const substantiveRoot=lastTask?(lastTask.root_outcome_id??`task:${lastTask.task_id}`):null;
   return {options,commitments,relation_evidence:relationEvidence.slice(-8),personal_views:copy(life.relation_views??[]),replies:(life.inbox??[]).slice(-12).map(m=>({message_id:m.message_id,sender_id:m.sender_id,text:m.text,reply_to:m.reply_to??null,at:m.at})),
     contact_basis:{substantive_root:substantiveRoot,input_ids:inputs.map(input=>input.id)},
+    issue_bases:issueContactBases(w,id,inputs,activities),
     unanswered_issues:unansweredCognitiveContacts(w,id).slice(0,16),
     rule:'邀请不等于接受。仅自己可回复；延期是一份新条件，仍需对方确认。共同结果只记录实际任务，各自理解保持私有。同一问题无新结果/来源或关联回复，不能换措辞、改称当面或缩减收件人重问。share都只是现场留言；可另行做事、暂缓或提出有具体条款的约定。'};
 }
@@ -136,7 +138,7 @@ export function compileCognitiveMessage(w,id,compiled,refs,receiverIds,at) {
   }
   if(typeof text!=='string'||!text.trim()||text.length>1600)fail('message_text_invalid');
   return {text,reply_to:reply,social_command:command,speech_sources:(parts??[]).filter(p=>p.kind==='evidence').map(p=>p.evidence_id),speech_verified:parts!==undefined,
-    contact_basis:{...copy(refs.social?.contact_basis??{substantive_root:null,input_ids:[]}),
+    contact_basis:{...copy(refs.social?.issue_bases?.find(b=>b.followup_id===(compiled.followup_id??refs.continuation?.current?.followup_id))??refs.social?.contact_basis??{substantive_root:null,input_ids:[]}),
       source_ids:copy(compiled.source_ids??[]),
       followup_id:compiled.followup_id??refs.continuation?.current?.followup_id??null}};
 }
