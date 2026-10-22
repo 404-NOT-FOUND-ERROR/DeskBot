@@ -30,6 +30,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         waylightReview:fileURLToPath(new URL('./waylight-review.html',import.meta.url)),
+        r3Review:fileURLToPath(new URL('./r3-review.html',import.meta.url)),
         windleafReview: fileURLToPath(new URL("./windleaf-review.html", import.meta.url)),
         sceneReview: fileURLToPath(new URL("./scene-review.html", import.meta.url)),
         lifeReview: fileURLToPath(new URL("./life-review.html", import.meta.url)),

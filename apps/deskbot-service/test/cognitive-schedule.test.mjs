@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPersistentWorld} from '../src/persistent-world.mjs';
 import {createCognitiveLife} from '../src/cognitive-life.mjs';
-import {scheduleCognitiveActor,cognitiveSleepWindow,fairCognitiveQueue} from '../src/cognitive-schedule.mjs';
+import {scheduleCognitiveActor,cognitiveSleepWindow,fairCognitiveQueue,cognitiveOpportunityKey} from '../src/cognitive-schedule.mjs';
 import {syncLifeNeeds} from '../src/life-state.mjs';
 const initial='2026-10-11T02:00:00Z';
 const budget={status:()=>({}),complete:()=>{throw Error('No paid calls in scheduler test');}};
@@ -61,4 +61,15 @@ test('a future accepted agreement does not occupy the whole day before its actua
  const context={perceptions:[],social:{commitments:[agreement]},refraction:{pending:[]}};
  assert.equal(scheduleCognitiveActor(w,'a',at,context).phase,'plan');
  agreement.not_before_at='2026-10-11T02:10:00Z';assert.equal(scheduleCognitiveActor(w,'a',at,context),null);
+});
+
+test('an unchanged invitation does not trigger ten-minute polling but revised terms do',()=>{
+ const at='2026-10-11T04:00:00Z',life={enabled:true,memories:[],next_decision_at:'2026-10-11T05:00:00Z',schedule:{last_dispatch_at:initial}};
+ const w={clock:{time_zone:'Asia/Shanghai'},cognition:{actors:{a:life}},tasks:[]};
+ const c={id:'offer',terms_revision:1,status:'proposed',available_responses:['accept','decline']};
+ const context={perceptions:[],social:{commitments:[c]},refraction:{pending:[]}};
+ assert.equal(scheduleCognitiveActor(w,'a',at,context).reason,'new_opportunity');
+ life.schedule.opportunity_review_key=cognitiveOpportunityKey(context);
+ assert.equal(scheduleCognitiveActor(w,'a',at,context),null);
+ c.terms_revision=2;assert.equal(scheduleCognitiveActor(w,'a',at,context).reason,'new_opportunity');
 });

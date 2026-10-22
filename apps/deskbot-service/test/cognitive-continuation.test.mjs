@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cognitiveTime,cognitiveContinuationContext,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage} from '../src/cognitive-continuation.mjs';
+import {cognitiveTime,cognitiveContinuationContext,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,prepareCognitiveFollowup,validateFollowupTransition} from '../src/cognitive-continuation.mjs';
 import {cognitiveContext,applyCognitiveMutation,cognitiveRelevantKey} from '../src/cognitive-life-state.mjs';
 import {scheduleCognitiveActor} from '../src/cognitive-schedule.mjs';
 import {installResidentLife} from '../src/resident-life.mjs';
@@ -96,4 +96,71 @@ test('an actual changed commitment permits a renewed invitation without inventin
  life.outbox=[{...outgoing,message_id:'m',commitment_id:'c',at:BASE}];w.social??={};w.social.commitments=[{id:'c',status:'proposed',responses:{'lamp-keeper-001':'pending'}}];
  assert.ok(duplicateUnansweredMessage(w,OWNER,outgoing));w.social.commitments[0].status='declined';
  assert.equal(duplicateUnansweredMessage(w,OWNER,outgoing),null);
+});
+
+test('a self-declared causal continuation cannot silently close its own issue as new/none',()=>{
+ const current={status:'continue',followup_id:'issue',question:'灯的后续',from_root_outcome_id:'task:old'};
+ for(const decision of ['new','none','drop'])
+  assert.throws(()=>validateFollowupTransition({followup_decision:decision,motivation:'self_continuation',prior_root_id:'task:old'},
+   {current,deferred:[]}),{code:'followup_continuation_conflict'});
+ assert.equal(validateFollowupTransition({followup_decision:'continue',followup_id:'issue'}, {current}).followup_id,'issue');
+});
+
+test('a detour preserves the old issue through reload and can explicitly return without new practice',()=>{
+ const w=developmentFixture(),life=w.cognition.actors[OWNER];
+ life.followup={status:'continue',followup_id:'lamp-question',question:'保留夜路与暗处',from_root_outcome_id:'task:old',created_at:BASE};
+ const evidence=structuredClone(w.memory.development);
+ prepareCognitiveFollowup(life,{followup_decision:'new',reason:'先吃饭'},cognitiveContinuationContext(w,OWNER,BASE),BASE);
+ assert.equal(life.followup,null);assert.equal(life.followup_archive,undefined);
+ assert.equal(life.deferred_followups[0].followup_id,'lamp-question');
+ life.followup={status:'continue',followup_id:'meal-question',from_root_outcome_id:'task:meal',question:'饭后散步'};
+ const reloaded=JSON.parse(JSON.stringify(w)),again=reloaded.cognition.actors[OWNER];
+ prepareCognitiveFollowup(again,{followup_decision:'continue',followup_id:'lamp-question'},cognitiveContinuationContext(reloaded,OWNER,BASE),BASE);
+ assert.equal(again.followup.question,'保留夜路与暗处');assert.equal(again.followup.created_at,BASE);
+ assert.equal(again.deferred_followups[0].followup_id,'meal-question');
+ assert.deepEqual(reloaded.memory.development,evidence);
+});
+
+test('none after a completed step does not prove that the original issue has been solved',()=>{
+ const old={status:'continue',followup_id:'old',question:'为什么灯变暗',from_root_outcome_id:'task:old'};
+ const next=cognitiveResultFollowup({followup:old},{status:'none',question:'没新问题',reason:'当前步骤做完',delay_hours:1},
+  {current:old,wait_options:[]},BASE,'task:step','continue');
+ assert.equal(next.followup_id,'old');assert.equal(next.question,old.question);assert.equal(next.status,'postpone');
+ assert.equal(next.from_root_outcome_id,'task:old');
+});
+
+test('closure requires explicit reason and a real result for resolution, while abandonment is a choice',()=>{
+ const w=developmentFixture(),life=w.cognition.actors[OWNER];
+ life.followup={status:'continue',followup_id:'issue',question:'研究问题',from_root_outcome_id:'task:old'};
+ const context=cognitiveContinuationContext(w,OWNER,BASE),before=structuredClone(life);
+ assert.throws(()=>prepareCognitiveFollowup(life,{followup_decision:'drop'},context,BASE),{code:'followup_close_requires_reason'});
+ assert.deepEqual(life,before);
+ assert.throws(()=>prepareCognitiveFollowup(life,{followup_decision:'none',followup_closure:{followup_id:'issue',kind:'resolved',reason:'我说做完了',evidence_ids:['made-up']}},context,BASE),{code:'followup_resolution_without_result'});
+ prepareCognitiveFollowup(life,{followup_decision:'drop',followup_closure:{followup_id:'issue',kind:'abandoned',reason:'暂时不想继续这个研究',evidence_ids:[]}},context,BASE);
+ assert.equal(life.followup,null);assert.equal(life.followup_archive[0].resolution.kind,'abandoned');
+});
+
+test('handoff next step cannot wait for unrelated water collection',()=>{
+ const w=developmentFixture(),life=w.cognition.actors[OWNER];
+ const context={wait_options:[{kind:'activity',id:'collect-water',available:false}],next_options:[{kind:'social',id:'give-water'}]};
+ assert.throws(()=>cognitiveResultFollowup(life,{status:'continue',question:'送水',reason:'等回应',delay_hours:1,
+  next_step:{kind:'social',id:'give-water'},wait_for:{kind:'activity',id:'collect-water'}},context,BASE,'task:water'),{code:'followup_wait_step_mismatch'});
+});
+
+test('one ready condition is reviewed once until the deadline or genuinely new evidence',()=>{
+ const w=developmentFixture(),life=w.cognition.actors[OWNER],at=later(BASE,60);
+ Object.assign(life,{enabled:true,next_decision_at:later(BASE,120),schedule:{last_dispatch_at:BASE,condition_review_key:'one'}});
+ const context={perceptions:[],social:{commitments:[]},refraction:{pending:[]},continuation:{urgent_review:true,review_key:'one'}};
+ assert.equal(scheduleCognitiveActor(w,OWNER,at,context),null);
+ context.continuation.review_key='a-new-reply';assert.equal(scheduleCognitiveActor(w,OWNER,at,context).reason,'followup_condition_review');
+ context.continuation.review_key='one';assert.equal(scheduleCognitiveActor(w,OWNER,later(BASE,121),context).reason,'followup_due');
+ context.perceptions=[{id:'new-source'}];assert.equal(scheduleCognitiveActor(w,OWNER,at,context).phase,'perceive');
+});
+
+test('a ready method does not shrink the chosen feedback review into repeated ten-minute polling',()=>{
+ const w=developmentFixture(),life=w.cognition.actors[OWNER],view={wait_options:[{kind:'activity',id:'tend-bed',available:true}]};
+ const target={kind:'activity',id:'tend-bed'};
+ assert.throws(()=>cognitiveWaitFollowup(life,{followup_decision:'postpone',reason:'条件已满足却等待',wait_for:target},view,BASE),{code:'followup_wait_needs_reconsideration'});
+ const next=cognitiveResultFollowup(life,{status:'continue',question:'晚点继续',reason:'留出别的安排',delay_hours:2,wait_for:target},view,BASE,'task:done');
+ assert.equal(next.next_review_at,later(BASE,120));
 });

@@ -13,7 +13,8 @@ import {waylightPersonalContext} from './waylight-life.mjs';
 import {cognitiveDestinations,resolveCognitiveRoute} from './cognitive-travel.mjs';
 import {cognitiveSocialContext,cognitiveSpeechEvidence,compileCognitiveMessage,commitCognitiveMessage,adoptCognitiveRelationViews} from './cognitive-social.mjs';
 import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink,attachCognitiveTrial} from './cognitive-development.mjs';
-import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor} from './cognitive-continuation.mjs';
+import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor,prepareCognitiveFollowup} from './cognitive-continuation.mjs';
+import {cognitiveOpportunityKey} from './cognitive-schedule.mjs';
 
 export const COGNITIVE_ACTORS=['shaping-001','wetland-grower-001','lamp-keeper-001'];
 export const cognitiveActorIds=world=>[...new Set([...COGNITIVE_ACTORS,...(world.cognition?.admitted_actors??[])])].filter(id=>cognitivePerson(world,id));
@@ -35,9 +36,9 @@ export function cognitiveContext(world,id,at,phase='plan'){
   const catalogue=livingReadModel(world,id,{at})?.activities.filter(a=>a.location_id===p.location_id)??[];
   const inputs=cognitiveInputs(world,id,at),seen=new Set((saved.perception_receipts??[]).map(r=>r.source_id));
   const perceptions=inputs.filter(s=>!seen.has(s.id)).slice(0,id===world.protagonist.character_id?5:3);
-  const social=cognitiveSocialContext(world,id,at);
+  const social=cognitiveSocialContext(world,id,at,inputs);
   return {schema:COGNITIVE_CONTEXT_VERSION,phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
-    time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments),
+    time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments,social.options),
     actor:{actor_id:id,name:p.display_name??'喵呜',role:role?.role??'聚形域伴生个体',traits:id==='shaping-001'?['好奇','有自己的节奏','先观察再判断']:[role?.temperament??'关心自己的生活'],
       values:id==='lamp-keeper-001'?['可靠','把光照与安全联系起来']:id==='wetland-grower-001'?['照料生命','在实际苗况中调整方法']:['具体可靠','愿意探索'],
       background:role?JSON.stringify({desires:role.desires,likes:role.likes,flaws:role.flaws}):'现实桌边的光粒造物，虚拟化身生活在聚形域。',
@@ -50,7 +51,7 @@ export function cognitiveContext(world,id,at,phase='plan'){
     visible_people:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id).map(other=>({actor_id:other.character_id??other.npc_id,name:other.display_name})),
     development:cognitiveDevelopmentContext(world,id,at),social,speech_evidence:cognitiveSpeechEvidence(world,id,at,objects.map(o=>({id:o.object_id,name:o.name??o.object_id,state:o}))),
     inventory:copy(world.living?.inventories[id]??{stock:{},capacity:24}),inquiry:fantasyPersonalContext(world,id),windleaf_inquiry:windleafPersonalContext(world,id),resonant_inquiry:resonantPersonalContext(world,id),capabilities:{activities:catalogue.map((a,i)=>({...a,activity_index:i+1})),travel:{destinations:cognitiveDestinations(world,p.location_id).map((p,i)=>({...p,destination_index:i+1})),rule:'虚拟化身按通路和实际时间行走；到达以后才能使用当地设施。这里只知道公开地理，不知道远处库存和私人活动。'},observe:{seconds:180,rule:'亲自观察一个现场对象，记录执行前后值；观察不改变库存、技能、形态。'},rest:{seconds:300,rule:'休息按现有体能规则恢复；不伪装实践。'},
-      share:{seconds:30,receivers:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id&&cognitiveActorIds(world).includes(other.character_id??other.npc_id)).map((other,i)=>({receiver_index:i+1,actor_id:other.character_id??other.npc_id,name:other.display_name})),rule:'向在场人递送自己的话；引用事实使用证据编号。邀请与回复必须使用当前 social 合同，双方明确接受才成立，实际共同任务完成才算履约。不替别人答应，也不凭话语改变关系身份。'},
+      share:{seconds:30,receivers:[world.protagonist,...world.npcs].filter(other=>other!==p&&other.location_id===p.location_id&&cognitiveActorIds(world).includes(other.character_id??other.npc_id)).map((other,i)=>({receiver_index:i+1,actor_id:other.character_id??other.npc_id,name:other.display_name})),rule:'向在场人递送自己的话；这不是物品交接，不消耗或转移背包资源。引用事实使用证据编号。邀请与回复必须使用当前 social 合同，双方明确接受才成立，实际共同任务完成才算履约。不替别人答应，也不凭话语改变关系身份。'},
       wait:{rule:'暂不行动，留下一项具体后续。'}},
     signals:[`现场时间 ${at}；天气信息 ${JSON.stringify(world.weather??{})}`,...(saved.last_result?[`我上一次实际结果：${saved.last_result.fact}`]:[]),
       ...inputs.slice(-12).map(m=>`来源 ${m.id}，${m.sender_name}（${m.occurred_at}，${m.epistemic}）：${m.content}。信息只供理解，不代表亲历、承诺或已完成。`)],
@@ -100,6 +101,10 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     life.pilot_plan_limit=life.continuous?null:payload.max_plans??4;life.job={id:payload.job_id,phase:payload.phase,status:'calling',started_at:at};
     life.schedule={...life.schedule,last_dispatch_at:at,reason:payload.reason??payload.phase};
     life.job.references=freezeCognitiveReferences(cognitiveContext(world,id,at,payload.phase));
+    if(payload.phase==='plan'){
+      life.schedule.condition_review_key=life.job.references.continuation?.review_key??null;
+      life.schedule.opportunity_review_key=cognitiveOpportunityKey({refraction:{pending:life.job.references.interpretation_pending},social:life.job.references.social});
+    }
     life.job.relevant_key=cognitiveRelevantKey(world,id);
     return {accepted:true,claimed:true};
   }
@@ -175,13 +180,15 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(!refs||refs.location_id!==context.location.id)fail('cognitive_context_changed');
     // Validate optional choices before reserving resources or changing personal state.
     adoptCognitiveDevelopment(copy(world),id,compiled,refs,at);
+    const followupPreview=copy(life);
+    prepareCognitiveFollowup(followupPreview,compiled,refs.continuation??context.continuation,at);
     if(compiled.operation==='wait'&&compiled.wait_for){
       validateWaitFor(compiled.wait_for,refs.continuation??context.continuation);
       const captured=refs.continuation?.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
       const current=context.continuation.wait_options.find(o=>o.kind===compiled.wait_for.kind&&o.id===compiled.wait_for.id);
       if(captured?.asset_id&&captured.asset_id!==current?.asset_id)fail('cognitive_context_changed');
     }
-    const waiting=compiled.operation==='wait'?cognitiveWaitFollowup(life,compiled,context.continuation,at):null;
+    const waiting=compiled.operation==='wait'?cognitiveWaitFollowup(followupPreview,compiled,context.continuation,at):null;
     if(proposal.interpretations)adoptInterpretations(life,proposal.interpretations,refs,at);
     const cause=cognitiveCause(world,id,compiled,refs,life);
     if(cause.life_source_context.some(s=>s.expires_at&&s.expires_at<=at))fail('cognitive_source_expired');
@@ -199,6 +206,8 @@ export function applyCognitiveMutation(world,payload,at,eventId){
         const selected=context.capabilities.activities.find(a=>a.activity_id===activityId);
         if(!selected)fail('activity_reference_unavailable');
         args.activity_id=selected.activity_id;
+        // A model title describes intent, not the effects certified by this method.
+        args.title=selected.title;
       }else if(compiled.operation==='observe'){
         if(!Number.isSafeInteger(compiled.object_index)||compiled.object_index<1)fail('object_reference_invalid');
         const objectId=refs.objects[compiled.object_index-1];if(!objectId)fail('object_reference_invalid');
@@ -208,6 +217,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
         const indices=compiled.receiver_indices??(Number.isSafeInteger(compiled.receiver_index)?[compiled.receiver_index]:[]);
         if(!Array.isArray(indices)||!indices.length||new Set(indices).size!==indices.length||indices.some(n=>!Number.isSafeInteger(n)||n<1||!refs.receivers[n-1]))fail('message_reference_invalid');
         const receivers=indices.map(n=>context.capabilities.share.receivers.find(r=>r.actor_id===refs.receivers[n-1]));if(receivers.some(r=>!r))fail('message_reference_unavailable');
+        args.title=`向${receivers.map(r=>r.name).join('、')}留言`;
         args.duration_seconds=30;life.outgoing_message={receiver_ids:receivers.map(r=>r.actor_id),
           receiver_names:receivers.map(r=>r.name),sender_id:id,sender_name:context.actor.name,...compileCognitiveMessage(world,id,compiled,refs,receivers.map(r=>r.actor_id),at)};
       }else if(compiled.operation==='rest'){args.duration_seconds=300;args.title='休息片刻';}
@@ -235,11 +245,13 @@ export function applyCognitiveMutation(world,payload,at,eventId){
       }catch(error){if(!error.code)throw error;blocked={code:error.code,message:error.message};}
     }
     const landed=world.cognition.actors[id];
+    landed.followup=followupPreview.followup??null;
+    landed.deferred_followups=followupPreview.deferred_followups??[];
+    landed.followup_archive=followupPreview.followup_archive??[];
     adoptCognitiveDevelopment(world,id,compiled,refs,at,{task,blocked});
-    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,from_location_id:refs.location_id,blocked,created_at:at,followup_decision:compiled.followup_decision??null};
+    landed.pending={root_outcome_id:task?`task:${task.task_id}`:`attempt:${payload.job_id}`,task_id:task?.task_id??null,action:copy(proposal.action),before,inventory_before:copy(context.inventory),from_location_id:refs.location_id,blocked,created_at:at,followup_decision:compiled.followup_decision??null};
     adoptPersonalContinuity(world,id,landed,proposal,at);landed.retry=null;
     if(compiled.operation==='wait'){
-      if(['drop','none','new'].includes(compiled.followup_decision))archiveCognitiveFollowup(landed,at,compiled.reason);
       landed.pending=null;landed.followup=waiting;
       landed.next_decision_at=landed.followup.next_review_at;
       if(landed.pilot_plan_limit!==null&&landed.plan_count>=landed.pilot_plan_limit){landed.enabled=false;landed.pilot_finished_at=at;}
@@ -277,7 +289,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     adoptPersonalContinuity(world,id,life,proposal,at);
     life.state=copy(proposal.state);life.last_result=copy(payload.result);life.reflection=copy(proposal.reflection??null);
     if(life.followup)life.followup_transitions=[...(life.followup_transitions??[]),{at,previous:copy(life.followup),decision:pending.followup_decision,next_status:followup.status,next_question:followup.question,actual_root_outcome_id:pending.root_outcome_id}].slice(-16);
-    if(['drop','none'].includes(followup.status)||['new','drop','none'].includes(pending.followup_decision))archiveCognitiveFollowup(life,at,followup.reason);
+    if(followup.followup_closure)archiveCognitiveFollowup(life,at,followup.followup_closure.reason,followup.followup_closure);
     life.followup=nextFollowup;
     life.pending=null;life.version++;life.job.status='completed';life.retry=null;life.next_decision_at=life.followup.next_review_at;
     if(life.pilot_plan_limit!==null&&life.plan_count>=life.pilot_plan_limit){life.enabled=false;life.pilot_finished_at=at;}
@@ -292,14 +304,25 @@ export function cognitiveActualResult(world,id,at){
   const task=pending.task_id?world.tasks.find(t=>t.task_id===pending.task_id):null;
   if(task&&!['completed','failed','cancelled'].includes(task.status))return null;
   const success=task?.status==='completed',context=cognitiveContext(world,id,at),after=task?.cognitive_observation?.objects??context.objects;
-    const message=task?.cognitive_operation==='share'?success?`向${task.cognitive_message?.receiver_names?.join('、')??'指定收件人'}实际留言：${task.cognitive_message?.text}。本次只核验留言送达；后续回应以收到的消息为准。`:`留言未送达。原计划内容：${task.cognitive_message?.text}。`:null;
+    const isMessage=task?.cognitive_operation==='share';
+    const message=isMessage?success?`向${task.cognitive_message?.receiver_names?.join('、')??'指定收件人'}实际留言：${task.cognitive_message?.text}。本次只核验留言送达，没有交付物品，也没有完成留言里提及的活动；后续回应与双方接受以实际消息及合同记录为准。`:`留言未送达。原计划内容：${task.cognitive_message?.text}。`:null;
     const travel=task?.kind==='travel'?`出发地点：${pending.from_location_id}；实际所在地点：${context.location.name}（${context.location.id}）；原计划目的地：${task.destination_location_id}。移动没有完成当地其他活动。`:null;
+    const verifiedTitle=isMessage?'递送留言':task?.activity_id
+      ?context.capabilities.activities.find(a=>a.activity_id===task.activity_id)?.title??`执行活动 ${task.activity_id}`
+      :task?.kind==='travel'?'沿通路移动':task?.cognitive_operation==='rest'?'休息片刻':'现场观察';
+    const effects={
+      operation:task?.cognitive_operation??null,verified_title:verifiedTitle,
+      ...(isMessage?{message_delivery:{delivered:success&&Boolean(task.cognitive_message_delivered_at),receiver_ids:copy(task.cognitive_message?.receiver_ids??[]),material_transfer:false}}:{}),
+      inventory:{before:copy(pending.inventory_before??null),after:copy(task?.cognitive_observation?.inventory??null)},
+      reservation:copy(task?.reservation??null),completion_stock_changes:copy(task?.completion?.result?.stock_changes??[]),
+      rule:'reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。'
+    };
     const comparison=task?.completion?.result?.before&&task?.completion?.result?.after
-      ?`；任务作用前后（用于判断本次活动的增量，不能拿更早一天的数值代替前值）：${JSON.stringify({before:task.completion.result.before,after:task.completion.result.after,...(task.completion.result.fantasy_result?{experiment:task.completion.result.fantasy_result}:{})})}`:'';
-    const fact=pending.blocked?`意图未能执行：${pending.blocked.message}`:task?`${cognitivePerson(world,id).display_name??'喵呜'}的任务「${task.title}」${success?'已实际完成':'未完成'}。${task.failure_reason??''}；${message??travel??`执行前现场：${JSON.stringify(pending.before.map(o=>({id:o.id,state:o.state})))}；执行后现场：${JSON.stringify(after.map(o=>({id:o.id,state:o.state})))}`}${comparison}`:'此回合没有实际任务。';
+      ?`；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：${JSON.stringify({before:task.completion.result.before,after:task.completion.result.after,...(task.completion.result.fantasy_result?{experiment:task.completion.result.fantasy_result}:{})})}`:'';
+    const fact=pending.blocked?`意图未能执行：${pending.blocked.message}`:task?`${cognitivePerson(world,id).display_name??'喵呜'}的任务「${verifiedTitle}」${success?'已实际完成':'未完成'}。${task.failure_reason??''}；${message??travel??`执行前现场：${JSON.stringify(pending.before.map(o=>({id:o.id,state:o.state})))}；执行后现场：${JSON.stringify(after.map(o=>({id:o.id,state:o.state})))}`}${comparison}；执行器核验的作用：${JSON.stringify(effects)}`:'此回合没有实际任务。';
   return {root_outcome_id:pending.root_outcome_id,task_id:pending.task_id,success,not_executed:!task,
     failure_reason:pending.blocked?.message??task?.failure_reason??'',fact,personal_fact:`我亲身经历的结果：${fact}`,
-    before:pending.before,after,occurred_at:task?.completion?.due_at??at};
+    before:pending.before,after,effects,occurred_at:task?.completion?.due_at??at};
 }
 
 export function settleCognitiveTask(world,task,at){
@@ -325,13 +348,19 @@ export function settleCognitiveTask(world,task,at){
       const life=world.cognition.actors[id]??={actor_id:id,version:0,state:{},memories:[],history:[],enabled:false,plan_count:0,followup:null};
       life.inbox??=[];
       if(!life.inbox.some(m=>m.task_id===task.task_id)){
-        life.inbox.push({...copy(message),message_id:`message:${task.task_id}:${id}`,task_id:task.task_id,at,source_kind:'heard_message',root_outcome_id:task.root_outcome_id??`task:${task.task_id}`});
+        // Contact pacing belongs to the sender; do not disclose their private
+        // issue IDs or unsent input IDs in somebody else's receipt.
+        const {contact_basis,...deliveredMessage}=message;
+        life.inbox.push({...copy(deliveredMessage),message_id:`message:${task.task_id}:${id}`,task_id:task.task_id,at,source_kind:'heard_message',root_outcome_id:task.root_outcome_id??`task:${task.task_id}`});
         life.inbox=life.inbox.slice(-256);life.input_version=(life.input_version??0)+1;
       }
     }
     task.cognitive_message_delivered_at=at;
   }
-  task.cognitive_observation={at,objects:cognitiveContext(world,task.actor_id,at).objects};
+  // Settlement can be replayed after a restart. Preserve the original outcome,
+  // including inventory, rather than replacing it with a later live state.
+  task.cognitive_observation??={at,objects:cognitiveContext(world,task.actor_id,at).objects,
+    inventory:copy(world.living?.inventories[task.actor_id]??{stock:{},capacity:24})};
 }
 
 export function cognitiveDialogueContext(world,id){

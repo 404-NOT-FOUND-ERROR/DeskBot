@@ -6,6 +6,11 @@ export function cognitiveSleepWindow(w,id,at){
  const hour=localHour(at,w.clock?.time_zone??'Asia/Shanghai');
  return id==='lamp-keeper-001'?hour>=1&&hour<8:hour>=23||hour<7;
 }
+export function cognitiveOpportunityKey(context){
+ return JSON.stringify([(context.refraction?.pending??[]).map(s=>s.id).sort(),
+  (context.social?.commitments??[]).filter(c=>c.status==='proposed'&&c.available_responses?.length)
+   .map(c=>[c.id,c.terms_revision,c.available_responses]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]);
+}
 export function scheduleCognitiveActor(w,id,at,context,{actualResult=false}={}){
  const life=w.cognition?.actors[id];if(!life?.enabled)return null;
  if(life.retry){return life.retry.retryable&&life.retry.at<=at?{phase:life.retry.phase,reason:'retry_due',priority:90}:null;}
@@ -28,8 +33,12 @@ export function scheduleCognitiveActor(w,id,at,context,{actualResult=false}={}){
  if(context.social?.relation_evidence?.length&&since('relate')>=720)return {phase:'relate',reason:'social_review',priority:30+Math.min(45,age/60)};
  if((life.memories?.length??0)>0&&since('maintain')>=1440)return {phase:'maintain',reason:'daily_memory_and_goals',priority:35+Math.min(45,age/60)};
  const due=life.next_decision_at&&life.next_decision_at<=at;
- const conditionReview=context.continuation?.urgent_review;
- const newOpportunity=context.refraction?.pending?.length>0||commitments.some(c=>c.available_responses?.length&&c.status==='proposed');
+ // A ready condition is an event to review once, not a polling invitation every ten minutes.
+ // Explicit review deadlines and newly arrived input still wake the actor normally.
+ const conditionReview=context.continuation?.urgent_review&&(!context.continuation.review_key
+  ||context.continuation.review_key!==life.schedule?.condition_review_key);
+ const offered=context.refraction?.pending?.length>0||commitments.some(c=>c.available_responses?.length&&c.status==='proposed');
+ const newOpportunity=offered&&cognitiveOpportunityKey(context)!==life.schedule?.opportunity_review_key;
  if((due||newOpportunity||conditionReview)&&age>=10)return {phase:'plan',reason:conditionReview?'followup_condition_review':due?'followup_due':'new_opportunity',priority:40+Math.min(40,age/60)};
  return null;
 }

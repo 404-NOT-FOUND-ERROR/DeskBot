@@ -1,5 +1,5 @@
 import unittest,asyncio
-from life_worker import LexicalRetrieval,hydrate,plain,valid_compilation,valid_followup,contract_json,restore_relations,restore_continuity,valid_activity_binding,valid_social_compilation,valid_development_binding,valid_continuation_binding,prompt_json
+from life_worker import LexicalRetrieval,hydrate,plain,valid_compilation,valid_followup,contract_json,restore_relations,restore_continuity,valid_activity_binding,valid_social_compilation,valid_development_binding,valid_continuation_binding,prompt_json,followup_repair,compilation_repair
 from core.interfaces.llm import LLMResponse
 from providers.agent_store.in_memory import InMemoryAgentStore
 from collections import deque
@@ -8,7 +8,65 @@ from input_refraction import external_goals,valid_interpretations
 from agent.motivation import MotivationBlender,ExternalDriveType
 from agent.need import NeedType
 from relationship_review import review_relationships
+from continuation_contract import continuation_errors
 class LifeAdapterTests(unittest.TestCase):
+ def test_recorded_r3_completion_claim_in_question_gets_an_exact_repair_hint(self):
+  context={'actor':{'name':'喵呜'},'inputs':[],'speech_evidence':[{'id':'task:shade','text':'安装罩片的实际记录。'}]}
+  value={'operation':'share','receiver_indices':[1],'message_parts':[
+   {'kind':'greeting','text':'你好'},{'kind':'evidence','evidence_id':'task:shade'},
+   {'kind':'question','text':'罩我已经装上了，亮度从约零点九三降到约零点五八。你愿意一起看取水时够不够亮？'}]}
+  self.assertFalse(valid_social_compilation(value,context))
+  hint=compilation_repair(value,context)
+  self.assertIn('message_parts[2]在自由文字中包含已完成',hint)
+  value['message_parts'][2]['text']='你愿意一起看取水时够不够亮？'
+  self.assertTrue(valid_social_compilation(value,context))
+ def test_paraphrased_contact_requires_an_actual_new_basis_or_a_formal_proposal(self):
+  context={'actor':{'name':'喵呜'},'continuation':{'current':{'followup_id':'issue'}},
+   'capabilities':{'share':{'receivers':[{'actor_id':'b','name':'灯穗'}]}},
+   'social':{'contact_basis':{'substantive_root':'task:old'},
+    'unanswered_issues':[{'followup_id':'issue','substantive_root':'task:old','receiver_ids':['b'],'input_ids':['known']}],
+    'options':[{'option_id':'give-water'}]}}
+  value={'operation':'share','receiver_indices':[1],'source_ids':['known'],'message_parts':[{'kind':'question','text':'换个说法，当面聊呢？'}]}
+  self.assertFalse(valid_social_compilation(value,context))
+  self.assertIn('不要换措辞',compilation_repair(value,context))
+  self.assertTrue(valid_social_compilation({**value,'social':{'operation':'invite','option_id':'give-water'}},context))
+  self.assertTrue(valid_social_compilation({**value,'source_ids':['new-external-input']},context))
+  context['social']['contact_basis']['substantive_root']='task:new-observation'
+  self.assertTrue(valid_social_compilation(value,context))
+ def test_continuation_identity_and_explicit_closure_are_not_guessed_from_titles(self):
+  view={'schema':'deskbot.cognitive-continuation.v2','current':{'followup_id':'issue','from_root_outcome_id':'task:old'},
+   'deferred':[],'completion_evidence_ids':['task:done'],'next_options':[]}
+  context={'continuation':view}
+  bad={'motivation':'self_continuation','prior_root_id':'task:old','followup_decision':'new'}
+  self.assertTrue(continuation_errors(bad,context))
+  fixed={**bad,'followup_decision':'continue','followup_id':'issue'}
+  self.assertEqual(continuation_errors(fixed,context),[])
+  self.assertTrue(continuation_errors({'status':'none','next_step':None},context))
+  close={'status':'none','followup_id':'issue','followup_closure':{'followup_id':'issue','kind':'resolved','reason':'实际结束','evidence_ids':['task:done']}}
+  self.assertEqual(continuation_errors(close,context),[])
+  close['followup_closure']['evidence_ids']=['invented']
+  self.assertTrue(continuation_errors(close,context))
+ def test_wait_target_must_match_typed_next_step_and_social_contract(self):
+  view={'schema':'deskbot.cognitive-continuation.v2','current':None,'next_options':[{'kind':'social','id':'give-water'},{'kind':'commitment','id':'gift'}],
+   'wait_options':[{'kind':'reply','id':'sent','commitment_id':'gift'}]}
+  value={'status':'continue','next_step':{'kind':'social','id':'give-water'},'wait_for':{'kind':'activity','id':'collect-water'}}
+  self.assertTrue(continuation_errors(value,{'continuation':view}))
+  value.update(next_step={'kind':'commitment','id':'gift'},wait_for={'kind':'reply','id':'sent'})
+  self.assertEqual(continuation_errors(value,{'continuation':view}),[])
+ def test_feedback_cannot_rebind_to_an_unrelated_deferred_issue(self):
+  context={'phase':'feedback','continuation':{'schema':'deskbot.cognitive-continuation.v2',
+   'current':{'followup_id':'current'},'deferred':[{'followup_id':'old'}]}}
+  self.assertTrue(continuation_errors({'status':'postpone','next_step':None,'followup_id':'old'},context))
+ def test_r3_nested_speech_is_rejected_and_repair_reports_all_source_and_shape_errors(self):
+  context={'actor':{'name':'喵呜'},'inputs':[],'speech_evidence':[{'id':'task:own','text':'实际净滤四份清水。'}]}
+  nested={'operation':'share','receiver_indices':[1],'message':'','source_ids':['task:own'],
+   'speech':{'message_parts':[{'kind':'evidence','evidence_id':'task:own'}],'reply_to':None}}
+  self.assertFalse(valid_social_compilation(nested,context))
+  hint=compilation_repair(nested,context)
+  self.assertIn('顶层message_parts',hint);self.assertIn('不属于外来输入',hint)
+  repaired={**nested,'source_ids':[],'message_parts':nested['speech']['message_parts'],'reply_to':None}
+  repaired.pop('speech')
+  self.assertTrue(valid_social_compilation(repaired,context))
  def test_prompt_time_view_preserves_canonical_context_and_labels_midnight(self):
   context={'time':{'zone':'Asia/Shanghai'}};data={'at':'2026-10-11T18:04:00Z','text':'任务:2026-10-11T18:04:00Z'}
   shown=prompt_json(data,context);self.assertIn('2026-10-12 02:04:00 Asia/Shanghai',shown);self.assertIn('UTC',shown)
@@ -80,6 +138,12 @@ class LifeAdapterTests(unittest.TestCase):
   self.assertFalse(valid_followup({'type':'continue','question':'x','reason':'x','delay_hours':1}))
   self.assertFalse(valid_compilation({'operation':'observe','object_index':True,'reason':'x'}))
   self.assertTrue(valid_compilation({'operation':'share','receiver_indices':[1,2],'message':'苗床需要补水','reason':'请教'}))
+ def test_r3_missing_delay_reports_exact_error_without_inventing_timing(self):
+  value={'status':'continue','question':'试一次取水','reason':'已装罩还没用过','review_after_minutes':30}
+  self.assertFalse(valid_followup(value))
+  self.assertIn('delay_hours',followup_repair(value,{}))
+  self.assertNotIn('delay_hours',value)
+  self.assertTrue(valid_followup({**value,'delay_hours':1}))
  def test_semantic_repair_is_an_explicit_second_call(self):
   class Router:
    calls=0

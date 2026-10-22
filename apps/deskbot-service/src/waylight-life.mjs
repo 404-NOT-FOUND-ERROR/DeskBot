@@ -124,5 +124,21 @@ export function waylightPersonalContext(w,id){
   return {version:WAYLIGHT_VERSION,law:copy(WAYLIGHT_LAW),local_asset:person?.location_id==='echo-waterside'?copy(lamp(w)):null,
     own_records:copy(w.waylight_life.records.filter(r=>r.actor_id===id)),
     authored_preference:id==='wetland-grower-001'?'关心浮圃夜里有暗处':id==='lamp-keeper-001'?'希望晚归的人看得清道路':'想把林间见到的光叶用到日常里',
+    tradeoffs:person?.location_id==='echo-waterside'?waylightTradeoffs(lamp(w)):null,
     rule:'初始取向不是已经发生的发言或承诺；只能据现场、自己的经历和实际收到的消息决定。灯从实际材料编成，能改法、修补、次日再用，不直接授予兴趣或身份。'};
+}
+export function waylightTradeoffs(l){
+ if(!l)return null;
+ // Read-only comparison from the same material law. This is not a simulated
+ // success, a private motive, or a forced per-character branch.
+ const base=clamp(l.charge*l.condition*(1-l.moisture*.6));
+ return {basis:'保持当前蓄光、湿润和完好不变的夜间规则推算；不算亲历、测记或已执行。可行性还要看时间、材料和现场。',
+  choices:[
+   {mode:'open',night_brightness:base,night_charge_cost_per_hour:WAYLIGHT_LAW.open_drain_per_hour,
+    filtration_light_enough:base>=WAYLIGHT_LAW.minimum_use_brightness,tradeoff:'路面更亮，消耗更快，水岸更亮，沾雨和强风磨损更多。'},
+   {mode:'hooded',night_brightness:base*.62,night_charge_cost_per_hour:WAYLIGHT_LAW.hooded_drain_per_hour,
+    filtration_light_enough:base*.62>=WAYLIGHT_LAW.minimum_use_brightness,tradeoff:'水岸留暗、保光和防雨，但当前照明降低，可能不足以净滤；需要真实罩片。'},
+  ],
+  alternatives:'可以先实际用水、与在场人商量、安装或调整罩片、等待环境变化、离开做别的。已有清水并不证明有人需要更多；先看背包和已收到的请求。',
+  rule:'按本人需要、私有经历和当前处境权衡，不要求三个人做不同动作，也不为制造差异反复开合罩片。'};
 }

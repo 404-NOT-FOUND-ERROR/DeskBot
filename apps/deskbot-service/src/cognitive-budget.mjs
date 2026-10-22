@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {loadLlmConfiguration} from './llm.mjs';
 
 export const PRICING={currency:'CNY',input_miss_per_million:2,input_hit_per_million:.04,output_per_million:8,
-  checked_at:'2026-10-10',basis:'peak_price_upper_estimate',source:'https://api-docs.deepseek.com/zh-cn/quick_start/pricing/'};
+  checked_at:'2026-10-20',basis:'peak_price_upper_estimate',source:'https://api-docs.deepseek.com/zh-cn/quick_start/pricing/'};
 function error(code,message=code){return Object.assign(new Error(message),{code});}
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 

@@ -33,6 +33,14 @@ function feedback(w,id){
  applyCognitiveMutation(w,{actor_id:id,phase:'feedback',operation:'claim',job_id:job},at,job+':claim');
  applyCognitiveMutation(w,{actor_id:id,phase:'feedback',operation:'feedback',job_id:job,result,proposal:proposal(id,'feedback',{followup:{status:'none',question:'继续自己的生活',reason:'依据实际结果',delay_hours:2}})},at,job+':adopt');
 }
+function perform(w,fields){
+ const at=w.clock.synced_at,job=`test-action-${++seq}`;
+ applyCognitiveMutation(w,{actor_id:own,phase:'plan',operation:'claim',job_id:job},at,job+':claim');
+ applyCognitiveMutation(w,{actor_id:own,phase:'plan',operation:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,own),
+  proposal:proposal(own,'plan',{compiled:{reason:'本地回归的实际行动',followup_decision:'continue',...fields},action:{agent_id:own}})},at,job+':plan');
+ const task=w.tasks.find(t=>t.task_id===w.cognition.actors[own].pending.task_id);finish(w,task);feedback(w,own);
+ return task;
+}
 function invite(w,option='visit'){const task=share(w,own,other,{social:{operation:'invite',option_id:option}});assert.equal(w.social.commitments.length,0);finish(w,task);feedback(w,own);return w.social.commitments[0];}
 function reply(w,id,receiver,response,extra={}){
  const c=w.social.commitments[0];const task=share(w,id,receiver,{reply_to:w.cognition.actors[id].inbox.findLast(m=>m.sender_id===receiver)?.message_id??null,social:{operation:'respond',commitment_id:c.id,response,...extra}});finish(w,task);feedback(w,id);return task;
@@ -82,6 +90,50 @@ test('reply links refer only to actually received messages and are recorded only
  const fresh=fixture();invite(fresh);const source=fresh.cognition.actors[other].inbox[0];const task=reply(fresh,other,own,'decline');
  assert.equal(task.cognitive_message.reply_to,source.message_id);assert.equal(fresh.cognition.actors[other].outbox[0].reply_to,source.message_id);
 });
+
+test('a real recipient receipt wakes the sender waiting on its own outbox ID, without leaking private pacing state',()=>{
+ const w=fixture();const first=share(w,own,other,{message_parts:[{kind:'question',text:'你愿意来看看吗？'}]});finish(w,first);feedback(w,own);
+ const life=w.cognition.actors[own],sent=life.outbox[0],receipt=w.cognition.actors[other].inbox[0];
+ assert.equal(receipt.contact_basis,undefined);
+ life.followup={status:'postpone',followup_id:'visit-question',question:'等一条实际回复',wait_for:{kind:'reply',id:sent.message_id},created_at:BASE};
+ life.inbox=[{message_id:'forged',sender_id:third,reply_to:receipt.message_id,at:BASE,text:'不是本次收件人的消息'}];
+ assert.equal(cognitiveContext(w,own,w.clock.synced_at).continuation.current.condition,'waiting');
+ const answer=share(w,other,own,{reply_to:receipt.message_id,message_parts:[{kind:'question',text:'你想看哪个地方？'}]});
+ finish(w,answer);feedback(w,other);
+ assert.equal(cognitiveContext(w,own,w.clock.synced_at).continuation.current.condition,'ready');
+ assert.equal(w.social.commitments.length,0);
+});
+
+test('saved R3 paraphrase pattern cannot reset an unanswered issue by narrowing recipients, including after reload',()=>{
+ let w=fixture();w.living.inventories[own]={stock:{water:4},capacity:24};
+ perform(w,{operation:'observe',object_index:1});
+ w.cognition.actors[own].followup={status:'continue',followup_id:'water-question',question:'清水如何交接',created_at:BASE};
+ const context=cognitiveContext(w,own,w.clock.synced_at),indices=[other,third].map(id=>context.capabilities.share.receivers.findIndex(r=>r.actor_id===id)+1);
+ const fields={followup_decision:'continue',followup_id:'water-question'};
+ const first=share(w,own,other,{...fields,receiver_indices:indices,message_parts:[{kind:'question',text:'你们想不想一起看取水够不够亮？'}]});
+ finish(w,first);feedback(w,own);w=JSON.parse(JSON.stringify(w));
+ const outbox=structuredClone(w.cognition.actors[own].outbox),stock=structuredClone(w.living.inventories);
+ const second=share(w,own,other,{...fields,message_parts:[{kind:'question',text:'我想当面问问，你愿意看一下清水怎么用吗？'}]});
+ assert.equal(second,undefined);assert.equal(w.cognition.actors[own].pending.blocked.code,'duplicate_message_without_reply');
+ assert.deepEqual(w.cognition.actors[own].outbox,outbox);assert.deepEqual(w.living.inventories,stock);
+ feedback(w,own);
+ // A concrete finite handoff is a different capability; no acceptance is invented.
+ const offer=share(w,own,other,{...fields,social:{operation:'invite',option_id:'give-water'}});
+ finish(w,offer);feedback(w,own);
+ assert.equal(w.social.commitments[0].status,'proposed');assert.deepEqual(w.living.inventories,stock);
+});
+
+test('new actual observation permits a renewed contact but failed attempts and rest do not',()=>{
+ const w=fixture();perform(w,{operation:'observe',object_index:1});
+ w.cognition.actors[own].followup={status:'continue',followup_id:'observation-question',question:'一起看观察结果',created_at:BASE};
+ const fields={followup_decision:'continue',followup_id:w.cognition.actors[own].followup.followup_id};
+ const first=share(w,own,other,{...fields,message_parts:[{kind:'question',text:'一起看看水边吗？'}]});finish(w,first);feedback(w,own);
+ perform(w,{operation:'rest'});
+ assert.equal(share(w,own,other,{...fields,message_parts:[{kind:'question',text:'过来看看如何？'}]}),undefined);feedback(w,own);
+ perform(w,{operation:'observe',object_index:1});
+ const next=share(w,own,other,{...fields,message_parts:[{kind:'question',text:'想讨论这次观察吗？'}]});finish(w,next);
+ assert.equal(next.status,'completed');assert.equal(w.cognition.actors[own].outbox.length,2);
+});
 test('private views omit partner memories and ungrounded completion quotes are rejected',()=>{
  const w=fixture();invite(w);w.cognition.actors[other].secret='PRIVATE_DIARY_CANARY';w.cognition.actors[other].memories=[{id:'secret',payload:{stored_content:'PRIVATE_DIARY_CANARY'}}];
  const context=cognitiveContext(w,own,w.clock.synced_at);assert.ok(!JSON.stringify(context).includes('PRIVATE_DIARY_CANARY'));
@@ -92,6 +144,34 @@ test('a gift commits finite inventory only after explicit agreement and actual l
  const w=fixture();w.living.inventories[own]={stock:{trays:1},capacity:24};w.living.inventories[other]={stock:{trays:0},capacity:24};
  invite(w,'give-tray');assert.equal(w.living.inventories[own].stock.trays,1);reply(w,other,own,'accept');tick(w);tick(w);
  assert.equal(w.social.commitments[0].status,'completed');assert.equal(w.living.inventories[own].stock.trays,0);assert.equal(w.living.inventories[other].stock.trays,1);
+});
+
+test('four water portions use the existing invitation, acceptance and handoff path without duplication on reload',()=>{
+ let w=fixture();w.living.inventories[own]={stock:{water:4},capacity:24};w.living.inventories[other]={stock:{water:0},capacity:24};
+ invite(w,'give-water');
+ assert.equal(w.living.inventories[own].stock.water,4);
+ assert.equal(w.social.commitments[0].status,'proposed');
+ reply(w,other,own,'accept');assert.equal(w.living.inventories[own].stock.water,4);
+ tick(w);tick(w);assert.equal(w.social.commitments[0].status,'completed');
+ assert.equal(w.living.inventories[own].stock.water,0);assert.equal(w.living.inventories[other].stock.water,4);
+ const before=structuredClone(w.living.inventories);
+ w=JSON.parse(JSON.stringify(w));tick(w);
+ assert.deepEqual(w.living.inventories,before);
+ assert.equal(w.social.commitments[0].changes.filter(x=>x.offers).length,1);
+});
+
+test('declining, silence, insufficient stock and full recipient bag cannot manufacture a water handoff',()=>{
+ for(const scenario of ['decline','silence','short','full']){
+  const w=fixture();w.living.inventories[own]={stock:{water:4},capacity:24};w.living.inventories[other]={stock:{water:0},capacity:scenario==='full'?2:24};
+  invite(w,'give-water');
+  if(scenario==='decline')reply(w,other,own,'decline');
+  else if(scenario!=='silence')reply(w,other,own,'accept');
+  if(scenario==='short')w.living.inventories[own].stock.water=1;
+  tick(w,scenario==='silence'?92:1);tick(w);
+  assert.notEqual(w.social.commitments[0].status,'completed',scenario);
+  assert.equal(w.living.inventories[other].stock.water,0,scenario);
+  assert.equal(w.living.inventories[own].stock.water,scenario==='short'?1:4,scenario);
+ }
 });
 test('agreed assistance travels, uses finite materials and delivers the actual tray',()=>{
  const w=fixture(),before=w.living.objects['parts-drawers'].stock.wood;

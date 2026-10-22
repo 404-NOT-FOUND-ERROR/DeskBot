@@ -36,6 +36,7 @@ from providers.agent_store.in_memory import InMemoryAgentStore
 from providers.vector_store.in_memory import InMemoryVectorStore
 from input_refraction import interpret_inputs, external_goals
 from relationship_review import review_relationships
+from continuation_contract import continuation_errors, CONTINUATION_CONTRACT
 
 
 class AbortJob(BaseException):
@@ -132,7 +133,8 @@ async def contract_json(router,messages,validator,max_tokens=900,repair_hint=Non
     for attempt in range(2):
         reply=await router.complete(LLMScene.DIRECTIVE,messages,max_tokens=max_tokens,json_mode=True)
         value=extract_json(reply.content)
-        if validator(value): return value
+        if isinstance(value,dict) and validator(value): return value
+        if not isinstance(value,dict): value={}
         hint=repair_hint(value) if callable(repair_hint) else repair_hint
         messages=messages+[LLMMessage('assistant',reply.content),LLMMessage('user',hint or '该 JSON 不符合给定字段合同。重新检查原合同要求的字段名、数据类型与取值。只修复本次合同，不引入其他阶段字段，不新增事实。')]
     raise ValueError('semantic_contract_rejected_after_retry')
@@ -143,8 +145,22 @@ def valid_followup(value):
         and type(value.get('delay_hours')) is int and 1<=value['delay_hours']<=48
         and ('review_after_minutes' not in value or type(value['review_after_minutes']) is int and 10<=value['review_after_minutes']<=2880))
 
+def followup_repair(value,context):
+    problems=[]
+    if value.get('status') not in ('continue','postpone','drop','none'):problems.append('status必须是continue/postpone/drop/none')
+    for key in ('question','reason'):
+        if not isinstance(value.get(key),str):problems.append(key+'必须是字符串')
+    if type(value.get('delay_hours')) is not int or not 1<=value['delay_hours']<=48:
+        problems.append('缺少或错误的delay_hours：它是必填的1至48整数；即使填写review_after_minutes也不能省略')
+    if 'review_after_minutes' in value and (type(value['review_after_minutes']) is not int or not 10<=value['review_after_minutes']<=2880):
+        problems.append('review_after_minutes必须是10至2880整数')
+    problems.extend(continuation_errors(value,context))
+    if not valid_continuation_binding(value,context) and not problems:problems.append('wait_for只能使用给定kind/id，已就绪或超时的条件必须重新考虑')
+    return '只修复这些字段错误：'+'；'.join(problems)+'。保留原意，不新增事实；返回完整JSON。'
+
 
 def valid_continuation_binding(value,context):
+    if continuation_errors(value,context): return False
     target=value.get('wait_for')
     if target is not None:
         if not isinstance(target,dict) or set(target)!={'kind','id'}: return False
@@ -169,7 +185,7 @@ def prompt_json(value,context):
                 if instant.tzinfo:return instant.astimezone(ZoneInfo(zone)).strftime('%Y-%m-%d %H:%M:%S')+' '+zone+' (UTC '+instant.astimezone(timezone.utc).isoformat()+')'
             except (ValueError,KeyError):pass
         return item
-    return json.dumps(display(value),ensure_ascii=False)
+    return json.dumps(display(value),ensure_ascii=False,separators=(',',':'))
 
 
 def valid_compilation(value):
@@ -217,9 +233,27 @@ def valid_source_binding(value,context):
     return all(s in {i['id'] for i in context.get('inputs',[])} for s in value.get('source_ids',[]))
 
 
+def social_contact_errors(value,context):
+    if value.get('operation')!='share' or value.get('reply_to') or value.get('social'): return []
+    social=context.get('social',{})
+    current=context.get('continuation',{}).get('current') or {}
+    issue=value.get('followup_id') or current.get('followup_id')
+    if not issue: return []
+    receivers=context.get('capabilities',{}).get('share',{}).get('receivers',[])
+    peers={receivers[n-1]['actor_id'] for n in value.get('receiver_indices',[]) if type(n) is int and 0<n<=len(receivers)}
+    basis=social.get('contact_basis',{})
+    for old in social.get('unanswered_issues',[]):
+        if old.get('followup_id')==issue and old.get('substantive_root')==basis.get('substantive_root') \
+           and peers.intersection(old.get('receiver_ids',[])) \
+           and not set(value.get('source_ids',[])).difference(old.get('input_ids',[])):
+            return ['同一问题的留言尚无关联回复，也没有新实际结果或本次选择引用的新来源。不要换措辞、缩减收件人或改称当面来续期；可选择实际观察/活动、暂缓，或确有意愿时提出有条款的正式约定，不能伪造新来源。']
+    return []
+
+
 def valid_social_compilation(value,context):
     import re
     if value.get('operation')!='share': return True
+    if social_contact_errors(value,context): return False
     parts=value.get('message_parts')
     if not isinstance(parts,list) or len(parts)>3: return False
     for part in parts:
@@ -253,9 +287,18 @@ def valid_social_compilation(value,context):
 def compilation_repair(value,context):
     import re
     hints=['只修复意图编译JSON，不加status/delay_hours。activity使用精确activity_id。证据段仅写kind/evidence_id。']
+    hints.extend(continuation_errors(value,context))
+    hints.extend(social_contact_errors(value,context))
+    if value.get('operation')=='share' and not isinstance(value.get('message_parts'),list):
+        hints.append('缺少顶层message_parts数组。message_parts和reply_to必须与operation同级，不可放入speech对象；删除speech外层，保留原段落含义。share只送达留言，不能把物品交付写成已完成。')
     invalid=[s for s in value.get('source_ids',[]) if s not in {i['id'] for i in context.get('inputs',[])}]
     if invalid:hints.append(f'source_ids 中这些不属于外来输入：{invalid}。现场观察证据不能写入source_ids，移除它们。保留真正影响选择的给定输入ID。')
     for i,part in enumerate(value.get('message_parts',[])):
+        if not isinstance(part,dict):
+            hints.append(f'message_parts[{i}]必须是段落对象。')
+            continue
+        if part.get('kind')!='evidence' and re.search(r'已经|已完成|刚刚.*[做浇修]|刚[做浇修]|答应了|同意了|证明了|证实了|我做过|我浇过|我修过',part.get('text','')):
+            hints.append(f'message_parts[{i}]在自由文字中包含已完成/已承诺断言。实际事实请用给定evidence_id独立引用；question只保留尚待回答的问题，intention只说未来打算。不能仅换成hypothesis标签绕过事实核验。')
         if part.get('kind')=='greeting':
             hints.append(f'message_parts[{i}]的greeting请直接用“你好”或“谢谢你”，不写人名。说话者是{context["actor"]["name"]}。')
         if value.get('social') and re.search(r'[零一二三四五六七八九十\d]+(?:分钟|小时|点)|上午|下午|明天|今晚',part.get('text','')):
@@ -285,6 +328,8 @@ async def run(context):
     constraints += '\n我的实际测记：'+prompt_json(context.get('inquiry'),context)
     constraints += '\n我的回声与余辉记录：'+prompt_json(context.get('resonant_inquiry'),context)
     constraints += '\n我的风语林造物与实际测记：'+prompt_json(context.get('windleaf_inquiry'),context)
+    constraints += '\n归途灯的实际规律、现场物件和我的初始取向：'+prompt_json(context.get('waylight'),context)
+    constraints += '\n后续的身份与边界：'+CONTINUATION_CONTRACT
     constraints += '\n我的实际兴趣、机会、愿望和试做：'+json.dumps(context.get('development'),ensure_ascii=False)
     constraints += '\n第一次自选探索还不能证明稳定爱好。需要实际返回，受邀劳动也不自动成为兴趣。已有试做可选对应的实际活动，不必每天做；条件受阻可以暂缓或换方法。'
     constraints += '\n我的明确约定与可商量事项：'+json.dumps(context.get('social'),ensure_ascii=False)
@@ -357,9 +402,10 @@ async def run(context):
             compile_prompt['development']=context.get('development')
             compile_prompt['time']=context.get('time')
             compile_prompt['continuation']=context.get('continuation')
-            compile_prompt['continuation_contract']='wait可填顶层wait_for:{kind:activity|reply|commitment,id:continuation.wait_options里的精确ID}和review_after_minutes:10至240整数。所等条件已ready不能继续以该条件为等待理由；reply期限到需改办法、drop收束或wait_for:null明确暂缓。暂缓并不等于放弃兴趣。不复述已送达且未回应的相同问题；有新邀请或新信息可明确说明。continue/postpone会保留原问题和出处，new明确另起事项，drop/none结束旧后续。'
+            compile_prompt['waylight']=context.get('waylight')
+            compile_prompt['continuation_contract']=CONTINUATION_CONTRACT+'wait的review_after_minutes为10至240整数，已经ready或超时的等待不可自动续期；可解除等待或改办法。'
             compile_prompt['development_contract']='interest_choice 和 wish_choice 是输出JSON顶层字段，不可再套development对象。通常两者填 null。确实决定改变当前投入时可填 interest_choice:{topic:给定主题,decision:continue|pause|drop|revisit,reason:具体原因,root_ids:该主题给定active_roots或recent_success_roots的非空子集}；只表达选择，不凭话增加喜欢或实践。如果我确实想提出或暂缓某个新角色，可填 wish_choice:{direction_id:给定方向,decision:consider|propose|defer,reason:具体原因}；propose仅在eligible为true时可用，仍不改变外观。不同于“可以提出”，“我现在愿意提出”需要我自己的选择。不为满足进度强行换角色。'
-            compile_prompt['speech_contract']+='证据段简化为{kind:evidence,evidence_id:给定ID}即可，不需要quote字段，服务器会逐字插入带来源的完整原文。若仍填写quote必须与speech_evidence.text完全一致，不能只抄social.replies.text。'
+            compile_prompt['speech_contract']+='message_parts、reply_to、social都是输出JSON顶层字段，与operation同级，不能放进speech对象。证据段简化为{kind:evidence,evidence_id:给定ID}即可，不需要quote字段，服务器会逐字插入带来源的完整原文。若仍填写quote必须与speech_evidence.text完全一致，不能只抄social.replies.text。'
             output['compiled']=await contract_json(router,[LLMMessage('system','你是聚形域意图编译器。只返回一个简短完整 JSON。'),LLMMessage('user',prompt_json(compile_prompt,context))],lambda value: valid_life_compilation(value) and valid_activity_binding(value,context) and valid_source_binding(value,context) and valid_social_compilation(value,context) and valid_development_binding(value,context) and valid_continuation_binding(value,context),max_tokens=1600,repair_hint=lambda value: compilation_repair(value,context))
         else: output['compiled']={'operation':'wait','reason':'本回合没有可采用的行动。','followup_decision':'postpone'}
     elif context['phase']=='reflect':
@@ -378,10 +424,10 @@ async def run(context):
         if context.get('reflect'):
             reflection=await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step)
             output['reflection']=plain(reflection)
-        output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。只返回 JSON。'),
+        output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
              LLMMessage('user',prompt_json({'personality':personality.to_prompt_context(),'actual_result':result,'prior_followup':saved.get('followup'),
-              'now':context.get('time',context['at']),'continuation':context.get('continuation'),
-              'contract':'{"status":"continue|postpone|drop|none", "question":"仍想做或暂时放下什么", "reason":"为什么", "delay_hours":1至48整数,"wait_for":null或{kind:activity|reply|commitment,id:给定ID},"review_after_minutes":10至2880整数}。后两字段可省略。status字段名必须是status，不能写type。delay_hours 从 now 的实际时间计算；用具体事项描述后续，不写与delay_hours不符的明天/今晚。可绑定具体测记或已送达消息，服务端核对条件和实际复查时间。受阻应改变办法或等待具体条件，不能声称失败的工作已完成；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context))
+              'now':context.get('time',context['at']),'continuation':context.get('continuation'),'issue_contract':CONTINUATION_CONTRACT,
+              'contract':'必须返回status、question、reason、delay_hours四个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1}。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context))
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['state']=plain(personality.state); output['memory_sequence']=memory._seq

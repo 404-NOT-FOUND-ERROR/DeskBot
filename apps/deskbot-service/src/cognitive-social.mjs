@@ -1,4 +1,5 @@
 import {proposeCognitiveCommitment,respondCognitiveCommitment} from './social-life.mjs';
+import {unansweredCognitiveContacts} from './cognitive-continuation.mjs';
 
 const copy=structuredClone;
 const person=(w,id)=>w.protagonist.character_id===id?w.protagonist:w.npcs.find(p=>p.npc_id===id);
@@ -7,7 +8,7 @@ const live=c=>['proposed','accepted','meeting','working'].includes(c.status);
 const lifeFor=(w,id)=>w.cognition.actors[id]??={actor_id:id,version:0,state:{},memories:[],history:[],enabled:false,plan_count:0,followup:null};
 
 /** Public shared terms only. A partner's needs, bag and private memory are absent. */
-export function cognitiveSocialContext(w,id,at) {
+export function cognitiveSocialContext(w,id,at,inputs=[]) {
   const own=person(w,id),life=w.cognition?.actors[id]??{},options=[];
   if(w.social&&own) {
     options.push({option_id:'visit',kind:'visit',title:'一起聊一会儿',location_id:own.location_id,reason:'留一段双方都愿意的时间交流',actor_order:'initiator_receiver'});
@@ -15,6 +16,11 @@ export function cognitiveSocialContext(w,id,at) {
       options.push({option_id:'meal',kind:'meal',title:'一起吃一顿饭',location_id:own.location_id,reason:'目前长桌有两份饭；到场后再次核验',actor_order:'initiator_receiver'});
     if((w.living?.inventories[id]?.stock.trays??0)>0)
       options.push({option_id:'give-tray',kind:'exchange',title:'送出一只现有托盘',location_id:own.location_id,reason:'只交接自己确实拥有的一只托盘',actor_order:'initiator_receiver',offers:[{resource:'trays',count:1,from:'initiator',to:'receiver'}]});
+    const water=Math.min(4,Math.floor(w.living?.inventories[id]?.stock.water??0));
+    if(water>0)
+      options.push({option_id:'give-water',kind:'exchange',title:`商量送出${water}份现有清水`,location_id:own.location_id,
+        reason:'清水仍在我的背包；对方明确接受后，双方到场并核验库存和容量才能交接。没有回复或被拒绝就不交付',
+        actor_order:'initiator_receiver',offers:[{resource:'water',count:water,from:'initiator',to:'receiver'}]});
     if(own.location_id==='moss-sprout-garden')
       options.push({option_id:'ask-tray-help',kind:'cooperate',title:'商量制作一只苗圃托盘',location_id:own.location_id,reason:'请对方沿实际通路备料制作，回来交接一只托盘',actor_order:'receiver_initiator',produce_activity:'craft-tray',resource:'trays'});
     if(own.location_id==='echo-waterside'&&w.living?.objects['floating-frame']?.waylight&&!w.living.objects['floating-frame'].waylight.has_hood)
@@ -23,6 +29,7 @@ export function cognitiveSocialContext(w,id,at) {
   const commitments=(w.social?.commitments??[]).filter(c=>c.control==='cognitive'&&c.actors.includes(id)).slice(-16).map(c=>({
     id:c.id,terms_revision:c.terms_revision,title:c.title,kind:c.kind,status:c.status,actors:copy(c.actors),initiator_id:c.initiator_id,
     location_id:c.location_id,deadline_at:c.deadline_at,not_before_at:c.not_before_at??null,responses:copy(c.responses),last_note:c.last_note,
+    offers:copy(c.offers??[]),changes:copy((c.changes??[]).slice(-4)),
     available_responses:!live(c)?[]:c.status==='proposed'&&c.responses[id]==='pending'?['accept','decline','delay','withdraw']:['withdraw'],
   }));
   const relationEvidence=[];
@@ -32,8 +39,14 @@ export function cognitiveSocialContext(w,id,at) {
       ...(w.social?.commitments??[]).filter(c=>c.control==='cognitive'&&c.actors.includes(id)&&c.actors.includes(peer)&&!live(c)).slice(-3).map(c=>({id:`commitment:${c.id}`,root:`commitment:${c.id}`,at:c.finished_at,text:`实际共同事务「${c.title}」：${c.status}，${c.last_note}`}))];
     if(sources.length)relationEvidence.push({actor_id:peer,name:person(w,peer)?.display_name??peer,sources:sources.sort((a,b)=>a.at.localeCompare(b.at)).slice(-6)});
   }
+  const lastTask=w.tasks.filter(t=>t.actor_id===id&&t.status==='completed'
+    &&(t.activity_id||['observe','travel'].includes(t.cognitive_operation)))
+    .sort((a,b)=>String(b.finished_at??b.completion?.due_at??b.due_at).localeCompare(String(a.finished_at??a.completion?.due_at??a.due_at)))[0];
+  const substantiveRoot=lastTask?(lastTask.root_outcome_id??`task:${lastTask.task_id}`):null;
   return {options,commitments,relation_evidence:relationEvidence.slice(-8),personal_views:copy(life.relation_views??[]),replies:(life.inbox??[]).slice(-12).map(m=>({message_id:m.message_id,sender_id:m.sender_id,text:m.text,reply_to:m.reply_to??null,at:m.at})),
-    rule:'邀请不等于接受。仅自己可回复；延期是一份新条件，仍需对方确认。共同结果只记录实际任务，各自理解保持私有。'};
+    contact_basis:{substantive_root:substantiveRoot,input_ids:inputs.map(input=>input.id)},
+    unanswered_issues:unansweredCognitiveContacts(w,id).slice(0,16),
+    rule:'邀请不等于接受。仅自己可回复；延期是一份新条件，仍需对方确认。共同结果只记录实际任务，各自理解保持私有。同一问题无新结果/来源或关联回复，不能换措辞、改称当面或缩减收件人重问。share都只是现场留言；可另行做事、暂缓或提出有具体条款的约定。'};
 }
 
 export function adoptCognitiveRelationViews(life,views,refs,at) {
@@ -56,7 +69,16 @@ export function cognitiveSpeechEvidence(w,id,at,objects) {
     const stock=Object.entries(o.state.stock??{}).map(([k,v])=>`${k}=${v}`);
     if(values.length||stock.length)evidence.push({id:`observation:${o.id}:${at}`,kind:'observation',text:`我在${at}看到${o.name}：${[...values,...stock].join('，')}。`});
   }
-  if(life.last_result)evidence.push({id:life.last_result.root_outcome_id,kind:'completed',text:life.last_result.success?`我的任务「${w.tasks.find(t=>t.task_id===life.last_result.task_id)?.title??'已记录任务'}」已实际完成。`:`我上次的意图没有完成：${life.last_result.failure_reason||'实际记录未完成'}。`});
+  if(life.last_result){
+    const task=w.tasks.find(t=>t.task_id===life.last_result.task_id);
+    // Legacy tasks can have an aspirational model title, such as "deliver water",
+    // even though share only delivered words. Never promote that title to evidence.
+    const label=task?.cognitive_operation==='share'?'递送留言'
+      :life.last_result.effects?.verified_title??(task?.activity_id?`执行活动 ${task.activity_id}`:'已记录的实际操作');
+    evidence.push({id:life.last_result.root_outcome_id,kind:'completed',text:life.last_result.success
+      ?`我的任务「${label}」已实际完成。${task?.cognitive_operation==='share'?'只核验话语送达，没有交付物品；提到的后续活动与双方承诺需另有实际记录。':''}`
+      :`我上次的意图没有完成：${life.last_result.failure_reason||'实际记录未完成'}。`});
+  }
   for(const m of (life.inbox??[]).slice(-8))evidence.push({id:m.message_id,kind:m.source_kind==='joint_result'?'shared_result':'hearsay',text:`${m.sender_name??'居民'}在${m.at}留下消息：${m.text}`});
   return evidence;
 }
@@ -113,7 +135,10 @@ export function compileCognitiveMessage(w,id,compiled,refs,receiverIds,at) {
     } else fail('social_operation_invalid');
   }
   if(typeof text!=='string'||!text.trim()||text.length>1600)fail('message_text_invalid');
-  return {text,reply_to:reply,social_command:command,speech_sources:(parts??[]).filter(p=>p.kind==='evidence').map(p=>p.evidence_id),speech_verified:parts!==undefined};
+  return {text,reply_to:reply,social_command:command,speech_sources:(parts??[]).filter(p=>p.kind==='evidence').map(p=>p.evidence_id),speech_verified:parts!==undefined,
+    contact_basis:{...copy(refs.social?.contact_basis??{substantive_root:null,input_ids:[]}),
+      source_ids:copy(compiled.source_ids??[]),
+      followup_id:compiled.followup_id??refs.continuation?.current?.followup_id??null}};
 }
 
 export function commitCognitiveMessage(w,task,at) {
@@ -127,7 +152,7 @@ export function commitCognitiveMessage(w,task,at) {
     const c=respondCognitiveCommitment(w,at,command.commitment_id,id,command.response,{revision:command.revision,messageId,delayMinutes:command.delay_minutes});message.commitment_id=c.id;
     (c.causes_by_actor??={})[id]=copy({life_source_ids:task.life_source_ids,life_source_context:task.life_source_context,life_motivation:task.life_motivation,life_decision:task.life_decision});
   }
-  life.outbox=[...(life.outbox??[]),{message_id:messageId,reply_to:message.reply_to,receiver_ids:message.receiver_ids,at,commitment_id:message.commitment_id??null,root_outcome_id:task.root_outcome_id,text:message.text}].slice(-128);
+  life.outbox=[...(life.outbox??[]),{message_id:messageId,reply_to:message.reply_to,receiver_ids:message.receiver_ids,at,commitment_id:message.commitment_id??null,root_outcome_id:task.root_outcome_id,text:message.text,contact_basis:copy(message.contact_basis??null)}].slice(-128);
 }
 
 export function deliverCognitiveSocialResults(w,at) {

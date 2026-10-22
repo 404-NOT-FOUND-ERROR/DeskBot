@@ -28,7 +28,7 @@ function Review(){
         <p className='waylight-review__time'>{new Date(item!.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时钟</p>
         <section className='waylight-review__readings'><WaylightState lamp={lamp}/></section>
         <h3>同一件事，留下不同余地</h3><p>敞亮的叶灯让刻线更清楚；多一片背水的罩，夜里耗光慢一些，水岸一侧也更暗。风雨、损耗和真实材料仍会限制下一次使用。</p>
-        <details><summary>关于人物与实验</summary><p>这组片段执行了喵呜自行制作、安装和次日使用的路径。灯穗与苔团的合作、拒绝和延期由另外的社交合同测试验证；画面没有把作者设定当成已经发生的对话。</p><p>下一批还要比较真实认知、各种输入对选择的影响，之后再做自然多日观察。</p></details>
+        <details><summary>关于人物与实验</summary><p>这组片段执行了喵呜自行制作、安装和次日使用的路径。灯穗与苔团的合作、拒绝和延期由另外的社交合同测试验证；画面没有把作者设定当成已经发生的对话。</p><p><a href="/r3-review.html">查看 R3：不同输入如何影响选择与后续 ↗</a></p></details>
       </aside>
     </div>}
   </main>;
