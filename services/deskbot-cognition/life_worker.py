@@ -100,7 +100,7 @@ class BoundedPersonality(PersonalityLayer):
 class BoundedDecision(DecisionEngine):
     def __init__(self, *args, context, **kwargs):
         super().__init__(*args, **kwargs)
-        self.context=context; self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0
+        self.context=context; self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None
 
     def _build_decision_prompt(self, personality, packet, candidates):
         # Upstream's generic output instructions also describe synchronous TALK,
@@ -128,21 +128,29 @@ class BoundedDecision(DecisionEngine):
 只选择action_menu中一项；selected_index是基础动作编号，不是activity_index。WORK/PHYSICAL的具体方法应匹配capabilities中的活动；observe只看现场，不代替正式测记或生产。材料、时段、冷却以实际条件为准。
 联系只可选contactable=true的人，person_indices使用visible_or_known_people的person_index；看到或记得某人不保证现在能联系。MOVE用capabilities.travel.destinations中的destination_index；PHYSICAL只能用visible_objects中的object_index填physical_entity_index。
 本地只有异步递话和明确约定，消息本身不能当作同步对话、物品交接或他人答应。实际耗时以执行器为准，estimated_steps填1。
-返回一个简短JSON：{inner_monologue:20至60字的选择理由,act:true或false,selected_index:动作编号,action_description:具体打算,expected_outcome:期望而非事实,estimated_steps:1}。
+act=true时返回完整JSON：{inner_monologue:20至60字的选择理由,act:true,selected_index:动作编号,activity_id:具体活动ID或null,production_use:用途对象或null,action_description:具体打算,expected_outcome:期望而非事实,estimated_steps:1,issue_choice:事项选择对象}。activity_id与production_use是顶层字段；completion_target_id不能替代activity_id。
 act=false时仅保留inner_monologue和act；不要为了填满回合硬编行动。
 SEND_MESSAGE另填person_indices、message_content、contact_intent、urgency(low|normal|high|critical)。MOVE另填destination_index。PHYSICAL另填physical_entity_index。其余不相关字段省略。
 WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做活动也填activity_id，若仅观察则填null。编译器只能执行本人选择的这个方法，不在修复时替你换成另一个活动。
-'''+CONTACT_CONTRACT+ISSUE_CHOICE_CONTRACT+PRODUCTION_CONTRACT
+'''+CONTACT_CONTRACT+ISSUE_CHOICE_CONTRACT+PRODUCTION_CONTRACT+'''
+发送前核对：WORK必须同时写顶层activity_id与issue_choice。没有output的活动production_use=null；有output时按用途合同填写。不从action_description猜活动编号。PHYSICAL观察、REST、MOVE、SEND_MESSAGE的activity_id=null，另有该动作特定字段时照填。'''
         return system,prompt_json(view,self.context),[prompt_json({'objects':view['visible_objects'],'inputs':view['received_inputs']},self.context)]
+
+    def _repair_prompt(self,user_prompt):
+        if not self.contact_errors:return user_prompt
+        return (user_prompt+'\n上次返回（没有执行）：'+json.dumps(self.last_payload,ensure_ascii=False,separators=(',',':'))
+            +'\n只修复明确的字段错误；若本来意愿不再可行，也可重新选择。activity_id是JSON顶层必填字段，不能只写在production_use或completion_target_id里。'
+            +'上次未采用原因：'+'；'.join(self.contact_errors)+'。返回完整JSON，不声称已执行。')
 
     async def _attempt_selection(self, personality, packet, candidates, system_prompt, user_prompt, given_facts):
         repair=self.attempts>0; self.attempts+=1
-        if self.contact_errors:user_prompt+='\n上次选择未采用：'+'；'.join(self.contact_errors)+'。重新自主选择可行的方法，不把旧话改名，不声称已经执行。'
+        user_prompt=self._repair_prompt(user_prompt)
         with observe_stage('decision_repair' if repair else 'decision'):
             return await super()._attempt_selection(personality,packet,candidates,system_prompt,user_prompt,given_facts)
 
     def _parse_llm_selection(self, content, candidates, packet=None):
         self.contact=None; self.issue=None; self.production=None; self.method=None
+        self.last_payload=content if isinstance(content,dict) else extract_json(content)
         selection=super()._parse_llm_selection(content,candidates,packet)
         if selection is None:return None
         payload=content if isinstance(content,dict) else extract_json(content)
@@ -175,7 +183,7 @@ WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做�
         return selection
 
     async def decide(self, *, personality, packet):
-        self.contact=None; self.issue=None; self.contact_errors=[]; self.attempts=0
+        self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None
         # Keep upstream's type/target semantics while describing DeskBot's actual
         # executor. In particular, it cannot broadcast, summon, or hand over by prose.
         descriptions={

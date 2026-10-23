@@ -1,12 +1,26 @@
 import unittest
 import asyncio
 from types import SimpleNamespace
-from life_worker import BoundedMemory
+from life_worker import BoundedMemory,BoundedDecision
+from agent.decision import ActionCandidate
+from core.interfaces.action import ActionType
+from core.interfaces.perception import SpatialPerception,LocationView
 from core.interfaces.llm import LLMResponse
 from continuation_contract import continuation_errors,issue_choice_errors,compiled_issue_errors
 from life_semantics import production_errors,compiled_method_errors,render_anchored_memory
 
 class LifeSemanticsTests(unittest.TestCase):
+ def test_recorded_missing_method_is_explained_without_inferring_it_from_target(self):
+  c={'phase':'plan','use_context':{'contract':'finite-use-v1','capacity':24,'production':[]},'capabilities':{'activities':[{'activity_id':'waylight-fit-shade'}]},'continuation':{'schema':'deskbot.cognitive-continuation.v3','decision_contract':'issue-choice-v2','current':{'followup_id':'q'},'completion_targets':[{'id':'activity:waylight-fit-shade'}]}}
+  engine=BoundedDecision(None,context=c)
+  packet=SimpleNamespace(agent_id='me',spatial=SpatialPerception(location_id='bank',location_view=LocationView('岸边','现场'),current_step=1,world_time_label='2026-10-23 19:00'),inbox=[],internal_context=SimpleNamespace(relevant_relations=[]))
+  value={'act':True,'selected_index':0,'action_description':'给归途灯装上遮光罩','issue_choice':{'followup_id':'q','followup_decision':'continue','completion_target_id':'activity:waylight-fit-shade','followup_closure':None,'step_review':None},'production_use':None}
+  candidates=[ActionCandidate(ActionType.WORK,'做事')]
+  self.assertIsNone(engine._parse_llm_selection(value,candidates,packet));self.assertIsNone(engine.method)
+  prompt=engine._repair_prompt('当前现场');self.assertIn('上次返回（没有执行）',prompt);self.assertIn('JSON顶层必填字段',prompt)
+  self.assertIn('给归途灯装上遮光罩',prompt)
+  self.assertIsNotNone(engine._parse_llm_selection({**value,'activity_id':'waylight-fit-shade'},candidates,packet))
+  self.assertEqual(engine.method,'waylight-fit-shade')
  def test_proved_but_unacknowledged_experiment_does_not_justify_repeated_stock(self):
   c={'use_context':{'contract':'finite-use-v1','capacity':24,'production':[{'activity_id':'water','already_held':4}]},'continuation':{'current':{'followup_id':'q','completion_target':{'id':'activity:water'},'resolution_evidence_ids':['task:water']}}}
   v={'operation':'activity','activity_id':'water','followup_decision':'continue','followup_id':'q','completion_target_id':'activity:water','production_use':{'activity_id':'water','kind':'experiment','target_stock':8,'reference_id':'q','reason':'再做一次'}}
