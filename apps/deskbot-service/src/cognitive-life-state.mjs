@@ -16,7 +16,8 @@ import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink
 import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor,prepareCognitiveFollowup} from './cognitive-continuation.mjs';
 import {cognitiveOpportunityKey} from './cognitive-schedule.mjs';
 import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
-import {cognitiveGrounding,cognitiveUseContext,validateDecisionContact,validateDecisionIssue} from './cognitive-grounding.mjs';
+import {cognitiveGrounding,cognitiveUseContext,validateDecisionContact,validateDecisionIssue,validateDecisionMethod} from './cognitive-grounding.mjs';
+import {cognitiveMemoryFrame} from './cognitive-memory-frame.mjs';
 
 export const COGNITIVE_ACTORS=['shaping-001','wetland-grower-001','lamp-keeper-001'];
 export const cognitiveActorIds=world=>[...new Set([...COGNITIVE_ACTORS,...(world.cognition?.admitted_actors??[])])].filter(id=>cognitivePerson(world,id));
@@ -183,6 +184,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(!refs||refs.location_id!==context.location.id)fail('cognitive_context_changed');
     validateDecisionContact(proposal,refs);
     validateDecisionIssue(proposal);
+    validateDecisionMethod(proposal,context);
     // Validate optional choices before reserving resources or changing personal state.
     adoptCognitiveDevelopment(copy(world),id,compiled,refs,at);
     const followupPreview=copy(life);
@@ -283,6 +285,12 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     for(const memory of proposal.memories??[]){
       if(old.has(memory.id))continue;
       let interruptedGoal=null;
+      if(memory.payload.stream==='experiential'&&memory.payload.raw_content===payload.result.personal_fact
+       &&proposal.memory_anchor_checks?.some(c=>c.root_outcome_id===pending.root_outcome_id&&c.status==='anchored')){
+        const frame=payload.result.memory_frame;
+        const prefix=`【已核验经历 · ${frame.at}】\n${frame.facts.map(f=>f.text).join('\n')}\n【我的感受，不作事实依据】`;
+        if(!memory.payload.stored_content?.startsWith(prefix))fail('cognitive_memory_anchor_changed');
+      }
       if(memory.payload.stream==='factual'&&memory.payload.raw_content!==payload.result.personal_fact){
         interruptedGoal=(life.state.short_term_goal_entities??[]).find(g=>g.status!=='interrupted'
           &&memory.payload.raw_content===`短期目标被中断，尚未完成：${g.text}`
@@ -330,9 +338,10 @@ export function cognitiveActualResult(world,id,at){
     const comparison=task?.completion?.result?.before&&task?.completion?.result?.after
       ?`；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：${JSON.stringify({before:task.completion.result.before,after:task.completion.result.after,...(task.completion.result.fantasy_result?{experiment:task.completion.result.fantasy_result}:{})})}`:'';
     const fact=pending.blocked?`意图未能执行：${pending.blocked.message}`:task?`${cognitivePerson(world,id).display_name??'喵呜'}的任务「${verifiedTitle}」${success?'已实际完成':'未完成'}。${task.failure_reason??''}；${message??travel??`执行前现场：${JSON.stringify(pending.before.map(o=>({id:o.id,state:o.state})))}；执行后现场：${JSON.stringify(after.map(o=>({id:o.id,state:o.state})))}`}${comparison}；执行器核验的作用：${JSON.stringify(effects)}`:'此回合没有实际任务。';
-  return {root_outcome_id:pending.root_outcome_id,task_id:pending.task_id,success,not_executed:!task,
+  const result={root_outcome_id:pending.root_outcome_id,task_id:pending.task_id,success,not_executed:!task,
     failure_reason:pending.blocked?.message??task?.failure_reason??'',fact,personal_fact:`我亲身经历的结果：${fact}`,
     before:pending.before,after,effects,occurred_at:task?.completion?.due_at??at};
+  result.memory_frame=cognitiveMemoryFrame(result,task);return result;
 }
 
 export function settleCognitiveTask(world,task,at){

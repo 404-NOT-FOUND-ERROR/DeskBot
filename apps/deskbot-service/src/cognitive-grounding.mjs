@@ -30,20 +30,56 @@ export function cognitiveGrounding(world, actorId, objects, activities) {
 /** Production is an opportunity, not proof that more stock is needed. No peer inventories. */
 export function cognitiveUseContext(world,actorId,activities,at){
  const stock=world.living?.inventories[actorId]?.stock??{};
- return {assessed_at:at,production:activities.filter(a=>a.output).map(a=>({activity_id:a.activity_id,
+ return {contract:'finite-use-v1',assessed_at:at,capacity:world.living?.inventories[actorId]?.capacity??24,production:activities.filter(a=>a.output).map(a=>({activity_id:a.activity_id,
   resource:a.output.resource,name:RESOURCES[a.output.resource]??a.output.resource,output_count:a.output.count,
   already_held:stock[a.output.resource]??0,
+  reserve_limit:a.output.count,
+  uses:activities.filter(other=>other.inputs?.some(i=>i.resource===a.output.resource)).map(other=>({activity_id:other.activity_id,title:other.title,available:other.available,count:other.inputs.filter(i=>i.resource===a.output.resource).reduce((n,i)=>n+i.count,0)})),
   accepted_outgoing:(world.social?.commitments??[]).filter(c=>c.actors?.includes(actorId)&&['accepted','meeting','working'].includes(c.status))
    .flatMap(c=>(c.offers??[]).filter(o=>o.from===actorId&&o.resource===a.output.resource).map(o=>({commitment_id:c.id,count:o.count}))),
  })),rule:'可生产不代表需要再生产。先看已经持有多少、真实用途和已接受的责任；未回复不是需求，无限备货不是默认后续。可有自己的备用或探索理由，也可用已有物品、做别的、休息或放下，不强制送出。没有货币或工钱机制，不把谈价当作已存在的交易。'};
 }
 
+export function validateProductionUse(compiled,context){
+ const use=context.use_context;if(use?.contract!=='finite-use-v1')return;
+ const p=compiled.operation==='activity'?use.production.find(p=>p.activity_id===compiled.activity_id):null;
+ const choice=compiled.production_use;
+ const reject=()=>{throw Object.assign(Error('production_use_invalid'),{code:'production_use_invalid',statusCode:409});};
+ if(!p){if(choice!=null)reject();return;}
+ if(!choice||choice.activity_id!==p.activity_id||!['self_use','accepted_delivery','reserve','experiment'].includes(choice.kind)
+  ||typeof choice.reason!=='string'||!choice.reason.trim()||choice.reason.length>240
+  ||!Number.isSafeInteger(choice.target_stock)||choice.target_stock<=0||choice.target_stock>use.capacity)reject();
+ if(choice.kind==='accepted_delivery'){
+  const offer=p.accepted_outgoing.find(o=>o.commitment_id===choice.reference_id);
+  if(!offer||choice.target_stock!==offer.count)reject();
+ }else if(choice.kind==='self_use'){
+  const consumer=p.uses.find(o=>o.activity_id===choice.reference_id);
+  if(!consumer||choice.target_stock!==consumer.count)reject();
+ }else if(choice.kind==='experiment'){
+  const issue=[context.continuation.current,...(context.continuation.deferred??[])].find(f=>f?.followup_id===choice.reference_id);
+  if(!issue||!['continue','postpone'].includes(compiled.followup_decision)||compiled.followup_id!==issue.followup_id
+   ||compiled.completion_target_id!==`activity:${p.activity_id}`||issue.completed_steps?.some(s=>s.target.id===compiled.completion_target_id)
+   ||issue.completion_target?.id===compiled.completion_target_id&&issue.resolution_evidence_ids?.length)reject();
+ }else if(choice.reference_id!=null||choice.target_stock>(p.reserve_limit??use.capacity))reject();
+ if(choice.kind!=='experiment'&&p.already_held>=choice.target_stock)reject();
+}
+
 export function validateDecisionIssue(proposal){
  if(!Object.hasOwn(proposal,'decision_issue')||proposal.decision_issue===null)return;
  const c=proposal.compiled,d=proposal.decision_issue;
- if(!d||['followup_id','completion_target_id','followup_closure'].some(k=>!isDeepStrictEqual(c[k]??null,d[k]??null))
+ if(!d||['followup_id','completion_target_id','followup_closure','step_review'].some(k=>!isDeepStrictEqual(c[k]??null,d[k]??null))
   ||c.followup_decision!==d.followup_decision)
   throw Object.assign(Error('decision_issue_changed_by_compiler'),{code:'decision_issue_changed_by_compiler',statusCode:409});
+}
+
+export function validateDecisionMethod(proposal,context){
+ if(!Object.hasOwn(proposal,'decision_method')||context.use_context?.contract!=='finite-use-v1')return;
+ const c=proposal.compiled,method=proposal.decision_method;
+ if(method!=null?(c.operation!=='activity'||c.activity_id!==method):c.operation==='activity')
+  throw Object.assign(Error('decision_method_changed_by_compiler'),{code:'decision_method_changed_by_compiler',statusCode:409});
+ if(!isDeepStrictEqual(c.production_use??null,proposal.decision_production??null))
+  throw Object.assign(Error('decision_production_changed_by_compiler'),{code:'decision_production_changed_by_compiler',statusCode:409});
+ validateProductionUse(c,context);
 }
 
 /** The compiler must implement, not silently replace, the actor's communication choice. */

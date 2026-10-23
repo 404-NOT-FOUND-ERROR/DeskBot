@@ -13,7 +13,7 @@ type Report={version:string;status:string;scope:string;limitations:string[];gate
     remediation:{title:string;text:string}[];cost:{calls:number;upper_cny:number;batches:{label:string;calls:number;upper_cny:number}[]}}|null};
 type Revision={status:string;changes:string[];checks:string;experiment:string;boundary:string;
   batch?:{version:string;calls:number;upper_cny:number;completed_windows:number;cases:{title:string;result:string;note:string}[]}};
-type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string}};
+type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string};completed_steps?:{target:{title:string};reason:string;evidence_ids:string[]}[]};
 type R3A={version:string;status:string;summary:string;completed_windows:number;observed_windows:number;planned_windows:number;repairs:number;
   usage:{calls:number;cost_cny:number;input:number;output:number;unknown:number};stages:{stage:string;calls:number;input:number;output:number;cost_cny:number;p50_ms:number|null;p95_ms:number|null}[];
   window_p50_ms:number|null;window_p95_ms:number|null;replay:{summary:string;status:string}|null;
@@ -21,6 +21,7 @@ type R3A={version:string;status:string;summary:string;completed_windows:number;o
   findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;stop_kind?:'budget'|'error'|null;elapsed_ms:number;note:string;
     turns:{turn:number;at:string;action:string;actual_text:string|null;reason?:string|null;delivered_message?:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
       decision_contact?:{kind:string;receiver_ids:string[]}|null;recollections?:{feeling:string;fact:string|null}[];
+      production_use?:{kind:string;target_stock:number;reason:string}|null;memory_anchor_checks?:{status:string}[];
       decision_issue?:{followup_decision:string;completion_target_id:string|null;followup_closure:{kind:string;reason:string}|null}|null;
       issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
 const stageNames:Record<string,string>={perception:'感知',motivation:'动机与目标',decision:'行动选择',decision_repair:'选择修复',feedback:'结果反馈',memory:'记忆',compile:'意图编译',compile_repair:'编译修复',followup:'后续选择',followup_repair:'后续修复',directive:'来源折射等指令'};
@@ -28,6 +29,7 @@ const issueStatus=(f:Issue)=>f.resolution?({resolved:'具体目标已完成',sat
 function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.original_question??issue.question}</p>
   {issue.question&&issue.original_question&&issue.question!==issue.original_question&&<p>这次打算：{issue.question}</p>}
   {issue.reason&&<p>它给出的理由：{issue.reason}</p>}
+  {!!issue.completed_steps?.length&&<details><summary>已经做成的 {issue.completed_steps.length} 个步骤</summary>{issue.completed_steps.map((s,i)=><p key={i}><b>{s.target.title}</b> · {s.reason}<br/><small>执行证据：{s.evidence_ids.join('、')}</small></p>)}</details>}
   {issue.completion_target&&<p>绑定的小目标：{issue.completion_target.title}{!!issue.completion_proofs?.length?'（已有对应执行证据）':''}</p>}<small>事项 {issue.followup_id??'尚未绑定'}{issue.last_reviewed_at?` · 上次复查 ${new Date(issue.last_reviewed_at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}`:''}</small>{issue.resolution&&<p>{issue.resolution.reason}</p>}</div>;}
 function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return <section className="experiment" aria-label={historical?`R3-A 历史复验 ${data.version}`:'R3-A 当前冻结复验'}>
   <span className="badge">R3-A · {data.version} · 隔离样本</span><h2>{data.status}</h2><p>{data.summary}</p>
@@ -41,6 +43,8 @@ function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return 
       {t.audit&&<p className="audit">{t.audit.verdict} · {t.audit.note}</p>}
       {t.reason&&<details><summary>它为什么这样安排</summary><blockquote>{t.reason}</blockquote></details>}
       {t.delivered_message&&<details><summary>实际送达的留言原文</summary><p style={{whiteSpace:'pre-wrap'}}>{t.delivered_message}</p></details>}
+      {t.production_use&&<p>这次生产的用途：{({reserve:'留存备用',self_use:'实际自用',accepted_delivery:'已接受的交付',experiment:'未完成的实验'} as Record<string,string>)[t.production_use.kind]}，目标总量 {t.production_use.target_stock}。{t.production_use.reason}</p>}
+      {!!t.memory_anchor_checks?.length&&<p><small>记忆中的事实：{t.memory_anchor_checks.every(c=>c.status==='anchored')?'已与执行记录绑定，个人感受单独保留。':'有感受输出未通过校验，已省略；原始事实仍保留。'}</small></p>}
       {t.decision_contact&&<p>本人选择：{({message:'递送留言',reply:'回复镇内消息',invite:'提出正式邀请',respond:'回应约定'} as Record<string,string>)[t.decision_contact.kind]??t.decision_contact.kind} → {t.decision_contact.receiver_ids.map(id=>actors[id]??id).join('、')}</p>}
       {t.decision_issue&&<p>对原问题的选择：{({continue:'继续',postpone:'暂缓',new:'先做另一件事',none:'眼下无关联',drop:'明确收束'} as Record<string,string>)[t.decision_issue.followup_decision]??t.decision_issue.followup_decision}{t.decision_issue.completion_target_id?'；行动前选定了具体小目标':''}{t.decision_issue.followup_closure?`；${t.decision_issue.followup_closure.reason}`:''}。</p>}
       {!!t.recollections?.length&&<details><summary>它怎样记住这件事 · 个人理解需核对</summary>{t.recollections.map((m,i)=><div key={i}><blockquote>{m.feeling}</blockquote><details><summary>对应事实原文</summary><p style={{overflowWrap:'anywhere'}}>{m.fact??'此片段未附事实原文，不将感受作为完成证据。'}</p></details></div>)}</details>}
@@ -70,7 +74,7 @@ function App(){
   useEffect(()=>{const controller=new AbortController();fetch('/r3-review.json',{signal:controller.signal}).then(r=>{if(!r.ok)throw Error(`实验报告读取失败（${r.status}）`);return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-hardening.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setRevision).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3a-review.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setR3a).catch(()=>{});return()=>controller.abort();},[]);
-  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json','/r3a-current-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
   const episodes=data?.episodes.filter(e=>e.group===group&&e.arm===arm&&e.repeat===repeat)??[];
   return <main>
     <header><div className="kicker">THE SHAPING FIELD / R3</div><h1>同一盏灯，不同来由</h1><p>它听到了什么，又真正做了什么？</p>

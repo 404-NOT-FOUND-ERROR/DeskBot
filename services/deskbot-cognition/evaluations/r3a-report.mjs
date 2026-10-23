@@ -5,6 +5,7 @@ const arg=n=>process.argv.find(a=>a.startsWith(`--${n}=`))?.slice(n.length+3);
 const dir=resolve(arg('input')),raw=JSON.parse(readFileSync(join(dir,'results.json')));
 const optional=name=>existsSync(join(dir,name))?JSON.parse(readFileSync(join(dir,name))):null;
 const audit=optional('semantic-audit.json'),replay=optional('replay-check.json');
+const validation=optional('local-validation.json'),manifest=optional('manifest.json');
 const budgetStopped=r=>['call_limit_reached','budget_exhausted','budget_limit_reached'].includes(r.error);
 const calls=raw.budget?.calls??[],quantile=(values,q)=>values.length?[...values].sort((a,b)=>a-b)[Math.max(0,Math.ceil(values.length*q)-1)]:null;
 function usage(rows){return {calls:rows.length,input:rows.reduce((n,r)=>n+(r.usage?.prompt_tokens??0),0),output:rows.reduce((n,r)=>n+(r.usage?.completion_tokens??0),0),
@@ -17,7 +18,7 @@ const report={schema:'deskbot.r3a-review.v1',version:raw.version,status:audit?.s
  protocol_or_execution_failures:raw.results.filter(r=>r.error&&!budgetStopped(r)).length,
  budget_stops:raw.results.filter(budgetStopped).length,assessment:audit?.assessment??null,
  completed_windows:raw.results.flatMap(r=>r.turns).filter(t=>t.followup&&!t.truncated).length,
- observed_windows:raw.results.reduce((n,r)=>n+r.turns.length,0),planned_windows:8,
+ observed_windows:raw.results.reduce((n,r)=>n+r.turns.length,0),planned_windows:(validation?.cases?.length??raw.results.length)*(manifest?.turns??4),
  window_p50_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.5),
  window_p95_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.95),
  replay,checks:optional('local-validation.json'),local_revision:optional('local-followup.json'),findings:audit?.findings??[],
@@ -29,11 +30,12 @@ const report={schema:'deskbot.r3a-review.v1',version:raw.version,status:audit?.s
    success:t.actual_result?.success??null,blocked:t.actual_result?.failure_reason??null,latency_ms:t.latency_ms??null,
    decision_contact:t.plan_proposal?.decision_contact??null,
    decision_issue:t.plan_proposal?.decision_issue??null,
+   production_use:t.plan_proposal?.decision_production??null,memory_anchor_checks:t.feedback_proposal?.memory_anchor_checks??[],
    recollections:(t.feedback_proposal?.memories??[]).filter(m=>m.payload.stream==='experiential'&&m.payload.kind==='event').map(m=>({
      feeling:m.payload.stored_content,
      fact:(t.feedback_proposal?.memories??[]).find(f=>f.payload.stream==='factual'&&f.payload.event_group_id===m.payload.event_group_id)?.payload.raw_content??null})),
    prior_issue:t.prior_followup??null,issues:t.issues??null,followup:t.followup??null,audit:audit?.cases?.[r.id]?.turns?.[String(t.turn)]??null}))})),
- limitations:['仅两例、最多各四个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。','其他居民未运行自主认知，不把未回复说成拒绝。',
+ limitations:[`计划 ${(validation?.cases?.length??raw.results.length)} 例、各 ${manifest?.turns??4} 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。`,'其他居民未运行自主认知，不把未回复说成拒绝。',
  'resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。','相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。',
  '费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。',
  '旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。']};

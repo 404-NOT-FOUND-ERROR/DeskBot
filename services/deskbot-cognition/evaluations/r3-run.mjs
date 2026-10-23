@@ -23,6 +23,7 @@ if(!Number.isSafeInteger(maxCalls)||maxCalls<1||maxCalls>900)throw Error('max_ca
 mkdirSync(dir,{recursive:true});
 const base=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
 const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs','services/deskbot-cognition/evaluations/recorded-calls.mjs',
+  'services/deskbot-cognition/life_semantics.py','apps/deskbot-service/src/cognitive-memory-frame.mjs',
   'apps/deskbot-service/src/cognitive-life-state.mjs','apps/deskbot-service/src/cognitive-continuity.mjs',
   'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
   'apps/deskbot-service/src/cognitive-social.mjs',
