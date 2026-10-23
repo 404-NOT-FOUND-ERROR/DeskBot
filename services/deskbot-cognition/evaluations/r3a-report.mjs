@@ -24,9 +24,11 @@ const report={schema:'deskbot.r3a-review.v1',version:raw.version,status:audit?.s
  cases:raw.results.map(r=>({id:r.id,error:r.error??null,error_detail:r.error_detail??null,stop_kind:r.error?(budgetStopped(r)?'budget':'error'):null,elapsed_ms:r.latency_ms,note:audit?.cases?.[r.id]?.note??'待逐例审查',
   turns:r.turns.map(t=>({turn:t.turn,at:t.at,action:t.task?.title??t.compiled?.operation??'未采用计划',activity:t.task?.activity_id??null,
    operation:t.compiled?.operation??null,reason:t.reason??null,result:t.actual_result?.effects??null,
-   actual_text:t.task?.cognitive_operation==='share'?'留言送达；物品未交接，所谈活动未因此完成。':t.task?.completion?.result?.text??null,
+   actual_text:t.task?.cognitive_operation==='share'?'留言送达；物品未交接，所谈活动未因此完成。':t.compiled?.operation==='wait'?'本人选择暂不行动，保留后续复查；没有新增物质成果。':t.task?.completion?.result?.text??(t.task?.status==='completed'&&t.compiled?.operation==='rest'?'已完成这次休息；没有把休息计作研究成果。':t.task?.status==='completed'&&t.compiled?.operation==='observe'?'已完成现场观察；没有制作、交付或新增物品。':null),
+   delivered_message:t.task?.cognitive_message_delivered_at?t.task?.cognitive_message?.text??null:null,
    success:t.actual_result?.success??null,blocked:t.actual_result?.failure_reason??null,latency_ms:t.latency_ms??null,
    decision_contact:t.plan_proposal?.decision_contact??null,
+   decision_issue:t.plan_proposal?.decision_issue??null,
    recollections:(t.feedback_proposal?.memories??[]).filter(m=>m.payload.stream==='experiential'&&m.payload.kind==='event').map(m=>({
      feeling:m.payload.stored_content,
      fact:(t.feedback_proposal?.memories??[]).find(f=>f.payload.stream==='factual'&&f.payload.event_group_id===m.payload.event_group_id)?.payload.raw_content??null})),
