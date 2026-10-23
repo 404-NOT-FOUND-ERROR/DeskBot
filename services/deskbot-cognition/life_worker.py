@@ -140,7 +140,7 @@ WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做�
         if not self.contact_errors:return user_prompt
         return (user_prompt+'\n上次返回（没有执行）：'+json.dumps(self.last_payload,ensure_ascii=False,separators=(',',':'))
             +'\n只修复明确的字段错误；若本来意愿不再可行，也可重新选择。activity_id是JSON顶层必填字段，不能只写在production_use或completion_target_id里。'
-            +'上次未采用原因：'+'；'.join(self.contact_errors)+'。返回完整JSON，不声称已执行。')
+            +'上次未采用原因：'+'；'.join(self.contact_errors)+'。返回完整JSON，不声称已执行。格式校验不是世界事件；角色的inner_monologue只谈生活处境和选择，不把字段错误说成被人拦下或物理上不能做。')
 
     async def _attempt_selection(self, personality, packet, candidates, system_prompt, user_prompt, given_facts):
         repair=self.attempts>0; self.attempts+=1

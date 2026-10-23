@@ -36,7 +36,7 @@ function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return 
   <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次选择或合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
   {data.findings.map(f=><p key={f}>{f}</p>)}
   {data.local_revision&&<div className="actual"><b>实验后的本地修正 · {data.local_revision.version}</b><p>{data.local_revision.checks}</p><ul>{data.local_revision.changes.map(c=><li key={c}>{c}</li>)}</ul><p>{data.local_revision.real_retested?'已重新进行真实验证':'尚未追加真实模型复验；下面仍是原冻结版本的结果。'}</p></div>}
-  <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?'缺材料时怎样接着生活':'收到装罩邀请以后'}</b><small>{c.id}</small></div>
+  <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?(c.id.endsWith('-off')?'材料充足的对照':'缺材料时怎样接着生活'):(c.id.endsWith('-off')?'没有新增邀请的对照':'收到装罩邀请以后')}</b><small>{c.id}</small></div>
     <p>{c.note}</p>{c.error&&<p className="error">{c.stop_kind==='budget'?'已达本批调用上限，停止追加。最后一次行动已执行，后续反馈尚未采用；该窗口未计作完整完成。':`本例停止：${c.error_detail??c.error}。失败窗口保留，未计作完成。`}</p>}
     {c.turns.map(t=><section className="turn" key={t.turn}><div className="turn-number">0{t.turn}<span>{new Date(t.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时间</span></div>
       <h3>{t.action}</h3><div className="actual">{t.actual_text??'这一窗口没有已完成的物件结果。'}</div>
@@ -47,7 +47,7 @@ function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return 
       {!!t.memory_anchor_checks?.length&&<p><small>记忆中的事实：{t.memory_anchor_checks.every(c=>c.status==='anchored')?'已与执行记录绑定，个人感受单独保留。':'有感受输出未通过校验，已省略；原始事实仍保留。'}</small></p>}
       {t.decision_contact&&<p>本人选择：{({message:'递送留言',reply:'回复镇内消息',invite:'提出正式邀请',respond:'回应约定'} as Record<string,string>)[t.decision_contact.kind]??t.decision_contact.kind} → {t.decision_contact.receiver_ids.map(id=>actors[id]??id).join('、')}</p>}
       {t.decision_issue&&<p>对原问题的选择：{({continue:'继续',postpone:'暂缓',new:'先做另一件事',none:'眼下无关联',drop:'明确收束'} as Record<string,string>)[t.decision_issue.followup_decision]??t.decision_issue.followup_decision}{t.decision_issue.completion_target_id?'；行动前选定了具体小目标':''}{t.decision_issue.followup_closure?`；${t.decision_issue.followup_closure.reason}`:''}。</p>}
-      {!!t.recollections?.length&&<details><summary>它怎样记住这件事 · 个人理解需核对</summary>{t.recollections.map((m,i)=><div key={i}><blockquote>{m.feeling}</blockquote><details><summary>对应事实原文</summary><p style={{overflowWrap:'anywhere'}}>{m.fact??'此片段未附事实原文，不将感受作为完成证据。'}</p></details></div>)}</details>}
+      {!!t.recollections?.length&&<details><summary>它怎样记住这件事 · 个人理解需核对</summary>{t.recollections.map((m,i)=><div key={i}><blockquote style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{m.feeling}</blockquote><details><summary>对应事实原文</summary><p style={{overflowWrap:'anywhere'}}>{m.fact??'此片段未附事实原文，不将感受作为完成证据。'}</p></details></div>)}</details>}
       {t.followup&&<IssueView issue={t.followup}/>}
       {t.issues&&<details><summary>暂存 {t.issues.deferred.length} 项 · 历史收束 {t.issues.closed.length} 项</summary>{[...t.issues.deferred,...t.issues.closed].map((f,i)=><IssueView key={`${f.followup_id}:${i}`} issue={f}/>)}</details>}
       <small>窗口耗时 {sec(t.latency_ms)}</small></section>)}
@@ -74,7 +74,7 @@ function App(){
   useEffect(()=>{const controller=new AbortController();fetch('/r3-review.json',{signal:controller.signal}).then(r=>{if(!r.ok)throw Error(`实验报告读取失败（${r.status}）`);return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-hardening.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setRevision).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3a-review.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setR3a).catch(()=>{});return()=>controller.abort();},[]);
-  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json','/r3a-current-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json','/r3a-current-screening.json','/r3a-protocol-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
   const episodes=data?.episodes.filter(e=>e.group===group&&e.arm===arm&&e.repeat===repeat)??[];
   return <main>
     <header><div className="kicker">THE SHAPING FIELD / R3</div><h1>同一盏灯，不同来由</h1><p>它听到了什么，又真正做了什么？</p>

@@ -10,6 +10,13 @@ from continuation_contract import continuation_errors,issue_choice_errors,compil
 from life_semantics import production_errors,compiled_method_errors,render_anchored_memory
 
 class LifeSemanticsTests(unittest.TestCase):
+ def test_recorded_experiment_reference_confusion_names_exact_field_without_changing_intent(self):
+  c={'use_context':{'contract':'finite-use-v1','capacity':24,'production':[{'activity_id':'waylight-use','already_held':0}]},'continuation':{'current':{'followup_id':'task:fixture-built-lamp','completed_steps':[{'target':{'id':'activity:waylight-fit-shade'}}]}}}
+  v={'operation':'activity','activity_id':'waylight-use','followup_decision':'continue','followup_id':'task:fixture-built-lamp','completion_target_id':'activity:waylight-use','production_use':{'activity_id':'waylight-use','kind':'experiment','target_stock':4,'reference_id':'activity:waylight-use','reason':'检验罩片朝归路时照明够不够'}}
+  errors=production_errors(v,c);self.assertEqual(len(errors),1)
+  self.assertIn('production_use.reference_id',errors[0]);self.assertIn('task:fixture-built-lamp',errors[0]);self.assertIn('不表示活动不能做',errors[0])
+  v['production_use']['reference_id']='task:fixture-built-lamp';self.assertEqual(production_errors(v,c),[])
+  v['completion_target_id']=None;self.assertIn('completion_target_id',production_errors(v,c)[0])
  def test_recorded_missing_method_is_explained_without_inferring_it_from_target(self):
   c={'phase':'plan','use_context':{'contract':'finite-use-v1','capacity':24,'production':[]},'capabilities':{'activities':[{'activity_id':'waylight-fit-shade'}]},'continuation':{'schema':'deskbot.cognitive-continuation.v3','decision_contract':'issue-choice-v2','current':{'followup_id':'q'},'completion_targets':[{'id':'activity:waylight-fit-shade'}]}}
   engine=BoundedDecision(None,context=c)

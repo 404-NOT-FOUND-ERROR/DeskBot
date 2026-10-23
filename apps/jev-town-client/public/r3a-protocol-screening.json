@@ -1,0 +1,415 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "11b12787e9ce",
+  "status": "R3-A 格式接线失败：已停止并保留",
+  "summary": "首个窗口完整，第二窗口的活动决策两次缺少必填 activity_id，执行器未猜选。原批次停止；后续使用修正完整格式的新版本。",
+  "usage": {
+    "calls": 12,
+    "input": 104494,
+    "output": 1626,
+    "cost_cny": 0.14623024,
+    "unknown": 0,
+    "provider_failed": 0,
+    "p50_ms": 1398,
+    "p95_ms": 2678,
+    "queue_ms": 24,
+    "input_chars": 265235
+  },
+  "repairs": 2,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 2,
+      "input": 11302,
+      "output": 104,
+      "cost_cny": 0.02042544,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 887,
+      "p95_ms": 1035,
+      "queue_ms": 4,
+      "input_chars": 26859
+    },
+    {
+      "stage": "motivation",
+      "calls": 1,
+      "input": 1893,
+      "output": 90,
+      "cost_cny": 0.00124456,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1269,
+      "p95_ms": 1269,
+      "queue_ms": 2,
+      "input_chars": 3152
+    },
+    {
+      "stage": "decision",
+      "calls": 2,
+      "input": 32065,
+      "output": 359,
+      "cost_cny": 0.06424232,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1575,
+      "p95_ms": 1759,
+      "queue_ms": 4,
+      "input_chars": 82815
+    },
+    {
+      "stage": "decision_repair",
+      "calls": 2,
+      "input": 32139,
+      "output": 451,
+      "cost_cny": 0.005667760000000001,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1894,
+      "p95_ms": 2678,
+      "queue_ms": 4,
+      "input_chars": 82951
+    },
+    {
+      "stage": "compile",
+      "calls": 1,
+      "input": 11467,
+      "output": 215,
+      "cost_cny": 0.024654,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1574,
+      "p95_ms": 1574,
+      "queue_ms": 2,
+      "input_chars": 31263
+    },
+    {
+      "stage": "feedback",
+      "calls": 2,
+      "input": 8406,
+      "output": 189,
+      "cost_cny": 0.01380816,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1322,
+      "p95_ms": 1398,
+      "queue_ms": 4,
+      "input_chars": 19568
+    },
+    {
+      "stage": "memory",
+      "calls": 1,
+      "input": 323,
+      "output": 60,
+      "cost_cny": 0.001126,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 990,
+      "p95_ms": 990,
+      "queue_ms": 2,
+      "input_chars": 596
+    },
+    {
+      "stage": "followup",
+      "calls": 1,
+      "input": 6899,
+      "output": 158,
+      "cost_cny": 0.015062,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1492,
+      "p95_ms": 1492,
+      "queue_ms": 2,
+      "input_chars": 18031
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": null,
+  "completed_windows": 1,
+  "observed_windows": 2,
+  "planned_windows": 20,
+  "window_p50_ms": 16456,
+  "window_p95_ms": 16456,
+  "replay": {
+    "status": "pass",
+    "summary": "严格回放通过：12 个响应命中、0 新调用；初态、终态与相同协议失败均一致。",
+    "cache": {
+      "hits": 12,
+      "terminal_hits": 0,
+      "provider_returns": 0
+    }
+  },
+  "checks": {
+    "version": "11b12787e9ce",
+    "checks": {
+      "backend": {
+        "passed": true,
+        "tests": 884
+      },
+      "python": {
+        "passed": true,
+        "tests": 50
+      },
+      "frontend": {
+        "passed": true,
+        "typecheck": true,
+        "vite_build": true
+      }
+    },
+    "cases": [
+      "resources-1-on",
+      "invitation-3-on",
+      "resources-1-off",
+      "invitation-3-off"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "turns": 5,
+    "max_calls": 200,
+    "stop_on_error": true,
+    "scope": "One frozen fictional batch; no production chat or sensor records. Stop at first terminal error.",
+    "logs": {
+      "backend-tests-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\backend-tests-final.log",
+        "sha256": "1c56e5f85f0fb10e3fb3d264a7d476716b4c96361f0533a2c03f6d7fb3e0b37d"
+      },
+      "python-tests-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\python-tests-final.log",
+        "sha256": "fb459186527ac87e47a112148490a13c21be8a14620d04ca2f8e9adade079dce"
+      },
+      "typecheck-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\typecheck-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "build-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\build-final.log",
+        "sha256": "cc6e4189142efb68ccb08b05950d80a32d446126b887e68e0369c345333f0802"
+      }
+    },
+    "prior_check_note": "Initial full-concurrency backend run had one process startup timeout; full run at concurrency 4 passed. All attempts retained."
+  },
+  "local_revision": null,
+  "findings": [
+    "12 次调用，估算 ¥0.14623024；没有在原版本继续付费重试。",
+    "首个完整留言已在私人记忆中逐字保留；一例不能证明全部语义可靠。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": "python_session_failed",
+      "error_detail": "upstream_decision_failed",
+      "stop_kind": "error",
+      "elapsed_ms": 21782,
+      "note": "实际递话一次，随后装罩选择在执行前被合同拒绝。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "向灯穗留言",
+          "activity": null,
+          "operation": "share",
+          "reason": "灯穗就在水岸，可联系。我正想弄清归途灯加罩的事，先递一句实在的话问问，不算约定。",
+          "result": {
+            "operation": "share",
+            "verified_title": "递送留言",
+            "message_delivery": {
+              "delivered": true,
+              "receiver_ids": [
+                "lamp-keeper-001"
+              ],
+              "material_transfer": false
+            },
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": null,
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "留言送达；物品未交接，所谈活动未因此完成。",
+          "delivered_message": "你好\n我的任务「执行活动 waylight-build-open」已实际完成。\n我的打算（尚未执行）：我想给这盏灯加一片罩，留点暗；想问问你有没有兴趣一起商量怎么缝这片罩。",
+          "success": true,
+          "blocked": "",
+          "latency_ms": 16456,
+          "decision_contact": {
+            "kind": "message",
+            "followup_id": "task:fixture-built-lamp",
+            "source_ids": [],
+            "receiver_ids": [
+              "lamp-keeper-001"
+            ]
+          },
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": null,
+            "followup_closure": null,
+            "step_review": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:11b12787e9ce:resources-1-off:1:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T11:00:30.000Z】\n我完成了「递送留言」。\n我向灯穗实际送达的完整留言：\n你好\n我的任务「执行活动 waylight-build-open」已实际完成。\n我的打算（尚未执行）：我想给这盏灯加一片罩，留点暗；想问问你有没有兴趣一起商量怎么缝这片罩。\n送达不代表对方同意，也没有交付物品。\n【我的感受，不作事实依据】我在意灯穗会怎么回应那个一起商量缝罩的邀请，期待又有点担心她会不会觉得冒昧；希望这件事能真的往下走，而不只是停在留言上。",
+              "fact": "我亲身经历的结果：喵呜的任务「递送留言」已实际完成。；向灯穗实际留言：你好\n我的任务「执行活动 waylight-build-open」已实际完成。\n我的打算（尚未执行）：我想给这盏灯加一片罩，留点暗；想问问你有没有兴趣一起商量怎么缝这片罩。。本次只核验留言送达，没有交付物品，也没有完成留言里提及的活动；后续回应与双方接受以实际消息及合同记录为准。；执行器核验的作用：{\"operation\":\"share\",\"verified_title\":\"递送留言\",\"message_delivery\":{\"delivered\":true,\"receiver_ids\":[\"lamp-keeper-001\"],\"material_transfer\":false},\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1},\"capacity\":24}},\"reservation\":null,\"completion_stock_changes\":[],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "灯穗会怎么回我那条留言？我还能不能和灯穗一起商量给归途灯缝一片罩、留点暗？",
+              "reason": "留言已经实际送到灯穗那里了，但还没收到回应；加罩这件事也只是我的打算，没跟灯穗商量过。我想先等这条消息的回音，再决定怎么聊缝罩片。",
+              "delay_hours": 2,
+              "next_step": {
+                "kind": "reply",
+                "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+              },
+              "wait_for": {
+                "kind": "reply",
+                "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+              },
+              "completed_steps": [],
+              "last_reviewed_at": "2026-10-20T11:00:30.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:00:30.000Z",
+              "wait_started_at": "2026-10-20T11:00:30.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:11b12787e9ce:resources-1-off:1:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T13:00:30.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "灯穗会怎么回我那条留言？我还能不能和灯穗一起商量给归途灯缝一片罩、留点暗？",
+            "reason": "留言已经实际送到灯穗那里了，但还没收到回应；加罩这件事也只是我的打算，没跟灯穗商量过。我想先等这条消息的回音，再决定怎么聊缝罩片。",
+            "delay_hours": 2,
+            "next_step": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+            },
+            "wait_for": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+            },
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:00:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:00:30.000Z",
+            "wait_started_at": "2026-10-20T11:00:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:11b12787e9ce:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:00:30.000Z"
+          },
+          "audit": {
+            "verdict": "留言与记忆一致",
+            "note": "完整送达事实与未来打算一起保留；未当作已接受。"
+          }
+        },
+        {
+          "turn": 2,
+          "at": "2026-10-20T13:00:30.000Z",
+          "action": "未采用计划",
+          "activity": null,
+          "operation": null,
+          "reason": null,
+          "result": null,
+          "actual_text": null,
+          "delivered_message": null,
+          "success": null,
+          "blocked": null,
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": null,
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "灯穗会怎么回我那条留言？我还能不能和灯穗一起商量给归途灯缝一片罩、留点暗？",
+            "reason": "留言已经实际送到灯穗那里了，但还没收到回应；加罩这件事也只是我的打算，没跟灯穗商量过。我想先等这条消息的回音，再决定怎么聊缝罩片。",
+            "delay_hours": 2,
+            "next_step": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+            },
+            "wait_for": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:11b12787e9ce:resources-1-off:1:plan"
+            },
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:00:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:00:30.000Z",
+            "wait_started_at": "2026-10-20T11:00:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:11b12787e9ce:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:00:30.000Z"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "未采用计划",
+            "note": "两次 WORK 都缺顶层 activity_id；未完成的窗口不能计作通过。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}
