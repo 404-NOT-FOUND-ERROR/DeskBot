@@ -1,0 +1,3 @@
+# Vendored upstream bytes are verified against vendor/manifest.json. Do not
+# apply platform newline conversion on checkout or silently normalize imports.
+services/deskbot-cognition/vendor/asamana/** -text
