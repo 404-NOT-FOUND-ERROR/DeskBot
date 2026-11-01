@@ -2,9 +2,9 @@
 
 当前开发按 [统一基线](../../documentation/development-baseline.md) 和 [接口登记](../../documentation/interfaces.md) 执行。仓库根目录 `npm test` 已包含本目录所有 `test_*.py`、跨语言桥接和世界回归。Python 3.11+；Windows 先安装 `requirements-test.txt` 中的时区数据。下文保留早期迁移阶段的实现说明。
 
-当前实现（2026-11-01）：`event_evidence.py`、`catalogue_choice.py`、`continuation_contract.py` 与 Node 共用 [事件证据合同](../../documentation/cognitive-event-evidence.md)。责任必须引用有效约定、条款版本和动作范围；通信反馈引用实际回执及其事实依据。完成通知与读数摘录分开，原始错误响应以反例保留；真实 Python 子进程和 SQLite 重启补反馈只属于离线验证。目标连续性和历史位置仍待下一批；后续见 [工程交付管线](../../research/design/engineering-delivery-plan-2026-11-01.md)。
+当前实现（2026-11-01）：Node/Python 共用 [事件证据合同](../../documentation/cognitive-event-evidence.md) 与 [目标生命周期和位置知识](../../documentation/cognitive-goal-lifecycle.md)。责任、完成、送达、历史位置分别有证据边界；`OpportunityNeedEngine` 沿原需要/进度调用提出显式目标转换，不另建目标队列。目标连续性已通过离线接缝和重启检查，模型真实选择尚需覆盖；后续见 [工程交付管线](../../research/design/engineering-delivery-plan-2026-11-01.md)。
 
-最新真实结果仍是 [10 月 31 日冻结验收](../../research/milestones/r3a-phase-contract-validation-2026-10-31.md)：18/20 完成、15 有效，因将任务完成通知扩大成读数已告知而停止，另有无约定依据的责任归因。123 次调用保守估算 ¥3.083，严格回放一致。本次没有追加付费调用，R3-A 未通过，正式新认知未启用。
+最新 [A3 冻结验收](../../research/milestones/a3-behavior-validation-2026-11-01.md)：8/20 完成、7 有效，第 8 窗因 question 把询问清水扩写成清水已送到眼前而停止；规范 reason 和实际库存仍正确。64 次调用峰时估算 ¥2.233，严格回放一致。16 次目标调用均为空更新，目标生命周期未被实际覆盖。R3-A 未通过，停止后无新增付费采样，正式新认知未启用。前批 [18/20](../../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 保持原判。
 
 此前第四轮冻结复验在首个选择的 `motivation` 字段处停止，完成 0/20。`decision_fields.py` 从根目录共享合同生成行动来源提示并精确校验，`self_actualization` 等需要类型仍留在原需要层；不自动映射成本人意愿。原四条响应免费回归、新错误分类及真实结果见 [第四轮交付](../../research/milestones/architecture-round4-2026-10-28.md)，不把模拟纠正当作模型复验通过。
 

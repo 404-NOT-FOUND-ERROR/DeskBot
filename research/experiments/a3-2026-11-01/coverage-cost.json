@@ -1,0 +1,41 @@
+{
+  "schema": "deskbot.a3-coverage-cost.v1",
+  "version": "cb2e483aa2bf",
+  "goal_lifecycle": {
+    "plan_windows": 8,
+    "new_goals": 0,
+    "updates": 0,
+    "nonempty_goal_queues": 0,
+    "noop_calls": 16,
+    "noop_input_tokens": 273411,
+    "noop_output_tokens": 112,
+    "noop_cost_upper_cny": 0.53617752,
+    "interpretation": "Empty goals remained empty; no proof of real-model creation or lifecycle choice. Noop cost is a measured optimization opportunity, not proof every call is removable."
+  },
+  "latency": {
+    "call_p50_ms": 1362,
+    "call_p95_ms": 2463,
+    "window_p50_ms": 12790,
+    "window_p95_ms": 15121,
+    "window_scope": "Planning, finite simulated execution and feedback; excludes assistant review pauses. Not natural life elapsed time."
+  },
+  "repairs": [
+    {
+      "call_id": "r3:cb2e483aa2bf:resources-1-off:2:plan:4",
+      "stage": "decision_repair"
+    },
+    {
+      "call_id": "r3:cb2e483aa2bf:resources-1-on:1:feedback:5",
+      "stage": "followup_repair"
+    },
+    {
+      "call_id": "r3:cb2e483aa2bf:resources-1-on:2:plan:4",
+      "stage": "decision_repair"
+    },
+    {
+      "call_id": "r3:cb2e483aa2bf:resources-1-on:3:plan:4",
+      "stage": "decision_repair"
+    }
+  ],
+  "scope": "Original same-version fictional cases only, no new calls."
+}

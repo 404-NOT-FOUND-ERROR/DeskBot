@@ -2,9 +2,9 @@
 
 2026-10-25 起生效。本文是用户确认的当前开发基线。此前 R0—R6、6A/6B 和实验分支文档继续作为历史证据；排期、术语与验收边界冲突时，以本文为准。阶段结果单独记入 `research/milestones/`，不把计划写成已交付能力。
 
-执行状态（2026-11-01）：A1 [公共事件证据](../research/milestones/r3a-event-evidence-2026-11-01.md) 与 A2 [目标连续性和位置知识](../research/milestones/a2-goal-lifecycle-2026-11-01.md) 已实现并经离线门禁。稳定目标、成果标准、方法与复查分开，记录实际送达和位置来源/年龄，SQLite 重启不重做成果。没有新增付费调用或启用正式新认知。下一步 A3 冻结新版本并重跑原四例二十窗口；具体出口见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
+执行状态（2026-11-01）：A1 [公共事件证据](../research/milestones/r3a-event-evidence-2026-11-01.md) 与 A2 [目标连续性和位置知识](../research/milestones/a2-goal-lifecycle-2026-11-01.md) 已实现并经离线门禁。[A3 真实复验](../research/milestones/a3-behavior-validation-2026-11-01.md) 完成 8/20、7 个有效，第 8 窗因后续问题夹带未发生的呈送动作停止。64 次调用峰时估算 ¥2.233，原版本严格回放一致。正式新认知未启用，R3-B 未放行。
 
-最新真实证据仍是 10 月 31 日 [反馈阶段合同版复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md)：18/20 完成，15 有效；第 18 窗将完成通知扩大成实测结果已告知，另有无约定依据的责任归因，按审阅停止。123 次调用保守估算 ¥3.083，严格缓存回放一致。R3-A 未放行；本轮修复不修改该分母和判定，前批 2/20 原记录保留。
+下一步 [A3.1](../research/design/a3-followup-remediation-2026-11-01.md) 先规范后续事实/意图、证据引用用途，补目标生命周期覆盖并优化空更新调用。本批目标始终为空，不能把问题链连续性当作 A2 全部获得真实覆盖。10 月 31 日 [18/20 历史复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 与更早结果保持原判，不合并窗口。具体出口见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
 
 ## 产品目标
 

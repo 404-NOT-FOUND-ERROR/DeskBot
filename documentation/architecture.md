@@ -2,9 +2,9 @@
 
 当前开发路线与原则以 [开发基线](development-baseline.md) 为准，当前接口索引见 [接口与调用链](interfaces.md)。下面保留按交付日期记录的实现历史，不作为最新统一验收状态。
 
-2026-11-01 当前实现：[公共事件证据接口](cognitive-event-evidence.md) 沿既有结果根、消息和约定接入。Node 生成完成通知/结果摘录和送达回执；Python 与 Node 共用事实反馈、约定条款及动作范围校验。私人感受不能扩展已发送字段，旧记录不补造回执。当前登记为 13 模块/14 接口，仍采用 Node/SQLite 单一事实、Python 受控认知、React/Three.js 读模型的架构。目标连续性与更完整位置知识仍待下一批，详见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
+2026-11-01 当前实现：[公共事件证据接口](cognitive-event-evidence.md) 沿既有结果根、消息和约定接入；[目标生命周期和位置知识](cognitive-goal-lifecycle.md) 将固定完成标准与方法、复查分开。当前登记为 15 模块/16 接口，仍采用 Node/SQLite 单一事实、Python 受控认知、React/Three.js 读模型。旧记录不补造回执或完成证据，详见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
 
-最新真实执行结果保持 [10 月 31 日复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md)：完成 18/20、15 有效，第 18 窗语义审阅停止，123 条缓存严格回放一致。本次没有新模型采样，持续生活与 R3-B 尚未放行。
+最新 [A3 真实复验](../research/milestones/a3-behavior-validation-2026-11-01.md) 完成 8/20、7 有效，第 8 窗停止；64 条缓存严格回放一致。执行器与回执保持正确，但自由 question 可夹带与 reason 矛盾的事实，现有两端校验均未覆盖；目标队列始终为空也是覆盖缺口。下一步先做后续事实/意图的统一合同，持续生活与 R3-B 尚未放行。[10 月 31 日历史结果](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 保持原判。
 
 2026-10-20 R3 修正：[稳定后续与等待](../research/milestones/cognition-r3-hardening-2026-10-20.md)。原认知链新增稳定问题编号、暂存/恢复与明确结案，下一步和等待对象分别绑定；清水交接沿用既有共同事务。调度记住已复查的条件/邀请版本，减少无变化唤醒。消息记录按问题、收件人和实际依据约束重复联系，并关联发送/收件编号；私有联系依据不发送给对方。Python 提示与 Node 校验共同守边界，角色仍负责选择。最新修正经本地回归，尚未完整真实模型复验。
 
