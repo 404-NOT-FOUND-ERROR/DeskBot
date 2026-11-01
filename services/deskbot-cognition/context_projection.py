@@ -17,6 +17,10 @@ def goal_lifecycle_view(context):
     fields=('goal_id','text','completion_criteria','lifecycle_status','evidence_ids','next_review_at','review_due','method_status','completion_status')
     view={k:deepcopy(v) for k,v in raw.items() if k!='goals'}
     view['goals']=[{k:deepcopy(g[k]) for k in fields if k in g} for g in raw.get('goals', [])]
+    if context.get('evidence_refs') and context.get('phase')=='feedback':
+        # Feedback cannot create a goal or choose a new method. Keep each
+        # existing goal's immutable criterion/proof, omit unbound catalogues.
+        view.pop('criteria',None)
     return view
 
 def continuation_view(context):
@@ -52,7 +56,7 @@ def continuation_view(context):
     return view
 
 def stage_context(context, stage):
-    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context', 'goal_opportunities', 'goal_lifecycle', 'event_evidence')
+    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context', 'goal_opportunities', 'goal_lifecycle', 'event_evidence', 'evidence_refs')
     research = ('inquiry', 'resonant_inquiry', 'windleaf_inquiry', 'waylight', 'development')
     if stage in ('perception', 'interrupt'):
         fields = common + ('social',)
@@ -68,6 +72,8 @@ def stage_context(context, stage):
     if 'goal_lifecycle' in result:
         result['goal_lifecycle']=goal_lifecycle_view(context)
         result.pop('goal_opportunities',None)  # Legacy view is the same records, not additional evidence.
+        if context.get('evidence_refs') and stage in ('perception','interrupt','feedback','followup','followup_repair'):
+            result['goal_lifecycle'].pop('criteria',None)
     if 'continuation' in result:
         result['continuation'] = continuation_view(context)
     if stage not in ('decision', 'motivation', 'plan', ''):

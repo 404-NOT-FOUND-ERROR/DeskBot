@@ -6,7 +6,7 @@ export function positionKnowledge(w,id,c){
  const saved=w.cognition?.actors[id]?.position_knowledge??[];
  const rows=new Map(saved.map(p=>[p.actor_id,copy(p)]));
  for(const p of c.visible_people)rows.set(p.actor_id,{actor_id:p.actor_id,location_id:c.location.id,
-  observed_at:c.at,basis:'seen_here',source_id:`sighting:${id}:${p.actor_id}:${c.at}`,observer_id:id});
+  observed_at:c.position_observed_at??c.at,basis:'seen_here',source_id:`sighting:${id}:${p.actor_id}:${c.position_observed_at??c.at}`,observer_id:id});
  return {schema:POSITION_KNOWLEDGE.schema,rule:POSITION_KNOWLEDGE.rule,people:[...rows.values()].map(p=>{
   const age=(Date.parse(c.at)-Date.parse(p.observed_at))/60000;
   const expired=!Number.isFinite(age)||age<0||age>POSITION_KNOWLEDGE.retention_hours*60;

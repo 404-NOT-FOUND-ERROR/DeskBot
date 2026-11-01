@@ -181,6 +181,7 @@ test('full Python need generation, choice, Node execution, feedback and SQLite r
   const c=cognitiveContext(w,OWNER,at,phase);c.mode='mock';
   delete c.goal_lifecycle; // Historical v1 goal bindings retain exact-method semantics.
   delete w.cognition.actors[OWNER].job.references.goal_lifecycle;
+  for(const key of ['followup_intent','evidence_refs']){delete c[key];delete w.cognition.actors[OWNER].job.references[key];}
   if(phase==='feedback'){c.result=cognitiveActualResult(w,OWNER,at);c.action=w.cognition.actors[OWNER].pending.action;}
   const p=await bridge.session(c,respond);
   if(phase==='plan'){

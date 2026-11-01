@@ -63,7 +63,7 @@ export function freezeCognitiveReferences(context){
     social:copy(context.social??{}),speech_evidence:copy(context.speech_evidence??[]),development:copy(context.development??null),
     choice_contract:context.choice_contract,choice_catalogue:copy(context.choice_catalogue??null),
     opportunities:copy(context.opportunities??null),event_evidence:copy(context.event_evidence??null),goal_lifecycle:copy(context.goal_lifecycle??null),
-    continuation:copy(context.continuation??null),
+    continuation:copy(context.continuation??null),followup_intent:copy(context.followup_intent??null),evidence_refs:copy(context.evidence_refs??null),
     perceptions:copy(context.perceptions??[]),interpretation_pending:copy(context.refraction?.pending??[]),known_people:copy(context.visible_people??[]),captured_at:context.at};
 }
 

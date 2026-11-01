@@ -1,0 +1,569 @@
+{
+  "schema": "deskbot.a31-offline-comparison.v1",
+  "paid_calls": 0,
+  "world_cases": 4,
+  "fixed_context_pairs": 8,
+  "comparison": "Current adapter with original A2 envelope versus A3.1 envelope on identical fixture snapshots. Not historical response replay or a real model sample.",
+  "characters": "JavaScript UTF-16 code units across messages; not token counts, billed cost or latency.",
+  "checks": {
+    "world_unchanged_by_workers": true,
+    "full_context_immutable": true,
+    "goal_queue_equal": true,
+    "result_basis_preserved": true,
+    "formation_calls_preserved": true
+  },
+  "totals": {
+    "a2-contract": {
+      "calls": 29,
+      "characters": 1197204,
+      "goal_calls": 8,
+      "empty_goal_calls": 8,
+      "by_stage": {
+        "perception": {
+          "calls": 4,
+          "characters": 130253
+        },
+        "motivation": {
+          "calls": 4,
+          "characters": 99161
+        },
+        "decision": {
+          "calls": 4,
+          "characters": 280736
+        },
+        "feedback": {
+          "calls": 8,
+          "characters": 337330
+        },
+        "memory": {
+          "calls": 4,
+          "characters": 155039
+        },
+        "followup": {
+          "calls": 4,
+          "characters": 191706
+        },
+        "directive": {
+          "calls": 1,
+          "characters": 2979
+        }
+      }
+    },
+    "a31-contract": {
+      "calls": 25,
+      "characters": 875785,
+      "goal_calls": 4,
+      "empty_goal_calls": 4,
+      "by_stage": {
+        "perception": {
+          "calls": 4,
+          "characters": 102411
+        },
+        "motivation": {
+          "calls": 4,
+          "characters": 99337
+        },
+        "decision": {
+          "calls": 4,
+          "characters": 283946
+        },
+        "feedback": {
+          "calls": 4,
+          "characters": 130241
+        },
+        "memory": {
+          "calls": 4,
+          "characters": 128437
+        },
+        "followup": {
+          "calls": 4,
+          "characters": 128434
+        },
+        "directive": {
+          "calls": 1,
+          "characters": 2979
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "case_id": "resources-1-off",
+      "phase": "plan",
+      "protocol": "a2-contract",
+      "context_sha256": "f6bee60f3013d924c16527ce1a138d8e914d28677353657295a55dbb4cab067e",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 32271
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24478
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 69392
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "resources-1-off",
+      "phase": "plan",
+      "protocol": "a31-contract",
+      "context_sha256": "f6bee60f3013d924c16527ce1a138d8e914d28677353657295a55dbb4cab067e",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 25365
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24522
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 70162
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "resources-1-off",
+      "phase": "feedback",
+      "protocol": "a2-contract",
+      "context_sha256": "bfbaecab5cb41069e727a7f705249f861ad400ffd35a01eb6037cd181db657d2",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 38978
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 38527
+        },
+        {
+          "stage": "feedback",
+          "scene": "need_goal_generation",
+          "characters": 44870
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 47631
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": true,
+        "reason": "live_goal_review"
+      }
+    },
+    {
+      "case_id": "resources-1-off",
+      "phase": "feedback",
+      "protocol": "a31-contract",
+      "context_sha256": "bfbaecab5cb41069e727a7f705249f861ad400ffd35a01eb6037cd181db657d2",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 32382
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 31931
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 31813
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "no_live_goals"
+      }
+    },
+    {
+      "case_id": "resources-1-on",
+      "phase": "plan",
+      "protocol": "a2-contract",
+      "context_sha256": "b70eb4526b979c65e1d94bff50ad4df0a6113924cd4ffd6a9ebff475d4a7c7ca",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 32290
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24497
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 69284
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "resources-1-on",
+      "phase": "plan",
+      "protocol": "a31-contract",
+      "context_sha256": "b70eb4526b979c65e1d94bff50ad4df0a6113924cd4ffd6a9ebff475d4a7c7ca",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 25384
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24541
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 70054
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "resources-1-on",
+      "phase": "feedback",
+      "protocol": "a2-contract",
+      "context_sha256": "902e05950d9619c41b537fb2eb28f9e56f85679a9f65a12f9bbee08f58587e6c",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 38908
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 38457
+        },
+        {
+          "stage": "feedback",
+          "scene": "need_goal_generation",
+          "characters": 44885
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 47662
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": true,
+        "reason": "live_goal_review"
+      }
+    },
+    {
+      "case_id": "resources-1-on",
+      "phase": "feedback",
+      "protocol": "a31-contract",
+      "context_sha256": "902e05950d9619c41b537fb2eb28f9e56f85679a9f65a12f9bbee08f58587e6c",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 32311
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 31860
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 31847
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "no_live_goals"
+      }
+    },
+    {
+      "case_id": "invitation-3-off",
+      "phase": "plan",
+      "protocol": "a2-contract",
+      "context_sha256": "afca12d2c1c812536398c5195a1de7b80bb6582aef88cc27f7ee151679917a3c",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 32271
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24478
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 69392
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "invitation-3-off",
+      "phase": "plan",
+      "protocol": "a31-contract",
+      "context_sha256": "afca12d2c1c812536398c5195a1de7b80bb6582aef88cc27f7ee151679917a3c",
+      "calls": [
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 25365
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 24522
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 70162
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "invitation-3-off",
+      "phase": "feedback",
+      "protocol": "a2-contract",
+      "context_sha256": "af6c75e1d1742b0643d967cfb36f58e3ddeed181ea249d7f3b0c19bc24738a91",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 38985
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 38534
+        },
+        {
+          "stage": "feedback",
+          "scene": "need_goal_generation",
+          "characters": 44874
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 47638
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": true,
+        "reason": "live_goal_review"
+      }
+    },
+    {
+      "case_id": "invitation-3-off",
+      "phase": "feedback",
+      "protocol": "a31-contract",
+      "context_sha256": "af6c75e1d1742b0643d967cfb36f58e3ddeed181ea249d7f3b0c19bc24738a91",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 32390
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 31939
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 31817
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "no_live_goals"
+      }
+    },
+    {
+      "case_id": "invitation-3-on",
+      "phase": "plan",
+      "protocol": "a2-contract",
+      "context_sha256": "63d84031ca28ab1520cb22a3e3e820961084f4ff7373df714a18f3550d145772",
+      "calls": [
+        {
+          "stage": "directive",
+          "scene": "directive",
+          "characters": 2979
+        },
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 33421
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 25708
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 72668
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "invitation-3-on",
+      "phase": "plan",
+      "protocol": "a31-contract",
+      "context_sha256": "63d84031ca28ab1520cb22a3e3e820961084f4ff7373df714a18f3550d145772",
+      "calls": [
+        {
+          "stage": "directive",
+          "scene": "directive",
+          "characters": 2979
+        },
+        {
+          "stage": "perception",
+          "scene": "agent_decision_main",
+          "characters": 26297
+        },
+        {
+          "stage": "motivation",
+          "scene": "need_goal_generation",
+          "characters": 25752
+        },
+        {
+          "stage": "decision",
+          "scene": "agent_decision_main",
+          "characters": 73568
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "not_requested"
+      }
+    },
+    {
+      "case_id": "invitation-3-on",
+      "phase": "feedback",
+      "protocol": "a2-contract",
+      "context_sha256": "f7e98239d3ec6e2d60429ccbc6e1e871acac266c303250070c49703776eea0e5",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 39972
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 39521
+        },
+        {
+          "stage": "feedback",
+          "scene": "need_goal_generation",
+          "characters": 45858
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 48775
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": true,
+        "reason": "live_goal_review"
+      }
+    },
+    {
+      "case_id": "invitation-3-on",
+      "phase": "feedback",
+      "protocol": "a31-contract",
+      "context_sha256": "f7e98239d3ec6e2d60429ccbc6e1e871acac266c303250070c49703776eea0e5",
+      "calls": [
+        {
+          "stage": "feedback",
+          "scene": "agent_decision_main",
+          "characters": 33158
+        },
+        {
+          "stage": "memory",
+          "scene": "memory_importance",
+          "characters": 32707
+        },
+        {
+          "stage": "followup",
+          "scene": "directive",
+          "characters": 32957
+        }
+      ],
+      "goal_updates": 0,
+      "goal_maintenance": {
+        "called": false,
+        "reason": "no_live_goals"
+      }
+    }
+  ]
+}

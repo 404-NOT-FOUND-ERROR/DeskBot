@@ -1,6 +1,6 @@
 # A3.1：修复后续事实边界，补目标覆盖并测量调用成本
 
-2026-11-01，依据 [A3 实验](../milestones/a3-behavior-validation-2026-11-01.md) 规划；以下尚未实施。先完成免费实现与反例，再另行冻结真实验收，不把新结果并入 `cb2e483aa2bf`。
+2026-11-01，依据 [A3 实验](../milestones/a3-behavior-validation-2026-11-01.md) 规划；本轮免费实现、反例与恢复检查已完成，见 [A3.1 交付记录](../milestones/a31-followup-remediation-2026-11-01.md)。真实验收按 [A3.2](a32-refrozen-acceptance-2026-11-01.md) 另行冻结，不把新结果并入 `cb2e483aa2bf`。
 
 ## 1. 先统一后续的事实依据和未来意图
 

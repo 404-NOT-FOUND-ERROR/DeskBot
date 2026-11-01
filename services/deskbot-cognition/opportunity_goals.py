@@ -62,6 +62,7 @@ class OpportunityNeedEngine(NeedEngine):
         self.context, self.pending_bindings, self.bindings = context, {}, []
         self.updates = []
         self.lifecycle_entities = None
+        self.maintenance = {'called':False,'reason':'not_requested'}
 
     async def _lifecycle_call(self, entities, step, evidence):
         if self._llm_router is None:
@@ -69,8 +70,13 @@ class OpportunityNeedEngine(NeedEngine):
         view = {'phase':self.context['phase'],'at':self.context['at'],
                 'goals':goal_lifecycle_view(self.context), 'evidence':evidence,
                 'next_options':[{k:v for k,v in r.items() if k!='binding'} for r in self.context['continuation']['next_options'] if not r.get('legacy_alias')]}
+        if self.context.get('evidence_refs') and self.context['phase']=='feedback':view.pop('next_options',None)
+        prompt=LIFECYCLE_PROMPT
+        if self.context.get('evidence_refs'):
+            prompt=prompt.replace('只返回JSON {goal_updates:[]}；没有必要变化时为空。',
+                '评估需要、现有后续和机会：若已有安排足够可保留；需要另一个可持续追踪的目标才新建。只返回JSON，goal_updates是转换数组；没有必要变化时允许空数组。')
         response = await self._llm_router.complete(LLMScene.NEED_GOAL_GENERATION,
-            [LLMMessage('system',LIFECYCLE_PROMPT),LLMMessage('user',json.dumps(view,ensure_ascii=False,default=str))],
+            [LLMMessage('system',prompt),LLMMessage('user',json.dumps(view,ensure_ascii=False,default=str))],
             temperature=.3,max_tokens=1400,json_mode=True)
         return parse_updates(extract_json(response.content),self.context,entities,step)
 
@@ -125,6 +131,12 @@ class OpportunityNeedEngine(NeedEngine):
 
     async def evaluate_goal_progress(self, **kwargs):
         if enabled(self.context):
+            previous=kwargs['personality'].state.short_term_goal_entities
+            if self.context.get('evidence_refs') and not any(g.status in (GoalStatus.ACTIVE,GoalStatus.INTERRUPTED) for g in previous):
+                self.updates=[]
+                self.maintenance={'called':False,'reason':'no_live_goals'}
+                return deepcopy(previous)
+            self.maintenance={'called':self._llm_router is not None,'reason':'live_goal_review' if self._llm_router is not None else 'no_router'}
             entities,self.updates=await self._lifecycle_call(kwargs['personality'].state.short_term_goal_entities,kwargs['step'],
                 {'action':kwargs['action_description'],'actual_result':self.context.get('result'),
                  'outcome':kwargs['action_result'],'expected_outcome':kwargs.get('expected_outcome'),

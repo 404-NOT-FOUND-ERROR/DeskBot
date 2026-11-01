@@ -1,0 +1,20 @@
+{
+  "schema": "deskbot.followup-intent.v1",
+  "required": ["status", "basis_ids", "next_step", "delay_hours"],
+  "optional": ["wait_for", "review_after_minutes", "followup_id", "closure", "unverified_idea"],
+  "statuses": ["continue", "postpone", "drop", "none"],
+  "error": "followup_intent_invalid",
+  "binding_error": "followup_intent_binding_changed",
+  "rule": "只选择实际依据与未来意图。basis_ids逐字引用本次bases全部ID；next_step/wait_for引用现有机会或等待条件，不执行任务。question/reason由执行器生成，模型不能提供。可用unverified_idea表达最多160字的奇幻想法或待验证假说；它不属于事实、交付、承诺或完成证据。closure可选{kind:resolved|satisfied|abandoned,evidence_ids:[]}，仍由原问题完成合同核验，不改问题ID或标准。",
+  "questions": {
+    "next": "下一步考虑：{title}。这只是意向，尚未执行。",
+    "wait": "等待条件：{title}。条件是否成立以实际记录为准。",
+    "continue": "保留这个问题，等新的实际线索再决定下一步。",
+    "postpone": "先暂缓，复查时再决定下一步。",
+    "drop": "我选择放下这项后续。",
+    "none": "此刻没有新的后续意图。"
+  },
+  "closures": {"resolved":"仅按已核验记录结束原先绑定的小步骤。", "satisfied":"我认为目前了解得够了；这不证明研究结论。", "abandoned":"我决定放下；这不代表目标已经完成。"},
+  "result_labels": {"completed":"本次任务已实际完成", "unfinished":"本次任务未完成", "not_executed":"本次没有执行任务"},
+  "migration": "仅新冻结上下文强制使用本合同。旧反馈保留原合同与原文；历史question/reason属于当时的表达，不补造事实依据。"
+}

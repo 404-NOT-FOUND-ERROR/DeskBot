@@ -1,3 +1,4 @@
+import {authoredFollowup} from '../../../services/deskbot-cognition/evaluations/authored-followup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {developmentFixture,formedCareFixture,policyChoice,arrange,atDay,OWNER} from '../../../services/deskbot-cognition/evaluations/development-fixtures.mjs';
@@ -7,7 +8,7 @@ import {syncDevelopmentEvidence} from '../src/development-evidence.mjs';
 import {syncLifeRhythm} from '../src/life-rhythm.mjs';
 import {startPracticalTrial,practicalTrialReadModel,controlPracticalTrial} from '../src/role-practical-trials.mjs';
 import {roleStagePreview,acceptRoleStage,rollbackRoleStage} from '../src/role-stages.mjs';
-import {applyCognitiveMutation,cognitiveRelevantKey,cognitiveActualResult} from '../src/cognitive-life-state.mjs';
+import {applyCognitiveMutation,cognitiveRelevantKey,cognitiveActualResult,cognitiveContext} from '../src/cognitive-life-state.mjs';
 import {settle} from '../../../services/deskbot-cognition/evaluations/development-fixtures.mjs';
 const facet=(w,topic='care')=>developmentFacetsReadModel(w,{actorId:OWNER,at:w.clock.synced_at}).actors[0].topics.find(t=>t.topic===topic);
 const rhythm=w=>w.memory.development.rhythm.actors[OWNER].topics.care;
@@ -17,7 +18,7 @@ test('interrupted personal goal is source checked separately from actual world r
  const planned=applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:'goal-plan',relevant_key:cognitiveRelevantKey(w,OWNER),proposal:{schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[{operation:'new',goal_id:goal.id,text:goal.text,criterion_id:null,next_step:null,reason:'有空去看看水边'}],actor_id:OWNER,phase:'plan',state:{short_term_goal_entities:[goal]},action:{action_description:'观察'},compiled:{operation:'observe',object_index:1,reason:'先看现场'}}},at,'plan');
  settle(w,w.tasks.find(t=>t.task_id===planned.task_id));const result=cognitiveActualResult(w,OWNER,w.clock.synced_at);
  applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'feedback',job_id:'goal-feedback'},w.clock.synced_at,'feedback-claim');
- const raw=`短期目标被中断，尚未完成：${goal.text}`,proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[{operation:'postpone',goal_id:goal.id,reason:'改变安排，之后再来'}],actor_id:OWNER,phase:'feedback',state:{short_term_goal_entities:[{...goal,status:'interrupted'}]},followup:{status:'postpone',question:'留待以后',reason:'改变安排',delay_hours:2},memories:[{id:'goal-memory',payload:{agent_id:OWNER,stream:'factual',kind:'event',raw_content:raw,stored_content:raw}}]};
+ const raw=`短期目标被中断，尚未完成：${goal.text}`,proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[{operation:'postpone',goal_id:goal.id,reason:'改变安排，之后再来'}],actor_id:OWNER,phase:'feedback',state:{short_term_goal_entities:[{...goal,status:'interrupted'}]},...authoredFollowup(cognitiveContext(w,OWNER,w.clock.synced_at,'feedback'),{status:'postpone',delay_hours:2}),memories:[{id:'goal-memory',payload:{agent_id:OWNER,stream:'factual',kind:'event',raw_content:raw,stored_content:raw}}]};
  const payload={actor_id:OWNER,operation:'feedback',job_id:'goal-feedback',result,proposal};
  const bad=structuredClone(payload);bad.proposal.state.short_term_goal_entities[0].id='someone-else';assert.throws(()=>applyCognitiveMutation(structuredClone(w),bad,w.clock.synced_at,'bad'),{code:'goal_identity_changed'});
  const forged=structuredClone(payload);forged.proposal.memories[0].payload.raw_content='我已经到了水边';assert.throws(()=>applyCognitiveMutation(structuredClone(w),forged,w.clock.synced_at,'forged'),{code:'cognitive_factual_record_changed'});

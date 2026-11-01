@@ -1,13 +1,50 @@
 import unittest
+import json
 from copy import deepcopy
 import life_worker
 from agent.goals import GoalEntity, GoalStatus
 from agent.personality import SoulLayer, PersonalityLayer
 from goal_lifecycle import CONTRACT, parse_updates
 from opportunity_goals import OpportunityNeedEngine
+from core.interfaces.llm import LLMResponse
 
 
 class GoalLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_progress_skips_call_but_preserves_closed_history_and_new_goal_formation(self):
+        _,c=self.setup_context();c['evidence_refs']={'schema':'deskbot.evidence-refs.v1','entries':[]}
+        c['goal_lifecycle']['goals']=[];c['actor']={'actor_id':'test'}
+        calls=[]
+        class Router:
+            async def complete(self,scene,messages,**kwargs):
+                calls.append(messages)
+                return LLMResponse(json.dumps({'goal_updates':[{'operation':'new','goal_id':'goal:new','text':'试着理解夜晚的光',
+                    'criterion_id':None,'next_step':None,'reason':'我想带着一个问题继续观察'}]}),0,0,'offline-stub')
+        p=PersonalityLayer(SoulLayer(name='测试居民',agent_id='test'))
+        closed=GoalEntity(id='closed',text='旧任务',goal_type='short_term',status=GoalStatus.COMPLETED)
+        p.set_short_term_goal_entities([closed]);need=OpportunityNeedEngine(Router(),context=c)
+        result=await need.evaluate_goal_progress(step=40,action_description='休息',action_result='休息结束',personality=p)
+        self.assertEqual(result,[closed]);self.assertEqual(calls,[])
+        self.assertEqual(need.maintenance,{'called':False,'reason':'no_live_goals'})
+        c['phase']='plan';p.set_short_term_goal_entities([])
+        await need._generate_short_term_goals(personality=p,now_step=41)
+        self.assertEqual(len(calls),1);self.assertEqual(need.updates[0]['operation'],'new')
+        self.assertEqual(need.lifecycle_entities[0].text,'试着理解夜晚的光')
+
+    async def test_live_overnight_goal_still_calls_maintenance_and_open_inquiry_cannot_complete(self):
+        goal,c=self.setup_context();c['evidence_refs']={'schema':'deskbot.evidence-refs.v1','entries':[]}
+        calls=[]
+        class Router:
+            async def complete(self,scene,messages,**kwargs):
+                calls.append(json.loads(messages[-1].content))
+                return LLMResponse(json.dumps({'goal_updates':[{'operation':'postpone','goal_id':goal.id,'reason':'今晚先休息','review_in_hours':12}]}),0,0,'offline-stub')
+        p=PersonalityLayer(SoulLayer(name='测试居民',agent_id='test'));p.set_short_term_goal_entities([goal])
+        need=OpportunityNeedEngine(Router(),context=c)
+        result=await need.evaluate_goal_progress(step=40,action_description='休息',action_result='休息结束',personality=p)
+        self.assertEqual(len(calls),1);self.assertEqual(result[0].status,GoalStatus.INTERRUPTED)
+        self.assertNotIn('criteria',calls[0]['goals']);self.assertNotIn('next_options',calls[0])
+        self.assertEqual(calls[0]['goals']['goals'][0]['completion_criteria'],{'kind':'open_inquiry'})
+        self.assertEqual(result[0].id,goal.id)
+
     def setup_context(self):
         goal=GoalEntity(id='goal:old',text='等下个夜晚再看',goal_type='short_term',created_step=0,due_step=2)
         c={'phase':'feedback','at':'2026-11-02T12:00:00Z','continuation':{'next_options':[]},

@@ -1,3 +1,4 @@
+import {authoredFollowup} from '../../../services/deskbot-cognition/evaluations/authored-followup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -48,7 +49,7 @@ function fakeLife(f,select){
   if(c.phase==='plan')return {...proposal(select(c)),actor_id:c.actor.actor_id,state:{agent_id:c.actor.actor_id}};
   if(c.phase==='perceive')return {...proposal(null,'perceive'),actor_id:c.actor.actor_id,state:{agent_id:c.actor.actor_id},
    memories:c.perceptions.map(s=>({id:'receipt-'+s.id,payload:{agent_id:c.actor.actor_id,stream:'factual',kind:'event',raw_content:perceptionFact(s),stored_content:perceptionFact(s),metadata_json:JSON.stringify({message_id:s.id})}}))};
-  return {...proposal(null,'feedback'),actor_id:c.actor.actor_id,state:{agent_id:c.actor.actor_id},followup:{status:'continue',question:'以后再比较',reason:'基于已发生的结果',delay_hours:24}};
+  return {...proposal(null,'feedback'),actor_id:c.actor.actor_id,state:{agent_id:c.actor.actor_id},...authoredFollowup(c,{delay_hours:24})};
  }};
  const life=createCognitiveLife({world:f.world,now:f.now,mode:'mock',bridge,budget:{status:()=>({})}});f.close(()=>life.close());return life;
 }
@@ -125,7 +126,7 @@ test('retryable feedback failure keeps task ownership and resumes the actual res
  const f=fixture(t);let failures=0;
  const bridge={close(){},async session(c){if(c.phase==='plan')return proposal({operation:'observe',object_index:1,reason:'记录'});
   if(!failures++)throw Object.assign(new Error('temporary'),{code:'python_timeout'});
-  return {...proposal(null,'feedback'),followup:{status:'continue',question:'再看',reason:'已观察',delay_hours:1}};
+  return {...proposal(null,'feedback'),...authoredFollowup(c)};
  }};
  const life=createCognitiveLife({world:f.world,now:f.now,mode:'mock',bridge,budget:{status:()=>({})}});f.close(()=>life.close());
  await life.run(id);const task=f.world.get().tasks.find(t=>t.origin==='cognitive_life');f.setTime(task.due_at);f.world.syncTasks();

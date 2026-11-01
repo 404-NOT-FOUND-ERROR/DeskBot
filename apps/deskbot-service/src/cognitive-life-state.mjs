@@ -23,6 +23,8 @@ import {cognitiveFailure,validCognitiveFailure} from './cognitive-failure.mjs';
 import {projectCognitiveOpportunities,validateOpportunityTransition} from './cognitive-opportunities.mjs';
 import {cognitiveGoalOpportunities,prepareGoalBindings,captureGoalOpportunityEvidence} from './cognitive-goal-opportunities.mjs';
 import {goalLifecycleContext} from './cognitive-goal-lifecycle.mjs';
+import {followupIntentContext,validateFollowupIntent,FOLLOWUP_INTENT} from './cognitive-followup-intent.mjs';
+import {evidenceReferences} from './cognitive-evidence-refs.mjs';
 import {positionKnowledge} from './cognitive-position-knowledge.mjs';
 import {captureContactResponses} from './cognitive-contact-purpose.mjs';
 import {EVENT_EVIDENCE,eventEvidenceContext,validateCommunicationFeedback,messageReceipt,resultDisclosures} from './cognitive-event-evidence.mjs';
@@ -77,6 +79,12 @@ export function cognitiveContext(world,id,at,phase='plan'){
   projectCognitiveOpportunities(context);
   context.goal_opportunities=cognitiveGoalOpportunities(world,id,context);
   context.goal_lifecycle=goalLifecycleContext(world,id,context);
+  // The actual-result helper uses a plan projection, so this does not recurse.
+  if(phase==='feedback'){
+    const result=cognitiveActualResult(world,id,at);
+    if(result)context.followup_intent=followupIntentContext(context,result);
+  }
+  context.evidence_refs=evidenceReferences(context);
   return context;
 }
 
@@ -119,6 +127,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(payload.phase==='plan'&&life.pending)fail('pending_result_requires_feedback');
     if(payload.phase==='plan'&&['planned','executing'].includes(world.autonomy?.actors[id]?.plan?.status))fail('cognitive_actor_busy','先完成原已接受的生活安排，再进入认知试运行。');
     if(payload.phase==='feedback'&&!life.pending)fail('feedback_without_result');
+    if(payload.phase==='feedback'&&!cognitiveActualResult(world,id,at))fail('result_not_terminal');
     if(payload.phase==='plan')life.enabled=true;
     life.pilot_plan_limit=life.continuous?null:payload.max_plans??4;life.job={id:payload.job_id,phase:payload.phase,status:'calling',started_at:at};
     life.schedule={...life.schedule,last_dispatch_at:at,reason:payload.reason??payload.phase};
@@ -223,6 +232,12 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     const waiting=compiled.operation==='wait'?(followupTransition.preserved_current&&followupPreview.followup
       ?{...copy(followupPreview.followup),next_review_at:followupPreview.followup.next_review_at??new Date(Date.parse(at)+3600000).toISOString()}
       :cognitiveWaitFollowup(followupPreview,compiled,context.continuation,at)):null;
+    if(waiting&&refs.evidence_refs){
+      // A no-action plan must not reintroduce free prose as a factual title.
+      waiting.question=FOLLOWUP_INTENT.questions[waiting.status]??FOLLOWUP_INTENT.questions.postpone;
+      waiting.reason='本人选择暂缓；未执行新动作，也未新增完成证据。';
+      waiting.intent_evidence={schema:FOLLOWUP_INTENT.schema,basis_ids:[],unverified_idea:{text:compiled.reason,epistemic:'unverified',label:'本人暂缓时的想法，未验证'}};
+    }
     if(proposal.interpretations)adoptInterpretations(life,proposal.interpretations,refs,at);
     const cause=cognitiveCause(world,id,compiled,refs,life);
     if(cause.life_source_context.some(s=>s.expires_at&&s.expires_at<=at))fail('cognitive_source_expired');
@@ -309,9 +324,15 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     const proposal=payload.proposal,followup=proposal.followup;
     validateCommunicationFeedback(followup,payload.result.effects?.communication);
     const feedbackContext=cognitiveContext(world,id,at,'feedback');
+    const intentEvidence=validateFollowupIntent(proposal,feedbackContext,life.job.references);
     validateOpportunityTransition(followup,feedbackContext.continuation,life.job.references.continuation);
     const goalBindings=prepareGoalBindings(life,proposal,feedbackContext,life.job.references,at);
     const nextFollowup=cognitiveResultFollowup(life,followup,feedbackContext.continuation,at,pending.root_outcome_id,pending.followup_decision);
+    if(intentEvidence){
+      nextFollowup.intent_evidence=intentEvidence;
+      // Keeping an older issue does not give its old prose current factual authority.
+      nextFollowup.question=followup.question;
+    }
     // Existing factual IDs/raw sources never overwritten by a later interpretation.
     const old=new Map(life.memories.map(m=>[m.id,m]));
     for(const memory of proposal.memories??[]){

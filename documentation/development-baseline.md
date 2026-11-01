@@ -4,7 +4,7 @@
 
 执行状态（2026-11-01）：A1 [公共事件证据](../research/milestones/r3a-event-evidence-2026-11-01.md) 与 A2 [目标连续性和位置知识](../research/milestones/a2-goal-lifecycle-2026-11-01.md) 已实现并经离线门禁。[A3 真实复验](../research/milestones/a3-behavior-validation-2026-11-01.md) 完成 8/20、7 个有效，第 8 窗因后续问题夹带未发生的呈送动作停止。64 次调用峰时估算 ¥2.233，原版本严格回放一致。正式新认知未启用，R3-B 未放行。
 
-下一步 [A3.1](../research/design/a3-followup-remediation-2026-11-01.md) 先规范后续事实/意图、证据引用用途，补目标生命周期覆盖并优化空更新调用。本批目标始终为空，不能把问题链连续性当作 A2 全部获得真实覆盖。10 月 31 日 [18/20 历史复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 与更早结果保持原判，不合并窗口。具体出口见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
+[A3.1 离线修复](../research/milestones/a31-followup-remediation-2026-11-01.md) 已完成：后续事实/意图/设想分离、证据用途目录、空队列维护跳过、跨夜工作进程与恢复用例。下一步按 [A3.2](../research/design/a32-refrozen-acceptance-2026-11-01.md) 冻结新版本，原矩阵与目标专项分别验收。历史 A3 批次目标始终为空，不能把问题链连续性当作 A2 全部获得真实覆盖。10 月 31 日 [18/20 历史复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 与更早结果保持原判，不合并窗口。具体出口见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
 
 ## 产品目标
 

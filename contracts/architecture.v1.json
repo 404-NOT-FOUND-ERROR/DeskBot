@@ -3,6 +3,8 @@
   "baseline": "documentation/development-baseline.md",
   "canonical_committer": "world",
   "modules": [
+    {"id":"evidence-refs","entry":"apps/deskbot-service/src/cognitive-evidence-refs.mjs","anchor":"export function evidenceReferences","authority":"projection"},
+    {"id":"followup-intent","entry":"apps/deskbot-service/src/cognitive-followup-intent.mjs","anchor":"export function validateFollowupIntent","authority":"projection"},
     {"id":"goal-lifecycle","entry":"apps/deskbot-service/src/cognitive-goal-lifecycle.mjs","anchor":"export function prepareGoalLifecycle","authority":"world_reducer"},
     {"id":"position-knowledge","entry":"apps/deskbot-service/src/cognitive-position-knowledge.mjs","anchor":"export function positionKnowledge","authority":"projection"},
     {"id":"event-evidence","entry":"apps/deskbot-service/src/cognitive-event-evidence.mjs","anchor":"export function resultDisclosures","authority":"projection"},
@@ -20,6 +22,8 @@
     {"id":"presentation","entry":"apps/deskbot-service/src/app.mjs","anchor":"/api/world/snapshot","authority":"projection"}
   ],
   "interfaces": [
+    {"id":"evidence-refs","producer":"evidence-refs","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-evidence-refs.v1.json","version":"deskbot.evidence-refs.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-followup-intent.test.mjs","apps/deskbot-service/test/cognitive-event-evidence.test.mjs"]},
+    {"id":"followup-intent","producer":"followup-intent","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-followup-intent.v1.json","version":"deskbot.followup-intent.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-followup-intent.test.mjs","apps/deskbot-service/test/cognitive-event-evidence.test.mjs"]},
     {"id":"goal-lifecycle","producer":"goal-lifecycle","consumers":["adoption","cognition","schedule","presentation"],"definition":"contracts/cognitive-goal-lifecycle.v1.json","version":"deskbot.goal-lifecycle.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-goal-lifecycle.test.mjs","services/deskbot-cognition/test_goal_lifecycle.py"]},
     {"id":"position-knowledge","producer":"position-knowledge","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-position-knowledge.v1.json","version":"deskbot.position-knowledge.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-position-knowledge.test.mjs"]},
     {"id":"event-evidence","producer":"event-evidence","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-event-evidence.v1.json","version":"deskbot.cognitive-event-evidence.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-event-evidence.test.mjs","services/deskbot-cognition/test_event_evidence.py","contracts/fixtures/event-evidence.v1.json"]},

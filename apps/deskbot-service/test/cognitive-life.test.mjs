@@ -1,3 +1,4 @@
+import {authoredFollowup} from '../../../services/deskbot-cognition/evaluations/authored-followup.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -30,7 +31,7 @@ function fakeBridge(selector,inspect=()=>{}){return {close(){},async session(c){
   action:{action_type:'work',action_description:'按现场条件行动',inner_monologue:'我想亲自弄清苗况。',expected_outcome:'取得真实记录',agent_id:c.actor.actor_id,step:state.step,target:{acts_on:[],claims:[],reaches:[]}}};
  return {schema:'deskbot.cognitive-life.proposal.v2',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],phase:'feedback',actor_id:c.actor.actor_id,state,memory_sequence:1,
   memories:[{id:`${c.actor.actor_id}:${c.result.root_outcome_id}`,payload:{agent_id:c.actor.actor_id,stream:'factual',kind:'event',raw_content:c.result.personal_fact,stored_content:c.result.personal_fact}}],
-  followup:{status:c.result.success?'continue':'postpone',question:c.result.success?'下次比较苗床':'改为先观察或等待设施空闲',reason:c.result.effects?.communication?.summary??c.result.fact,delay_hours:24,...(c.result.effects?.communication?{communication_evidence_id:c.result.effects.communication.id}:{})}};
+  ...authoredFollowup(c,{status:c.result.success?'continue':'postpone',delay_hours:24})};
 }};}
 function makeLife(f,selector,inspect){const life=createCognitiveLife({world:f.world,budget:{complete(){throw Error('fake bridge should not call model')},status(){return {}}},now:f.now,mode:'mock',clockScope:'isolated_test_clock',bridge:fakeBridge(selector,inspect)});f.close(()=>life.close());return life;}
 
@@ -91,7 +92,7 @@ test('facility contention is remembered as not executed, with no duplicate resou
  await life.run('shaping-001');const before=f.world.get().living.objects['seedling-rack'].stock.water;
  const blocked=await life.run('wetland-grower-001');assert.equal(blocked.adoption.blocked.code,'activity_unavailable');
  assert.equal(f.world.get().living.objects['seedling-rack'].stock.water,before);await life.tick();
- const s=f.world.get().cognition.actors['wetland-grower-001'];assert.equal(s.last_result.not_executed,true);assert.equal(s.last_result.success,false);assert.match(s.followup.question,/观察/);
+ const s=f.world.get().cognition.actors['wetland-grower-001'];assert.equal(s.last_result.not_executed,true);assert.equal(s.last_result.success,false);assert.match(s.followup.question,/暂缓/);
 });
 test('task outcome freezes observed state before subsequent changes and survives a next-day restart',async t=>{
  const f=fixture(t),life=makeLife(f,()=>({operation:'observe',object_index:1,title:'观察',reason:'比较苗况'}));

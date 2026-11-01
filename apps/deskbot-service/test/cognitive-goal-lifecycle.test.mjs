@@ -142,7 +142,7 @@ test('actual Python worker uses explicit ID lifecycle in existing plan and feedb
   }else if(req.stage==='decision')value={act:true,choice_id:chosen.id,inner_monologue:'我想先备一批水',expected_outcome:'得到实际清水',issue:{decision:'continue',id:'current'},motivation:'self_exploration',source_ids:[]};
   else if(req.stage==='feedback')value=req.scene==='need_goal_generation'?{goal_updates:[{operation:'complete',goal_id:goalId,reason:'执行器记录了这批实际产出'}]}:{reason:'做成这一步',emotion:'joy',intensity:.3,valence:.3};
   else if(req.stage==='memory')value=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
-  else if(req.stage==='followup')value={status:'continue',question:'以后再看新的机会',reason:'这批取水已完成，大问题仍开放',delay_hours:1,next_step:null};
+  else if(req.stage==='followup')value={status:'continue',basis_ids:JSON.parse(req.messages.at(-1).content).evidence.bases.map(b=>b.id),delay_hours:1,next_step:null};
   else throw Error(req.stage);return JSON.stringify(value);
  };
  for(const phase of ['plan','feedback']){
@@ -153,8 +153,60 @@ test('actual Python worker uses explicit ID lifecycle in existing plan and feedb
   const p=await bridge.session(c,respond);assert.equal(p.goal_contract,GOAL_LIFECYCLE.schema);
   if(phase==='plan')goalId=p.goal_updates[0].goal_id;
   applyCognitiveMutation(w,{actor_id:OWNER,operation:phase,job_id:job,proposal:p,relevant_key:cognitiveRelevantKey(w,OWNER),...(c.result?{result:c.result}:{})},at,job);
-  if(phase==='plan')settle(w,w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id));
+  if(phase==='plan'){
+   const before=structuredClone(w);
+   assert.throws(()=>applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'feedback',job_id:'too-early'},at,'too-early'),{code:'result_not_terminal'});
+   assert.deepEqual(w,before,'an early claim cannot obtain a legacy envelope without evidence');
+   settle(w,w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id));
+  }
  }
  assert.equal(w.cognition.actors[OWNER].goal_bindings[goalId].lifecycle_status,'completed');
  assert.equal(calls.filter(c=>c==='motivation').length,1);assert.equal(calls.filter(c=>c.includes('repair')||c.startsWith('compile')).length,0);
+});
+
+test('seeded goal maintenance crosses midnight and SQLite through actual worker postpone/resume/replan/completion',async t=>{
+ let w=seed();const d=declaration(context(w),'collect-water','goal:seeded');d.review_in_hours=1;d.next_step=ref(method(context(w),'waylight-use'));adopt(w,[d]);
+ adopt(w,[{operation:'new',goal_id:'goal:open',text:'长期了解水岸的变化',criterion_id:null,next_step:null,reason:'开放研究，暂无结论',review_in_hours:1}]);
+ const criteria=structuredClone(w.cognition.actors[OWNER].goal_bindings[d.goal_id].completion_criteria);
+ const bridge=createCognitionBridge({workerFile:'life_worker.py',mode:'mock',timeoutMs:30000,maxFrames:30});t.after(()=>bridge.close());
+ const directory=mkdtempSync(join(tmpdir(),'deskbot-a31-goal-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));
+ let operation='postpone',phase='plan',chosen=null;
+ const respond=async req=>{
+  let v;
+  if(req.stage==='perception')v={reason:'复查原来的事',emotion:'anticipation',intensity:.3,valence:.3,need_activation:{self_actualization:.4}};
+  else if(req.scene==='need_goal_generation'){
+   const u={operation,goal_id:d.goal_id,reason:'隔离测试中明确选择维护同一目标'};
+   if(operation==='postpone')u.review_in_hours=12;
+   if(operation==='replan')u.next_step=ref(chosen);
+   v={goal_updates:[u,...(phase==='feedback'?[{operation:'abandon',goal_id:'goal:open',reason:'我决定停止这个开放研究，不把一次产出当成结论'}]:[])]};
+  }else if(req.stage==='decision')v=operation==='continue'?{act:true,choice_id:chosen.id,inner_monologue:'现在执行已选择的取水方法',expected_outcome:'得到一批实际水',issue:{decision:'continue',id:'current'},motivation:'self_exploration',source_ids:[]}:{act:false,inner_monologue:'此次只复查自己的目标，暂不开始动作'};
+  else if(req.stage==='feedback')v={reason:'记录实际产出',emotion:'joy',intensity:.3,valence:.3};
+  else if(req.stage==='memory')v=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
+  else if(req.stage==='followup')v={status:'continue',basis_ids:context(w,'feedback').followup_intent.bases.map(b=>b.id),next_step:null,delay_hours:1};
+  else throw Error(req.stage);
+  return JSON.stringify(v);
+ };
+ const run=async()=>{
+  const at=w.clock.synced_at,job=`seeded:${operation}:${phase}`;
+  applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase,job_id:job},at,job);
+  const c=context(w,phase);c.mode='mock';if(phase==='feedback'){c.result=cognitiveActualResult(w,OWNER,at);c.action=w.cognition.actors[OWNER].pending.action;}
+  const p=await bridge.session(c,respond);assert.equal(p.goal_updates[0].operation,operation);
+  applyCognitiveMutation(w,{actor_id:OWNER,operation:phase,job_id:job,proposal:p,relevant_key:cognitiveRelevantKey(w,OWNER),...(c.result?{result:c.result}:{})},at,job);
+  assert.deepEqual(w.cognition.actors[OWNER].goal_bindings[d.goal_id].completion_criteria,criteria);
+ };
+ tick(w,plus(w.clock.synced_at,61));await run();
+ const filename=join(directory,'world.sqlite');let db=createSqlitePersistence({filename});db.put('canonical-world.states',w.world_id,w);db.close();
+ db=createSqlitePersistence({filename});w=db.get('canonical-world.states',w.world_id);db.close();
+ tick(w,plus(w.clock.synced_at,13*60));operation='resume';await run();
+ tick(w,plus(w.clock.synced_at,6*60+1));operation='replan';chosen=method(context(w),'collect-water');await run();
+ // Review a chosen method without executing or claiming it completed.
+ assert.equal(w.cognition.actors[OWNER].goal_bindings[d.goal_id].attempts.length,2);
+ assert.deepEqual(w.cognition.actors[OWNER].goal_bindings[d.goal_id].evidence_ids,[]);
+ tick(w,plus(w.clock.synced_at,6*60+1));operation='continue';chosen=method(context(w),'collect-water');await run();
+ const task=w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id);settle(w,task);
+ phase='feedback';operation='complete';await run();
+ assert.equal(w.cognition.actors[OWNER].goal_bindings[d.goal_id].lifecycle_status,'completed');
+ assert.equal(w.cognition.actors[OWNER].goal_bindings['goal:open'].lifecycle_status,'abandoned');
+ assert.equal(context(w).goal_lifecycle.goals.find(g=>g.goal_id==='goal:open').evidence_ids.length,0);
+ assert.deepEqual(w.cognition.actors[OWNER].goal_bindings[d.goal_id].evidence_ids,[task.root_outcome_id]);
 });

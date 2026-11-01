@@ -12,7 +12,7 @@ type Scope='live'|'experiment';
 interface Goal {id:string;text:string;status:string}
 interface ObjectState {id:string;name:string;state:{moisture?:number;health?:number;growth?:number;stock?:Record<string,number>}}
 interface Result {fact:string;success:boolean;not_executed:boolean;occurred_at:string;root_outcome_id:string;before:ObjectState[];after:ObjectState[]}
-interface Followup {status:string;question:string;reason:string;next_review_at:string}
+interface Followup {status:string;question:string;reason:string;next_review_at:string;intent_evidence?:{unverified_idea?:{text:string;epistemic:string}}}
 interface Memory {id:string;root_outcome_id:string;epistemic?:string;source_record_id?:string;payload:{stream:string;kind:string;raw_content:string;stored_content:string}}
 interface Life {enabled:boolean;reason:string;plan_count:number;job?:{status:string;error?:string};pending?:{task_id:string};last_result?:Result;followup?:Followup;memories:Memory[];
  perception_receipts?:{source_id:string;at:string;epistemic:string}[];relations?:{to_id:string;to_name:string;interaction_count:number;history_summary:string}[];
@@ -53,7 +53,7 @@ export function CognitiveLifeReview({baseUrl='http://127.0.0.1:4311'}:{baseUrl?:
     <section><h3>为什么想做</h3><p>{life?.reason??'启用后，读取自己的需要、经历与眼前条件形成安排。'}</p><ul>{life?.state.short_term_goal_entities?.map(g=><li key={g.id}><span>{label(g.status)}</span> {g.text}</li>)}</ul></section>
     <section><h3>正在做什么</h3><p>{task?`${task.title} · ${label(task.status)} · ${time(task.due_at)} 到期`:'当前没有认知任务在执行。'}</p></section>
     <section><h3>实际发生什么</h3>{result?<><p>{result.not_executed?'意图未执行':result.success?'任务已核验完成':'任务未完成'} · {time(result.occurred_at)}</p><details><summary>结果原文与现场记录</summary><ObjectComparison result={result}/><details><summary>任务结果原文</summary><p>{result.fact}</p><code>{result.root_outcome_id}</code></details></details></>:<p>尚无实际结果。</p>}</section>
-    <section><h3>还想继续什么</h3><p>{life?.followup?`${label(life.followup.status)}：${life.followup.question}`:'尚未形成后续。'}</p>{life?.followup&&<><p className="cgl-muted">{life.followup.reason}</p><p>下次检查：{time(life.followup.next_review_at)}</p></>}</section>
+    <section><h3>还想继续什么</h3><p>{life?.followup?`${label(life.followup.status)}：${life.followup.question}`:'尚未形成后续。'}</p>{life?.followup&&<><p className="cgl-muted">{life.followup.reason}</p>{life.followup.intent_evidence?.unverified_idea&&<p>未验证设想：{life.followup.intent_evidence.unverified_idea.text}</p>}<p>下次检查：{time(life.followup.next_review_at)}</p></>}</section>
     <section><h3>听到了什么，和谁有来往</h3><p>已留下 {life?.perception_receipts?.length??0} 条来源记录。</p>{life?.memories.filter(m=>m.source_record_id).slice(-2).map(m=><p key={m.id}>{m.payload.stored_content}</p>)}{life?.relations?.filter(r=>r.interaction_count>0).map(r=><p key={r.to_id}>{r.to_name} · {r.interaction_count} 次已接收交流{r.history_summary?` · ${r.history_summary}`:''}</p>)}<small>听闻保留出处；收到消息不代表答应，也不增加实践。</small></section>
     {!!life?.interpretations?.length&&<section><h3>这些消息让它想到什么</h3>{life.interpretations.slice(-3).map((item,i)=><div key={`${item.source_id}:${i}`}><p><strong>{item.topic}</strong> · {item.question||'留意后继续自己的生活'}</p><p className="cgl-muted">{item.reason}</p></div>)}<small>个人理解可以修正；来源本身不能改写身份或世界事实。</small></section>}
     {life?.job?.error&&<p role="alert" className="cgl-error">本回合中断：{life.job.error}。没有用预写安排冒充模型结果。</p>}

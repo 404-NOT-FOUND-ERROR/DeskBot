@@ -47,6 +47,7 @@ from failure_contract import error_frame
 from opportunity_goals import OpportunityNeedEngine
 from goal_lifecycle import CONTRACT as GOAL_LIFECYCLE, enabled as goal_lifecycle_enabled
 from event_evidence import CONTRACT as EVENT_EVIDENCE, communication_errors
+from followup_intent import CONTRACT as FOLLOWUP_INTENT, compile_intent
 from contact_contract import (CONTACT_CONTRACT, contact_readiness, contact_intent_errors,
     bind_contact_intent, compiled_contact_errors, social_contact_errors)
 
@@ -631,11 +632,34 @@ async def run(context):
         if context.get('reflect'):
             reflection=await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step)
             output['reflection']=plain(reflection)
-        output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
-             LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
-              'now':context.get('time',context['at']),'continuation':continuation_view(context),'grounding':context.get('grounding'),'use_context':context.get('use_context'),'issue_contract':FEEDBACK_CONTINUATION_CONTRACT,
-              'communication_contract':EVENT_EVIDENCE['feedback_rule'],
-              'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:opportunity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可引用给定测记或已送达消息作为未来意向，服务端核对条件；这不是执行或目标绑定。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup',failure_code=lambda value: EVENT_EVIDENCE['errors']['communication'] if communication_errors(value,context) else feedback_error_code(value))
+        if context.get('followup_intent',{}).get('schema')==FOLLOWUP_INTENT['schema']:
+            def valid_intent(raw):
+                try:
+                    value=compile_intent(raw,context)
+                    return valid_followup(value) and valid_continuation_binding(value,context)
+                except (ValueError,TypeError,KeyError):return False
+            def intent_repair(raw):
+                try:return followup_repair(compile_intent(raw,context),context)
+                except (ValueError,TypeError,KeyError):return FOLLOWUP_INTENT['rule']+' 必填status/basis_ids/next_step/delay_hours；不能输出question/reason。保留原意，返回完整JSON。'
+            # The result's large object/inventory snapshots have already been
+            # used by the feedback/memory stages. This call selects intentions.
+            view={k:v for k,v in context['followup_intent'].items() if k not in ('next_options','wait_options')}
+            cont=continuation_view(context)
+            raw=await contract_json(router,[LLMMessage('system',FOLLOWUP_INTENT['rule']),
+                LLMMessage('user',prompt_json({'self':PersonalityLayer.to_prompt_context(personality),
+                    'now':context.get('time',context['at']),'evidence':view,'continuation':cont,
+                    'contract':{'required':FOLLOWUP_INTENT['required'],'optional':FOLLOWUP_INTENT['optional'],'statuses':FOLLOWUP_INTENT['statuses'],
+                        'delay_hours':'integer 1..48','review_after_minutes':'integer 10..2880',
+                        'next_step':'null or {kind,id} from next_options','wait_for':'null or {kind,id} from wait_options'}},context))],
+                valid_intent,repair_hint=intent_repair,stage='followup',failure_code=FOLLOWUP_INTENT['error'])
+            output['followup_binding']={'contract':FOLLOWUP_INTENT['schema'],'actor_payload':raw}
+            output['followup']=compile_intent(raw,context)
+        else:
+            output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
+                 LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
+                  'now':context.get('time',context['at']),'continuation':continuation_view(context),'grounding':context.get('grounding'),'use_context':context.get('use_context'),'issue_contract':FEEDBACK_CONTINUATION_CONTRACT,
+                  'communication_contract':EVENT_EVIDENCE['feedback_rule'],
+                  'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:opportunity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可引用给定测记或已送达消息作为未来意向，服务端核对条件；这不是执行或目标绑定。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup',failure_code=lambda value: EVENT_EVIDENCE['errors']['communication'] if communication_errors(value,context) else feedback_error_code(value))
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['memory_anchor_checks']=memory.anchor_checks
@@ -643,6 +667,7 @@ async def run(context):
     if context['phase'] in ('plan','feedback') and goal_lifecycle_enabled(context):
         output['goal_contract']=GOAL_LIFECYCLE['schema']
         output['goal_updates']=plain(need.updates)
+        output['goal_maintenance']=plain(need.maintenance)
     original={m['id']:m['payload'] for m in saved.get('memories',[])}
     output['memories']=[];output['memory_updates']=[]
     for stream in MemoryStream:

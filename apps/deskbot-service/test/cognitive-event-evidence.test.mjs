@@ -121,10 +121,8 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
   }else if(req.stage==='feedback')v=req.scene==='need_goal_generation'?{goal_updates:turn===3?[{operation:'complete',goal_id:'goal:send-readings',reason:'同一结果根的指定字段确已送达指定接收者'}]:[]}:{reason:'记录结果',emotion:'joy',intensity:.3,valence:.3};
   else if(req.stage==='memory')v=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
   else if(req.stage==='followup'||req.stage==='followup_repair'){
-   const receipt=cognitiveActualResult(w,OWNER,w.clock.synced_at)?.effects.communication;
-   v={status:'continue',question:'之后怎样继续了解这里？',reason:receipt?.summary??'还想了解更多',delay_hours:1,next_step:null};
-   if(receipt)v.communication_evidence_id=receipt.id;
-   if(mode==='bad')v.reason=original.adopted_followup.reason;
+   v={status:'continue',basis_ids:cognitiveContext(w,OWNER,w.clock.synced_at,'feedback').followup_intent.bases.map(b=>b.id),delay_hours:1,next_step:null,unverified_idea:'灯光会不会记得雨水的声音？'};
+   if(mode==='bad')v.question='清水已经送到苔团眼前了，我该等回应，还是先做点别的？';
   }else throw Error(req.stage);
   return JSON.stringify(v);
  };
@@ -149,7 +147,7 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
  assert.equal(receipt.disclosures[0].kind,'completion_notice');assert.ok(!receipt.text.includes('蓄光'));
  assert.equal(cognitiveContext(w,OWNER,w.clock.synced_at).goal_lifecycle.goals.find(g=>g.goal_id==='goal:send-readings').evidence_ids.length,0);
  const taskCount=w.tasks.length,stock=structuredClone(w.living.inventories[OWNER]);
- mode='bad';await assert.rejects(run('feedback'),e=>e.failure?.cause_code==='cognitive_communication_evidence_invalid');
+ mode='bad';await assert.rejects(run('feedback'),e=>e.failure?.cause_code==='followup_intent_invalid');
  // Close and reopen the same SQLite persistence used by the service. The
  // coordinator's failed job stays pending; resuming must not execute it again.
  const directory=mkdtempSync(join(tmpdir(),'deskbot-event-evidence-'));
@@ -160,6 +158,10 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
  mode='good';await run('feedback');
  settleCognitiveTask(w,w.tasks.find(t=>t.task_id===task.task_id),w.clock.synced_at);
  assert.equal(w.tasks.length,taskCount);assert.deepEqual(w.living.inventories[OWNER],stock);
+ const restored=cognitiveContext(w,OWNER,w.clock.synced_at);
+ assert.equal(restored.saved.followup.intent_evidence.unverified_idea.epistemic,'unverified');
+ assert.ok(!restored.saved.followup.question.includes('记得雨水'));
+ assert.deepEqual(restored.saved.followup.intent_evidence.basis_ids,[w.cognition.actors[OWNER].last_result.root_outcome_id,receipt.id]);
  assert.equal(w.cognition.actors[OWNER].outbox.filter(m=>m.receipt?.id===receipt.id).length,1);
  assert.ok(cognitiveContext(w,OWNER,w.clock.synced_at).speech_evidence.some(e=>e.id===readings.root_outcome_id&&e.disclosures?.some(d=>d.kind==='result_extract')));
  turn=3;await run('plan');task=w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id);settle(w,task);await run('feedback');

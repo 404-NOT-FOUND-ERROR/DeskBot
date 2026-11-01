@@ -1,0 +1,12 @@
+{
+  "schema":"deskbot.evidence-refs.v1",
+  "rule":"只引用本目录中可见且用途相符的ID。输入是听闻；位置仅作线索；回执只证明列明的通信作用。选择依据不等于实践、承诺或完成证据。不存在与不可见统一拒绝为unavailable，避免暴露私人ID。",
+  "types":{
+    "input":{"uses":["choice_context"],"bucket":"source_ids"},
+    "outcome":{"uses":["choice_context","followup_basis"],"bucket":"own_evidence_ids"},
+    "receipt":{"uses":["choice_context","followup_basis"],"bucket":"context_evidence_ids"},
+    "position":{"uses":["choice_context"],"bucket":"context_evidence_ids"},
+    "speculation":{"uses":["idea_context"],"bucket":"context_evidence_ids"}
+  },
+  "errors":{"unavailable":"evidence_ref_unavailable","stale":"evidence_ref_stale","use":"evidence_ref_wrong_use"}
+}

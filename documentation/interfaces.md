@@ -32,6 +32,8 @@
 | 具体动作目录 | `deskbot.choice-catalogue.v2` | 模型选择、Python 绑定、Node 复核已接；活动语义登记尚不完整 |
 | 行动来源字段 | `deskbot.cognitive-decision-fields.v1` | Python 提示/绑定与 Node 共用类别和错误码；需要类型不代替行动来源，不自动推断或修正本人意愿 |
 | 反馈阶段字段 | `deskbot.cognitive-followup-phases.v1` | Python 提示/校验与 Node 接纳共用允许字段；步骤归档及目标绑定只属计划，反馈保留实际结果、证据与未来意向，不重复执行 |
+| 后续事实/意图/设想 | `deskbot.followup-intent.v1` | 共享模板编译、双端检查与冻结绑定；事实标题不可由模型补写，设想单独标记。见 [A3.1 接口](cognitive-followup-intent.md) |
+| 引用目录与用途 | `deskbot.evidence-refs.v1` | 本人可知范围内区分输入、结果、回执、位置与设想；用途不提升世界权限 |
 | 公共事件证据 | `deskbot.cognitive-event-evidence.v1` | 结果摘录、送达回执、事实依据与当前约定范围；Python/Node 共用错误码和反例；旧 job 保留历史语义 |
 | 活动方法与条件 | `deskbot.activity-methods.v1`，`method-conditions-v2` | 第二轮迁移普通汲水、借灯净滤与水岸测记；同源定义、分条件证据和兴趣主题已接，其他活动仍待迁移 |
 | 事项与后续 | `deskbot.cognitive-continuation.v3` + `deskbot.opportunities.v1` | 第三轮共用机会、用途与条件；生命周期仍有双端校验，由共同反例约束 |

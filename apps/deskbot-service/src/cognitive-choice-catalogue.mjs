@@ -3,6 +3,7 @@ import {pendingContactPurpose,purposeSignature} from './cognitive-contact-purpos
 import {cognitiveActionSemantics} from './cognitive-action-semantics.mjs';
 import {validateObligationEvidence} from './cognitive-event-evidence.mjs';
 import {selfPositionDisclosure} from './cognitive-position-knowledge.mjs';
+import {classifyEvidence} from './cognitive-evidence-refs.mjs';
 
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
@@ -105,6 +106,12 @@ export function cognitiveChoiceCatalogue(w,id,c){
 export function validateCatalogueSelection(proposal,context,refs){
  const receipt=proposal.choice_binding;
  if(receipt?.contract!=='choice-catalogue-v2'){
+  if(refs.evidence_refs){
+   const c=proposal.compiled??{},ids=[...(c.source_ids??[]),...(c.own_evidence_ids??[]),...(c.context_evidence_ids??[])];
+   const typed=classifyEvidence(ids,refs.evidence_refs);
+   classifyEvidence(ids,context.evidence_refs);
+   if(Object.entries(typed).some(([key,values])=>!isDeepStrictEqual(c[key]??[],values)))fail('catalogue_evidence_changed');
+  }
   // New claims cannot bypass obligation scope by omitting the choice receipt.
   // Frozen pre-contract jobs retain their original compatibility boundary.
   if(refs.event_evidence)validateObligationEvidence(proposal.compiled,context,proposal.compiled);
@@ -120,7 +127,10 @@ export function validateCatalogueSelection(proposal,context,refs){
  const own=new Set([context.saved.last_result?.root_outcome_id,...issues.flatMap(f=>[f.origin_root_outcome_id,f.from_root_outcome_id,
    ...(f.resolution_evidence_ids??[]),...(f.completed_steps??[]).flatMap(s=>s.evidence_ids??[])])].filter(Boolean));
  const external=new Set(context.inputs.map(i=>i.id));
- if(claims.some(s=>!own.has(s)&&!external.has(s))
+ if(refs.evidence_refs){
+  const frozen=classifyEvidence(claims,refs.evidence_refs),current=classifyEvidence(claims,context.evidence_refs);
+  if(!isDeepStrictEqual(frozen,current)||Object.entries(frozen).some(([key,ids])=>!isDeepStrictEqual(c[key]??[],ids)))fail('catalogue_evidence_changed');
+ }else if(claims.some(s=>!own.has(s)&&!external.has(s))
   ||!isDeepStrictEqual(c.source_ids,[...new Set(claims.filter(s=>external.has(s)))])
   ||!isDeepStrictEqual(c.own_evidence_ids??[],[...new Set(claims.filter(s=>own.has(s)))]))fail('catalogue_evidence_changed');
  const expected={operation:b.operation,activity_id:b.activity_id??null,object_index:b.object_index??null,

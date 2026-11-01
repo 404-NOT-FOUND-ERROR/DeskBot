@@ -13,7 +13,7 @@ type Report={version:string;status:string;scope:string;limitations:string[];gate
     remediation:{title:string;text:string}[];cost:{calls:number;upper_cny:number;batches:{label:string;calls:number;upper_cny:number}[]}}|null};
 type Revision={status:string;changes:string[];checks:string;experiment:string;boundary:string;
   batch?:{version:string;calls:number;upper_cny:number;completed_windows:number;cases:{title:string;result:string;note:string}[]}};
-type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;communication_evidence_id?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string};completed_steps?:{target:{title:string};reason:string;evidence_ids:string[]}[]};
+type Issue={intent_evidence?:{unverified_idea?:{text:string;epistemic:string}};followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;communication_evidence_id?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string};completed_steps?:{target:{title:string};reason:string;evidence_ids:string[]}[]};
 type R3A={version:string;status:string;summary:string;completed_windows:number;observed_windows:number;planned_windows:number;repairs:number;
   deterministic_choice_windows?:number;
   assessment?:{meaningful_windows?:number;entered_windows?:number;first_adopted?:number;decision_windows?:number;rule?:string}|null;
@@ -30,9 +30,9 @@ type R3A={version:string;status:string;summary:string;completed_windows:number;o
       issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
 const stageNames:Record<string,string>={perception:'感知',motivation:'动机与目标',decision:'行动选择',decision_repair:'选择修复',feedback:'结果反馈',memory:'记忆',compile:'意图编译',compile_repair:'编译修复',followup:'后续选择',followup_repair:'后续修复',directive:'来源折射等指令'};
 const issueStatus=(f:Issue)=>f.resolution?({resolved:'具体目标已完成',satisfied:'个人收束',abandoned:'明确放下'}[f.resolution.kind]??f.resolution.kind):({continue:'继续惦记',postpone:'暂缓',none:'暂无新后续',drop:'已收束'}[f.status??'']??'等待复查');
-function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.original_question??issue.question}</p>
-  {issue.question&&issue.original_question&&issue.question!==issue.original_question&&<p>这次打算：{issue.question}</p>}
-  {issue.reason&&<p>{issue.communication_evidence_id?'送达记录的事实依据':'它给出的理由'}：{issue.reason}</p>}
+function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.question??issue.original_question}</p>{issue.intent_evidence?.unverified_idea&&<p>未验证设想：{issue.intent_evidence.unverified_idea.text}</p>}
+  {issue.question&&issue.original_question&&issue.question!==issue.original_question&&<details><summary>最初的问题（当时的想法）</summary><p>{issue.original_question}</p></details>}
+  {issue.reason&&<p>{issue.communication_evidence_id?'送达记录的事实依据':issue.intent_evidence?'执行记录的依据':'它给出的理由'}：{issue.reason}</p>}
   {!!issue.completed_steps?.length&&<details><summary>已经做成的 {issue.completed_steps.length} 个步骤</summary>{issue.completed_steps.map((s,i)=><p key={i}><b>{s.target.title}</b> · {s.reason}<br/><small>执行证据：{s.evidence_ids.join('、')}</small></p>)}</details>}
   {issue.completion_target&&<p>绑定的小目标：{issue.completion_target.title}{!!issue.completion_proofs?.length?'（已有对应执行证据）':''}</p>}<small>事项 {issue.followup_id??'尚未绑定'}{issue.last_reviewed_at?` · 上次复查 ${new Date(issue.last_reviewed_at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}`:''}</small>{issue.resolution&&<p>{issue.resolution.reason}</p>}</div>;}
 function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return <section className="experiment" aria-label={historical?`R3-A 历史复验 ${data.version}`:'R3-A 当前冻结复验'}>

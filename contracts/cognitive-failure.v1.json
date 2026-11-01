@@ -68,7 +68,12 @@
       "goal_identity_changed",
       "goal_identity_missing",
       "goal_transition_required",
-      "goal_deadline_immutable"
+      "goal_deadline_immutable",
+      "followup_intent_invalid",
+      "followup_intent_binding_changed",
+      "evidence_ref_unavailable",
+      "evidence_ref_stale",
+      "evidence_ref_wrong_use"
     ],
     "decision": [
       "upstream_decision_failed"

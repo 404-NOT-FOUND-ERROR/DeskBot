@@ -1,0 +1,21 @@
+{
+  "schema": "deskbot.a31-offline-validation.v1",
+  "completed_at": "2026-11-01T16:00:56.251671+00:00",
+  "command": "./scripts/run-tests.ps1",
+  "counts": {
+    "architecture": 4,
+    "cognition_python": 94,
+    "service_node": 953,
+    "voice_python": 16,
+    "frontend": 326
+  },
+  "total": 1393,
+  "typecheck_and_production_build": "passed",
+  "registered_modules": 17,
+  "registered_interfaces": 18,
+  "paid_calls": 0,
+  "real_behavior_retested": false,
+  "gate_log_sha256": "7b241cb9b9c105661f2584a6eb6c235787350562b030055704b889fe5b16f065",
+  "historical_a3_unchanged": true,
+  "note": "Offline tests and deterministic worker responses; no claim of spontaneous behavior or natural cross-day observation."
+}

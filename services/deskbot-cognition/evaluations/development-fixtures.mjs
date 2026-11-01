@@ -1,3 +1,4 @@
+import {authoredFollowup} from './authored-followup.mjs';
 // Isolated policy fixtures. Dates, supply and needs are authored test conditions;
 // every result is executed by the ordinary finite task engine, never inserted.
 import {createPersistentWorld} from '../../../apps/deskbot-service/src/persistent-world.mjs';
@@ -5,7 +6,7 @@ import {installAutonomy} from '../../../apps/deskbot-service/src/life-state.mjs'
 import {installLivedMemory,syncLivedMemory} from '../../../apps/deskbot-service/src/lived-memory.mjs';
 import {advanceLivingResources} from '../../../apps/deskbot-service/src/living-resources.mjs';
 import {advanceWorldTask,applyRealTimeClock} from '../../../apps/deskbot-service/src/realtime-world.mjs';
-import {applyCognitiveMutation,cognitiveRelevantKey,cognitiveActualResult,settleCognitiveTask} from '../../../apps/deskbot-service/src/cognitive-life-state.mjs';
+import {applyCognitiveMutation,cognitiveRelevantKey,cognitiveActualResult,settleCognitiveTask,cognitiveContext} from '../../../apps/deskbot-service/src/cognitive-life-state.mjs';
 import {settlePracticalTrials} from '../../../apps/deskbot-service/src/role-practical-trials.mjs';
 export const OWNER='shaping-001',BASE='2026-10-01T02:00:00.000Z',DAY=86400000;
 export const atDay=n=>new Date(Date.parse(BASE)+n*DAY).toISOString();
@@ -47,7 +48,7 @@ export function policyChoice(w,compiled,job=`fixture:${w.tasks.length}:${w.clock
   const actual=cognitiveActualResult(w,OWNER,w.clock.synced_at),feedbackJob=job+':feedback';
   applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'feedback',job_id:feedbackJob},w.clock.synced_at,feedbackJob+':claim');
   const receipt=actual.effects?.communication;
-  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'feedback',state:{},memories:[],followup:{status:'continue',question:'测试后续仍待自主选择',reason:receipt?.summary??'确定性夹具',delay_hours:24,...(receipt?{communication_evidence_id:receipt.id}:{})}}},w.clock.synced_at,feedbackJob+':adopt');
+  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'feedback',state:{},memories:[],...authoredFollowup(cognitiveContext(w,OWNER,w.clock.synced_at,'feedback'),{delay_hours:24})}},w.clock.synced_at,feedbackJob+':adopt');
  }
  return task;
 }

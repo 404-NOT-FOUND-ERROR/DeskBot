@@ -6,6 +6,7 @@ checked by Node before execution. Reasons and expectations never create effects.
 from copy import deepcopy
 from decision_fields import MOTIVATION_PROMPT, validate_motivation
 from event_evidence import CONTRACT as EVIDENCE_CONTRACT, validate_obligation
+from evidence_refs import classify_evidence
 
 CONTRACT = '''只返回一个完整JSON对象。你根据自己的需要、经历、兴趣和关系选择，不必为了故事进度行动。
 有行动时：{act:true,choice_id:choices中的一个id,inner_monologue:20至100字的本人理由,expected_outcome:期望而非事实,issue:{decision:continue|postpone|new|none|resolved|satisfied|abandoned,id:current或给定问题ID或null},motivation:按下方字段合同选择,source_ids:实际影响我的外来输入ID数组}。
@@ -16,7 +17,7 @@ resolved只结束已证明的原小目标；satisfied是我觉得了解够了；
 motivation按真实原因选，放在JSON顶层；source_ids也是顶层数组。实际影响选择的输入或本人已核验结果可在source_ids引用其给定ID，程序按已知类型分别绑定外来来源与本人旧事，未知ID拒绝。讨论来信选项必须引用该来信id。消息是听闻，未回复不代表需要或同意。
 可以act=false，只返回act和inner_monologue，表示暂不行动，旧事不会自动关闭。格式错误没有发生在世界里，不把修复当作一次遭遇。
 已有development证据下仍可选填interest_choice:{topic,decision:continue|pause|drop|revisit,reason,root_ids:给定证据}或wish_choice:{direction_id,decision:consider|propose|defer,reason}。propose须eligible=true。没有明确意愿就省略，不为实验进度强行改变兴趣或角色。
-''' + MOTIVATION_PROMPT + EVIDENCE_CONTRACT['obligation_rule']
+''' + MOTIVATION_PROMPT + EVIDENCE_CONTRACT['obligation_rule'] + '有evidence_refs目录时，source_ids按目录choice_context用途选择；可引用位置线索和通信回执，但它们不会变成本人成果或已接受的义务。不可见ID与不存在ID均不可用；过期和用途不符分别报错。'
 
 
 def bind_catalogue_choice(payload, context, candidates, people):
@@ -55,10 +56,12 @@ def bind_catalogue_choice(payload, context, candidates, people):
         own.update(f.get('resolution_evidence_ids',[]))
         for step in f.get('completed_steps',[]):own.update(step.get('evidence_ids',[]))
     external={i['id'] for i in context.get('inputs',[])}
-    if any(s not in own|external for s in citations):
+    if context.get('evidence_refs'):
+        typed=classify_evidence(citations,context['evidence_refs'])
+    elif any(s not in own|external for s in citations):
         raise ValueError('source_ids包含未知证据，不能根据前缀编造本人的成果')
-    own_citations=list(dict.fromkeys(s for s in citations if s in own))
-    p['source_ids']=list(dict.fromkeys(s for s in citations if s in external))
+    own_citations=typed['own_evidence_ids'] if context.get('evidence_refs') else list(dict.fromkeys(s for s in citations if s in own))
+    p['source_ids']=typed['source_ids'] if context.get('evidence_refs') else list(dict.fromkeys(s for s in citations if s in external))
     choice = p['issue']
     if not isinstance(choice, dict) or set(choice) != {'decision', 'id'}:
         raise ValueError('issue只填decision和id')
@@ -106,6 +109,7 @@ def bind_catalogue_choice(payload, context, candidates, people):
     compiled = {**issue, 'operation': operation, 'activity_id': b.get('activity_id'), 'title': row['title'][:40],
                 'reason': p['inner_monologue'], 'message': '', 'motivation': p['motivation'], 'source_ids': p['source_ids'],
                 'prior_root_id': prior, 'own_evidence_ids':own_citations, 'production_use': production, 'interest_choice': deepcopy(p.get('interest_choice')), 'wish_choice': deepcopy(p.get('wish_choice'))}
+    if context.get('evidence_refs'):compiled['context_evidence_ids']=typed['context_evidence_ids']
     if p.get('obligation_ref'):
         compiled['obligation_ref']=deepcopy(p['obligation_ref'])
         compiled['commitment_id']=p['obligation_ref']['commitment_id']
