@@ -1,0 +1,16 @@
+{
+  "schema": "deskbot.a32-offline-validation.v1",
+  "completed_at": "2026-11-01T16:31:14.896Z",
+  "command": "./scripts/run-tests.ps1",
+  "counts": {
+    "architecture": 4,
+    "cognition_python": 94,
+    "service_node": 959,
+    "voice_python": 16,
+    "frontend": 326
+  },
+  "total": 1399,
+  "typecheck_and_production_build": "passed",
+  "paid_calls_at_gate": 0,
+  "gate_log_sha256": "6b4bbdd145247640dcd6edbe2d02bbad1f8f7af7765c57af4035509f8735408e"
+}

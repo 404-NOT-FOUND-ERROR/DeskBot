@@ -4,11 +4,11 @@
 
 聚形域是伴生于现实的奇幻空间。时间、天气、新闻、主人互动与身体感知经过分级，成为角色能够理解的处境和机会。角色有自己的需要、关系和未完成的问题；实际行动消耗时间与材料，留下可追溯的结果。用户可以参与，输入不会直接改写身份或赠送成果。
 
-**当前进度：A3.1 免费修复已完成，R3-A 仍待新版本真实验收。** 后续的已发生事实、未来意图和未验证设想已分开；证据引用统一按类型与用途检查。真实 Python 工作进程和 SQLite 恢复已覆盖跨夜、换方法与实际结算。见 [A3.1 交付与测量](research/milestones/a31-followup-remediation-2026-11-01.md)。
+**当前进度：A3.2 新冻结复验已执行，R3-A 尚未通过。** 1,399 项离线检查与构建通过；真实原矩阵进入 2/20 窗，1 窗完整有效，第二窗因设想字段类型不匹配停止。实际取水已结算，错误反馈未采用。14 次调用峰时估算上界约 ¥0.32；严格缓存回放一致，未追加调用。见 [A3.2 记录与原始反例](research/milestones/a32-refrozen-acceptance-2026-11-02.md)。
 
 固定隔离上下文的免费对照中，请求由 **29 次降至 25 次**，提示字符减少 **26.85%**；目标形成调用保留。这是预设响应的工程测量，**不是真实费用节省或生活质量验收**。上一轮 [A3](research/milestones/a3-behavior-validation-2026-11-01.md) 仍保留 8/20 完整、7 有效的原结论。
 
-目标与原则见 [开发基线](documentation/development-baseline.md)，接缝见 [接口与调用链](documentation/interfaces.md)，总排期见 [工程交付管线](research/design/engineering-delivery-plan-2026-11-01.md)。**下一步 [A3.2](research/design/a32-refrozen-acceptance-2026-11-01.md)：冻结新版本，原行为矩阵与目标专项分别验收。** 正式新认知尚未启用；三人双向生活、地区机制、自然跨日及角色/实体设计仍按门槛推进。
+目标与原则见 [开发基线](documentation/development-baseline.md)，接缝见 [接口与调用链](documentation/interfaces.md)，总排期见 [工程交付管线](research/design/engineering-delivery-plan-2026-11-01.md)。**下一步 [A3.3](research/design/a33-command-readmodel-boundary-2026-11-02.md)：分离命令与读模型、完善类型化提示和字段诊断，先做连续读回回归。** 目标专项已准备但 0/16 真实窗口运行，保持未覆盖。正式新认知尚未启用；三人双向生活、地区机制、自然跨日及角色/实体设计仍按门槛推进。
 
 ```mermaid
 flowchart LR
@@ -164,7 +164,7 @@ Pop-Location
 
 ## 下一阶段
 
-下一批先按 [A3.1 修复计划](research/design/a3-followup-remediation-2026-11-01.md) 完成免费接缝验证，再冻结原 20 窗口矩阵及单列的目标覆盖实验。原矩阵要求 20 个完整、至少 16 个有效且无关键事实错误；失败、修复、未运行和费用完整保留。A1/A2 离线通过不转化为模型通过率。放行后按[当前开发基线](documentation/development-baseline.md)进行少量人物双向生活、地区机制迁移和正式运行接线，再进入 R4 自然多日观察。
+下一批按 [A3.3 接缝修正](research/design/a33-command-readmodel-boundary-2026-11-02.md)先完成免费验证，再登记原 20 窗口矩阵及单列目标专项。原矩阵要求 20 个完整、至少 16 个有效且无关键事实错误；失败、修复、未运行和费用完整保留。A1/A2 离线通过不转化为模型通过率。放行后按[当前开发基线](documentation/development-baseline.md)进行少量人物双向生活、地区机制迁移和正式运行接线，再进入 R4 自然多日观察。
 
 完整人物、美术、表情、声音与打印壳在此基础上联合设计。现实身体没有摄像头或移动能力，只有屏幕、触摸、双麦声源方向、磁识别和单轴转头。当前设备仍为小智固件，DeskBot 实机协议、电机与换壳校准、真实中文 ASR/TTS 尚待接入。虚拟身份不会赋予现实身体额外能力。
 

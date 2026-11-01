@@ -1,0 +1,125 @@
+{
+  "schema": "deskbot.a32-followup-shape-counterexample.v1",
+  "version": "70e67a6d129f",
+  "case_id": "resources-1-off",
+  "turn": 2,
+  "error": {
+    "schema": "deskbot.cognitive-failure.v1",
+    "layer": "contract",
+    "code": "python_session_failed",
+    "cause_code": "followup_intent_invalid",
+    "phase": "feedback",
+    "stage": "followup_repair",
+    "job_id": null,
+    "actor_id": "shaping-001",
+    "retryable": false,
+    "record_as_experience": false
+  },
+  "field": "unverified_idea",
+  "expected": "optional nonempty string, 1..160 Unicode code points",
+  "actual_type": "object",
+  "raw_response": {
+    "status": "continue",
+    "basis_ids": [
+      "task:cognitive:r3:70e67a6d129f:resources-1-off:2:plan"
+    ],
+    "next_step": null,
+    "wait_for": null,
+    "delay_hours": 2,
+    "review_after_minutes": 120,
+    "followup_id": "task:fixture-built-lamp",
+    "unverified_idea": {
+      "text": "也许归途灯的罩片不必全遮，只在水面方向留一道窄缝，让取水处亮、岸线仍暗；下次试滤水时顺手看明暗边界。",
+      "epistemic": "unverified",
+      "label": "未验证设想"
+    }
+  },
+  "repair_response": {
+    "status": "continue",
+    "basis_ids": [
+      "task:cognitive:r3:70e67a6d129f:resources-1-off:2:plan"
+    ],
+    "next_step": null,
+    "wait_for": null,
+    "delay_hours": 2,
+    "review_after_minutes": 120,
+    "followup_id": "task:fixture-built-lamp",
+    "unverified_idea": {
+      "text": "也许归途灯的罩片不必全遮，只在水面方向留一道窄缝，让取水处亮、岸线仍暗；下次试滤水时顺手看明暗边界。",
+      "epistemic": "unverified",
+      "label": "未验证设想"
+    }
+  },
+  "previous_read_model_value": {
+    "text": "也许归途灯的罩片不必全遮，只在水面方向留一道窄缝，让取水处亮、岸线仍暗；下次试滤水时顺手看明暗边界。",
+    "epistemic": "unverified",
+    "label": "未验证设想"
+  },
+  "prompt_contract": {
+    "required": [
+      "status",
+      "basis_ids",
+      "next_step",
+      "delay_hours"
+    ],
+    "optional": [
+      "wait_for",
+      "review_after_minutes",
+      "followup_id",
+      "closure",
+      "unverified_idea"
+    ],
+    "statuses": [
+      "continue",
+      "postpone",
+      "drop",
+      "none"
+    ],
+    "delay_hours": "integer 1..48",
+    "review_after_minutes": "integer 10..2880",
+    "next_step": "null or {kind,id} from next_options",
+    "wait_for": "null or {kind,id} from wait_options"
+  },
+  "legacy_rule_still_present": "当前是结果反馈阶段。动作已经结算；只表达怎样看待实际结果、是否继续惦记和下次复查安排。status表达continue/postpone/drop/none，不使用计划阶段的followup_decision。当前问题的身份和已绑定目标由服务端保留；可选followup_id只能指向当前问题，不能恢复另一问题。next_step只是未来意向，不执行动作、不绑定完成标准。步骤归档与下一目标选择留到下一次计划；现在保留已经完成的目标及其真实证据，不重复执行它。可以按当前已绑定目标的resolution_evidence_ids给出status:drop和followup_closure:{followup_id,kind:resolved|satisfied|abandoned,reason,evidence_ids:[]}。resolved只证明事先绑定的一步，不能宣称整项研究完成；个人觉得了解够了用satisfied，主动放下用abandoned。还想继续研究就保持continue/postpone，不必为了记录完成而结案。反馈JSON只允许这些字段：status、question、reason、delay_hours、next_step、wait_for、review_after_minutes、followup_id、followup_closure、communication_evidence_id。",
+  "repair_hint": "只选择实际依据与未来意图。basis_ids逐字引用本次bases全部ID；next_step/wait_for引用现有机会或等待条件，不执行任务。question/reason由执行器生成，模型不能提供。可用unverified_idea表达最多160字的奇幻想法或待验证假说；它不属于事实、交付、承诺或完成证据。closure可选{kind:resolved|satisfied|abandoned,evidence_ids:[]}，仍由原问题完成合同核验，不改问题ID或标准。 必填status/basis_ids/next_step/delay_hours；不能输出question/reason。保留原意，返回完整JSON。",
+  "diagnostic_context": {
+    "followup_intent": {
+      "schema": "deskbot.followup-intent.v1",
+      "rule": "只选择实际依据与未来意图。basis_ids逐字引用本次bases全部ID；next_step/wait_for引用现有机会或等待条件，不执行任务。question/reason由执行器生成，模型不能提供。可用unverified_idea表达最多160字的奇幻想法或待验证假说；它不属于事实、交付、承诺或完成证据。closure可选{kind:resolved|satisfied|abandoned,evidence_ids:[]}，仍由原问题完成合同核验，不改问题ID或标准。",
+      "bases": [
+        {
+          "id": "task:cognitive:r3:70e67a6d129f:resources-1-off:2:plan",
+          "kind": "outcome",
+          "summary": "本次任务已实际完成"
+        }
+      ],
+      "next_options": [],
+      "wait_options": []
+    },
+    "continuation": {
+      "current": {
+        "followup_id": "task:fixture-built-lamp"
+      }
+    }
+  },
+  "offline_probe": {
+    "network_calls": 0,
+    "raw_node": "followup_intent_invalid",
+    "raw_python": "followup_intent_invalid",
+    "change": "For diagnosis only, replace unverified_idea object with its text, keeping every other field identical.",
+    "corrected_node_accepted": true,
+    "corrected_python_accepted": true,
+    "compiled_equal": true,
+    "world_unchanged": true,
+    "caveat": "This is a free structural probe, not a new model answer or an adopted world result."
+  },
+  "preserved_execution": {
+    "activity": "waylight-use",
+    "status": "completed",
+    "water_units": 4,
+    "task_count": 1,
+    "pending_task_id": "cognitive:r3:70e67a6d129f:resources-1-off:2:plan",
+    "adopted_feedback": false,
+    "persisted_fact_memories": 2
+  }
+}

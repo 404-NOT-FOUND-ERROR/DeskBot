@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "summary": "世界初态/终态 1/1 条一致；停止原因 1/1 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+  "original_version": "70e67a6d129f",
+  "replay_version": "70e67a6d129f",
+  "cached_responses": 14,
+  "state_matches": 1,
+  "termination_matches": 1,
+  "differences": []
+}

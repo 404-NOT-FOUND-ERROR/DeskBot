@@ -1,0 +1,71 @@
+{
+  "schema": "deskbot.a32-cost.v1",
+  "calls": 14,
+  "provider_returns": 14,
+  "provider_failures": 0,
+  "repair_calls": 1,
+  "input_tokens": 178582,
+  "output_tokens": 1059,
+  "cache_hit_tokens": 23552,
+  "cache_miss_tokens": 155030,
+  "uncertain_calls": 0,
+  "upper_cny": 0.31947408,
+  "billed_cny": null,
+  "pricing_checked_at": "2026-11-02",
+  "pricing_url": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "cost_basis": "peak_price_upper_estimate_not_account_bill",
+  "call_latency_ms": {
+    "median": 1230,
+    "p95": 4032,
+    "max": 4032,
+    "total": 21261
+  },
+  "by_stage": {
+    "perception": {
+      "calls": 2,
+      "input_tokens": 22421,
+      "output_tokens": 93,
+      "upper_cny": 0.029780559999999998
+    },
+    "motivation": {
+      "calls": 2,
+      "input_tokens": 21675,
+      "output_tokens": 14,
+      "upper_cny": 0.04321112
+    },
+    "decision": {
+      "calls": 2,
+      "input_tokens": 57052,
+      "output_tokens": 314,
+      "upper_cny": 0.1141072
+    },
+    "feedback": {
+      "calls": 2,
+      "input_tokens": 26135,
+      "output_tokens": 113,
+      "upper_cny": 0.05116696
+    },
+    "memory": {
+      "calls": 3,
+      "input_tokens": 14857,
+      "output_tokens": 94,
+      "upper_cny": 0.02896072
+    },
+    "followup": {
+      "calls": 2,
+      "input_tokens": 23908,
+      "output_tokens": 297,
+      "upper_cny": 0.050192
+    },
+    "followup_repair": {
+      "calls": 1,
+      "input_tokens": 12534,
+      "output_tokens": 134,
+      "upper_cny": 0.00205552
+    }
+  },
+  "goal_generation_calls": 2,
+  "empty_goal_returns": 2,
+  "feedback_empty_queue_calls": 0,
+  "network_calls_after_stop": 0
+}

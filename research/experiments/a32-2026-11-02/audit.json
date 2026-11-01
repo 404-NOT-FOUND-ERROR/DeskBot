@@ -1,0 +1,147 @@
+{
+  "schema": "deskbot.a32-acceptance.v1",
+  "version": "70e67a6d129f",
+  "status": "stopped_protocol_failure",
+  "passed": false,
+  "reviewer": "Codex 逐窗核对；不是用户验收或独立真人盲审。",
+  "source_baseline": "f5c4a8a53eb70f9d450765f3300193ca6046ab4f",
+  "original": {
+    "planned_windows": 20,
+    "entered_windows": 2,
+    "complete_windows": 1,
+    "valid_windows": 1,
+    "incomplete_windows": 1,
+    "unrun_windows": 18,
+    "critical_adopted_fact_errors": 0,
+    "protocol_failures": 1,
+    "provider_failures": 0,
+    "all_goal_queues_empty": true,
+    "first_window_note": "有效：先提出聊天邀请，回执仅证明送达，未虚构接受、活动或交付；库存未变。原问题ID保留，借灯取水明确为未来意图，窄缝设想单独标为未验证。目标队列为空，未计为目标形成。",
+    "stop": "Second feedback returned a storage/read-model object where the command schema requires a string; bounded repair repeated it. Execution preserved, feedback not adopted."
+  },
+  "goals": {
+    "version": "ad779612c364",
+    "planned_window_cap": 16,
+    "entered_windows": 0,
+    "complete_windows": 0,
+    "status": "not_run_original_gate_failed",
+    "coverage": "unknown_not_passed",
+    "scenarios": [
+      {
+        "id": "G1-formation",
+        "status": "not_run"
+      },
+      {
+        "id": "G2-change-method",
+        "status": "not_run"
+      },
+      {
+        "id": "G3-overnight",
+        "status": "not_run"
+      },
+      {
+        "id": "G4-open-inquiry",
+        "status": "not_run"
+      }
+    ]
+  },
+  "cost": {
+    "schema": "deskbot.a32-cost.v1",
+    "calls": 14,
+    "provider_returns": 14,
+    "provider_failures": 0,
+    "repair_calls": 1,
+    "input_tokens": 178582,
+    "output_tokens": 1059,
+    "cache_hit_tokens": 23552,
+    "cache_miss_tokens": 155030,
+    "uncertain_calls": 0,
+    "upper_cny": 0.31947408,
+    "billed_cny": null,
+    "pricing_checked_at": "2026-11-02",
+    "pricing_url": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    "cost_basis": "peak_price_upper_estimate_not_account_bill",
+    "call_latency_ms": {
+      "median": 1230,
+      "p95": 4032,
+      "max": 4032,
+      "total": 21261
+    },
+    "by_stage": {
+      "perception": {
+        "calls": 2,
+        "input_tokens": 22421,
+        "output_tokens": 93,
+        "upper_cny": 0.029780559999999998
+      },
+      "motivation": {
+        "calls": 2,
+        "input_tokens": 21675,
+        "output_tokens": 14,
+        "upper_cny": 0.04321112
+      },
+      "decision": {
+        "calls": 2,
+        "input_tokens": 57052,
+        "output_tokens": 314,
+        "upper_cny": 0.1141072
+      },
+      "feedback": {
+        "calls": 2,
+        "input_tokens": 26135,
+        "output_tokens": 113,
+        "upper_cny": 0.05116696
+      },
+      "memory": {
+        "calls": 3,
+        "input_tokens": 14857,
+        "output_tokens": 94,
+        "upper_cny": 0.02896072
+      },
+      "followup": {
+        "calls": 2,
+        "input_tokens": 23908,
+        "output_tokens": 297,
+        "upper_cny": 0.050192
+      },
+      "followup_repair": {
+        "calls": 1,
+        "input_tokens": 12534,
+        "output_tokens": 134,
+        "upper_cny": 0.00205552
+      }
+    },
+    "goal_generation_calls": 2,
+    "empty_goal_returns": 2,
+    "feedback_empty_queue_calls": 0,
+    "network_calls_after_stop": 0
+  },
+  "source_freeze": {
+    "status": "pass",
+    "files": 263,
+    "frozen_sha256": "25a6ff9788024b184bcad618638917b272438a321ba877932ef3b787fa0a3773",
+    "current_sha256": "25a6ff9788024b184bcad618638917b272438a321ba877932ef3b787fa0a3773",
+    "checked_at": "2026-11-01T16:44:25.464Z"
+  },
+  "replay": {
+    "status": "pass",
+    "summary": "世界初态/终态 1/1 条一致；停止原因 1/1 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+    "original_version": "70e67a6d129f",
+    "replay_version": "70e67a6d129f",
+    "cached_responses": 14,
+    "state_matches": 1,
+    "termination_matches": 1,
+    "differences": []
+  },
+  "findings": [
+    "第一窗真实提出聊天邀请，回执明确未接受、未交付；未来借灯取水是意图，窄缝想法标为未验证。",
+    "第二窗读回原问题，实际借灯净滤，原水消耗4份、背包增加4份清水。反馈未成功采用，不能算完整有效窗口。",
+    "原始与修复响应完全相同，unverified_idea 复制了上次存储对象；输出合同只接受字符串。Node 与 Python 一致拒绝。",
+    "免费单字段探针仅把对象换成其 text，双端编译均通过且世界不变，定位为命令/读模型形状混淆；未将修改后内容冒充模型原响应或正式采用结果。",
+    "新意图提示仍带旧 continuation.rule 的 question/reason 字段说明；optional 列表没有 unverified_idea 的机器可读类型；通用修复提示没有具体字段路径。",
+    "A3.1 测试证明边界能拒绝非法值，却未覆盖把已保存设想读回后再生成的协议可用性；后续需要专用提示投影与逐字段错误，而非增加重试或放宽事实边界。",
+    "两个计划窗目标生成都为空；第一窗空维护已跳过。第二窗反馈中断，不能据此宣称全部维护/兴趣链可靠。",
+    "按登记停止后未追加模型采样，目标专项0/16保持未覆盖；原A3和本批分开报告，R3-B仍未放行。"
+  ],
+  "next": "A3.3：输出命令/持久化读模型分离、完整类型化提示与具体修复诊断、真实历史读回回归；免费验证后另行登记复验。"
+}

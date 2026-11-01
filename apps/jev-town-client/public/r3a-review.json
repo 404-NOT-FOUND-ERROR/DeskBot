@@ -221,15 +221,15 @@
     "stop_policy": "First terminal error or critical factual defect, or more than four invalid windows. Review every completed window. No replacement cases, retries beyond existing one repair, or additional paid runs after stop."
   },
   "local_revision": {
-    "version": "a31-offline-2026-11-01",
-    "checks": "A3.1 的 1,393 项离线检查、类型检查与生产构建通过；包含真实工作进程、跨夜与 SQLite 恢复。尚未运行新真实模型复验。",
+    "version": "a32-2026-11-02 · 70e67a6d129f",
+    "checks": "A3.2 的 1,399 项离线检查、类型检查与构建通过；真实原矩阵进入2/20窗，1窗完整有效，第二窗协议失败后停止。R3-A尚未通过。",
     "changes": [
-      "事实依据、未来意图、未验证设想分离；新反馈拒绝自由事实标题。",
-      "统一引用类型和用途；位置和回执不冒充实践或义务。",
-      "空队列跳过结果维护，目标形成调用保留。",
-      "四例固定上下文请求 29→25，提示字符减少26.85%；不是收费比例。"
+      "实际取水只结算一次，错误反馈未采用；原始与一次修复都将设想对象填进字符串字段。",
+      "14次真实调用，峰时估算上界约0.32元；严格缓存回放一致，停止后新增调用0。",
+      "目标专项另列最多16窗，已准备但未启动，保持未覆盖；没有启用正式新认知。",
+      "下一步A3.3先修命令与读模型的提示接缝、明确字段类型和错误，补连续读回回归。"
     ],
-    "real_retested": false
+    "real_retested": true
   },
   "findings": [
     "实际动作顺序：第一例净滤→敞灯测记→装罩→次日展开→休息；第二例邀请→净滤→询问清水需求。休息有效，不要求持续生产；其他人物仍是静态实验接收者。",

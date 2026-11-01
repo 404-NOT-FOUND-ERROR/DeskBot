@@ -14,6 +14,8 @@ import {cases,personaCases,fixture,hash,plus,tick,settle,digest,opportunity} fro
 import {interestCases,interestFixture} from './r3-interest-fixtures.mjs';
 import {recordedCalls} from './recorded-calls.mjs';
 import {awaitWindowReview} from './r3-window-review.mjs';
+import {experimentSources,experimentVersion} from './experiment-freeze.mjs';
+import {goalCases,goalFixture,goalSnapshot,restartGoalWorld,goalCoverage} from './a32-goal-fixtures.mjs';
 
 const arg=n=>process.argv.find(a=>a.startsWith(`--${n}=`))?.slice(n.length+3);
 const dir=resolve(arg('output')??'../runtime/r3-20261020'),real=process.argv.includes('--real'),replay=process.argv.includes('--replay');
@@ -23,43 +25,22 @@ if(!Number.isSafeInteger(turns)||turns<2||turns>6)throw Error('turns_must_be_2_t
 if(!Number.isSafeInteger(maxCalls)||maxCalls<1||maxCalls>900)throw Error('max_calls_must_be_1_to_900');
 mkdirSync(dir,{recursive:true});
 const base=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
-const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs','services/deskbot-cognition/evaluations/recorded-calls.mjs',
-  'services/deskbot-cognition/evaluations/r3-window-review.mjs',
-  'contracts/cognitive-event-evidence.v1.json','apps/deskbot-service/src/cognitive-event-evidence.mjs','services/deskbot-cognition/event_evidence.py',
-  'contracts/cognitive-goal-lifecycle.v1.json','apps/deskbot-service/src/cognitive-goal-lifecycle.mjs','services/deskbot-cognition/goal_lifecycle.py',
-  'contracts/cognitive-position-knowledge.v1.json','apps/deskbot-service/src/cognitive-position-knowledge.mjs',
-  'contracts/cognitive-decision-fields.v1.json','services/deskbot-cognition/decision_fields.py',
-  'contracts/cognitive-followup-phases.v1.json','services/deskbot-cognition/followup_phases.py',
-  'contracts/cognitive-failure.v1.json','services/deskbot-cognition/failure_contract.py','apps/deskbot-service/src/cognitive-failure.mjs',
-  'services/deskbot-cognition/life_semantics.py','services/deskbot-cognition/actor_choice.py','services/deskbot-cognition/catalogue_choice.py',
-  'apps/deskbot-service/src/cognitive-choice-catalogue.mjs','apps/deskbot-service/src/cognitive-contact-purpose.mjs','apps/deskbot-service/src/cognitive-memory-frame.mjs',
-  'apps/deskbot-service/src/cognitive-action-semantics.mjs',
-  'contracts/activity-methods.v1.json','apps/deskbot-service/src/activity-methods.mjs',
-  'contracts/cognitive-opportunities.v1.json','apps/deskbot-service/src/cognitive-opportunities.mjs','apps/deskbot-service/src/cognitive-goal-opportunities.mjs',
-  'services/deskbot-cognition/opportunity_contract.py','services/deskbot-cognition/opportunity_goals.py',
-  'apps/deskbot-service/src/living-resources.mjs','apps/deskbot-service/src/realtime-world.mjs','apps/deskbot-service/src/development-facets.mjs',
-  'apps/deskbot-service/src/cognitive-life-state.mjs','apps/deskbot-service/src/cognitive-continuity.mjs',
-  'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
-  'apps/deskbot-service/src/cognitive-social.mjs',
-  'apps/deskbot-service/src/cognitive-issue-evidence.mjs','services/deskbot-cognition/context_projection.py',
-  'apps/deskbot-service/src/cognitive-grounding.mjs','services/deskbot-cognition/contact_contract.py',
-  'apps/deskbot-service/src/cognitive-budget.mjs',
-  'apps/deskbot-service/src/cognitive-continuation.mjs','apps/deskbot-service/src/cognitive-schedule.mjs',
-  'apps/deskbot-service/src/social-life.mjs','services/deskbot-cognition/continuation_contract.py',
-  'apps/deskbot-service/src/autonomous-life.mjs','apps/deskbot-service/src/life-choice.mjs'];
 const interests=process.argv.includes('--interests');
-if(interests)relevant.push('services/deskbot-cognition/evaluations/r3-interest-fixtures.mjs','services/deskbot-cognition/evaluations/development-fixtures.mjs');
+const goals=process.argv.includes('--goals');
+if([interests,goals,process.argv.includes('--personas')].filter(Boolean).length>1)throw Error('choose_one_fixture_family');
+const sources=experimentSources(base),relevant=Object.keys(sources);
 const runnerHash=hash(readFileSync(fileURLToPath(import.meta.url),'utf8'));
-const version=hash({files:relevant.map(p=>[p,hash(readFileSync(join(base,p),'utf8'))]),runner:runnerHash,turns}).slice(0,12);
+const settings={turns,family:goals?'goals':interests?'interests':process.argv.includes('--personas')?'personas':'original',
+ model:{provider:'deepseek',model:'deepseek-flash',thinking:'disabled',temperature_default:.55},review:'deskbot.r3-window-review.v1'};
+const version=experimentVersion(sources,settings);
 const runDir=join(dir,version);mkdirSync(runDir,{recursive:true});mkdirSync(join(runDir,'calls'),{recursive:true});mkdirSync(join(runDir,'worlds'),{recursive:true});
 const frozenPath=join(runDir,'frozen-sources.json.gz');
-if(!existsSync(frozenPath))writeFileSync(frozenPath,gzipSync(JSON.stringify(Object.fromEntries(
-  [...relevant,'services/deskbot-cognition/evaluations/r3-run.mjs','services/deskbot-cognition/evaluations/r3-interest-fixtures.mjs']
-    .map(p=>[p,readFileSync(join(base,p),'utf8')])))));
-const seed=interests?interestFixture:fixture;
-const select=interests?interestCases:process.argv.includes('--personas')?personaCases:cases;
+if(!existsSync(frozenPath))writeFileSync(frozenPath,gzipSync(JSON.stringify(sources)),{flag:'wx'});
+else if(hash(JSON.parse(gunzipSync(readFileSync(frozenPath))))!==hash(sources))throw Error('frozen_sources_changed');
+const seed=goals?goalFixture:interests?interestFixture:fixture;
+const select=goals?goalCases:interests?interestCases:process.argv.includes('--personas')?personaCases:cases;
 const all=select.map(c=>{const w=seed(c);return {...c,start_hash:hash(w),context:cognitiveContext(w,c.actor,w.clock.synced_at)};});
-writeFileSync(join(runDir,interests?'manifest-interest.json':process.argv.includes('--personas')?'manifest-personas.json':'manifest.json'),JSON.stringify({version,files:relevant,runner_hash:runnerHash,fixtures:all.map(({context,...c})=>c),scope:'Only authored fixtures; no production database',turns},null,2));
+writeFileSync(join(runDir,interests?'manifest-interest.json':process.argv.includes('--personas')?'manifest-personas.json':'manifest.json'),JSON.stringify({version,files:relevant,settings,runner_hash:runnerHash,fixtures:all.map(({context,...c})=>c),scope:'Only authored fixtures; no production database',turns},null,2));
 writeFileSync(join(runDir,process.argv.includes('--personas')?'outbound-personas.json.gz':'outbound-fixtures.json.gz'),gzipSync(JSON.stringify(all)));
 if(!real&&!replay&&!process.argv.includes('--rules')){console.log(JSON.stringify({version,prepared:all.length,runDir,paid_calls:0}));process.exit(0);}
 if(real){
@@ -93,11 +74,12 @@ const report=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{version,res
   '邀请经 agent 来源接入口送达，未预先建立双方承诺；初始库存明确编排。',
   '自动判据只是筛查；合理改法与关键事实错误需要逐例语义审查。',
 ]};
+if(real&&report.results.some(r=>r.error))throw Error('stopped_batch_requires_new_registration');
 function save(){
   if(budget)report.budget=budget.status();
   const temp=file+'.tmp';writeFileSync(temp,JSON.stringify(report,null,2));renameSync(temp,file);
 }
-let processed=0,consecutiveFailures=0;
+let processed=0,consecutiveFailures=0,invalidWindows=report.results.flatMap(r=>r.turns).filter(t=>t.review?.valid===false).length;
 const recorded=recordedCalls({directory:join(runDir,'calls'),mode:real?'real':'replay',complete:(id,request)=>budget.complete(id,request)});
 const failureLimit=process.argv.includes('--stop-on-error')?1:2;
 const call=recorded.call;
@@ -168,15 +150,19 @@ try{
     for(const arm of arms){
       const key=`${arm}:${c.id}`;
       if(report.results.some(r=>r.key===key)||processed>=Number(arg('take')??1000)||consecutiveFailures>=failureLimit)continue;
-      const w=seed(c),episode={...c,key,arm,initial_hash:hash(w),initial:digest(w,c.actor),turns:[]},started=performance.now();
+      let w=seed(c);
+      const episode={...c,key,arm,initial_hash:hash(w),initial:digest(w,c.actor),initial_goals:goalSnapshot(w,c.actor),turns:[]},started=performance.now();
+      let restart=null;
       try{
         for(let turn=1;turn<=turns;turn++){
           const record={turn,at:w.clock.synced_at,prior_followup:structuredClone(w.cognition.actors[c.actor].followup??null),
-            opportunity:opportunity(w,c.actor),inputs:cognitiveContext(w,c.actor,w.clock.synced_at).inputs,before:digest(w,c.actor)};
+            opportunity:opportunity(w,c.actor),inputs:cognitiveContext(w,c.actor,w.clock.synced_at).inputs,before:digest(w,c.actor),
+            goals_before:goalSnapshot(w,c.actor),...(restart?{restart}:{})};
+          restart=null;
           episode.turns.push(record);
           const t=performance.now();
           if(arm==='cognition')await cognitive(w,c,record,turn);else await oldPolicy(w,c,record,turn,arm);
-          record.latency_ms=Math.round(performance.now()-t);record.after=digest(w,c.actor);
+          record.latency_ms=Math.round(performance.now()-t);record.after=digest(w,c.actor);record.goals_after=goalSnapshot(w,c.actor);
           console.log(JSON.stringify({key,turn,op:record.compiled?.operation??record.plan?.goal,activity:record.compiled?.activity_id,followup:record.followup?.status}));
           if(record.truncated)break;
           if(real&&process.argv.includes('--review-windows'))record.review=await awaitWindowReview({directory:join(runDir,'reviews'),version,key,record});
@@ -185,11 +171,18 @@ try{
             if(review)record.review=structuredClone(review);
           }
           if(record.review?.decision==='stop')throw Object.assign(Error(record.review.note),{code:'window_review_stopped'});
+          if(record.review?.valid===false&&++invalidWindows>4)throw Object.assign(Error('More than four invalid windows'),{code:'invalid_window_limit'});
+          if(goals){episode.coverage=goalCoverage(c,episode);if(episode.coverage.covered){episode.end_reason='registered_coverage_reached';break;}}
           if(turn<turns){
             let next=record.followup?.next_review_at??plus(w.clock.synced_at,60);
             if(next<w.clock.synced_at)next=w.clock.synced_at;
             const hour=(new Date(next).getUTCHours()+8)%24;
             if(hour>=23||hour<6)next=plus(next,(hour>=23?33-hour:9-hour)*60);
+            if(goals&&c.id==='G3-overnight'&&turn===1){
+              const restored=restartGoalWorld(w,join(runDir,'worlds',hash(key)+(replay?'-replay':'')+'.sqlite'));
+              w=restored.world;restart=restored.proof;
+              if(next<'2026-10-21T01:00:00.000Z')next='2026-10-21T01:00:00.000Z';
+            }
             tick(w,next);
           }
         }
@@ -200,6 +193,7 @@ try{
       }
       episode.latency_ms=Math.round(performance.now()-started);
       episode.final_hash=hash(w);episode.final=digest(w,c.actor);
+      if(goals)episode.coverage=goalCoverage(c,episode);
       writeFileSync(join(runDir,'worlds',hash(key)+(replay?'-replay':'')+'.json.gz'),gzipSync(JSON.stringify(w)));
       report.results.push(episode);processed++;report.cache={...recorded.stats};save();
     }

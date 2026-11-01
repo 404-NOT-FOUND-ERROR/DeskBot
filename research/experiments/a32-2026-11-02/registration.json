@@ -1,0 +1,125 @@
+{
+  "schema": "deskbot.a32-registration.v1",
+  "gate": {
+    "schema": "deskbot.a32-offline-validation.v1",
+    "completed_at": "2026-11-01T16:31:14.896Z",
+    "command": "./scripts/run-tests.ps1",
+    "counts": {
+      "architecture": 4,
+      "cognition_python": 94,
+      "service_node": 959,
+      "voice_python": 16,
+      "frontend": 326
+    },
+    "total": 1399,
+    "typecheck_and_production_build": "passed",
+    "paid_calls_at_gate": 0,
+    "gate_log_sha256": "6b4bbdd145247640dcd6edbe2d02bbad1f8f7af7765c57af4035509f8735408e"
+  },
+  "batches": [
+    {
+      "family": "original",
+      "version": "70e67a6d129f",
+      "checks": {
+        "backend": {
+          "passed": true,
+          "count": 959
+        },
+        "python": {
+          "passed": true,
+          "count": 94
+        },
+        "frontend": {
+          "passed": true,
+          "count": 326,
+          "build": true
+        }
+      },
+      "cases": [
+        "resources-1-off",
+        "resources-1-on",
+        "invitation-3-off",
+        "invitation-3-on"
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 170,
+      "turns": 5,
+      "require_window_review": true,
+      "offline_gate": "6b4bbdd145247640dcd6edbe2d02bbad1f8f7af7765c57af4035509f8735408e",
+      "approval": "User authorized isolated fictional contexts and economical spending without a monetary limit; no formal data.",
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "source_files": 263,
+      "planned_windows": 20,
+      "original_initial_state_comparison": [
+        {
+          "id": "resources-1-off",
+          "matches": true
+        },
+        {
+          "id": "resources-1-on",
+          "matches": true
+        },
+        {
+          "id": "invitation-3-off",
+          "matches": true
+        },
+        {
+          "id": "invitation-3-on",
+          "matches": true
+        }
+      ],
+      "registered_at": "2026-11-01T16:31:14.924Z"
+    },
+    {
+      "family": "goals",
+      "version": "ad779612c364",
+      "checks": {
+        "backend": {
+          "passed": true,
+          "count": 959
+        },
+        "python": {
+          "passed": true,
+          "count": 94
+        },
+        "frontend": {
+          "passed": true,
+          "count": 326,
+          "build": true
+        }
+      },
+      "cases": [
+        "G1-formation",
+        "G2-change-method",
+        "G3-overnight",
+        "G4-open-inquiry"
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 160,
+      "turns": 4,
+      "require_window_review": true,
+      "offline_gate": "6b4bbdd145247640dcd6edbe2d02bbad1f8f7af7765c57af4035509f8735408e",
+      "approval": "User authorized isolated fictional contexts and economical spending without a monetary limit; no formal data.",
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "source_files": 263,
+      "planned_windows": 16,
+      "original_initial_state_comparison": null,
+      "registered_at": "2026-11-01T16:31:14.943Z"
+    }
+  ],
+  "sequence": "original must pass before goals"
+}
