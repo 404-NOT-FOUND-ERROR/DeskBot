@@ -7,6 +7,13 @@ import {validateProductionUse,validateDecisionMethod,validateDecisionIssue} from
 import {cognitiveMemoryFrame} from '../src/cognitive-memory-frame.mjs';
 import {startActivityTask} from '../src/realtime-world.mjs';
 const world=()=>fixture(cases.find(c=>c.id==='invitation-3-on'));
+
+test('single actor choice receipt prevents later execution substitution',()=>{
+ const compiled={operation:'rest',reason:'先歇一会'};
+ const proposal={compiled,choice_binding:{contract:'single-choice-v1',model_compile_calls:0,compiled:structuredClone(compiled)}};
+ validateDecisionMethod(proposal,{});
+ assert.throws(()=>validateDecisionMethod({...proposal,compiled:{operation:'activity',activity_id:'water-bed'}},{}),{code:'actor_choice_binding_changed'});
+});
 function completedShade(){
  const w=world(),life=w.cognition.actors[OWNER],at=w.clock.synced_at;
  prepareCognitiveFollowup(life,{followup_decision:'continue',completion_target_id:'activity:waylight-fit-shade'},cognitiveContext(w,OWNER,at).continuation,at);
@@ -16,11 +23,15 @@ function completedShade(){
 }
 test('after installation, use is ready and cannot inherit the six-hour adjustment wait even in feedback',()=>{
  const {life,at,context}=completedShade();
- assert.equal(context.wait_options.find(o=>o.id==='waylight-use').available,true);
- const value={status:'continue',question:'继续用灯',reason:'改罩要等六小时',delay_hours:6,next_step:{kind:'activity',id:'waylight-use'},wait_for:{kind:'activity',id:'waylight-use'}};
+ const use=context.wait_options.find(o=>o.kind==='opportunity'&&o.completion_target_id?.startsWith('method:waylight-use:')&&o.requires_issue===context.current.followup_id);
+ assert.ok(use);assert.equal(use.available,true);
+ // Multiple purposes must not collapse into a bare activity reference.
+ assert.ok(!context.wait_options.some(o=>o.kind==='activity'&&o.id==='waylight-use'));
+ const ref={kind:'opportunity',id:use.id};
+ const value={status:'continue',question:'继续用灯',reason:'改罩要等六小时',delay_hours:6,next_step:ref,wait_for:ref};
  assert.throws(()=>cognitiveResultFollowup(life,value,context,at,'task:shade','continue'),{code:'followup_condition_already_ready'});
  const next=cognitiveResultFollowup(life,{...value,wait_for:null,reason:'我想先休息，稍后再试',delay_hours:1},context,at,'task:shade','continue');
- assert.equal(next.wait_for,null);assert.equal(next.next_step.id,'waylight-use');
+ assert.equal(next.wait_for,null);assert.equal(next.next_step.id,use.id);
 });
 test('a completed step can be acknowledged and followed by a different criterion in the same inquiry',()=>{
  const {life,at,context}=completedShade(),id=context.current.followup_id;

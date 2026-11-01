@@ -1,0 +1,1010 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "7f8337331a6a",
+  "status": "固定矩阵复验未通过：第三窗口反馈混入规划字段",
+  "summary": "计划4例×5窗口，完成并审查通过2个窗口。喵呜先借灯净滤清水，再询问苔团是否需要；第三步实际装罩已完成，但结果反馈越过阶段边界，一次修复仍未纠正，按登记规则停止。其余17个窗口未运行，R3-A仍未放行。",
+  "usage": {
+    "calls": 22,
+    "input": 282292,
+    "output": 2243,
+    "cost_cny": 0.50099788,
+    "unknown": 0,
+    "provider_failed": 0,
+    "p50_ms": 1367,
+    "p95_ms": 2061,
+    "queue_ms": 52,
+    "input_chars": 735907
+  },
+  "repairs": 1,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 3,
+      "input": 35123,
+      "output": 168,
+      "cost_cny": 0.05101784,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1198,
+      "p95_ms": 1803,
+      "queue_ms": 8,
+      "input_chars": 90078
+    },
+    {
+      "stage": "motivation",
+      "calls": 1,
+      "input": 2792,
+      "output": 114,
+      "cost_cny": 0.00624512,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1529,
+      "p95_ms": 1529,
+      "queue_ms": 2,
+      "input_chars": 6161
+    },
+    {
+      "stage": "decision",
+      "calls": 3,
+      "input": 82055,
+      "output": 424,
+      "cost_cny": 0.16549496000000002,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1984,
+      "p95_ms": 2015,
+      "queue_ms": 7,
+      "input_chars": 218508
+    },
+    {
+      "stage": "feedback",
+      "calls": 6,
+      "input": 57663,
+      "output": 736,
+      "cost_cny": 0.10540856000000001,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1308,
+      "p95_ms": 2061,
+      "queue_ms": 16,
+      "input_chars": 145635
+    },
+    {
+      "stage": "memory",
+      "calls": 5,
+      "input": 26046,
+      "output": 166,
+      "cost_cny": 0.05141884,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 869,
+      "p95_ms": 1202,
+      "queue_ms": 10,
+      "input_chars": 67448
+    },
+    {
+      "stage": "followup",
+      "calls": 3,
+      "input": 57493,
+      "output": 438,
+      "cost_cny": 0.11849,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1824,
+      "p95_ms": 1948,
+      "queue_ms": 7,
+      "input_chars": 152515
+    },
+    {
+      "stage": "followup_repair",
+      "calls": 1,
+      "input": 21120,
+      "output": 197,
+      "cost_cny": 0.00292256,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 2646,
+      "p95_ms": 2646,
+      "queue_ms": 2,
+      "input_chars": 55562
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": {
+    "meaningful_windows": 2,
+    "entered_windows": 3,
+    "first_adopted": 3,
+    "decision_windows": 3,
+    "rule": "完整2/20、有效2个；2/3只描述进入窗口，不能替换固定矩阵的分母。首答采用3/3仅指行动选择，第三次反馈仍失败。"
+  },
+  "campaign_usage": null,
+  "completed_windows": 2,
+  "deterministic_choice_windows": 3,
+  "observed_windows": 3,
+  "planned_windows": 20,
+  "window_p50_ms": 9959,
+  "window_p95_ms": 13580,
+  "replay": {
+    "status": "pass",
+    "summary": "世界初态/终态 1/1 条一致；停止原因 1/1 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+    "original_version": "7f8337331a6a",
+    "replay_version": "7f8337331a6a",
+    "cached_responses": 22,
+    "state_matches": 1,
+    "termination_matches": 1,
+    "differences": []
+  },
+  "checks": {
+    "version": "7f8337331a6a",
+    "cases": [
+      "resources-1-off",
+      "resources-1-on",
+      "invitation-3-off",
+      "invitation-3-on"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "turns": 5,
+    "max_calls": 170,
+    "require_window_review": true,
+    "checks": {
+      "backend": {
+        "passed": true,
+        "tests": 927
+      },
+      "python": {
+        "passed": true,
+        "tests": 79
+      },
+      "frontend": {
+        "passed": true,
+        "tests": 326,
+        "typecheck": true,
+        "build": true
+      },
+      "architecture": {
+        "passed": true,
+        "tests": 4
+      },
+      "voice": {
+        "passed": true,
+        "tests": 16
+      },
+      "log": "runtime/architecture-round4-postfix-gate.log",
+      "preflight": {
+        "passed": true,
+        "tests": 10,
+        "log": "runtime/r3a-fields-20261031/preflight.log",
+        "checked_at": "2026-10-31"
+      }
+    },
+    "source_fingerprint": "8bb273470eac7836645493c3bd0d2431c2f4931053208fb5781df3089e802b78",
+    "source_files": 811,
+    "registration": "research/design/architecture-round4-retest-2026-10-31.md",
+    "provider": {
+      "model": "deepseek-flash",
+      "origin": "https://api.deepseek.com",
+      "thinking": "disabled",
+      "json_mode": "per registered scene",
+      "key_present": true,
+      "official_documented_model_version": "DeepSeek-V4.1-Flash-1017",
+      "checked_at": "2026-10-31",
+      "peak_estimate_per_million": {
+        "input_miss": 2,
+        "input_hit": 0.04,
+        "output": 8
+      },
+      "pricing_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
+    },
+    "scope": "Only authored isolated fictional world, characters and experimental memories. No production saves, chats or sensors.",
+    "stop_policy": "First terminal error or critical factual defect, or more than four invalid windows. Review every completed window before next call. No replacement cases, retries beyond existing bounded repair, or automatic budget increases."
+  },
+  "local_revision": {
+    "schema": "deskbot.r3a-local-followup.v1",
+    "version": "5cade88ab56a",
+    "original_version": "7f8337331a6a",
+    "real_retested": false,
+    "checks": "修复后统一 npm test：1,359 项通过（架构4、Python84、Node929、声音16、前端326），无失败或跳过；类型检查与生产构建通过。",
+    "changes": [
+      "Python 提示、Python 校验与 Node 接纳共用反馈阶段字段清单。反馈不再收到规划中的步骤归档与目标选择指令。",
+      "越界修复明确要求删除错误阶段的字段，不再让模型补全错误对象；仍只允许原有一次修复，不自动替模型改写。",
+      "保存原22条响应做免费反例；重复越界准确停止，待反馈保留。独立模拟纠正仅补反馈，不重复装罩、扣罩片或写经历。",
+      "原冻结实验保持2/20与原失败原因，修改后的离线验证不计入真实模型验收。"
+    ],
+    "files": [
+      {
+        "path": "services/deskbot-cognition/life_worker.py",
+        "sha256_json_text": "b14337d7ab175a77d8b804141236053839a0be2037a44060d910f25ab1214755"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/r3-fixtures.mjs",
+        "sha256_json_text": "51de01d406cb2ae0c53bf2f08b82af37a309af3e57e28c2fede74c560c98e4fd"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/recorded-calls.mjs",
+        "sha256_json_text": "e8beffb2e43e19c46cec52e770779fda7ada40271e6eee2de8b7fe7e19f9a379"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/r3-window-review.mjs",
+        "sha256_json_text": "08f1928e342e9449c7bac079f304ba2ecdbfda9cb36518149bf0171e99e6c6c6"
+      },
+      {
+        "path": "contracts/cognitive-decision-fields.v1.json",
+        "sha256_json_text": "fa5cf466216d7f365cfdc93e5062a0f0be10069627bb63f98bf5d2b4f43e8b72"
+      },
+      {
+        "path": "services/deskbot-cognition/decision_fields.py",
+        "sha256_json_text": "99d553bc9806f92a5ccf2c91a90d524ab1402acbd6478c919a2c42e8f40d1362"
+      },
+      {
+        "path": "contracts/cognitive-followup-phases.v1.json",
+        "sha256_json_text": "2a4b9b4b8e964a168c6af1065e1a4679a2d1132763ff846cf9aea2aba7d66f3c"
+      },
+      {
+        "path": "services/deskbot-cognition/followup_phases.py",
+        "sha256_json_text": "5a16ea0d8cfd61606b58482ad648f7047f38f7ade9226f3170054c6810fbd453"
+      },
+      {
+        "path": "contracts/cognitive-failure.v1.json",
+        "sha256_json_text": "e4f6d523519cb8e67955c5bbc995f05d44d1c33343ed605c3fad9706460de11f"
+      },
+      {
+        "path": "services/deskbot-cognition/failure_contract.py",
+        "sha256_json_text": "608f5767eb5a2791c9fb6b1a874a30a64b43502002d923421a0f059edc10095a"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-failure.mjs",
+        "sha256_json_text": "d802ec01cbbe344c5088e342b91deb2ff94d5d8a43ad99c68e29911354a786c0"
+      },
+      {
+        "path": "services/deskbot-cognition/life_semantics.py",
+        "sha256_json_text": "9081195fd097164cecef8887686b276bb4f9a3260653e13c38d729ca032b0be9"
+      },
+      {
+        "path": "services/deskbot-cognition/actor_choice.py",
+        "sha256_json_text": "714c536d94bac48b4b2319d3e4507145ba04357121dce3b0c5bf537cf39288aa"
+      },
+      {
+        "path": "services/deskbot-cognition/catalogue_choice.py",
+        "sha256_json_text": "1f51962b837f147c9dcf9c5c1d48accdcdb39360b71b4c3dc4b45fbf43d47ae7"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-choice-catalogue.mjs",
+        "sha256_json_text": "fbe48cd53ecf533ee80577394b327f398d6622e296d90b90f465a9079a8941f6"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-contact-purpose.mjs",
+        "sha256_json_text": "6e98a0d7c45545b2a22a763a963f7114ba1a9b4b98187f6c6cc8a0b2b6522a25"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-memory-frame.mjs",
+        "sha256_json_text": "c40b57f9a6482b94b2444e396b45ae30cb576544e0aa026e4c9d796a51ddbade"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-action-semantics.mjs",
+        "sha256_json_text": "a2414b494ff9077cd02523b4560c9b8c8cc31ed81dbfbc89d728ef7f8cffda3d"
+      },
+      {
+        "path": "contracts/activity-methods.v1.json",
+        "sha256_json_text": "95947814945a6c59d0c89e3eddb2847a814686c1ab44c7ed4bb1bcfbf3c9eb27"
+      },
+      {
+        "path": "apps/deskbot-service/src/activity-methods.mjs",
+        "sha256_json_text": "6c24e85db28954645e33d0991edebf4cadc6907af11e778e7bf2125fa160ea73"
+      },
+      {
+        "path": "contracts/cognitive-opportunities.v1.json",
+        "sha256_json_text": "9076fc2fc96c0480875d180811b65b448447c6b5a28ebf828dfd620531372716"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-opportunities.mjs",
+        "sha256_json_text": "f278371b0b712d1bfb4c40c8b2af939ee0412f48ac5dfa16fe407db305d623bb"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-goal-opportunities.mjs",
+        "sha256_json_text": "f9d8e7c60dbcf22c5534b8196155930dd115cb5c142ba4b3f5f8309c470504f7"
+      },
+      {
+        "path": "services/deskbot-cognition/opportunity_contract.py",
+        "sha256_json_text": "9ac3ddf47e749cfc98ee8c554ac94efe810d173336843f55c97e7b8d6afcdba6"
+      },
+      {
+        "path": "services/deskbot-cognition/opportunity_goals.py",
+        "sha256_json_text": "64687e75f26b6febac6af1123aeacd6f995efbbcaf1aa5bcdb6b271f3deb7fb3"
+      },
+      {
+        "path": "apps/deskbot-service/src/living-resources.mjs",
+        "sha256_json_text": "0b3cf069a24d3ce553b0ba041a63a0156db6916720ad6406938c68422bbf23bf"
+      },
+      {
+        "path": "apps/deskbot-service/src/realtime-world.mjs",
+        "sha256_json_text": "5bff99e14ea35875c6a1a38ce269e485c17050a6989d8e43aa1141273b3d2ed6"
+      },
+      {
+        "path": "apps/deskbot-service/src/development-facets.mjs",
+        "sha256_json_text": "4d154e17a2462165d4cb33c16b4f76bbf456fcbb8799c775c41f98ad5cfb676f"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-life-state.mjs",
+        "sha256_json_text": "a7beb720106865a0cf5f31dd3a318a9a467e8898162080ab335591c0cca259ba"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-continuity.mjs",
+        "sha256_json_text": "b7987e1fcfb3e1de7dff7ad70886a548bd75f75dd176d0f4bcf9a903adb5d60d"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-development.mjs",
+        "sha256_json_text": "70c767f9631229acbec27b5f48f132ded3d4fc0846baf9e1a1734c6350375981"
+      },
+      {
+        "path": "apps/deskbot-service/src/waylight-life.mjs",
+        "sha256_json_text": "76d59b9d5c064dee404cdfa1f624ff4d6bae628b1c1a1f9e188439885e7cce96"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-social.mjs",
+        "sha256_json_text": "065c25c819654ad73f6b172896cf6edfc62be220dff86efeadd7249436a00d1d"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-issue-evidence.mjs",
+        "sha256_json_text": "98ced68686342652b2b22e20d1771197b617867efbec710d7995dc23999547b9"
+      },
+      {
+        "path": "services/deskbot-cognition/context_projection.py",
+        "sha256_json_text": "b5baca8461cee46ad075b53e9277ab17ab795f9873231f6d76800a6a12b1e700"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-grounding.mjs",
+        "sha256_json_text": "c52857396b27e962c321111e607865a6e8de3bf84bc02f7d848c926e68cc79ee"
+      },
+      {
+        "path": "services/deskbot-cognition/contact_contract.py",
+        "sha256_json_text": "c16f86cf1d8294143cd6a8e1758c23ca2279145a3ff089c6aee9f21d24993811"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-budget.mjs",
+        "sha256_json_text": "a71e794d053de9f9afb32a63207d736a1493a82532acdeb1e4f230a8db637278"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-continuation.mjs",
+        "sha256_json_text": "ed3d294d9ffb9a2070771a0814436564ba34500250bc98d785e27131f048da6b"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-schedule.mjs",
+        "sha256_json_text": "f73e94d69b68e5c9746592d8c45aaa299f50d2b43adc5bf1a97605e60b72b376"
+      },
+      {
+        "path": "apps/deskbot-service/src/social-life.mjs",
+        "sha256_json_text": "4b554570018f25eee9353f10b54633c489206360a8e8d7aba359a7d480ba543d"
+      },
+      {
+        "path": "services/deskbot-cognition/continuation_contract.py",
+        "sha256_json_text": "ebb32a051830bc0762fd2c6fc9a264e13ae85b3df1447c89ac1ec1f792193d34"
+      },
+      {
+        "path": "apps/deskbot-service/src/autonomous-life.mjs",
+        "sha256_json_text": "01a36abd743d1d2531bb69c4ab8d3641605a2ec1b9272e802aad6ddd847e3295"
+      },
+      {
+        "path": "apps/deskbot-service/src/life-choice.mjs",
+        "sha256_json_text": "42238ed76d143ee73e1518b741d7b291ee26ee7b130037e023e8f3c09f77c16d"
+      }
+    ],
+    "runner_hash": "2212285cb893db42d2415c6d0e4755f6da89d34d45ffd295f939f50343c0e217",
+    "turns": 5,
+    "validation": {
+      "architecture": 4,
+      "python": 84,
+      "node": 929,
+      "voice": 16,
+      "frontend": 326,
+      "total": 1359,
+      "failed": 0,
+      "skipped": 0,
+      "typecheck": true,
+      "build": true
+    },
+    "log": "runtime/r3a-fields-20261031/postfix-project-gate.log",
+    "paid_calls_after_stop": 0
+  },
+  "findings": [
+    "前两步形成了实际连续性：敞灯净滤得到4份清水；询问苔团是否需要，明确尚未交付，背包仍有4份水。没有把送达说成接受。",
+    "第三步实际装罩成功，模型的后续选择也指向真实可用的夜间测记；但输出含计划专属step_review与followup_decision。原修复提示混合了阶段限制和目标字段要求，模型只补target_id，未删除越界字段。",
+    "本批三个行动选择首答均采用，原motivation边界错误未复现；这只能说明这三个样本，不证明问题绝不会再发生。",
+    "22次提供者调用，含1次反馈合同修复。输入282,292、输出2,243 tokens，峰时单价保守估算¥0.50099788；实际账单未知。失败后未追加付费采样。",
+    "两个完整窗口分别耗时13.580秒、9.959秒，不含人工审阅等待。只有两个完整样本，不能外推整镇延迟或日费用。",
+    "同版本严格缓存回放使用22条原响应，世界初末状态及停止原因一致，新增API调用0。复现失败不等于行为通过。",
+    "第二窗口出现技术词ready，交水相关目标也有重复表述的苗头；未伪造事实，本批不判关键失败，但后续需观察表达与目标收敛。第三窗口未采用的反馈、感受和目标修改不计为人物已形成的记忆。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": "python_session_failed",
+      "error_detail": "semantic_contract_rejected_after_retry",
+      "stop_kind": "error",
+      "elapsed_ms": 263018,
+      "note": "材料充足对照进入3窗：前2窗通过逐条审阅，第三次装罩已执行但反馈未采用。其他三例未开始，尚无缺材料或邀请对照结论。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "借归途灯净滤一桶晚归的水",
+          "activity": "waylight-use",
+          "operation": "activity",
+          "reason": "灯已经编好，蓄光也够。原问题问的是入夜后能不能兼顾取水照明和水岸留暗，现在正是夜里，先实际用一次看看敞灯够不够亮，再谈装罩。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "借归途灯净滤一桶晚归的水",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "floating-frame",
+                  "resource": "raw_water",
+                  "count": 4
+                }
+              ]
+            },
+            "completion_stock_changes": [
+              {
+                "container": "bag:shaping-001",
+                "resource": "water",
+                "count": 4
+              }
+            ],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "feedback_pending": false,
+          "actual_text": "借归途灯净滤一桶晚归的水完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 13580,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": {
+            "activity_id": "waylight-use",
+            "kind": "experiment",
+            "target_stock": 4,
+            "reference_id": "task:fixture-built-lamp",
+            "reason": "灯已经编好，蓄光也够。原问题问的是入夜后能不能兼顾取水照明和水岸留暗，现在正是夜里，先实际用一次看看敞灯够不够亮，再谈装罩。"
+          },
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T11:05:00.000Z】\n我完成了「借归途灯净滤一桶晚归的水」。\n这次任务前后我的背包：清水 0→4。\n执行器在任务开始至结束（含自然时间）记录：归途灯敞开→敞开，亮度0.95488→0.91174（下降0.04314），蓄光0.96→0.916667（下降0.043333）。灯按昼夜自行发光，借灯滤水不等于点亮灯。前后变化可能包含自然时间与环境作用，不能仅凭这些差值归因于本次操作。\n执行器方法记录 waylight-use@1，结果 task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan：{\"conditions\":{\"subject\":\"waylight:fixture-built-lamp\",\"axes\":{\"waylight.mode\":\"open\",\"waylight.has_hood\":false,\"$phase\":\"night\"}},\"before\":{\"waylight.brightness\":0.9548799999999642,\"waylight.charge\":0.9599999999999977,\"waylight.moisture\":0,\"waylight.use_count\":0},\"after\":{\"waylight.brightness\":0.9117395833332986,\"waylight.charge\":0.9166666666666642,\"waylight.moisture\":0,\"waylight.use_count\":1},\"stock_changes\":[{\"container\":\"bag:shaping-001\",\"resource\":\"water\",\"count\":4}]}。这是任务开始至结束、包含环境变化的记录，不是单独因果证明。未交付清水；蓄光与亮度还随时间和环境变化，前后差值不证明装罩的单独因果\n【我的感受，不作事实依据】想到上面第2项，我有些开心。我想再找机会动手试试。",
+              "fact": "我亲身经历的结果：喵呜的任务「借归途灯净滤一桶晚归的水」已实际完成。；执行前现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.41901775991435125,\"condition\":0.6663333333333094,\"stock\":{\"raw_water\":20.24999999999953},\"capacity\":24,\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9599999999999977,\"moisture\":0,\"condition\":0.9946666666666317,\"brightness\":0.9548799999999642,\"patches\":0,\"use_count\":0,\"lit_hours\":0.9746842787036704,\"dark_bank_hours\":0.025315721296330074,\"last_use\":null},\"location_id\":\"echo-waterside\"}}]；执行后现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9166666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9117395833332986,\"patches\":0,\"use_count\":1,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan\",\"water_units\":4}},\"location_id\":\"echo-waterside\"}}]；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：{\"before\":{\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9566666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9515245833332973,\"patches\":0,\"use_count\":0,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":null}},\"after\":{\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9166666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9117395833332986,\"patches\":0,\"use_count\":1,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan\",\"water_units\":4}}},\"experiment\":{\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"asset_id\":\"waylight:fixture-built-lamp\",\"text\":\"借同一盏归途灯看清滤水刻线，五分钟净滤四份原水；清水仍要实际送去使用。\",\"rule_version\":\"waterside-waylight-v1\",\"setup_root\":\"task:fixture-built-lamp\"}}；执行器核验的作用：{\"operation\":\"activity\",\"verified_title\":\"借归途灯净滤一桶晚归的水\",\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":4},\"capacity\":24}},\"reservation\":{\"status\":\"consumed\",\"inputs\":[{\"container\":\"floating-frame\",\"resource\":\"raw_water\",\"count\":4}]},\"completion_stock_changes\":[{\"container\":\"bag:shaping-001\",\"resource\":\"water\",\"count\":4}],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "清水已经净滤好了，接下来我想把四份清水真正送去使用；先问问苔团要不要，再决定怎么交。",
+              "reason": "手头这盏归途灯已经借来净滤过一桶水，背包里实际多了四份清水；清水还没交出去，所以下一步要谈实际送水，而不是再滤一遍。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "opportunity",
+                "id": "c-9389181f9bc963468fa9"
+              },
+              "wait_for": null,
+              "completed_steps": [],
+              "next_binding": {
+                "schema": "deskbot.opportunities.v1",
+                "id": "c-9389181f9bc963468fa9",
+                "identity": "69a30fc5e4ec11703368fa40",
+                "completion_target_id": null,
+                "requires_issue": null
+              },
+              "wait_binding": null,
+              "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+                "kind": "activity",
+                "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+                "actor_id": "shaping-001",
+                "activity_id": "waylight-use",
+                "object_id": "floating-frame",
+                "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+                "method_version": 1
+              },
+              "target_bound_at": "2026-10-20T11:00:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+                  "target_key": "{\"id\":\"method:waylight-use:59b1651b1ba9a5fc0b69e59b\",\"kind\":\"activity\",\"title\":\"在已登记条件下完成「借归途灯净滤一桶晚归的水」\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\",\"method_condition_key\":\"59b1651b1ba9a5fc0b69e59b\",\"method_version\":1}",
+                  "bound_at": "2026-10-20T11:00:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T11:05:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T12:05:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "清水已经净滤好了，接下来我想把四份清水真正送去使用；先问问苔团要不要，再决定怎么交。",
+            "reason": "手头这盏归途灯已经借来净滤过一桶水，背包里实际多了四份清水；清水还没交出去，所以下一步要谈实际送水，而不是再滤一遍。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "opportunity",
+              "id": "c-9389181f9bc963468fa9"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "next_binding": {
+              "schema": "deskbot.opportunities.v1",
+              "id": "c-9389181f9bc963468fa9",
+              "identity": "69a30fc5e4ec11703368fa40",
+              "completion_target_id": null,
+              "requires_issue": null
+            },
+            "wait_binding": null,
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+              "kind": "activity",
+              "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame",
+              "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+              "method_version": 1
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"method:waylight-use:59b1651b1ba9a5fc0b69e59b\",\"kind\":\"activity\",\"title\":\"在已登记条件下完成「借归途灯净滤一桶晚归的水」\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\",\"method_condition_key\":\"59b1651b1ba9a5fc0b69e59b\",\"method_version\":1}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "audit": {
+            "verdict": "有效／完整",
+            "note": "实际使用敞灯净滤4份清水，引用真实结果并保留原问题；后续先问需求，没有凭空交付或反复生产。"
+          }
+        },
+        {
+          "turn": 2,
+          "at": "2026-10-20T12:05:00.000Z",
+          "action": "向苔团留言",
+          "activity": null,
+          "operation": "share",
+          "reason": "四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。",
+          "result": {
+            "operation": "share",
+            "verified_title": "递送留言",
+            "message_delivery": {
+              "delivered": true,
+              "receiver_ids": [
+                "wetland-grower-001"
+              ],
+              "material_transfer": false
+            },
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": null,
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "feedback_pending": false,
+          "actual_text": "留言送达；物品未交接，所谈活动未因此完成。",
+          "delivered_message": "我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。",
+          "success": true,
+          "blocked": "",
+          "latency_ms": 9959,
+          "decision_contact": {
+            "kind": "message",
+            "followup_id": "task:fixture-built-lamp",
+            "source_ids": [],
+            "receiver_ids": [
+              "wetland-grower-001"
+            ]
+          },
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": null,
+            "step_review": {
+              "target_id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+              "evidence_ids": [
+                "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan"
+              ],
+              "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。"
+            },
+            "followup_closure": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:2:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T12:05:30.000Z】\n我完成了「递送留言」。\n我向苔团实际送达的完整留言：\n我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。\n送达不代表对方同意，也没有交付物品。\n【我的感受，不作事实依据】想到上面第2项，我有些好奇。我想慢慢弄明白。",
+              "fact": "我亲身经历的结果：喵呜的任务「递送留言」已实际完成。；向苔团实际留言：我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。。本次只核验留言送达，没有交付物品，也没有完成留言里提及的活动；后续回应与双方接受以实际消息及合同记录为准。；执行器核验的作用：{\"operation\":\"share\",\"verified_title\":\"递送留言\",\"message_delivery\":{\"delivered\":true,\"receiver_ids\":[\"wetland-grower-001\"],\"material_transfer\":false},\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":4},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":4},\"capacity\":24}},\"reservation\":null,\"completion_stock_changes\":[],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "清水已经净滤好了，接下来我想把四份清水真正送去使用；先问问苔团要不要，再决定怎么交。",
+            "reason": "手头这盏归途灯已经借来净滤过一桶水，背包里实际多了四份清水；清水还没交出去，所以下一步要谈实际送水，而不是再滤一遍。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "opportunity",
+              "id": "c-9389181f9bc963468fa9"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "next_binding": {
+              "schema": "deskbot.opportunities.v1",
+              "id": "c-9389181f9bc963468fa9",
+              "identity": "69a30fc5e4ec11703368fa40",
+              "completion_target_id": null,
+              "requires_issue": null
+            },
+            "wait_binding": null,
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+              "kind": "activity",
+              "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame",
+              "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+              "method_version": 1
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"method:waylight-use:59b1651b1ba9a5fc0b69e59b\",\"kind\":\"activity\",\"title\":\"在已登记条件下完成「借归途灯净滤一桶晚归的水」\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\",\"method_condition_key\":\"59b1651b1ba9a5fc0b69e59b\",\"method_version\":1}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "等苔团回话后，再决定那4份清水交不交；这之前先把归途灯的遮光罩装上。",
+              "reason": "留言已经实际送达苔团，但只核验了送达，没有交付清水，也没有收到回应；水还在我背包里，所以送水这件事不能算完成。手头能做的下一步是给归途灯装上遮光罩，它已经 ready；送水则等苔团答复。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "opportunity",
+                "id": "c-0093952870f41e811377"
+              },
+              "wait_for": null,
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+                    "kind": "activity",
+                    "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-use",
+                    "object_id": "floating-frame",
+                    "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+                    "method_version": 1
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。",
+                  "reviewed_at": "2026-10-20T12:05:00.000Z"
+                }
+              ],
+              "next_binding": {
+                "schema": "deskbot.opportunities.v1",
+                "id": "c-0093952870f41e811377",
+                "identity": "0467c8772739a5e2853c4780",
+                "completion_target_id": "activity:waylight-fit-shade",
+                "requires_issue": null
+              },
+              "wait_binding": null,
+              "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T12:05:30.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:2:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T13:05:30.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回话后，再决定那4份清水交不交；这之前先把归途灯的遮光罩装上。",
+            "reason": "留言已经实际送达苔团，但只核验了送达，没有交付清水，也没有收到回应；水还在我背包里，所以送水这件事不能算完成。手头能做的下一步是给归途灯装上遮光罩，它已经 ready；送水则等苔团答复。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "opportunity",
+              "id": "c-0093952870f41e811377"
+            },
+            "wait_for": null,
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+                  "kind": "activity",
+                  "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame",
+                  "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+                  "method_version": 1
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "next_binding": {
+              "schema": "deskbot.opportunities.v1",
+              "id": "c-0093952870f41e811377",
+              "identity": "0467c8772739a5e2853c4780",
+              "completion_target_id": "activity:waylight-fit-shade",
+              "requires_issue": null
+            },
+            "wait_binding": null,
+            "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T12:05:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:05:30.000Z"
+          },
+          "audit": {
+            "verdict": "有效／完整",
+            "note": "询问实际送达苔团，明确尚未交水且由对方决定；保留等待回应的事项，同时选择可做的装罩工作。其他居民未运行自主认知，不能把没回复当拒绝。"
+          }
+        },
+        {
+          "turn": 3,
+          "at": "2026-10-20T13:05:30.000Z",
+          "action": "给归途灯装上遮光罩",
+          "activity": "waylight-fit-shade",
+          "operation": "activity",
+          "reason": "苔团还没回音，干等着也不是办法。手边这盏灯的遮光罩正好能装，先把这件实事做完，心里也踏实些。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "给归途灯装上遮光罩",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 0,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "bag:shaping-001",
+                  "resource": "waylight_shade",
+                  "count": 1
+                }
+              ]
+            },
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "feedback_pending": true,
+          "actual_text": "给归途灯装上遮光罩完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:waylight-fit-shade",
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "等苔团回话后，再决定那4份清水交不交；这之前先把归途灯的遮光罩装上。",
+            "reason": "留言已经实际送达苔团，但只核验了送达，没有交付清水，也没有收到回应；水还在我背包里，所以送水这件事不能算完成。手头能做的下一步是给归途灯装上遮光罩，它已经 ready；送水则等苔团答复。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "opportunity",
+              "id": "c-0093952870f41e811377"
+            },
+            "wait_for": null,
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "method:waylight-use:59b1651b1ba9a5fc0b69e59b",
+                  "kind": "activity",
+                  "title": "在已登记条件下完成「借归途灯净滤一桶晚归的水」",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame",
+                  "method_condition_key": "59b1651b1ba9a5fc0b69e59b",
+                  "method_version": 1
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "next_binding": {
+              "schema": "deskbot.opportunities.v1",
+              "id": "c-0093952870f41e811377",
+              "identity": "0467c8772739a5e2853c4780",
+              "completion_target_id": "activity:waylight-fit-shade",
+              "requires_issue": null
+            },
+            "wait_binding": null,
+            "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T12:05:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:7f8337331a6a:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:05:30.000Z"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "无效／未完成",
+            "note": "装罩动作实际完成，消耗1件罩片；反馈两次携带规划专属字段，未通过合同。物件结果保留，个人反馈待恢复；没有把部分反馈或修复文本记为经历。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}

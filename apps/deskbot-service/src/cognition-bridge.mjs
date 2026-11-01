@@ -3,6 +3,7 @@ import { createInterface } from 'node:readline';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { cognitionRoot, fail } from './cognition-contracts.mjs';
+import { cognitiveFailure, validCognitiveFailure } from './cognitive-failure.mjs';
 
 export function findCognitionPython() {
   if (process.env.DESKBOT_COGNITION_PYTHON) return process.env.DESKBOT_COGNITION_PYTHON;
@@ -24,7 +25,7 @@ export function createCognitionBridge({ python = findCognitionPython(), timeoutM
       const env = Object.fromEntries(['SystemRoot', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'LANG'].filter(key => process.env[key]).map(key => [key, process.env[key]]));
       const child = spawn(python, ['-u', join(cognitionRoot, workerFile)], { env: { ...env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
       children.add(child);
-      let answer, error, frames = 0, stderr = '', settled = false;
+      let answer, error, frames = 0, stderr = '', settled = false, stage = null;
       const timer = setTimeout(() => { error = Object.assign(new Error('Python session timed out'), { code: 'python_timeout' }); child.kill(); }, timeoutMs);
       const lines = createInterface({ input: child.stdout });
       child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-1200); });
@@ -36,10 +37,16 @@ export function createCognitionBridge({ python = findCognitionPython(), timeoutM
           const value = JSON.parse(line);
           if (value.type === 'model_request') {
             if (!modelRequest || value.mode !== mode || (workerFile === 'worker.py' && frames !== 1)) fail('invalid_model_request');
+            stage = value.stage ?? value.scene ?? null;
             const content = await modelRequest(value);
             if (!child.killed) child.stdin.write(JSON.stringify({ type: 'model_reply', mode, content }) + '\n');
           } else if (value.type === 'completed') answer = value.value;
-          else if (value.type === 'error') fail('python_session_failed', value.error);
+          else if (value.type === 'error') {
+            if (value.failure !== undefined && !validCognitiveFailure(value.failure)) fail('invalid_bridge_frame');
+            const failure = cognitiveFailure('python_session_failed', {cause_code:value.failure?.code ?? value.error,
+              phase:frame.phase,stage:value.failure?.stage ?? stage,actor_id:frame.actor?.actor_id});
+            throw Object.assign(new Error(value.error), {code:'python_session_failed',failure});
+          }
           else fail('invalid_bridge_frame');
         } catch (e) { error = e; child.kill(); }
       });
@@ -47,9 +54,11 @@ export function createCognitionBridge({ python = findCognitionPython(), timeoutM
         clearTimeout(timer); children.delete(child); lines.close();
         if (settled) return;
         settled = true;
-        if (error) reject(error);
-        else if (code !== 0 || !answer) reject(Object.assign(new Error(`Python session failed (${code}): ${stderr}`), { code: 'python_session_failed' }));
-        else resolve(answer);
+        if (!error && (code !== 0 || !answer)) error=Object.assign(new Error(`Python session failed (${code}): ${stderr}`), {code:'python_session_failed'});
+        if (error) {
+          error.failure ??= cognitiveFailure(error.code, {phase:frame.phase,stage,actor_id:frame.actor?.actor_id,retryable:error.retryable});
+          reject(error);
+        } else resolve(answer);
       });
       child.stdin.write(JSON.stringify(frame) + '\n');
     });

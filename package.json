@@ -13,6 +13,7 @@
     "start:world": "npm.cmd --prefix apps/jev-town-client run dev:deskbot",
     "stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local.ps1",
     "test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "test:service": "npm.cmd --prefix apps/deskbot-service test",
     "test:voice": "python -m unittest discover -s voice-sidecar/tests -v",
     "package:source": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-source.ps1"

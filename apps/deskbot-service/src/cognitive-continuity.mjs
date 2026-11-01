@@ -1,4 +1,6 @@
 import {activityTopic} from './development-facets.mjs';
+import {readFileSync} from 'node:fs';
+const decisionFields=JSON.parse(readFileSync(new URL('../../../contracts/cognitive-decision-fields.v1.json',import.meta.url),'utf8'));
 // Canonical inputs and bounded personal working state. No model may write world facts here.
 const copy=structuredClone;
 const hashText=value=>String(value??'').trim();
@@ -47,7 +49,7 @@ export function cognitiveWorkingState(life,query=''){
     const size=JSON.stringify([...group.values()]).length;if(bytes+size>96000||selected.size+group.size>80)continue;
     for(const [key,value]of group)selected.set(key,value);bytes+=size;
   }
-  const {history,inbox,job,memories,...state}=raw;
+  const {history,inbox,job,memories,contact_purposes,...state}=raw;
   return {...copy(state),memories:copy([...selected.values()]),memory_window:{total:raw.memory_archive?.total??all.length,loaded:selected.size,originals_retained:true},
     // Transport IDs are not the canonical archive. Pending execution remains readable independently.
     job:job?{id:job.id,phase:job.phase,status:job.status}:null,history:copy((history??[]).slice(-4)),inbox:copy((inbox??[]).slice(-8))};
@@ -57,6 +59,8 @@ export function freezeCognitiveReferences(context){
   return {location_id:context.location.id,objects:context.objects.map(o=>o.id),activities:context.capabilities.activities.map(a=>a.activity_id),
     destinations:(context.capabilities.travel?.destinations??[]).map(p=>p.id),receivers:context.capabilities.share.receivers.map(r=>r.actor_id),sources:copy(context.inputs??[]),
     social:copy(context.social??{}),speech_evidence:copy(context.speech_evidence??[]),development:copy(context.development??null),
+    choice_contract:context.choice_contract,choice_catalogue:copy(context.choice_catalogue??null),
+    opportunities:copy(context.opportunities??null),event_evidence:copy(context.event_evidence??null),
     continuation:copy(context.continuation??null),
     perceptions:copy(context.perceptions??[]),interpretation_pending:copy(context.refraction?.pending??[]),known_people:copy(context.visible_people??[]),captured_at:context.at};
 }
@@ -96,7 +100,7 @@ export function cognitiveCause(world,id,compiled,refs,life){
   if(!Array.isArray(compiled.source_ids??[])||sourceIds.some(s=>typeof s!=='string'||!refs.sources.some(r=>r.id===s)))throw Object.assign(new Error('unknown motivation source'),{code:'cognitive_source_unknown'});
   const sources=sourceIds.map(sourceId=>refs.sources.find(s=>s.id===sourceId));
   let kind=compiled.motivation??'unknown';
-  if(!['need','self_exploration','self_continuation','invited','accepted_obligation','unknown'].includes(kind))throw Object.assign(new Error('invalid motivation'),{code:'cognitive_motivation_invalid'});
+  if(!decisionFields.motivation.allowed.includes(kind))throw Object.assign(new Error('invalid motivation'),{code:decisionFields.motivation.invalid_code});
   const requested=compiled.prior_root_id??null;
   const oldResult=life.last_result,canonicalPrior=oldResult?.task_id?`task:${oldResult.task_id}`:oldResult?.root_outcome_id;
   const ownedRoots=(world.memory?.development?.records??[]).filter(r=>r.actor_ids.includes(id)).map(r=>r.root_outcome_id);

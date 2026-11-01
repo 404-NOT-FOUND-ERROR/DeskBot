@@ -18,6 +18,12 @@ import {cognitiveOpportunityKey} from './cognitive-schedule.mjs';
 import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
 import {cognitiveGrounding,cognitiveUseContext,validateDecisionContact,validateDecisionIssue,validateDecisionMethod} from './cognitive-grounding.mjs';
 import {cognitiveMemoryFrame} from './cognitive-memory-frame.mjs';
+import {cognitiveChoiceCatalogue,validateCatalogueSelection} from './cognitive-choice-catalogue.mjs';
+import {cognitiveFailure,validCognitiveFailure} from './cognitive-failure.mjs';
+import {projectCognitiveOpportunities,validateOpportunityTransition} from './cognitive-opportunities.mjs';
+import {cognitiveGoalOpportunities,prepareGoalBindings,captureGoalOpportunityEvidence} from './cognitive-goal-opportunities.mjs';
+import {captureContactResponses} from './cognitive-contact-purpose.mjs';
+import {EVENT_EVIDENCE,eventEvidenceContext,validateCommunicationFeedback,messageReceipt,resultDisclosures} from './cognitive-event-evidence.mjs';
 
 export const COGNITIVE_ACTORS=['shaping-001','wetland-grower-001','lamp-keeper-001'];
 export const cognitiveActorIds=world=>[...new Set([...COGNITIVE_ACTORS,...(world.cognition?.admitted_actors??[])])].filter(id=>cognitivePerson(world,id));
@@ -40,7 +46,7 @@ export function cognitiveContext(world,id,at,phase='plan'){
   const inputs=cognitiveInputs(world,id,at),seen=new Set((saved.perception_receipts??[]).map(r=>r.source_id));
   const perceptions=inputs.filter(s=>!seen.has(s.id)).slice(0,id===world.protagonist.character_id?5:3);
   const social=cognitiveSocialContext(world,id,at,inputs,catalogue);
-  return {schema:COGNITIVE_CONTEXT_VERSION,phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
+  const context={schema:COGNITIVE_CONTEXT_VERSION,choice_contract:'choice-catalogue-v2',phase,mode:'real',world_id:world.world_id,epoch:world.cognition?.epoch??at,at,
     time:cognitiveTime(at,world.clock?.time_zone??'Asia/Shanghai'),continuation:cognitiveContinuationContext(world,id,at,catalogue,social.commitments,social.options,cognitiveActorIds(world)),
     actor:{actor_id:id,name:p.display_name??'喵呜',role:role?.role??'聚形域伴生个体',traits:id==='shaping-001'?['好奇','有自己的节奏','先观察再判断']:[role?.temperament??'关心自己的生活'],
       values:id==='lamp-keeper-001'?['可靠','把光照与安全联系起来']:id==='wetland-grower-001'?['照料生命','在实际苗况中调整方法']:['具体可靠','愿意探索'],
@@ -60,6 +66,11 @@ export function cognitiveContext(world,id,at,phase='plan'){
     signals:[`现场时间 ${at}；天气信息 ${JSON.stringify(world.weather??{})}`,...(saved.last_result?[`我上一次实际结果：${saved.last_result.fact}`]:[]),
       ...inputs.slice(-12).map(m=>`来源 ${m.id}，${m.sender_name}（${m.occurred_at}，${m.epistemic}）：${m.content}。信息只供理解，不代表亲历、承诺或已完成。`)],
     relevant_key:cognitiveRelevantKey(world,id)};
+  context.choice_catalogue=cognitiveChoiceCatalogue(world,id,context);
+  context.event_evidence=eventEvidenceContext(world,id,context);
+  projectCognitiveOpportunities(context);
+  context.goal_opportunities=cognitiveGoalOpportunities(world,id,context);
+  return context;
 }
 
 function validateProposal(proposal,id,phase){
@@ -114,9 +125,12 @@ export function applyCognitiveMutation(world,payload,at,eventId){
   }
   if(life.job?.id!==payload.job_id)fail('cognitive_job_obsolete');
   if(payload.operation==='error'){
+    if(payload.failure!==undefined&&!validCognitiveFailure(payload.failure))fail('invalid_failure_report');
     life.job.status='failed';life.job.error=payload.error;
     const retryable=(life.retry?.attempt??0)<3&&(payload.retryable===true||['interrupted_on_restart','python_timeout','cognitive_context_changed','activity_reference_unavailable','object_reference_unavailable','message_reference_unavailable','cognitive_source_expired'].includes(payload.error)||/^fetch_|^network_/.test(payload.error??''));
     life.retry={phase:payload.phase??life.job.phase,reason:payload.error,attempt:(life.retry?.attempt??0)+1,at:new Date(Date.parse(at)+Math.min(15*60000,30000*2**Math.min(life.retry?.attempt??0,5))).toISOString(),retryable};
+    life.job.failure=cognitiveFailure(payload.error,{...payload.failure,phase:payload.phase??life.job.phase,
+      job_id:payload.job_id,actor_id:id,retryable});
     // Pending feedback keeps ownership even on a terminal error: the old planner cannot overwrite an unfinished cognitive episode.
     if(!retryable&&!life.pending)life.enabled=false;
     return {accepted:true,reason:payload.error};
@@ -185,6 +199,9 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     validateDecisionContact(proposal,refs);
     validateDecisionIssue(proposal);
     validateDecisionMethod(proposal,context);
+    validateCatalogueSelection(proposal,context,refs);
+    validateOpportunityTransition(compiled,context.continuation,refs.continuation);
+    const goalBindings=prepareGoalBindings(life,proposal,context,refs,at);
     // Validate optional choices before reserving resources or changing personal state.
     adoptCognitiveDevelopment(copy(world),id,compiled,refs,at);
     const followupPreview=copy(life);
@@ -247,6 +264,8 @@ export function applyCognitiveMutation(world,payload,at,eventId){
         task=trial.tasks.find(t=>t.task_id===started.task_id);task.origin='cognitive_life';task.cognitive_job_id=payload.job_id;
         task.cognitive_operation=compiled.operation;task.cognitive_object_id=life.observed_object??null;task.cognitive_message=copy(life.outgoing_message??null);
         task.root_outcome_id=`task:${task.task_id}`;Object.assign(task,copy(cause));
+        const opportunity=context.opportunities.entries.find(e=>e.id===proposal.choice_binding?.actor_payload?.choice_id);
+        if(opportunity)task.opportunity_binding={id:opportunity.id,identity:opportunity.identity};
         attachCognitiveTrial(trial,task,trialLink,at);
         if(compiled.operation==='travel')task.life_action='travel';
         if(compiled.operation==='rest')task.life_action='rest';
@@ -256,6 +275,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
       }catch(error){if(!error.code)throw error;blocked={code:error.code,message:error.message};}
     }
     const landed=world.cognition.actors[id];
+    landed.goal_bindings=goalBindings;
     landed.followup=followupPreview.followup??null;
     landed.deferred_followups=followupPreview.deferred_followups??[];
     landed.followup_archive=followupPreview.followup_archive??[];
@@ -279,7 +299,11 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     if(task&&!['completed','failed','cancelled'].includes(task.status))fail('result_not_terminal');
     if(JSON.stringify(cognitiveActualResult(world,id,payload.result.occurred_at))!==JSON.stringify(payload.result))fail('cognitive_actual_result_changed');
     const proposal=payload.proposal,followup=proposal.followup;
-    const nextFollowup=cognitiveResultFollowup(life,followup,cognitiveContext(world,id,at,'feedback').continuation,at,pending.root_outcome_id,pending.followup_decision);
+    validateCommunicationFeedback(followup,payload.result.effects?.communication);
+    const feedbackContext=cognitiveContext(world,id,at,'feedback');
+    validateOpportunityTransition(followup,feedbackContext.continuation,life.job.references.continuation);
+    const goalBindings=prepareGoalBindings(life,proposal,feedbackContext,life.job.references,at);
+    const nextFollowup=cognitiveResultFollowup(life,followup,feedbackContext.continuation,at,pending.root_outcome_id,pending.followup_decision);
     // Existing factual IDs/raw sources never overwritten by a later interpretation.
     const old=new Map(life.memories.map(m=>[m.id,m]));
     for(const memory of proposal.memories??[]){
@@ -305,7 +329,8 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     }
     life.memories=[...old.values()];life.memory_sequence=proposal.memory_sequence;
     adoptPersonalContinuity(world,id,life,proposal,at);
-    life.state=copy(proposal.state);life.last_result=copy(payload.result);life.reflection=copy(proposal.reflection??null);
+    life.state=copy(proposal.state);life.goal_bindings=goalBindings;life.last_result=copy(payload.result);life.reflection=copy(proposal.reflection??null);
+    if(task&&life.job.references.event_evidence?.schema===EVENT_EVIDENCE.schema)task.cognitive_disclosures??=resultDisclosures(payload.result,task);
     if(life.followup)life.followup_transitions=[...(life.followup_transitions??[]),{at,previous:copy(life.followup),decision:pending.followup_decision,next_status:followup.status,next_question:followup.question,actual_root_outcome_id:pending.root_outcome_id}].slice(-16);
     if(followup.followup_closure)archiveCognitiveFollowup(life,at,followup.followup_closure.reason,followup.followup_closure);
     life.followup=nextFollowup;
@@ -328,9 +353,11 @@ export function cognitiveActualResult(world,id,at){
     const verifiedTitle=isMessage?'递送留言':task?.activity_id
       ?context.capabilities.activities.find(a=>a.activity_id===task.activity_id)?.title??`执行活动 ${task.activity_id}`
       :task?.kind==='travel'?'沿通路移动':task?.cognitive_operation==='rest'?'休息片刻':'现场观察';
+    const communication=isMessage?copy(task.cognitive_message?.receipt??messageReceipt(task,task.finished_at??task.completion?.due_at??at,false)):null;
     const effects={
       operation:task?.cognitive_operation??null,verified_title:verifiedTitle,
-      ...(isMessage?{message_delivery:{delivered:success&&Boolean(task.cognitive_message_delivered_at),receiver_ids:copy(task.cognitive_message?.receiver_ids??[]),material_transfer:false}}:{}),
+      ...(isMessage?{message_delivery:{delivered:success&&Boolean(task.cognitive_message_delivered_at),receiver_ids:copy(task.cognitive_message?.receiver_ids??[]),material_transfer:false},
+        ...(communication?{communication}:{})}:{}),
       inventory:{before:copy(pending.inventory_before??null),after:copy(task?.cognitive_observation?.inventory??null)},
       reservation:copy(task?.reservation??null),completion_stock_changes:copy(task?.completion?.result?.stock_changes??[]),
       rule:'reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。'
@@ -375,12 +402,14 @@ export function settleCognitiveTask(world,task,at){
       }
     }
     task.cognitive_message_delivered_at=at;
+    captureContactResponses(world);
   }
   // Settlement can be replayed after a restart. Preserve the original outcome,
   // including inventory, rather than replacing it with a later live state.
   task.cognitive_observation??={at,objects:cognitiveContext(world,task.actor_id,at).objects,
     inventory:copy(world.living?.inventories[task.actor_id]??{stock:{},capacity:24})};
   captureIssueResolutionEvidence(world,task.actor_id);
+  captureGoalOpportunityEvidence(world,task.actor_id);
 }
 
 export function cognitiveDialogueContext(world,id){

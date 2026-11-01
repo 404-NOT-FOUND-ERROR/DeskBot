@@ -42,7 +42,7 @@ test('usage retains failures and partial known costs on restart, distinguishes s
 test('serialized cognition records queue latency separately without charging idempotent replay',async t=>{
  const {p}=fixture(t),ledger=createModelUsage({persistence:p});let release,called=false;
  const gate=new Promise(r=>release=r),broker=createCognitiveBudget({persistence:p,onUsage:ledger.record,testProvider:async()=>{if(!called){called=true;await gate;}return {choices:[{finish_reason:'stop',message:{content:'{}'}}]};}});
- const request={messages:[{role:'user',content:'fictional'}],json_mode:true,phase:'plan',usage_scope:'lab'};
+ const request={messages:[{role:'user',content:'Return fictional JSON.'}],json_mode:true,phase:'plan',usage_scope:'lab'};
  const first=broker.complete('a',request),second=broker.complete('b',request);await new Promise(r=>setTimeout(r,25));release();await Promise.all([first,second]);await broker.complete('b',request);await broker.close();
  assert.equal(ledger.status().totals.attempts,2);assert.ok(ledger.status().recent.find(r=>r.call_id==='b').queue_ms>=20);
 });

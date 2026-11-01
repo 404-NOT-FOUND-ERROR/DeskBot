@@ -1,0 +1,400 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "8301838d4d37",
+  "status": "第四轮冻结复验未通过：行动来源字段越界",
+  "summary": "计划 4 例 × 5 窗口。第一例第一窗口在动作采用前失败；一次修复仍返回同一非法字段，按预注册停止。没有新动作、反馈或记忆闭环，不能评价持续生活已达成。",
+  "usage": {
+    "calls": 4,
+    "input": 52216,
+    "output": 421,
+    "cost_cny": 0.06565215999999999,
+    "unknown": 0,
+    "provider_failed": 0,
+    "p50_ms": 1379,
+    "p95_ms": 2225,
+    "queue_ms": 9,
+    "input_chars": 138979
+  },
+  "repairs": 1,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 1,
+      "input": 8647,
+      "output": 49,
+      "cost_cny": 0.01567896,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1379,
+      "p95_ms": 1379,
+      "queue_ms": 2,
+      "input_chars": 22171
+    },
+    {
+      "stage": "motivation",
+      "calls": 1,
+      "input": 2795,
+      "output": 118,
+      "cost_cny": 0.006534,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1251,
+      "p95_ms": 1251,
+      "queue_ms": 2,
+      "input_chars": 6173
+    },
+    {
+      "stage": "decision",
+      "calls": 1,
+      "input": 20279,
+      "output": 127,
+      "cost_cny": 0.041072239999999996,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 2225,
+      "p95_ms": 2225,
+      "queue_ms": 2,
+      "input_chars": 55079
+    },
+    {
+      "stage": "decision_repair",
+      "calls": 1,
+      "input": 20495,
+      "output": 127,
+      "cost_cny": 0.00236696,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1428,
+      "p95_ms": 1428,
+      "queue_ms": 3,
+      "input_chars": 55556
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": {
+    "meaningful_windows": 0,
+    "entered_windows": 1,
+    "first_adopted": 0,
+    "decision_windows": 1,
+    "rule": "0/1 仅描述进入窗口；0/20 完整、其余19未运行，不能计算已通过率或替换样本。"
+  },
+  "campaign_usage": null,
+  "completed_windows": 0,
+  "deterministic_choice_windows": 0,
+  "observed_windows": 1,
+  "planned_windows": 20,
+  "window_p50_ms": null,
+  "window_p95_ms": null,
+  "replay": {
+    "status": "pass",
+    "summary": "世界初态/终态 1/1 条一致；停止原因 1/1 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+    "original_version": "8301838d4d37",
+    "replay_version": "8301838d4d37",
+    "cached_responses": 4,
+    "state_matches": 1,
+    "termination_matches": 1,
+    "differences": []
+  },
+  "checks": {
+    "version": "8301838d4d37",
+    "cases": [
+      "resources-1-off",
+      "resources-1-on",
+      "invitation-3-off",
+      "invitation-3-on"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "turns": 5,
+    "max_calls": 170,
+    "require_window_review": true,
+    "checks": {
+      "backend": {
+        "passed": true,
+        "tests": 924
+      },
+      "python": {
+        "passed": true,
+        "tests": 75
+      },
+      "frontend": {
+        "passed": true,
+        "tests": 326,
+        "typecheck": true,
+        "build": true
+      },
+      "architecture": {
+        "passed": true,
+        "tests": 4
+      },
+      "voice": {
+        "passed": true,
+        "tests": 16
+      },
+      "log": "runtime/architecture-round4-project-gate.log"
+    },
+    "source_fingerprint": "581007b6108adb23a82f6257066166e9d274f0e32219d5963fbc29722af9dbf9",
+    "source_files": 803,
+    "registration": "research/design/architecture-round4-frozen-validation-2026-10-28.md",
+    "provider": {
+      "model": "deepseek-flash",
+      "origin": "https://api.deepseek.com",
+      "thinking": "disabled",
+      "json_mode": "per registered scene",
+      "key_present": true,
+      "official_documented_model_version": "DeepSeek-V4.1-Flash-1017",
+      "checked_at": "2026-10-28",
+      "peak_estimate_per_million": {
+        "input_miss": 2,
+        "input_hit": 0.04,
+        "output": 8
+      },
+      "pricing_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
+    },
+    "scope": "Only authored isolated fictional world, characters and experimental memories. No production saves, chats or sensors.",
+    "stop_policy": "First terminal error or critical factual defect, or more than four invalid windows. Review every completed window before next call. No replacement cases, retries beyond existing bounded repair, or automatic budget increases."
+  },
+  "local_revision": {
+    "version": "7f8337331a6a",
+    "real_retested": false,
+    "checks": "完整 npm test：1,352 项通过（架构 4、Python 79、Node 927、声音 16、前端 326），无失败或跳过；类型检查、生产构建通过。修复后新增付费调用 0。",
+    "changes": [
+      "行动来源允许值、含义与错误码集中到同一合同，Python 提示/绑定与 Node 采用共同读取；不把需要类型自动映射成本人意愿。",
+      "重复非法值准确报 cognitive_motivation_invalid，并保留合同层、decision_repair 阶段；不创建动作或记忆，也不增加修复次数。",
+      "原四条响应逐字复用的离线反例可稳定拒绝；另用明确标注的模拟纠正验证同一选项能沿原执行器完成。后者不是模型已纠正，也不是原冻结版本严格回放。",
+      "原批 8301838d4d37 的失败与费用完整保留；个人理由的准确性、20 窗口连续性与自然跨日仍未通过。"
+    ],
+    "source_files": [
+      {
+        "path": "services/deskbot-cognition/life_worker.py",
+        "sha256": "d393c4f3c89b9d98910f62f3c3739f9837b51500661b9772b3ae52bf935f1df6"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/r3-fixtures.mjs",
+        "sha256": "51de01d406cb2ae0c53bf2f08b82af37a309af3e57e28c2fede74c560c98e4fd"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/recorded-calls.mjs",
+        "sha256": "e8beffb2e43e19c46cec52e770779fda7ada40271e6eee2de8b7fe7e19f9a379"
+      },
+      {
+        "path": "services/deskbot-cognition/evaluations/r3-window-review.mjs",
+        "sha256": "08f1928e342e9449c7bac079f304ba2ecdbfda9cb36518149bf0171e99e6c6c6"
+      },
+      {
+        "path": "contracts/cognitive-decision-fields.v1.json",
+        "sha256": "fa5cf466216d7f365cfdc93e5062a0f0be10069627bb63f98bf5d2b4f43e8b72"
+      },
+      {
+        "path": "services/deskbot-cognition/decision_fields.py",
+        "sha256": "99d553bc9806f92a5ccf2c91a90d524ab1402acbd6478c919a2c42e8f40d1362"
+      },
+      {
+        "path": "contracts/cognitive-failure.v1.json",
+        "sha256": "12745650cd9aeb438f257f86675865b54650c5d725fe163511bff4ba68097efd"
+      },
+      {
+        "path": "services/deskbot-cognition/failure_contract.py",
+        "sha256": "608f5767eb5a2791c9fb6b1a874a30a64b43502002d923421a0f059edc10095a"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-failure.mjs",
+        "sha256": "d802ec01cbbe344c5088e342b91deb2ff94d5d8a43ad99c68e29911354a786c0"
+      },
+      {
+        "path": "services/deskbot-cognition/life_semantics.py",
+        "sha256": "9081195fd097164cecef8887686b276bb4f9a3260653e13c38d729ca032b0be9"
+      },
+      {
+        "path": "services/deskbot-cognition/actor_choice.py",
+        "sha256": "714c536d94bac48b4b2319d3e4507145ba04357121dce3b0c5bf537cf39288aa"
+      },
+      {
+        "path": "services/deskbot-cognition/catalogue_choice.py",
+        "sha256": "1f51962b837f147c9dcf9c5c1d48accdcdb39360b71b4c3dc4b45fbf43d47ae7"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-choice-catalogue.mjs",
+        "sha256": "fbe48cd53ecf533ee80577394b327f398d6622e296d90b90f465a9079a8941f6"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-contact-purpose.mjs",
+        "sha256": "6e98a0d7c45545b2a22a763a963f7114ba1a9b4b98187f6c6cc8a0b2b6522a25"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-memory-frame.mjs",
+        "sha256": "c40b57f9a6482b94b2444e396b45ae30cb576544e0aa026e4c9d796a51ddbade"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-action-semantics.mjs",
+        "sha256": "a2414b494ff9077cd02523b4560c9b8c8cc31ed81dbfbc89d728ef7f8cffda3d"
+      },
+      {
+        "path": "contracts/activity-methods.v1.json",
+        "sha256": "95947814945a6c59d0c89e3eddb2847a814686c1ab44c7ed4bb1bcfbf3c9eb27"
+      },
+      {
+        "path": "apps/deskbot-service/src/activity-methods.mjs",
+        "sha256": "6c24e85db28954645e33d0991edebf4cadc6907af11e778e7bf2125fa160ea73"
+      },
+      {
+        "path": "contracts/cognitive-opportunities.v1.json",
+        "sha256": "9076fc2fc96c0480875d180811b65b448447c6b5a28ebf828dfd620531372716"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-opportunities.mjs",
+        "sha256": "f278371b0b712d1bfb4c40c8b2af939ee0412f48ac5dfa16fe407db305d623bb"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-goal-opportunities.mjs",
+        "sha256": "f9d8e7c60dbcf22c5534b8196155930dd115cb5c142ba4b3f5f8309c470504f7"
+      },
+      {
+        "path": "services/deskbot-cognition/opportunity_contract.py",
+        "sha256": "9ac3ddf47e749cfc98ee8c554ac94efe810d173336843f55c97e7b8d6afcdba6"
+      },
+      {
+        "path": "services/deskbot-cognition/opportunity_goals.py",
+        "sha256": "64687e75f26b6febac6af1123aeacd6f995efbbcaf1aa5bcdb6b271f3deb7fb3"
+      },
+      {
+        "path": "apps/deskbot-service/src/living-resources.mjs",
+        "sha256": "0b3cf069a24d3ce553b0ba041a63a0156db6916720ad6406938c68422bbf23bf"
+      },
+      {
+        "path": "apps/deskbot-service/src/realtime-world.mjs",
+        "sha256": "5bff99e14ea35875c6a1a38ce269e485c17050a6989d8e43aa1141273b3d2ed6"
+      },
+      {
+        "path": "apps/deskbot-service/src/development-facets.mjs",
+        "sha256": "4d154e17a2462165d4cb33c16b4f76bbf456fcbb8799c775c41f98ad5cfb676f"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-life-state.mjs",
+        "sha256": "a7beb720106865a0cf5f31dd3a318a9a467e8898162080ab335591c0cca259ba"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-continuity.mjs",
+        "sha256": "b7987e1fcfb3e1de7dff7ad70886a548bd75f75dd176d0f4bcf9a903adb5d60d"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-development.mjs",
+        "sha256": "70c767f9631229acbec27b5f48f132ded3d4fc0846baf9e1a1734c6350375981"
+      },
+      {
+        "path": "apps/deskbot-service/src/waylight-life.mjs",
+        "sha256": "76d59b9d5c064dee404cdfa1f624ff4d6bae628b1c1a1f9e188439885e7cce96"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-social.mjs",
+        "sha256": "065c25c819654ad73f6b172896cf6edfc62be220dff86efeadd7249436a00d1d"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-issue-evidence.mjs",
+        "sha256": "98ced68686342652b2b22e20d1771197b617867efbec710d7995dc23999547b9"
+      },
+      {
+        "path": "services/deskbot-cognition/context_projection.py",
+        "sha256": "205544c04ce8c45b8d372521d05cb88c84cd78589324bf6c979fb5332a271261"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-grounding.mjs",
+        "sha256": "c52857396b27e962c321111e607865a6e8de3bf84bc02f7d848c926e68cc79ee"
+      },
+      {
+        "path": "services/deskbot-cognition/contact_contract.py",
+        "sha256": "c16f86cf1d8294143cd6a8e1758c23ca2279145a3ff089c6aee9f21d24993811"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-budget.mjs",
+        "sha256": "a71e794d053de9f9afb32a63207d736a1493a82532acdeb1e4f230a8db637278"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-continuation.mjs",
+        "sha256": "dd6df634af549ae13c9d0feb3999ebb4f6e2c2976bb57fe2a27a40db9d031832"
+      },
+      {
+        "path": "apps/deskbot-service/src/cognitive-schedule.mjs",
+        "sha256": "f73e94d69b68e5c9746592d8c45aaa299f50d2b43adc5bf1a97605e60b72b376"
+      },
+      {
+        "path": "apps/deskbot-service/src/social-life.mjs",
+        "sha256": "4b554570018f25eee9353f10b54633c489206360a8e8d7aba359a7d480ba543d"
+      },
+      {
+        "path": "services/deskbot-cognition/continuation_contract.py",
+        "sha256": "67c8d7bd64f7a2d30c6d51cf3f6de83a7085cd9f93a5f5f971f1f61613b95ab6"
+      },
+      {
+        "path": "apps/deskbot-service/src/autonomous-life.mjs",
+        "sha256": "01a36abd743d1d2531bb69c4ab8d3641605a2ec1b9272e802aad6ddd847e3295"
+      },
+      {
+        "path": "apps/deskbot-service/src/life-choice.mjs",
+        "sha256": "42238ed76d143ee73e1518b741d7b291ee26ee7b130037e023e8f3c09f77c16d"
+      }
+    ],
+    "runner_hash": "9f3956d3e940b229503d56de8aafb7d026a9ef7064b28f4a16d1be8d6fc6e81d",
+    "turns": 5
+  },
+  "findings": [
+    "需要层的 self_actualization 被写进另一套行动来源字段 motivation；该字段只接受 need/self_exploration/self_continuation/invited/accepted_obligation/unknown。",
+    "模型选中了目录中实际可执行的装罩机会，但 Python 后置校验仅返回笼统错误，修复响应原样重复。原冻结批记录仍为 upstream_decision_failed，不用修复后的新错误码覆盖历史。",
+    "4 次提供者调用，包含一次决策修复；输入 52,216 / 输出 421 tokens，按峰时单价估算 ¥0.06565216，实际账单未知。到此停止本轮付费调用。",
+    "原响应还把装罩描述成测记的必要前提，当前程序并没有这个前提。这段未采用的理由没有形成世界事实，但个人解释的准确性仍须后续真实复验。",
+    "同版本严格缓存回放使用4条原响应，初末状态和停止原因一致，新增 API 调用0；复现失败不等于行为通过。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": "python_session_failed",
+      "error_detail": "upstream_decision_failed",
+      "stop_kind": "error",
+      "elapsed_ms": 8207,
+      "note": "第一窗口止于行动选择合同，无任务结算；其余三例未开始。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "未采用计划",
+          "activity": null,
+          "operation": null,
+          "reason": null,
+          "result": null,
+          "actual_text": null,
+          "delivered_message": null,
+          "success": null,
+          "blocked": null,
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": null,
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "无效／未完成",
+            "note": "初次与修复两次选择均包含非法 motivation；没有被执行，也没有写成个人经历。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}

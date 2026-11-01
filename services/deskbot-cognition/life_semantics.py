@@ -22,13 +22,19 @@ def production_errors(value, context):
         if not consumer or choice['target_stock'] != consumer['count']:
             return ['production_use.kind=self_use时reference_id须选本次uses中的消耗活动ID，target_stock等于其count；这不表示其他地点不存在用途。若原意只是今后备用，可自主选择reserve；若要实际验证原问题，可自主选择experiment并遵守相应合同，不强迫改变原意']
     elif choice['kind'] == 'experiment':
+        if view.get('experiment_rule') in ('authored-method-v1','method-conditions-v2') and not production.get('experiment'):
+            return ['该方法没有已定义的可验证实验效果；不能因为同处水岸或产物相同就冒充归途灯实验']
+        registered = view.get('experiment_rule') == 'method-conditions-v2'
+        experiment = production.get('experiment') or {}
+        if registered and (not experiment.get('available') or choice['target_stock'] != production['already_held'] + production['output_count']):
+            return ['本次方法和条件已经留有实际证据，或产量不是已登记的一批；改问题名称、时钟变化不能重新制造实验用途']
         cont = context.get('continuation', {})
         issue = next((f for f in [cont.get('current'), *cont.get('deferred', [])] if f and f.get('followup_id') == value.get('followup_id')), None)
         if not issue or value.get('followup_decision') not in ('continue', 'postpone'):
             return ['experiment需要当前本人问题；issue_choice.followup_id须是current/deferred的问题ID，并选择continue或postpone']
         if choice.get('reference_id') != issue['followup_id']:
             return [f"production_use.reference_id填本人问题ID {issue['followup_id']}，必须等于issue_choice.followup_id；不要填活动ID或completion_target_id。当前填的是 {choice.get('reference_id')}。这是引用字段错误，不表示活动不能做"]
-        expected = 'activity:' + production['activity_id']
+        expected = experiment['completion_target_id'] if registered else 'activity:' + production['activity_id']
         if value.get('completion_target_id') != expected:
             return [f'用于验证所选活动时，issue_choice.completion_target_id须事前选择 {expected}；未完成的旧目标仍不能偷换']
         if (any(s['target']['id'] == expected for s in issue.get('completed_steps', []))
@@ -65,9 +71,26 @@ def render_anchored_memory(frame, value):
     """All factual clauses come from the executor; the model selects attention/feeling."""
     facts = frame.get('facts', [])
     ids = [f['id'] for f in facts]
+    if frame.get('affect_contract') == 'bounded-affect-v1':
+        if (not isinstance(value, dict) or set(value) != {'focus_id', 'feeling', 'wish'}
+            or value.get('focus_id') not in ids or value.get('feeling') not in AFFECT_FEELINGS
+            or value.get('wish') not in AFFECT_WISHES):
+            return ''
+        # The selected focus stays identifiable, while no ungrounded sentence
+        # can invent an action, other person's response, quantity or cause.
+        anchor = '\n'.join(f['text'] for f in facts)
+        return (f"【已核验经历 · {frame['at']}】\n{anchor}\n【我的感受，不作事实依据】"
+                f"想到上面第{ids.index(value['focus_id'])+1}项，我{AFFECT_FEELINGS[value['feeling']]}。{AFFECT_WISHES[value['wish']]}")
     if (not isinstance(value, dict) or value.get('fact_ids') != ids
         or value.get('focus_id') not in ids or not isinstance(value.get('feeling'), str)
         or not 0 < len(value['feeling'].strip()) <= 160):
         return ''
     anchor = '\n'.join(f['text'] for f in facts)
     return f"【已核验经历 · {frame['at']}】\n{anchor}\n【我的感受，不作事实依据】{value['feeling'].strip()}"
+
+
+AFFECT_FEELINGS = {'curious':'有些好奇', 'uncertain':'还拿不准', 'pleased':'有些开心',
+                  'relieved':'松了口气', 'uneasy':'有点不安', 'disappointed':'有些失落', 'calm':'心情平静'}
+AFFECT_WISHES = {'understand':'我想慢慢弄明白。', 'try':'我想再找机会动手试试。',
+                'rest':'我想先歇一歇。', 'share':'我想找人聊聊。', 'wait':'我愿意先等等看。',
+                'leave':'我想把注意力放到别处。', 'none':'我暂时没有新的打算。'}

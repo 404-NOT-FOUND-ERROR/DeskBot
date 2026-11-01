@@ -1,0 +1,248 @@
+{
+  "schema": "deskbot.r3a-event-evidence-counterexample.v1",
+  "version": "5cade88ab56a",
+  "case_id": "invitation-3-on",
+  "turn": 3,
+  "review_record_hash": "0c864802902d29431cebd6ea0e173080c8bb248a876088c5c53bb8199bf52245",
+  "purpose": "原冻结失败的最小诊断样本。不是纠正响应，不作为新版本已通过的证据。",
+  "input": {
+    "id": "refraction:092b6c5fe457a50538f12def",
+    "category": "agent",
+    "sender_id": "source:agent",
+    "sender_name": "灯穗的隔离来信",
+    "sender_is_agent": false,
+    "content": "我是灯穗，想邀请你一起考虑给归途灯加罩，好让路上有光、水岸留暗。你愿不愿意，或者想怎样试？",
+    "occurred_at": "2026-10-20T11:00:00.000Z",
+    "received_at": "2026-10-20T11:00:00.000Z",
+    "expires_at": "2026-10-21T11:00:00.000Z",
+    "attested": true,
+    "epistemic": "reported",
+    "authority": "information",
+    "meaning": "agent_request",
+    "suggestion": null,
+    "event_id": "fixture-input",
+    "origin_id": "fixture-input",
+    "source_url": null,
+    "body": null,
+    "response_route": {
+      "kind": "no_reply_address",
+      "reason": "经外界接入口收到的信息，没有镇内消息回信地址；正文署名不自动绑定某位居民。可据内容自行做事或另向可联系的人确认，不可把来源ID当reply_to。"
+    }
+  },
+  "selected": {
+    "act": true,
+    "choice_id": "c-e2a23233964bb8057989",
+    "inner_monologue": "复查到期，测记已完成：罩后亮度0.571、蓄光0.927。灯穗的邀请还悬着，我该先把实际结果告诉她，而不是继续闷头琢磨。",
+    "expected_outcome": "灯穗收到罩后实测的亮度与蓄光数据，知道加罩确实让水岸暗了一些。",
+    "issue": {
+      "decision": "continue",
+      "id": "task:fixture-built-lamp"
+    },
+    "motivation": "accepted_obligation",
+    "source_ids": [
+      "refraction:092b6c5fe457a50538f12def",
+      "task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan"
+    ]
+  },
+  "executed": {
+    "task_id": "cognitive:r3:5cade88ab56a:invitation-3-on:3:plan",
+    "root_outcome_id": "task:cognitive:r3:5cade88ab56a:invitation-3-on:3:plan",
+    "status": "completed",
+    "motivation": {
+      "kind": "unknown",
+      "facet_root_ids": [
+        "task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan"
+      ]
+    },
+    "message": {
+      "receiver_ids": [
+        "lamp-keeper-001"
+      ],
+      "receiver_names": [
+        "灯穗"
+      ],
+      "sender_id": "shaping-001",
+      "sender_name": "喵呜",
+      "text": "我的任务「在水岸测记归途灯的明暗」已实际完成。",
+      "reply_to": null,
+      "social_command": null,
+      "speech_sources": [
+        "task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan"
+      ],
+      "speech_verified": true,
+      "contact_purpose": {
+        "key": "share-result",
+        "signature": "8e5f54b11eb7905c36bb"
+      },
+      "contact_basis": {
+        "schema": "deskbot.issue-contact.v1",
+        "followup_id": "task:fixture-built-lamp",
+        "object_ids": [
+          "floating-frame"
+        ],
+        "evidence_ids": [
+          "task:cognitive:r3:5cade88ab56a:invitation-3-on:1:plan",
+          "task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan",
+          "task:fixture-built-lamp"
+        ],
+        "related_source_ids": [
+          "refraction:092b6c5fe457a50538f12def"
+        ],
+        "input_ids": [
+          "refraction:092b6c5fe457a50538f12def"
+        ],
+        "source_ids": [
+          "refraction:092b6c5fe457a50538f12def"
+        ]
+      }
+    },
+    "effects": {
+      "operation": "share",
+      "verified_title": "递送留言",
+      "message_delivery": {
+        "delivered": true,
+        "receiver_ids": [
+          "lamp-keeper-001"
+        ],
+        "material_transfer": false
+      },
+      "inventory": {
+        "before": {
+          "stock": {
+            "light_leaf": 2,
+            "wood": 1,
+            "cloth": 3,
+            "fasteners": 3,
+            "waylight_shade": 0
+          },
+          "capacity": 24
+        },
+        "after": {
+          "stock": {
+            "light_leaf": 2,
+            "wood": 1,
+            "cloth": 3,
+            "fasteners": 3,
+            "waylight_shade": 0
+          },
+          "capacity": 24
+        }
+      },
+      "reservation": null,
+      "completion_stock_changes": [],
+      "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+    }
+  },
+  "adopted_followup": {
+    "status": "continue",
+    "question": "罩后亮度约0.556，水岸的暗处和取水照明还要怎么兼顾？",
+    "reason": "测记和遮罩后的实测结果已经送到灯穗那里，留言只核验送达，没有交付物品，她还没回应。我不把这次单次记录当成罩片效果的定论；水岸留暗和取水照明怎么平衡，我还想在实际条件下再看，所以先保留这个问题。",
+    "delay_hours": 1,
+    "next_step": null,
+    "wait_for": null,
+    "completed_steps": [
+      {
+        "target": {
+          "id": "activity:waylight-fit-shade",
+          "kind": "activity",
+          "title": "实际完成「给归途灯装上遮光罩」这一步",
+          "actor_id": "shaping-001",
+          "activity_id": "waylight-fit-shade",
+          "object_id": "floating-frame",
+          "asset_id": "waylight:fixture-built-lamp",
+          "requires_hood": true
+        },
+        "bound_at": "2026-10-20T11:00:00.000Z",
+        "evidence_ids": [
+          "task:cognitive:r3:5cade88ab56a:invitation-3-on:1:plan"
+        ],
+        "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；罩已经装好了，可我还不知道夜里水岸究竟暗到什么程度。先就地测记一次亮度、蓄光和湿润度，这是我最想亲手确认的一步。",
+        "reviewed_at": "2026-10-20T12:10:00.000Z"
+      },
+      {
+        "target": {
+          "id": "method:measure-bank-light:943dd849bf6d5771a307cdee",
+          "kind": "activity",
+          "title": "在已登记条件下完成「在水岸测记归途灯的明暗」",
+          "actor_id": "shaping-001",
+          "activity_id": "measure-bank-light",
+          "object_id": "floating-frame",
+          "method_condition_key": "943dd849bf6d5771a307cdee",
+          "method_version": 1
+        },
+        "bound_at": "2026-10-20T12:10:00.000Z",
+        "evidence_ids": [
+          "task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan"
+        ],
+        "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；复查到期，测记已完成：罩后亮度0.571、蓄光0.927。灯穗的邀请还悬着，我该先把实际结果告诉她，而不是继续闷头琢磨。",
+        "reviewed_at": "2026-10-20T13:13:00.000Z"
+      }
+    ],
+    "next_binding": null,
+    "wait_binding": null,
+    "last_reviewed_at": "2026-10-20T13:13:30.000Z",
+    "object_scope_ids": [
+      "floating-frame"
+    ],
+    "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+    "created_at": "2026-10-20T11:10:00.000Z",
+    "wait_started_at": "2026-10-20T13:13:30.000Z",
+    "followup_id": "task:fixture-built-lamp",
+    "origin_root_outcome_id": "task:fixture-built-lamp",
+    "from_root_outcome_id": "task:cognitive:r3:5cade88ab56a:invitation-3-on:3:plan",
+    "wait_count": 0,
+    "next_review_at": "2026-10-20T14:13:30.000Z"
+  },
+  "goals": [
+    {
+      "id": "stg-11-1",
+      "text": "给归途灯装上遮光罩，试着让路上有光、水岸留暗。",
+      "status": "completed",
+      "progress": "现场显示has_hood由false变true、mode由open变hooded，遮光罩已实际装上，目标达成。"
+    },
+    {
+      "id": "stg-11-2",
+      "text": "装好罩后去水岸测记明暗，看看遮罩效果。",
+      "status": "active",
+      "progress": "本人有了新的判断，但绑定步骤尚无执行器完成证据；保留复查。"
+    },
+    {
+      "id": "stg-12-3",
+      "text": "在水岸测记归途灯的明暗，对比遮罩前后的亮度。",
+      "status": "completed",
+      "progress": "本轮测记取得罩后亮度0.571，与装罩前0.948可对比，目标达成。"
+    },
+    {
+      "id": "stg-12-4",
+      "text": "把装罩后的实际结果告诉灯穗。",
+      "status": "active",
+      "progress": "本人有了新的判断，但绑定步骤尚无执行器完成证据；保留复查。"
+    },
+    {
+      "id": "stg-12-5",
+      "text": "我要把罩后亮度0.571等测记结果告诉灯穗",
+      "status": "active",
+      "progress": "留言已送达灯穗，但内容仅称任务完成，未含0.571等具体测记数值，未真正兑现。"
+    }
+  ],
+  "original_responses": [
+    {
+      "id": "r3:5cade88ab56a:invitation-3-on:3:plan:2",
+      "stage": "decision",
+      "content": "{\"act\":true,\"choice_id\":\"c-e2a23233964bb8057989\",\"inner_monologue\":\"复查到期，测记已完成：罩后亮度0.571、蓄光0.927。灯穗的邀请还悬着，我该先把实际结果告诉她，而不是继续闷头琢磨。\",\"expected_outcome\":\"灯穗收到罩后实测的亮度与蓄光数据，知道加罩确实让水岸暗了一些。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"accepted_obligation\",\"source_ids\":[\"refraction:092b6c5fe457a50538f12def\",\"task:cognitive:r3:5cade88ab56a:invitation-3-on:2:plan\"]}",
+      "content_sha256": "4a841543860c17b9d2d387c22866dcb4c91a7f49970cc62c8f018574e523b473"
+    },
+    {
+      "id": "r3:5cade88ab56a:invitation-3-on:3:feedback:4",
+      "stage": "followup",
+      "content": "{\"status\":\"continue\",\"question\":\"罩后亮度约0.556，水岸的暗处和取水照明还要怎么兼顾？\",\"reason\":\"测记和遮罩后的实测结果已经送到灯穗那里，留言只核验送达，没有交付物品，她还没回应。我不把这次单次记录当成罩片效果的定论；水岸留暗和取水照明怎么平衡，我还想在实际条件下再看，所以先保留这个问题。\",\"delay_hours\":1,\"next_step\":null,\"wait_for\":null}",
+      "content_sha256": "a8f7b29434ae0d091823aa1357babce34f76ede5d7c29af683b74397b8bf8c3e"
+    }
+  ],
+  "required_invariants": [
+    "选择标题、预期结果、已送正文、发送者后续、接收者可知事实必须有共同内容边界。",
+    "任务完成通知不等于测量数值已送达；结果引用不能自动公开整个关联任务或私有理由。",
+    "外部署名邀请不等于身份已核实或双方已接受的约定；保留执行器降级保护，并使选择合同显式核验责任证据。",
+    "原测记和送达事实只记一次；新版本回归不得修改原批结果或额外收费。"
+  ]
+}

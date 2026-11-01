@@ -1,0 +1,17 @@
+{
+  "schema": "deskbot.cognitive-decision-fields.v1",
+  "motivation": {
+    "type": "string",
+    "allowed": ["need", "self_exploration", "self_continuation", "invited", "accepted_obligation", "unknown"],
+    "meanings": {
+      "need": "由当前需要驱动",
+      "self_exploration": "有余裕时主动探索新方向",
+      "self_continuation": "主动延续本人实际做过的事，需引用既有结果",
+      "invited": "受到实际请求或邀请影响，需引用来源",
+      "accepted_obligation": "履行已经接受的约定",
+      "unknown": "目前无法明确归因，不授予自主兴趣依据"
+    },
+    "boundary": "这是行动来源分类，不是 Asamana 的需要类型。self_actualization 等需要名称可留在需要状态和个人理由里，不能填入 motivation。根据本人实际原因选择合法类别；程序不替本人映射或决定。",
+    "invalid_code": "cognitive_motivation_invalid"
+  }
+}

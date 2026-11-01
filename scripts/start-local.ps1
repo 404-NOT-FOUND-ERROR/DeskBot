@@ -2,6 +2,7 @@
 param(
   [switch]$StartWeb,
   [switch]$StartWorld,
+  [switch]$ProbeLlm,
   [string]$LlmConfigPath,
   [string]$WeatherEnvFile
 )
@@ -33,7 +34,7 @@ if (-not (Test-Path -LiteralPath $LlmConfigPath -PathType Leaf)) {
 # The config file is read by Node; only the path and provider are exported.
 $env:DESKBOT_LLM_PROVIDER = 'deepseek'
 $env:DESKBOT_LLM_CONFIG = (Resolve-Path -LiteralPath $LlmConfigPath).Path
-$env:DESKBOT_LLM_PROBE = '1'
+$env:DESKBOT_LLM_PROBE = if ($ProbeLlm) { '1' } else { '0' }
 # Two bounded, public sources. No additional API key is needed.
 if ([string]::IsNullOrWhiteSpace($env:DESKBOT_NEWS_ENABLED)) { $env:DESKBOT_NEWS_ENABLED = '1' }
 if ([string]::IsNullOrWhiteSpace($env:DESKBOT_AIR_ENABLED)) { $env:DESKBOT_AIR_ENABLED = '1' }

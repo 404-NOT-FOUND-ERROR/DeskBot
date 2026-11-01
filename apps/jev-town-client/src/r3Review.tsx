@@ -13,14 +13,18 @@ type Report={version:string;status:string;scope:string;limitations:string[];gate
     remediation:{title:string;text:string}[];cost:{calls:number;upper_cny:number;batches:{label:string;calls:number;upper_cny:number}[]}}|null};
 type Revision={status:string;changes:string[];checks:string;experiment:string;boundary:string;
   batch?:{version:string;calls:number;upper_cny:number;completed_windows:number;cases:{title:string;result:string;note:string}[]}};
-type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string};completed_steps?:{target:{title:string};reason:string;evidence_ids:string[]}[]};
+type Issue={followup_id?:string;question?:string;original_question?:string;status?:string;reason?:string;communication_evidence_id?:string;last_reviewed_at?:string;completion_target?:{title:string};completion_proofs?:{evidence_id:string}[];resolution?:{kind:string;reason:string};completed_steps?:{target:{title:string};reason:string;evidence_ids:string[]}[]};
 type R3A={version:string;status:string;summary:string;completed_windows:number;observed_windows:number;planned_windows:number;repairs:number;
+  deterministic_choice_windows?:number;
+  assessment?:{meaningful_windows?:number;entered_windows?:number;first_adopted?:number;decision_windows?:number;rule?:string}|null;
+  campaign_usage?:{calls:number;upper_cny:number;estimated_known_cny:number;unknown_reservation_cny:number;unknown_calls:number}|null;
   usage:{calls:number;cost_cny:number;input:number;output:number;unknown:number};stages:{stage:string;calls:number;input:number;output:number;cost_cny:number;p50_ms:number|null;p95_ms:number|null}[];
   window_p50_ms:number|null;window_p95_ms:number|null;replay:{summary:string;status:string}|null;
   local_revision?:{version:string;checks:string;changes:string[];real_retested:boolean}|null;
-  findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;stop_kind?:'budget'|'error'|null;elapsed_ms:number;note:string;
-    turns:{turn:number;at:string;action:string;actual_text:string|null;reason?:string|null;delivered_message?:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
+  findings:string[];limitations:string[];cases:{id:string;error:string|null;error_detail:string|null;stop_kind?:'budget'|'error'|'review'|null;elapsed_ms:number;note:string;
+    turns:{turn:number;at:string;action:string;actual_text:string|null;feedback_pending?:boolean;reason?:string|null;delivered_message?:string|null;latency_ms:number|null;prior_issue:Issue|null;followup:Issue|null;
       decision_contact?:{kind:string;receiver_ids:string[]}|null;recollections?:{feeling:string;fact:string|null}[];
+      result?:{communication?:{id:string;delivered:boolean;summary:string;disclosures:{kind:string;fields:{label:string}[]}[]}}|null;
       production_use?:{kind:string;target_stock:number;reason:string}|null;memory_anchor_checks?:{status:string}[];
       decision_issue?:{followup_decision:string;completion_target_id:string|null;followup_closure:{kind:string;reason:string}|null}|null;
       issues:{current:Issue|null;deferred:Issue[];closed:Issue[]}|null;audit:{verdict:string;note:string}|null}[]}[]};
@@ -28,21 +32,26 @@ const stageNames:Record<string,string>={perception:'感知',motivation:'动机�
 const issueStatus=(f:Issue)=>f.resolution?({resolved:'具体目标已完成',satisfied:'个人收束',abandoned:'明确放下'}[f.resolution.kind]??f.resolution.kind):({continue:'继续惦记',postpone:'暂缓',none:'暂无新后续',drop:'已收束'}[f.status??'']??'等待复查');
 function IssueView({issue}:{issue:Issue}){return <div className="followup"><b>{issueStatus(issue)}</b><p>{issue.original_question??issue.question}</p>
   {issue.question&&issue.original_question&&issue.question!==issue.original_question&&<p>这次打算：{issue.question}</p>}
-  {issue.reason&&<p>它给出的理由：{issue.reason}</p>}
+  {issue.reason&&<p>{issue.communication_evidence_id?'送达记录的事实依据':'它给出的理由'}：{issue.reason}</p>}
   {!!issue.completed_steps?.length&&<details><summary>已经做成的 {issue.completed_steps.length} 个步骤</summary>{issue.completed_steps.map((s,i)=><p key={i}><b>{s.target.title}</b> · {s.reason}<br/><small>执行证据：{s.evidence_ids.join('、')}</small></p>)}</details>}
   {issue.completion_target&&<p>绑定的小目标：{issue.completion_target.title}{!!issue.completion_proofs?.length?'（已有对应执行证据）':''}</p>}<small>事项 {issue.followup_id??'尚未绑定'}{issue.last_reviewed_at?` · 上次复查 ${new Date(issue.last_reviewed_at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})}`:''}</small>{issue.resolution&&<p>{issue.resolution.reason}</p>}</div>;}
 function R3AView({data,historical=false}:{data:R3A;historical?:boolean}){return <section className="experiment" aria-label={historical?`R3-A 历史复验 ${data.version}`:'R3-A 当前冻结复验'}>
   <span className="badge">R3-A · {data.version} · 隔离样本</span><h2>{data.status}</h2><p>{data.summary}</p>
   <p>完成 {data.completed_windows} / 计划 {data.planned_windows} 个窗口；实际进入 {data.observed_windows} 个。{data.usage.calls} 次模型调用，含 {data.repairs} 次选择或合同修复；估算 ¥{data.usage.cost_cny.toFixed(3)}，未知用量 {data.usage.unknown} 次。</p>
+  {data.campaign_usage&&<p>本轮连同请求失败批共 {data.campaign_usage.calls} 次请求；已知用量估算 ¥{data.campaign_usage.estimated_known_cny.toFixed(3)}，另保留未知用量预留 ¥{data.campaign_usage.unknown_reservation_cny.toFixed(3)}，合计上界 ¥{data.campaign_usage.upper_cny.toFixed(3)}。预留不是实际扣款。</p>}
+  {!!data.deterministic_choice_windows&&<p>{data.deterministic_choice_windows} 个窗口采用单次角色选择，程序直接绑定执行；活动、用途与事项无需第二个模型重复编译。窗口完成数只说明执行链完整，生活连续性另看逐条审查。</p>}
+  {data.assessment?.meaningful_windows!=null&&<p>逐条审查计入有效选择/推进 {data.assessment.meaningful_windows} / {data.assessment.entered_windows}；首答直接采用 {data.assessment.first_adopted} / {data.assessment.decision_windows}。{data.assessment.rule}</p>}
   {data.findings.map(f=><p key={f}>{f}</p>)}
   {data.local_revision&&<div className="actual"><b>实验后的本地修正 · {data.local_revision.version}</b><p>{data.local_revision.checks}</p><ul>{data.local_revision.changes.map(c=><li key={c}>{c}</li>)}</ul><p>{data.local_revision.real_retested?'已重新进行真实验证':'尚未追加真实模型复验；下面仍是原冻结版本的结果。'}</p></div>}
   <div className="pair">{data.cases.map(c=><article className="episode" key={c.id}><div className="episode-top"><b>{c.id.startsWith('resources')?(c.id.endsWith('-off')?'材料充足的对照':'缺材料时怎样接着生活'):(c.id.endsWith('-off')?'没有新增邀请的对照':'收到装罩邀请以后')}</b><small>{c.id}</small></div>
-    <p>{c.note}</p>{c.error&&<p className="error">{c.stop_kind==='budget'?'已达本批调用上限，停止追加。最后一次行动已执行，后续反馈尚未采用；该窗口未计作完整完成。':`本例停止：${c.error_detail??c.error}。失败窗口保留，未计作完成。`}</p>}
+    <p>{c.note}</p>{c.error&&<p className="error">{c.stop_kind==='budget'?'已达本批调用上限，停止追加。最后一次行动已执行，后续反馈尚未采用；该窗口未计作完整完成。':c.stop_kind==='review'?`逐窗审阅停止：${c.error_detail??c.error} 这个窗口的执行与反馈已完成，但内容审查未通过；完成数和有效数分别记录。`:`本例停止：${c.error_detail??c.error}。失败窗口保留，未计作完成。`}</p>}
     {c.turns.map(t=><section className="turn" key={t.turn}><div className="turn-number">0{t.turn}<span>{new Date(t.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})} · 实验时间</span></div>
       <h3>{t.action}</h3><div className="actual">{t.actual_text??'这一窗口没有已完成的物件结果。'}</div>
+      {t.feedback_pending&&<p className="error">动作结果已保存，个人反馈尚未采用。此窗口未完成；恢复时应先处理原结果，不能重复执行动作。</p>}
       {t.audit&&<p className="audit">{t.audit.verdict} · {t.audit.note}</p>}
       {t.reason&&<details><summary>它为什么这样安排</summary><blockquote>{t.reason}</blockquote></details>}
       {t.delivered_message&&<details><summary>实际送达的留言原文</summary><p style={{whiteSpace:'pre-wrap'}}>{t.delivered_message}</p></details>}
+      {t.result?.communication&&<details><summary>{t.result.communication.delivered?'送达凭据与公开内容':'未送达的记录'}</summary><p>{t.result.communication.summary}</p>{t.result.communication.disclosures.map((d,i)=><p key={i}>{d.kind==='result_extract'?'结果摘录':'完成通知'}：{d.fields.map(f=>f.label).join('、')}</p>)}<small>{t.result.communication.id}</small></details>}
       {t.production_use&&<p>这次生产的用途：{({reserve:'留存备用',self_use:'实际自用',accepted_delivery:'已接受的交付',experiment:'未完成的实验'} as Record<string,string>)[t.production_use.kind]}，目标总量 {t.production_use.target_stock}。{t.production_use.reason}</p>}
       {!!t.memory_anchor_checks?.length&&<p><small>记忆中的事实：{t.memory_anchor_checks.every(c=>c.status==='anchored')?'已与执行记录绑定，个人感受单独保留。':'有感受输出未通过校验，已省略；原始事实仍保留。'}</small></p>}
       {t.decision_contact&&<p>本人选择：{({message:'递送留言',reply:'回复镇内消息',invite:'提出正式邀请',respond:'回应约定'} as Record<string,string>)[t.decision_contact.kind]??t.decision_contact.kind} → {t.decision_contact.receiver_ids.map(id=>actors[id]??id).join('、')}</p>}
@@ -74,7 +83,7 @@ function App(){
   useEffect(()=>{const controller=new AbortController();fetch('/r3-review.json',{signal:controller.signal}).then(r=>{if(!r.ok)throw Error(`实验报告读取失败（${r.status}）`);return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3-hardening.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setRevision).catch(()=>{});return()=>controller.abort();},[]);
   useEffect(()=>{const controller=new AbortController();fetch('/r3a-review.json',{signal:controller.signal}).then(r=>r.ok?r.json():null).then(setR3a).catch(()=>{});return()=>controller.abort();},[]);
-  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json','/r3a-current-screening.json','/r3a-protocol-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();Promise.all(['/r3a-first-screening.json','/r3a-repair-screening.json','/r3a-grounded-screening.json','/r3a-current-screening.json','/r3a-protocol-screening.json','/r3a-semantics-screening.json','/r3a-format-screening.json','/r3a-single-choice-screening.json','/r3a-catalogue-screening.json','/r3a-fields-screening.json','/r3a-feedback-screening.json'].map(path=>fetch(path,{signal:controller.signal}).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>setR3aHistory(rows.filter(Boolean)));return()=>controller.abort();},[]);
   const episodes=data?.episodes.filter(e=>e.group===group&&e.arm===arm&&e.repeat===repeat)??[];
   return <main>
     <header><div className="kicker">THE SHAPING FIELD / R3</div><h1>同一盏灯，不同来由</h1><p>它听到了什么，又真正做了什么？</p>

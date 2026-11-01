@@ -1,0 +1,170 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "17fb2d6ecfb4",
+  "status": "请求格式筛查失败 · 已停止",
+  "summary": "第一轮决策请求缺少 JSON 明示词，被 DeepSeek HTTP 400 拒绝。两次前置调用返回，第三次无用量；尚无已执行行动或完整窗口。",
+  "usage": {
+    "calls": 3,
+    "input": 6440,
+    "output": 172,
+    "cost_cny": 0.11587064000000001,
+    "unknown": 1,
+    "provider_failed": 1,
+    "p50_ms": 1276,
+    "p95_ms": 1481,
+    "queue_ms": 6,
+    "input_chars": 46585
+  },
+  "repairs": 0,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 1,
+      "input": 4540,
+      "output": 52,
+      "cost_cny": 0.00096608,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1481,
+      "p95_ms": 1481,
+      "queue_ms": 2,
+      "input_chars": 10900
+    },
+    {
+      "stage": "motivation",
+      "calls": 1,
+      "input": 1900,
+      "output": 120,
+      "cost_cny": 0.00149856,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1276,
+      "p95_ms": 1276,
+      "queue_ms": 2,
+      "input_chars": 3177
+    },
+    {
+      "stage": "decision",
+      "calls": 1,
+      "input": 0,
+      "output": 0,
+      "cost_cny": 0.113406,
+      "unknown": 1,
+      "provider_failed": 1,
+      "p50_ms": 341,
+      "p95_ms": 341,
+      "queue_ms": 2,
+      "input_chars": 32508
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": null,
+  "campaign_usage": null,
+  "completed_windows": 0,
+  "deterministic_choice_windows": 0,
+  "observed_windows": 1,
+  "planned_windows": 20,
+  "window_p50_ms": null,
+  "window_p95_ms": null,
+  "replay": null,
+  "checks": {
+    "version": "17fb2d6ecfb4",
+    "recorded_at": "2026-10-25T13:44:14.825Z",
+    "cases": [
+      "resources-1-off",
+      "resources-1-on",
+      "invitation-3-off",
+      "invitation-3-on"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "max_calls": 170,
+    "turns": 5,
+    "checks": {
+      "backend": {
+        "passed": true,
+        "total": 887,
+        "full_run": "886 passed, 1 cached-weather regression; fixed and relevant 34/34 retested",
+        "log": "backend-tests-final.log",
+        "repair_log": "source-cache-regression.log"
+      },
+      "python": {
+        "passed": true,
+        "total": 60,
+        "log": "python-tests.log"
+      },
+      "frontend": {
+        "passed": true,
+        "typecheck": "frontend-typecheck.log",
+        "build": "frontend-build.log",
+        "warning": "existing large chunks"
+      },
+      "integration": {
+        "passed": true,
+        "test": "cognitive-single-choice.test.mjs",
+        "note": "Actual Python worker and Node executor; fixed mock responses, no model network"
+      }
+    },
+    "approval_scope": "Previously authorized fictional fixtures and experiment memories only; exclude formal chat and sensors",
+    "stop": "one final protocol/execution failure ends batch; inspect resource pair before continuing",
+    "pricing": "Registered 2026-10-20 estimate; actual bill unknown"
+  },
+  "local_revision": null,
+  "findings": [
+    "补上本地 JSON 请求预检查后，只在原累计上限内允许一次修正版；旧失败与不确定费用保留。",
+    "本批终止请求未完整写入旧回放缓存，不能声称其严格回放通过。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": "provider_http_error",
+      "error_detail": "DeepSeek HTTP 400: Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'. (request_id: 778b893b-e1cc-4470-96ca-d640e907c439)",
+      "stop_kind": "error",
+      "elapsed_ms": 4721,
+      "note": "请求阶段停止，尚未执行任务。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "未采用计划",
+          "activity": null,
+          "operation": null,
+          "reason": null,
+          "result": null,
+          "actual_text": null,
+          "delivered_message": null,
+          "success": null,
+          "blocked": null,
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": null,
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "请求失败",
+            "note": "缺少 JSON 明示词；非世界事件，不计为角色的一次失败经历。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}

@@ -17,6 +17,8 @@ notepad config\llm_config.json
 
 只填写自己的 DeepSeek key；`base_url` 和 `model` 按账号实际可用值填写。启动脚本默认优先读取 `config\llm_config.json`，也兼容当前工作站旧的 `DeskBotClaude\foundry-bench\llm_config.json`。
 
+启动默认不调用模型做探测；需要单独验证连通时传 `-ProbeLlm`。已启用的旧生活选择仍依其运行配置执行，新持续认知默认关闭。
+
 ## 天气与城市
 
 服务支持 Open-Meteo 与和风天气。新下载仓库没有本机城市配置；可以创建 `config/weather.local.env`，以下是上海 Open-Meteo 的无密钥配置示例：
@@ -37,11 +39,10 @@ DESKBOT_WEATHER_TIMEZONE=Asia/Shanghai
 如需国内实时天气：
 
 ```powershell
-Copy-Item config\weather.env.example config\weather.env
-notepad config\weather.env
+notepad config\weather.local.env
 ```
 
-将 `DESKBOT_WEATHER_URL` 的 `YOUR_API_HOST` 换成和风控制台提供的 API Host，并填入 token。启动时显式传入：
+把 provider 改为 `qweather`，增加 `DESKBOT_WEATHER_URL`（控制台给定的 API Host + `/v7/weather/now`）、`DESKBOT_WEATHER_AUTH_MODE=api-key` 和 `DESKBOT_WEATHER_TOKEN`。密钥仅保存在忽略提交的本地文件。也可显式传入其他本地配置路径：
 
 ```powershell
 .\scripts\start-local.ps1 -StartWeb -WeatherEnvFile (Resolve-Path config\weather.env)

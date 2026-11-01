@@ -36,15 +36,25 @@ from providers.agent_store.in_memory import InMemoryAgentStore
 from providers.vector_store.in_memory import InMemoryVectorStore
 from input_refraction import interpret_inputs, external_goals
 from relationship_review import review_relationships
-from continuation_contract import continuation_errors, CONTINUATION_CONTRACT, issue_choice_errors, compiled_issue_errors, ISSUE_CHOICE_CONTRACT
+from continuation_contract import continuation_errors, CONTINUATION_CONTRACT, FEEDBACK_CONTINUATION_CONTRACT, issue_choice_errors, compiled_issue_errors, ISSUE_CHOICE_CONTRACT
+from followup_phases import feedback_error_code
 from context_projection import BODY_BOUNDARY, stage_context, continuation_view
-from life_semantics import production_errors, PRODUCTION_CONTRACT, render_anchored_memory, compiled_method_errors
+from life_semantics import production_errors, PRODUCTION_CONTRACT, render_anchored_memory, compiled_method_errors, AFFECT_FEELINGS, AFFECT_WISHES
+from actor_choice import bind_choice, CONTRACT as SINGLE_CHOICE_CONTRACT
+from decision_fields import MOTIVATIONS, MOTIVATION_PROMPT
+from catalogue_choice import bind_catalogue_choice, CONTRACT as CATALOGUE_CONTRACT
+from failure_contract import error_frame
+from opportunity_goals import OpportunityNeedEngine
+from event_evidence import CONTRACT as EVENT_EVIDENCE, communication_errors
 from contact_contract import (CONTACT_CONTRACT, contact_readiness, contact_intent_errors,
     bind_contact_intent, compiled_contact_errors, social_contact_errors)
 
 
 class AbortJob(BaseException):
     pass
+
+
+_last_model_stage = None
 
 
 def plain(value):
@@ -63,7 +73,9 @@ class PipeProvider(LLMProvider):
     def __init__(self, scene, mode, lock): self.scene, self.mode, self.lock = scene, mode, lock
 
     async def complete(self, messages, temperature=.7, max_tokens=1000, *, json_mode=False):
+        global _last_model_stage
         async with self.lock:
+            _last_model_stage = get_log_context().get('stage', self.scene)
             emit({'type':'model_request','mode':self.mode,'scene':self.scene,
                   'stage':get_log_context().get('stage',self.scene),
                   'messages':plain(messages),'temperature':temperature,
@@ -100,7 +112,8 @@ class BoundedPersonality(PersonalityLayer):
 class BoundedDecision(DecisionEngine):
     def __init__(self, *args, context, **kwargs):
         super().__init__(*args, **kwargs)
-        self.context=context; self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None
+        self.context=context; self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None; self.compiled=None
+        self.contract_failure_code=None
 
     def _build_decision_prompt(self, personality, packet, candidates):
         # Upstream's generic output instructions also describe synchronous TALK,
@@ -109,7 +122,10 @@ class BoundedDecision(DecisionEngine):
         # needs, personality, memories, relations, target parser and feedback loop.
         awareness=packet.internal_context
         allowed={r['actor_id'] for r in self.context.get('capabilities',{}).get('share',{}).get('receivers',[])}
-        people=[{'person_index':i,'actor_id':aid,'name':who.name,'contactable':aid in allowed}
+        positions={p['actor_id']:p for p in self.context.get('event_evidence',{}).get('people',[])}
+        people=[{'person_index':i,'actor_id':aid,'name':who.name,'contactable':aid in allowed,
+                 'known_position':positions.get(aid),
+                 'position_rule':'只有known_position为本次亲见位置；其余未知，不从名字、职业或住处推断当前位置。'}
             for i,(aid,who) in enumerate(_message_roster(packet),1)]
         view={'self':personality.to_prompt_context(),
             'direction':plain(getattr(awareness,'need_evaluation',None)),
@@ -121,6 +137,44 @@ class BoundedDecision(DecisionEngine):
             'current_uses':self.context.get('use_context',{}),
             'contact_readiness':contact_readiness(self.context),
             'action_menu':[{'selected_index':i,'type':a.action_type.value,'meaning':a.description} for i,a in enumerate(candidates)]}
+        if self.context.get('choice_contract') == 'choice-catalogue-v2':
+            view['self'] = PersonalityLayer.to_prompt_context(personality)
+            view['conditions'] = stage_context(self.context, 'decision')
+            view['conditions'].pop('capabilities', None)
+            view['conditions'].pop('use_context', None)
+            for key in ('action_menu', 'current_uses', 'contact_readiness'):
+                view.pop(key, None)
+            view['choices'] = [{**{k:v for k,v in row.items() if k != 'binding'},
+                'effect':row['binding']} for row in self.context['choice_catalogue']['choices']]
+            view['unavailable'] = self.context['choice_catalogue']['unavailable']
+            view['current_signals'] = self.context.get('signals', [])[:2]
+            return BODY_BOUNDARY+'\n'+CATALOGUE_CONTRACT, prompt_json(view,self.context), []
+        if self.context.get('choice_contract') == 'single-choice-v1':
+            # Identity once, current conditions once; do not repeat the same
+            # catalogue/use/continuation in both personality and compiler prompts.
+            view['self'] = PersonalityLayer.to_prompt_context(personality)
+            view['conditions'] = stage_context(self.context, 'decision')
+            view.pop('current_uses', None)
+            view['speech_evidence'] = self.context.get('speech_evidence', [])
+            view['prior_result_root'] = self.context.get('saved', {}).get('last_result', {}).get('root_outcome_id')
+            fields = {
+                'work': {'required_top_level':['activity_id'], 'activity_id_from':'conditions.capabilities.activities[].activity_id'},
+                'physical': {'choose_one':{'actual_activity':{'required_top_level':['activity_id']},
+                    'observe_only':{'required_top_level':['physical_entity_index'],'physical_entity_index_from':'visible_objects[].object_index'}}},
+                'send_message': {'required_top_level':['person_indices','contact','message_parts'],
+                    'person_indices_from':'visible_or_known_people[].person_index where contactable=true',
+                    'contact':'kind and its terms; message_parts is the body, not another contact command'},
+                'move': {'required_top_level':['destination_index'],'destination_index_from':'conditions.capabilities.travel.destinations[].destination_index'},
+                'rest': {'required_top_level':[]},
+            }
+            for action in view['action_menu']:
+                action['meaning'] = action['meaning'].replace('按contact_intent声明具体方式', '按contact声明具体方式')
+                action['output_fields'] = fields[action['type']]
+            # Inputs are already present with provenance; signals repeat them.
+            view['current_signals'] = self.context.get('signals', [])[:2]
+            return (BODY_BOUNDARY + '\n你是这个正在生活的角色。根据自己的需要、经历、关系和现实可行性权衡一步，可以暂缓、休息或改做别的。\n'
+                + SINGLE_CHOICE_CONTRACT, prompt_json(view, self.context),
+                [prompt_json({'objects':view['visible_objects'],'inputs':view['received_inputs']},self.context)])
         system='''你是聚形域中正在生活的这个角色。结合自己的需要、性格、经历、关系与尚未完成的问题，自主决定眼下的一步。
 先看实际可行性，再表达意愿。个人回忆中的感受不是客观证据；信息的署名、邀请和你的计划均不等于已发生或已接受。
 有不同可行选择时按自己的理由权衡，不必为了完成故事或交付进度去行动。可以休息、换一件事或暂缓。
@@ -139,18 +193,33 @@ WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做�
     def _repair_prompt(self,user_prompt):
         if not self.contact_errors:return user_prompt
         return (user_prompt+'\n上次返回（没有执行）：'+json.dumps(self.last_payload,ensure_ascii=False,separators=(',',':'))
-            +'\n只修复明确的字段错误；若本来意愿不再可行，也可重新选择。activity_id是JSON顶层必填字段，不能只写在production_use或completion_target_id里。'
+            +'\n只修复明确的字段错误；若本来意愿不再可行，也可重新选择。遵守本次输出合同，完整返回。'
+            +('' if self.context.get('choice_contract')=='choice-catalogue-v2' else 'WORK的activity_id是JSON顶层必填字段，不能只放在目标里。')
             +'上次未采用原因：'+'；'.join(self.contact_errors)+'。返回完整JSON，不声称已执行。格式校验不是世界事件；角色的inner_monologue只谈生活处境和选择，不把字段错误说成被人拦下或物理上不能做。')
 
     async def _attempt_selection(self, personality, packet, candidates, system_prompt, user_prompt, given_facts):
         repair=self.attempts>0; self.attempts+=1
         user_prompt=self._repair_prompt(user_prompt)
+        self.contract_failure_code=None
         with observe_stage('decision_repair' if repair else 'decision'):
             return await super()._attempt_selection(personality,packet,candidates,system_prompt,user_prompt,given_facts)
 
     def _parse_llm_selection(self, content, candidates, packet=None):
-        self.contact=None; self.issue=None; self.production=None; self.method=None
+        self.contact=None; self.issue=None; self.production=None; self.method=None; self.compiled=None
+        self.contract_failure_code=None
         self.last_payload=content if isinstance(content,dict) else extract_json(content)
+        bound = None
+        if self.context.get('choice_contract') in ('single-choice-v1', 'choice-catalogue-v2'):
+            try:
+                if not isinstance(self.last_payload, dict): raise ValueError('只返回一个完整JSON对象')
+                binder=bind_catalogue_choice if self.context['choice_contract']=='choice-catalogue-v2' else bind_choice
+                content, bound = binder(self.last_payload, self.context, candidates,
+                    [aid for aid, _ in _message_roster(packet)] if packet else [])
+            except (ValueError, KeyError, TypeError) as error:
+                self.contact_errors = [str(error)]
+                self.contract_failure_code = getattr(error, 'code', None)
+                note_active_call_adoption(False, 'actor_choice_invalid: ' + str(error))
+                return None
         selection=super()._parse_llm_selection(content,candidates,packet)
         if selection is None:return None
         payload=content if isinstance(content,dict) else extract_json(content)
@@ -171,7 +240,7 @@ WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做�
             self.method=method;self.production=plain(payload.get('production_use'))
         if selection.action_type.value=='send_message':
             choice=payload.get('contact_intent')
-            self.contact_errors=contact_intent_errors(choice,selection.target.acted_on_agents,self.context)
+            self.contact_errors=[] if self.context.get('choice_contract')=='choice-catalogue-v2' else contact_intent_errors(choice,selection.target.acted_on_agents,self.context)
             if issue is not None and isinstance(choice,dict) and choice.get('followup_id')!=issue.get('followup_id'):
                 self.contact_errors.append('contact_intent与issue_choice须引用同一本人事项')
             if self.contact_errors:
@@ -180,10 +249,23 @@ WORK另填activity_id（capabilities中精确活动ID）；PHYSICAL若实际做�
             self.contact=bind_contact_intent(choice,selection.target.acted_on_agents)
         else:self.contact_errors=[]
         self.issue=plain(issue)
+        if bound is not None:
+            errors = continuation_errors(bound, self.context) + production_errors(bound, self.context)
+            if not valid_life_compilation(bound): errors.append('motivation、来源、标题和理由必须符合选择合同')
+            if not valid_source_binding(bound, self.context): errors.append('source_ids只能引用本轮外来输入')
+            if not valid_social_compilation(bound, self.context): errors.append(compilation_repair(bound, self.context))
+            if not valid_development_binding(bound, self.context): errors.append('兴趣/角色选择须有本人给定证据和实际资格')
+            if not valid_continuation_binding(bound, self.context): errors.append('检查本人事项、完成条件与等待条件，不能把就绪写成受阻')
+            if errors:
+                self.contact_errors = errors
+                note_active_call_adoption(False, 'actor_choice_invalid: ' + ';'.join(errors))
+                return None
+            self.compiled = bound
         return selection
 
     async def decide(self, *, personality, packet):
-        self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None
+        self.contact=None; self.issue=None; self.production=None; self.method=None; self.contact_errors=[]; self.attempts=0; self.last_payload=None; self.compiled=None
+        self.contract_failure_code=None
         # Keep upstream's type/target semantics while describing DeskBot's actual
         # executor. In particular, it cannot broadcast, summon, or hand over by prose.
         descriptions={
@@ -207,10 +289,13 @@ class BoundedMemory(MemorySystem):
         if not frame or kwargs['raw_content']!=result.get('personal_fact'):
             return await super()._write_experiential(**kwargs)
         personality=kwargs['personality']
+        affect_prompt=('事实由程序逐项原样保存，你只选择注意力和此刻的个人情绪、打算。返回JSON：'
+            '{focus_id:facts中的一个id,feeling:给定情绪英文键,wish:给定打算英文键}。不加字段，不重新讲述事实。'
+            '可选情绪：'+json.dumps(AFFECT_FEELINGS,ensure_ascii=False)+'；可选打算：'+json.dumps(AFFECT_WISHES,ensure_ascii=False)) if frame.get('affect_contract')=='bounded-affect-v1' else '你是这个角色，事实已经完整保存。只选择此刻最在意的一项和具体感受，不重新讲述经过、删减留言或推断他人反应。返回JSON：{fact_ids:逐项照录facts的全部id,focus_id:最在意的一个id,feeling:最多160字的第一人称感受}。feeling只写我在意什么、担忧或期待什么；不写刚才做了什么、不重述留言、数量、时间或客观因果。事实将由程序原样与感受一起保留。'
         # Reuse one memory call. Invalid affect is omitted, never replaced by invented prose.
         with observe_stage('memory'):
             response=await self._llm_router.complete(LLMScene.MEMORY_SUMMARIZATION,[
-                LLMMessage('system','你是这个角色，事实已经完整保存。只选择此刻最在意的一项和具体感受，不重新讲述经过、删减留言或推断他人反应。返回JSON：{fact_ids:逐项照录facts的全部id,focus_id:最在意的一个id,feeling:最多160字的第一人称感受}。feeling只写我在意什么、担忧或期待什么；不写刚才做了什么、不重述留言、数量、时间或客观因果。事实将由程序原样与感受一起保留。'),
+                LLMMessage('system',affect_prompt),
                 LLMMessage('user',prompt_json({'actor':self.context['actor']['name'],'traits':personality.soul.traits_text(),'values':personality.soul.values_text(),
                     'emotion':personality.state.emotion.summary(),'facts':frame['facts'],'at':frame['at'],'related_people':kwargs.get('related_agent_directory') or {}},self.context))
             ],max_tokens=650,json_mode=True)
@@ -251,7 +336,7 @@ def hydrate_action(data):
     return AgentAction(**data)
 
 
-async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None,stage='contract'):
+async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None,stage='contract',failure_code=None):
     for attempt in range(2):
         with observe_stage(stage if attempt == 0 else stage+'_repair'):
             reply=await router.complete(LLMScene.DIRECTIVE,messages,max_tokens=max_tokens,json_mode=True)
@@ -260,7 +345,7 @@ async def contract_json(router,messages,validator,max_tokens=900,repair_hint=Non
         if not isinstance(value,dict): value={}
         hint=repair_hint(value) if callable(repair_hint) else repair_hint
         messages=messages+[LLMMessage('assistant',reply.content),LLMMessage('user',hint or '该 JSON 不符合给定字段合同。重新检查原合同要求的字段名、数据类型与取值。只修复本次合同，不引入其他阶段字段，不新增事实。')]
-    raise ValueError('semantic_contract_rejected_after_retry')
+    raise ValueError(failure_code(value) if callable(failure_code) else failure_code or 'semantic_contract_rejected_after_retry')
 
 
 def valid_followup(value):
@@ -322,7 +407,7 @@ def valid_compilation(value):
 
 
 def valid_life_compilation(value):
-    return (valid_compilation(value) and value.get('motivation') in ('need','self_exploration','self_continuation','invited','accepted_obligation','unknown')
+    return (valid_compilation(value) and value.get('motivation') in MOTIVATIONS
         and isinstance(value.get('source_ids'),list) and all(isinstance(s,str) for s in value['source_ids'])
         and value.get('followup_decision') in ('continue','postpone','drop','new','none')
         and isinstance(value.get('title'),str) and len(value['title'])<=40 and len(value['reason'])<=160
@@ -360,6 +445,11 @@ def valid_source_binding(value,context):
 def valid_social_compilation(value,context):
     import re
     if value.get('operation')!='share': return True
+    if context.get('choice_contract')=='choice-catalogue-v2':
+        parts=value.get('message_parts',[])
+        row=next((r for r in context['choice_catalogue']['choices'] if len(parts)==1 and r['id']==parts[0].get('choice_id')),None)
+        return bool(row and parts==[{'kind':'catalogue','choice_id':row['id']}] and row['binding']['operation']=='share'
+            and row['binding']['receiver_indices']==value.get('receiver_indices'))
     if social_contact_errors(value,context): return False
     parts=value.get('message_parts')
     if not isinstance(parts,list) or len(parts)>3: return False
@@ -445,7 +535,7 @@ async def run(context):
     await memory.warm_recent_memories(step,lookback_steps=24*14)
     # Upstream counter is process-local. Node namespaces every new memory by job; old IDs preserved.
     memory._seq=int(saved.get('memory_sequence',0))
-    need=NeedEngine(router,seconds_per_step=3600,world_start_second_of_day=start)
+    need=OpportunityNeedEngine(router,context=context,seconds_per_step=3600,world_start_second_of_day=start)
     decision=BoundedDecision(router,context=context,seconds_per_step=3600,world_start_second_of_day=start)
     agent=Agent(world_id=context['world_id'],agent_id=actor['actor_id'],personality=personality,decision_engine=decision,
                 memory_system=memory,need_engine=need,relation_system=RelationSystem(store,world_id=context['world_id'],agent_id=actor['actor_id']),agent_store=store,llm_router=router,
@@ -476,20 +566,26 @@ async def run(context):
         agent.pending_external_goals=external_goals(interpretations)
         plan=await agent.plan_step(step=step,spatial=spatial,inbox=[],broadcasts=[])
         output['decision_status']=plain(plan.decision_status)
-        if plain(plan.decision_status)=='failed': raise ValueError('upstream_decision_failed')
+        if plain(plan.decision_status)=='failed': raise ValueError(decision.contract_failure_code or 'upstream_decision_failed')
         agent.personality.apply_need_state(step=step,active_needs=[n.type.value for n in plan.need_evaluation.active_needs],dominant_need=plain(plan.need_evaluation.dominant_need),
                long_term_goals=plan.need_evaluation.long_term_goals,short_term_goal_entities=plan.need_evaluation.short_term_goal_entities)
         output['needs']=plain(plan.need_evaluation)
+        output['goal_bindings']=plain(need.bindings)
         output['action']=plain(plan.action)
         output['decision_contact']=plain(decision.contact)
         output['decision_issue']=plain(decision.issue)
         output['decision_method']=decision.method
         output['decision_production']=plain(decision.production)
-        if plan.action:
+        if plan.action and decision.compiled is not None:
+            await agent.begin_ongoing_step(plan=plan,estimated_steps=1)
+            output['compiled'] = plain(decision.compiled)
+            output['choice_binding'] = {'contract':context['choice_contract'],'actor_payload':plain(decision.last_payload),
+                'compiled':plain(decision.compiled),'model_compile_calls':0}
+        elif plan.action:
             await agent.begin_ongoing_step(plan=plan,estimated_steps=1)
             compile_prompt={'speaker':{'id':actor['actor_id'],'name':actor['name']},'at':context['at'],'intent':plain(plan.action),'capabilities':context['capabilities'],'objects':context['objects'],
                 'available_sources':context.get('inputs',[]),'input_interpretations':interpretations,'prior_result_root':saved.get('last_result',{}).get('root_outcome_id'),
-                'causality_contract':'同时返回 motivation: need|self_exploration|self_continuation|invited|accepted_obligation|unknown，source_ids: 实际影响本次选择的给定来源id数组，prior_root_id: 延续本人实际旧事的结果id或null。当前需要驱动填need；有自由余裕的首次探索填self_exploration；继续过去亲自做过的事填self_continuation并引用结果；受用户/居民请求填invited并引用来源；履行已经接受的约定填accepted_obligation并提供commitment_id。不虚构来源或把每个选择都标成自主。',
+                'causality_contract':MOTIVATION_PROMPT+' 同时返回source_ids: 实际影响本次选择的给定来源id数组，prior_root_id: 延续本人实际旧事的结果id或null。履行已接受约定须提供commitment_id。不虚构来源或把每个选择都标成自主。',
                 'contract':'将意图编译为 JSON：{operation: activity|observe|rest|share|wait|travel, destination_index:1起或null, activity_id: 给定活动的精确ID或null, activity_index: 活动上明确标注的编号或null, object_index:1起或null, receiver_indices:1起的收件人编号数组, message:实际说出的消息或空字符串, title:短标题, reason:方法与限制, followup_decision:continue|postpone|drop|new|none}。只能选给定能力。activity 必须返回精确 activity_id；如另填 activity_index 必须与该条 activity_index 一致，不能自己数数组位置。意图涉及实际测记、试验、制作、排湿或移动时，优先匹配有明确条件和效果的 activity；observe 只是看一看，不能代替正式测记或产生作品。travel 的 destination_index 绑定 capabilities.travel.destinations 编号；上游 move 意图必须编译为 travel，不得当成已抵达或当地已完成活动。不把工作默认当成已完成，也不制造物品。observe 必须绑定一个对象，rest 不得伪装完成研究。share 必须在 receiver_indices 填入 capabilities.share.receivers 里至少一人的编号；向多人留言可填多个编号，不可填null。留言不代表对方答应或已建立关系。activity 包含未满足条件时也可提出，会被服务端拒绝并反馈。'}
             compile_prompt['social']=context.get('social',{})
             compile_prompt['speech_evidence']=context.get('speech_evidence',[])
@@ -536,8 +632,9 @@ async def run(context):
             output['reflection']=plain(reflection)
         output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),
              LLMMessage('user',prompt_json({'personality':PersonalityLayer.to_prompt_context(personality),'actual_result':result,
-              'now':context.get('time',context['at']),'continuation':continuation_view(context),'grounding':context.get('grounding'),'use_context':context.get('use_context'),'issue_contract':CONTINUATION_CONTRACT,
-              'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:activity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可绑定给定测记或已送达消息，服务端核对条件。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup')
+              'now':context.get('time',context['at']),'continuation':continuation_view(context),'grounding':context.get('grounding'),'use_context':context.get('use_context'),'issue_contract':FEEDBACK_CONTINUATION_CONTRACT,
+              'communication_contract':EVENT_EVIDENCE['feedback_rule'],
+              'contract':'必须返回status、question、reason、delay_hours、next_step五个字段。示例：{"status":"continue","question":"再实际试一次","reason":"仍有问题","delay_hours":1,"next_step":null}。next_step从next_options选kind/id；没有具体办法明确填null。status取continue/postpone/drop/none；delay_hours必填1至48整数，即使加了review_after_minutes也不可省略。可选wait_for:null或{kind:opportunity|reply|commitment,id:给定ID}，可选review_after_minutes:10至2880整数。若提供分钟字段，以它安排下一次复查；否则用delay_hours。从now的实际时间计算，不写不符的明天/今晚。可引用给定测记或已送达消息作为未来意向，服务端核对条件；这不是执行或目标绑定。受阻应改变办法或等待具体条件；question表达未来想做什么，不补写没发生的读数、判断或承诺。'},context))],lambda value:valid_followup(value) and valid_continuation_binding(value,context),repair_hint=lambda value:followup_repair(value,context),stage='followup',failure_code=lambda value: EVENT_EVIDENCE['errors']['communication'] if communication_errors(value,context) else feedback_error_code(value))
     else: raise ValueError('unknown_phase')
     await memory.drain_writes()
     output['memory_anchor_checks']=memory.anchor_checks
@@ -576,6 +673,9 @@ def restore_continuity(agent,memory,saved):
 
 
 if __name__=='__main__':
-    try: emit({'type':'completed','value':asyncio.run(run(json.loads(sys.stdin.readline())))})
+    context = None
+    try:
+        context = json.loads(sys.stdin.readline())
+        emit({'type':'completed','value':asyncio.run(run(context))})
     except BaseException as error:
-        emit({'type':'error','error':str(error)[:500]}); sys.exit(1)
+        emit(error_frame(error, context, _last_model_stage)); sys.exit(1)

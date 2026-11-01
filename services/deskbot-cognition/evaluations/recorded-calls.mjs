@@ -1,4 +1,4 @@
-// Responses and local admission refusals are separate trace events. No replay fallback.
+// Responses, admission refusals and provider failures retain their original stop. No replay fallback.
 import {readFileSync,writeFileSync,existsSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
 import {gzipSync,gunzipSync} from 'node:zlib';
@@ -13,14 +13,15 @@ export function recordedCalls({directory,mode,complete}){
   if(existsSync(path)){
    const event=JSON.parse(gunzipSync(readFileSync(path)));
    if(event.id!==id||event.fingerprint!==fingerprint)throw reject('replay_request_mismatch');
-   if(event.terminal){stats.terminal_hits++;throw reject(event.terminal.code);}
+   if(event.terminal){stats.terminal_hits++;throw Object.assign(reject(event.terminal.code),{message:event.terminal.message??event.terminal.code});}
    stats.hits++;return event.response;
   }
   if(mode!=='real')throw reject('replay_cache_missing');
   let response;
   try{response=await complete(id,request);}catch(e){
    // A refusal before provider admission has no billable response to manufacture.
-   if(['call_limit_reached','budget_exhausted'].includes(e.code))write(path,{id,fingerprint,request,terminal:{code:e.code,kind:'admission_refused'}});
+   if(['call_limit_reached','budget_exhausted','json_prompt_required'].includes(e.code))write(path,{id,fingerprint,request,terminal:{code:e.code,message:e.message,kind:'admission_refused'}});
+   else write(path,{id,fingerprint,request,terminal:{code:e.code??null,message:e.message,kind:'provider_failed'}});
    throw e;
   }
   stats.provider_returns++;write(path,{id,fingerprint,request,response});return response;

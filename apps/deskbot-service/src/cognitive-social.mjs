@@ -1,6 +1,8 @@
 import {proposeCognitiveCommitment,respondCognitiveCommitment,cognitiveInvitationAvailable} from './social-life.mjs';
 import {unansweredCognitiveContacts} from './cognitive-continuation.mjs';
 import {issueContactBases} from './cognitive-issue-evidence.mjs';
+import {pendingContactPurpose,rememberContactPurpose} from './cognitive-contact-purpose.mjs';
+import {EVENT_EVIDENCE,resultDisclosures,messageReceipt} from './cognitive-event-evidence.mjs';
 
 const copy=structuredClone;
 const person=(w,id)=>w.protagonist.character_id===id?w.protagonist:w.npcs.find(p=>p.npc_id===id);
@@ -80,9 +82,17 @@ export function cognitiveSpeechEvidence(w,id,at,objects) {
     // even though share only delivered words. Never promote that title to evidence.
     const label=task?.cognitive_operation==='share'?'递送留言'
       :life.last_result.effects?.verified_title??(task?.activity_id?`执行活动 ${task.activity_id}`:'已记录的实际操作');
-    evidence.push({id:life.last_result.root_outcome_id,kind:'completed',text:life.last_result.success
+    const disclosures=resultDisclosures(life.last_result,task);
+    evidence.push({id:life.last_result.root_outcome_id,kind:'completed',disclosures,text:life.last_result.success
       ?`我的任务「${label}」已实际完成。${task?.cognitive_operation==='share'?'只核验话语送达，没有交付物品；提到的后续活动与双方承诺需另有实际记录。':''}`
       :`我上次的意图没有完成：${life.last_result.failure_reason||'实际记录未完成'}。`});
+  }
+  // Sending a notice does not erase the actual reading from available evidence.
+  // Only already-frozen public projections, never live re-reads or private memory.
+  for(const task of w.tasks.filter(t=>t.actor_id===id&&t.cognitive_disclosures?.some(d=>d.kind==='result_extract'))
+    .toSorted((a,b)=>String(b.finished_at??b.due_at).localeCompare(String(a.finished_at??a.due_at))).slice(0,2)){
+   const notice=task.cognitive_disclosures.find(d=>d.kind==='completion_notice');
+   if(notice&&!evidence.some(e=>e.id===notice.root_outcome_id))evidence.push({id:notice.root_outcome_id,kind:'completed',text:notice.text,disclosures:copy(task.cognitive_disclosures)});
   }
   for(const m of (life.inbox??[]).slice(-8))evidence.push({id:m.message_id,kind:m.source_kind==='joint_result'?'shared_result':'hearsay',text:`${m.sender_name??'居民'}在${m.at}留下消息：${m.text}`});
   return evidence;
@@ -96,10 +106,18 @@ export function compileCognitiveMessage(w,id,compiled,refs,receiverIds,at) {
     if((life.outbox??[]).some(m=>m.reply_to===reply))fail('reply_already_delivered');
   }
   const parts=compiled.message_parts;
-  let text;
+  let text,chosenContact=null;
   if(parts!==undefined) {
     if(!Array.isArray(parts)||parts.length>3)fail('speech_parts_invalid');
     text=parts.map(part=>{
+      if(part.kind==='catalogue'){
+        const entry=refs.choice_catalogue?.choices.find(c=>c.id===part.choice_id);
+        if(parts.length!==1||!entry||entry.binding.operation!=='share'
+          ||JSON.stringify(entry.binding.receiver_indices.map(n=>refs.receivers[n-1]))!==JSON.stringify(receiverIds))fail('catalogue_speech_invalid');
+        chosenContact=entry.binding;
+        if(receiverIds.some(peer=>pendingContactPurpose(w,id,peer,chosenContact.contact_purpose)))fail('contact_purpose_unanswered');
+        return chosenContact.text;
+      }
       if(part.kind==='evidence') {
         const source=refs.speech_evidence?.find(e=>e.id===part.evidence_id);
         if(!source||part.quote!==undefined&&part.quote!==source.text)fail('speech_evidence_mismatch');
@@ -140,7 +158,9 @@ export function compileCognitiveMessage(w,id,compiled,refs,receiverIds,at) {
     } else fail('social_operation_invalid');
   }
   if(typeof text!=='string'||!text.trim()||text.length>1600)fail('message_text_invalid');
-  return {text,reply_to:reply,social_command:command,speech_sources:(parts??[]).filter(p=>p.kind==='evidence').map(p=>p.evidence_id),speech_verified:parts!==undefined,
+  return {text,reply_to:reply,social_command:command,speech_sources:chosenContact?.speech_sources??(parts??[]).filter(p=>p.kind==='evidence').map(p=>p.evidence_id),speech_verified:parts!==undefined,
+    ...(refs.event_evidence?.schema===EVENT_EVIDENCE.schema?{evidence_contract:EVENT_EVIDENCE.schema,disclosures:copy(chosenContact?.disclosures??[])}:{}),
+    ...(chosenContact?{contact_purpose:copy(chosenContact.contact_purpose)}:{}),
     contact_basis:{...copy(refs.social?.issue_bases?.find(b=>b.followup_id===(compiled.followup_id??refs.continuation?.current?.followup_id))??refs.social?.contact_basis??{substantive_root:null,input_ids:[]}),
       source_ids:copy(compiled.source_ids??[]),
       followup_id:compiled.followup_id??refs.continuation?.current?.followup_id??null}};
@@ -157,7 +177,11 @@ export function commitCognitiveMessage(w,task,at) {
     const c=respondCognitiveCommitment(w,at,command.commitment_id,id,command.response,{revision:command.revision,messageId,delayMinutes:command.delay_minutes});message.commitment_id=c.id;
     (c.causes_by_actor??={})[id]=copy({life_source_ids:task.life_source_ids,life_source_context:task.life_source_context,life_motivation:task.life_motivation,life_decision:task.life_decision});
   }
-  life.outbox=[...(life.outbox??[]),{message_id:messageId,reply_to:message.reply_to,receiver_ids:message.receiver_ids,at,commitment_id:message.commitment_id??null,root_outcome_id:task.root_outcome_id,text:message.text,contact_basis:copy(message.contact_basis??null)}].slice(-128);
+  const receipt=messageReceipt(task,at,true);
+  if(receipt)message.receipt=receipt;
+  const sent={message_id:messageId,reply_to:message.reply_to,receiver_ids:message.receiver_ids,at,commitment_id:message.commitment_id??null,root_outcome_id:task.root_outcome_id,text:message.text,...(receipt?{receipt:copy(receipt)}:{}),contact_basis:copy(message.contact_basis??null),...(message.contact_purpose?{contact_purpose:copy(message.contact_purpose)}:{})};
+  rememberContactPurpose(life,sent);
+  life.outbox=[...(life.outbox??[]),sent].slice(-128);
 }
 
 export function deliverCognitiveSocialResults(w,at) {

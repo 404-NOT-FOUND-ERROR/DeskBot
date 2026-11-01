@@ -1,5 +1,17 @@
 # DeskBot 认知适配器
 
+当前开发按 [统一基线](../../documentation/development-baseline.md) 和 [接口登记](../../documentation/interfaces.md) 执行。仓库根目录 `npm test` 已包含本目录所有 `test_*.py`、跨语言桥接和世界回归。Python 3.11+；Windows 先安装 `requirements-test.txt` 中的时区数据。下文保留早期迁移阶段的实现说明。
+
+当前实现（2026-11-01）：`event_evidence.py`、`catalogue_choice.py`、`continuation_contract.py` 与 Node 共用 [事件证据合同](../../documentation/cognitive-event-evidence.md)。责任必须引用有效约定、条款版本和动作范围；通信反馈引用实际回执及其事实依据。完成通知与读数摘录分开，原始错误响应以反例保留；真实 Python 子进程和 SQLite 重启补反馈只属于离线验证。目标连续性和历史位置仍待下一批；后续见 [工程交付管线](../../research/design/engineering-delivery-plan-2026-11-01.md)。
+
+最新真实结果仍是 [10 月 31 日冻结验收](../../research/milestones/r3a-phase-contract-validation-2026-10-31.md)：18/20 完成、15 有效，因将任务完成通知扩大成读数已告知而停止，另有无约定依据的责任归因。123 次调用保守估算 ¥3.083，严格回放一致。本次没有追加付费调用，R3-A 未通过，正式新认知未启用。
+
+此前第四轮冻结复验在首个选择的 `motivation` 字段处停止，完成 0/20。`decision_fields.py` 从根目录共享合同生成行动来源提示并精确校验，`self_actualization` 等需要类型仍留在原需要层；不自动映射成本人意愿。原四条响应免费回归、新错误分类及真实结果见 [第四轮交付](../../research/milestones/architecture-round4-2026-10-28.md)，不把模拟纠正当作模型复验通过。
+
+10 月 31 日的 [修复版复验](../../research/milestones/architecture-round4-retest-2026-10-31.md) 完成 2/20，第三次实际装罩后反馈失败。`followup_phases.py` 与 Node 共用 `cognitive-followup-phases.v1`：反馈只认当前结果、保留或收束事项及表达未来意向；步骤归档与目标绑定属于下一计划。越界字段要求明确重新输出，不自动丢弃或增加重试。原任务结果保留，修复后只补反馈；离线恢复验证不计入真实模型通过率。
+
+R3-A 第三轮在 vendor 外新增 `OpportunityNeedEngine`，保留 Asamana 的需要评分和目标队列，将原有短期目标生成调用接到世界提供的具体机会。目标可绑定一个步骤，也可以保留未绑定设想；实际完成依据仍来自 Node 结算。当前选择、目标和反馈后的下一步共用 [机会接口](../../documentation/cognitive-opportunities.md)，没有额外增加规划调用。离线、真实模型与正式生活的验收分别记录在 [第三轮交付](../../research/milestones/architecture-round3-2026-10-28.md)。
+
 ## 当前：v0.6，迁移第 1–5 阶段
 
 个人感知/解释、目标与实际方法、跨轮记忆、反思、私人关系及明确共同事务已接通。连续调度支持十三名已登记人物、公平队列、睡眠与慢速整理；当前正式持续付费默认不启用。兴趣、机会与角色意愿回接既有 facets/rhythm/wishes/trials/stages，没有平行经验值或让模型直接改形态。

@@ -1,0 +1,28 @@
+{
+  "schema": "deskbot.recorded-counterexample.v1",
+  "source_version": "8301838d4d37",
+  "case_id": "resources-1-off",
+  "scope": "Only fictional isolated fixture responses. Not live user data. Reuse under changed prompts is a regression test, not strict replay.",
+  "calls": [
+    {
+      "stage": "perception",
+      "content": "{\"reason\":\"归途灯罩已备好，装罩这一步可以做了\",\"emotion\":\"anticipation\",\"intensity\":0.4,\"valence\":0.4,\"need_activation\":{\"self_actualization\":0.5}}",
+      "sha256": "d48d103125fee296fdd5887446027f8875e06deeee9e83aa0b4f6001638e0a81"
+    },
+    {
+      "stage": "motivation",
+      "content": "{\"goals\":[{\"text\":\"给归途灯装上遮光罩，让灯能挡一挡背水侧的光\",\"due_in_hours\":null,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-0093952870f41e811377\"},\"followup_id\":null},{\"text\":\"在水岸测记归途灯的明暗，看看实际效果\",\"due_in_hours\":null,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-2427231e3cc441a531f3\"},\"followup_id\":null}]}",
+      "sha256": "2be77ad3db93b9d640ffb176ba31ad69c3c84525e323d9b216d7a3dd8caa96fb"
+    },
+    {
+      "stage": "decision",
+      "content": "{\"act\":true,\"choice_id\":\"c-0093952870f41e811377\",\"inner_monologue\":\"罩片就在背包里，灯也蓄了快一整天的光。先把罩装上，之后才能实际测夜间明暗，也才知道够不够净滤。\",\"expected_outcome\":\"归途灯装上实际制作的罩片，变为有罩状态；之后可展开罩片或做夜间测记。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"self_actualization\",\"source_ids\":[\"task:fixture-built-lamp\"]}",
+      "sha256": "a70be92da2aedaf50995b345cacf510354203f2f25d612489ed6fa8b7f3310f1"
+    },
+    {
+      "stage": "decision_repair",
+      "content": "{\"act\":true,\"choice_id\":\"c-0093952870f41e811377\",\"inner_monologue\":\"罩片就在背包里，灯也蓄了快一整天的光。先把罩装上，之后才能实际测夜间明暗，也才知道够不够净滤。\",\"expected_outcome\":\"归途灯装上实际制作的罩片，变为有罩状态；之后可展开罩片或做夜间测记。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"self_actualization\",\"source_ids\":[\"task:fixture-built-lamp\"]}",
+      "sha256": "a70be92da2aedaf50995b345cacf510354203f2f25d612489ed6fa8b7f3310f1"
+    }
+  ]
+}

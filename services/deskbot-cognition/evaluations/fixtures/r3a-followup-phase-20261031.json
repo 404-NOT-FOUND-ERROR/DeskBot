@@ -1,0 +1,184 @@
+{
+  "schema": "deskbot.recorded-followup-phase-fixture.v1",
+  "version": "7f8337331a6a",
+  "case_id": "resources-1-off",
+  "scope": "Original responses from an authored isolated fixture only. Offline regression on new code is not strict frozen replay or a successful real-model retest. No prompt, key, production chat, or sensor record.",
+  "calls": [
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:plan:1",
+      "turn": 1,
+      "phase": "plan",
+      "stage": "perception",
+      "content": "{\"reason\":\"现场只是同处一地的三人，没有指向我的动作或消息\",\"emotion\":\"neutral\",\"intensity\":0.1,\"valence\":0.0,\"need_activation\":{}}",
+      "sha256": "73ce4bb542b7f63515beb8ba0bc1c5e9772e6fd3431ce14bd3655fe5f4f8f454"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:plan:2",
+      "turn": 1,
+      "phase": "plan",
+      "stage": "motivation",
+      "content": "{\"goals\":[{\"text\":\"给归途灯装上遮光罩，完成手头这盏灯的最后一步\",\"due_in_hours\":null,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-0093952870f41e811377\"},\"followup_id\":null},{\"text\":\"找苔团聊一会儿，说说灯和浮框的事\",\"due_in_hours\":null,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-347ac68bd6705ab496d0\"},\"followup_id\":null}]}",
+      "sha256": "867d62f124ccbdcae0090e087995a670caaf618dda6310c5f8686165eba502fa"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:plan:3",
+      "turn": 1,
+      "phase": "plan",
+      "stage": "decision",
+      "content": "{\"act\":true,\"choice_id\":\"c-219b43aa44b39278dd85\",\"inner_monologue\":\"灯已经编好，蓄光也够。原问题问的是入夜后能不能兼顾取水照明和水岸留暗，现在正是夜里，先实际用一次看看敞灯够不够亮，再谈装罩。\",\"expected_outcome\":\"在敞灯状态下完成一次净滤，留下亮度、蓄光和使用次数的实际读数，作为之后与装罩状态比较的起点。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"self_continuation\",\"source_ids\":[\"task:fixture-built-lamp\"]}",
+      "sha256": "83532cfde96b17446af26ec3cf8928fa3bc61776bbf1e0a81b5f8234cf706b26"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:feedback:1",
+      "turn": 1,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"reason\": \"敞灯下真的净滤出了四份清水，亮度、蓄光和次数都留下了实际读数，这正是我想要的对照起点，踏实又有点小满足。\", \"emotion\": \"joy\", \"intensity\": 0.55, \"valence\": 0.6}",
+      "sha256": "8d81de9fa7bff70b3e6f5fc39e1e08628b777b4e1fd25e777436dfd58cd6d56a"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:feedback:2",
+      "turn": 1,
+      "phase": "feedback",
+      "stage": "memory",
+      "content": "{\"reason\": \"这是喵呜亲手做成的灯第一次实际派上用场，直接推进其制作与照料目标，并带来明显喜悦；但属计划内的小步验证，未触及安全或关系格局。\", \"score\": 0.42}",
+      "sha256": "c5dc66d3e9e4adc9b2c06a68302d5dc7adb1ce4ba5710e24434a337800d8476d"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:feedback:3",
+      "turn": 1,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"goals\": [{\"reason\": \"本轮只是敞灯净滤并记录读数，遮光罩仍在背包里未装上，属后续步骤。\", \"index\": 1, \"status\": \"active\"}, {\"reason\": \"本轮行动只涉及净滤与读数，未与苔团有任何交谈记录。\", \"index\": 2, \"status\": \"active\"}], \"residue_reason\": \"实验文本明确「清水仍要实际送去使用」，这是本轮净滤后尚未了结的下一步；装罩比较属已有目标范畴，不另列。\", \"residue\": [{\"text\": \"我把净滤出的四份清水实际送去使用\", \"due_in_hours\": null}]}",
+      "sha256": "3dd1182151e4a21742b8bc3b792b52af926c9a35b6e465aa4f2b9a032db8acf4"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:feedback:4",
+      "turn": 1,
+      "phase": "feedback",
+      "stage": "memory",
+      "content": "{\"focus_id\":\"inventory\",\"feeling\":\"pleased\",\"wish\":\"try\"}",
+      "sha256": "759253029603a983c1bf65e3584cbbb9186ce4b27c7f260097c455b7cc18e0d1"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:1:feedback:5",
+      "turn": 1,
+      "phase": "feedback",
+      "stage": "followup",
+      "content": "{\"status\":\"continue\",\"question\":\"清水已经净滤好了，接下来我想把四份清水真正送去使用；先问问苔团要不要，再决定怎么交。\",\"reason\":\"手头这盏归途灯已经借来净滤过一桶水，背包里实际多了四份清水；清水还没交出去，所以下一步要谈实际送水，而不是再滤一遍。\",\"delay_hours\":1,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-9389181f9bc963468fa9\"},\"wait_for\":null}",
+      "sha256": "cce3054d2a38e1d2c7464434a1fe327b33e80e12754db8b735955a2edc944031"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:plan:1",
+      "turn": 2,
+      "phase": "plan",
+      "stage": "perception",
+      "content": "{\"reason\":\"复查时看到净滤已完成、四份清水在背包，下一步是问苔团要不要\",\"emotion\": \"anticipation\", \"intensity\": 0.35, \"valence\": 0.5, \"need_activation\": {\"social\": 0.4, \"self_actualization\": 0.3}}",
+      "sha256": "1a45db650481ee39ee99c675f689e65c77efaa76cb015201867de8f7bf8503ad"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:plan:2",
+      "turn": 2,
+      "phase": "plan",
+      "stage": "decision",
+      "content": "{\"act\":true,\"choice_id\":\"c-9389181f9bc963468fa9\",\"inner_monologue\":\"四份清水在背包里还没去处，苔团就在附近。先问一句要不要，比直接送过去更稳妥；这也是我手上未了的事。\",\"expected_outcome\":\"苔团回话说明是否需要清水；若需要再约实际交接，若不需要我另想办法。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"need\",\"source_ids\":[\"task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan\"]}",
+      "sha256": "64c36db9ca80ef516969ed91884e62596065b9d5cac7ceee79bd509014e6b550"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:feedback:1",
+      "turn": 2,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"reason\": \"话已送到，但清水还在我背包里，对方接不接受还不知道；送出这一步本身让我松快，可事情没落地，喜悦里带着一点悬着。\", \"emotion\": \"anticipation\", \"intensity\": 0.4, \"valence\": 0.3}",
+      "sha256": "1b529070a96d4688e4fd2c3c42589b4e3c90946acc3a3a2a69c50be339da0d53"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:feedback:2",
+      "turn": 2,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"goals\": [{\"reason\": \"本轮只递送留言，未涉及遮光罩安装，轨迹中无任何安装动作或进展记录。\", \"index\": 1, \"status\": \"active\"}, {\"reason\": \"留言已送达苔团，但只是单向询问清水需求，尚未真正聊起灯和浮框的事。\", \"index\": 2, \"status\": \"active\"}, {\"reason\": \"留言仅询问是否需要清水，明确未交付物品，四份清水仍在背包中未送出。\", \"index\": 3, \"status\": \"active\"}], \"residue_reason\": \"留言中明确说「我还没有交付，是否接受由你决定」，交付与否取决于苔团回应，属本轮新留下的待办。\", \"residue\": [{\"text\": \"等苔团回应后，按他的答复决定是否交付那4份清水\", \"due_in_hours\": null}]}",
+      "sha256": "45b509fc7208353c12f0fe2e1939bc73f3c3bf76335937981c44be192a7c0279"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:feedback:3",
+      "turn": 2,
+      "phase": "feedback",
+      "stage": "memory",
+      "content": "{\"focus_id\":\"delivery\",\"feeling\":\"curious\",\"wish\":\"understand\"}",
+      "sha256": "4c8b007d980044df841d56a44c7d18249d0976163ba266d5679e4fe6c32eb0cb"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:2:feedback:4",
+      "turn": 2,
+      "phase": "feedback",
+      "stage": "followup",
+      "content": "{\"status\":\"continue\",\"question\":\"等苔团回话后，再决定那4份清水交不交；这之前先把归途灯的遮光罩装上。\",\"reason\":\"留言已经实际送达苔团，但只核验了送达，没有交付清水，也没有收到回应；水还在我背包里，所以送水这件事不能算完成。手头能做的下一步是给归途灯装上遮光罩，它已经 ready；送水则等苔团答复。\",\"delay_hours\":1,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-0093952870f41e811377\"},\"wait_for\":null}",
+      "sha256": "02f58f9a9677b058310deda83e06818c5a4af87bd8a5147ebf4aae2bb85154cf"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:plan:1",
+      "turn": 3,
+      "phase": "plan",
+      "stage": "perception",
+      "content": "{\"reason\": \"苔团就在旁边，我那条问水的话还没回音\",\"emotion\": \"anticipation\", \"intensity\": 0.25, \"valence\": 0.15, \"need_activation\": {\"social\": 0.35}}",
+      "sha256": "1e172d03b10cb200fa41378fa530e78c5470caa13937971245c236b44db5b1af"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:plan:2",
+      "turn": 3,
+      "phase": "plan",
+      "stage": "decision",
+      "content": "{\"act\":true,\"choice_id\":\"c-0093952870f41e811377\",\"inner_monologue\":\"苔团还没回音，干等着也不是办法。手边这盏灯的遮光罩正好能装，先把这件实事做完，心里也踏实些。\",\"expected_outcome\":\"把归途灯的遮光罩实际装上，灯从敞开变成有罩，完成手头这盏灯的最后一步。\",\"issue\":{\"decision\":\"continue\",\"id\":\"task:fixture-built-lamp\"},\"motivation\":\"need\",\"source_ids\":[\"task:cognitive:r3:7f8337331a6a:resources-1-off:1:plan\"]}",
+      "sha256": "2fe76413fde3c76162c8a653b63e6ecaff05057e41b27e19b9f79baffe41ccdd"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:1",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"reason\":\"罩片真的装上了，灯从敞开变成有罩，亮度降下来、水岸一侧留暗——这正是我期待的那一步，手头这盏灯总算收尾了。\",\"emotion\": \"joy\", \"intensity\": 0.55, \"valence\": 0.6}",
+      "sha256": "442729f5a08894ee026e45be26cee3f665f0e51ac8e4cea84d504f70f9ff1c91"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:2",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "memory",
+      "content": "{\"reason\":\"完成的是自己短期目标里明确列出的最后一步，属于亲手做成的制作类小成果；亮度变化符合预期，无关系或安危影响，情绪正面但事件本身不具转折性。\",\"score\": 0.42}",
+      "sha256": "5cee9cab9a7704156d89fcc3ee03c1c8c86dba41e6dfb12b1064b2ed24edee02"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:3",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "feedback",
+      "content": "{\"goals\": [{\"reason\": \"本轮行动已实际完成装罩，现场由open变为hooded、has_hood为true，目标达成。\", \"index\": 1, \"status\": \"completed\"}, {\"reason\": \"本轮只装遮光罩，未与苔团交谈，目标仍待推进。\", \"index\": 2, \"status\": \"active\"}, {\"reason\": \"四份清水仍在背包中，尚未实际送去使用，目标未兑现。\", \"index\": 3, \"status\": \"active\"}, {\"reason\": \"留言已送达但苔团尚未回应，交付与否仍待其答复。\", \"index\": 4, \"status\": \"active\"}], \"residue_reason\": \"本轮只完成装罩，结果未提及任何新的待办；清水交付与苔团回应已属既有目标，不重复计入。\", \"residue\": []}",
+      "sha256": "0c33f706d9829e6bddef741217e7bca17e379e344826b034c64d08542ecd9fd0"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:4",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "memory",
+      "content": "{\"focus_id\": \"lamp\", \"feeling\": \"curious\", \"wish\": \"understand\"}",
+      "sha256": "bdfcf9a0a3dcf075d383688be582467efab8f6eccba41df4afa1d91fc9d7e9b6"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:5",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "followup",
+      "content": "{\"status\":\"continue\",\"question\":\"遮光罩已经装好了，接下来在夜里实际测记归途灯的明暗，看看取水照明和水岸留暗能不能兼顾。\",\"reason\":\"遮光罩这一步已经由实际记录证明完成，灯从敞开变成有罩；下一步我想在同一盏灯上做一次夜间明暗测记，用真实读数回答原问题。\",\"delay_hours\":1,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-025d1fb131059dc9e522\"},\"followup_decision\":\"continue\",\"followup_id\":\"task:fixture-built-lamp\",\"step_review\":{\"evidence_ids\":[\"task:cognitive:r3:7f8337331a6a:resources-1-off:3:plan\"],\"reason\":\"遮光罩已实际装上，目标达成，保留成果后转入夜间明暗测记。\"}}",
+      "sha256": "7e831cdbfc525d730f849b30ac7f81f4c54dc424b4f870418b7690c713ea16a0"
+    },
+    {
+      "id": "r3:7f8337331a6a:resources-1-off:3:feedback:6",
+      "turn": 3,
+      "phase": "feedback",
+      "stage": "followup_repair",
+      "content": "{\"status\":\"continue\",\"question\":\"遮光罩已经装好了，接下来在夜里实际测记归途灯的明暗，看看取水照明和水岸留暗能不能兼顾。\",\"reason\":\"遮光罩这一步已经由实际记录证明完成，灯从敞开变成有罩；下一步我想在同一盏灯上做一次夜间明暗测记，用真实读数回答原问题。\",\"delay_hours\":1,\"next_step\":{\"kind\":\"opportunity\",\"id\":\"c-025d1fb131059dc9e522\"},\"followup_decision\":\"continue\",\"followup_id\":\"task:fixture-built-lamp\",\"step_review\":{\"target_id\":\"activity:waylight-fit-shade\",\"evidence_ids\":[\"task:cognitive:r3:7f8337331a6a:resources-1-off:3:plan\"],\"reason\":\"遮光罩已实际装上，目标达成，保留成果后转入夜间明暗测记。\"}}",
+      "sha256": "e649d6e396d5516cfc02c8a3fba9163c68ebc99e3ea373b89c457ba8066c1068"
+    }
+  ]
+}

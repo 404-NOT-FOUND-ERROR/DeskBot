@@ -166,7 +166,7 @@ export function createInputRuntime({
       display_name: source.display_name,
       kind: source.kind,
       enabled: source.enabled,
-      status: source.enabled ? (source.last_error ? 'error' : (fresh ? 'fresh' : source.status)) : 'disabled',
+      status: source.enabled ? (source.last_error ? 'error' : (fresh ? 'fresh' : source.last_success_at ? 'stale' : source.status)) : 'disabled',
       last_attempt_at: source.last_attempt_at,
       last_success_at: source.last_success_at,
       next_attempt_at: source.next_attempt_at,

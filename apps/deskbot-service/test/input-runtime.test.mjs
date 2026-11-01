@@ -53,6 +53,9 @@ test('input runtime persists success, TTL scheduling, and skips work before due'
   const restoredSkipped = await restored.tick();
   assert.equal(restoredSkipped[0].skipped, true);
   assert.equal(calls, 1);
+  clock = new Date('2026-09-28T00:11:00.000Z');
+  assert.equal(restored.status().sources[0].freshness, 'stale');
+  assert.equal(restored.status().sources[0].status, 'stale');
   restoredPersistence.close();
   rmSync(directory, { recursive: true, force: true });
 });

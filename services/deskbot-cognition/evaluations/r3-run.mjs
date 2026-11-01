@@ -13,6 +13,7 @@ import {lifeChoicePrompt} from '../../../apps/deskbot-service/src/life-choice.mj
 import {cases,personaCases,fixture,hash,plus,tick,settle,digest,opportunity} from './r3-fixtures.mjs';
 import {interestCases,interestFixture} from './r3-interest-fixtures.mjs';
 import {recordedCalls} from './recorded-calls.mjs';
+import {awaitWindowReview} from './r3-window-review.mjs';
 
 const arg=n=>process.argv.find(a=>a.startsWith(`--${n}=`))?.slice(n.length+3);
 const dir=resolve(arg('output')??'../runtime/r3-20261020'),real=process.argv.includes('--real'),replay=process.argv.includes('--replay');
@@ -23,7 +24,18 @@ if(!Number.isSafeInteger(maxCalls)||maxCalls<1||maxCalls>900)throw Error('max_ca
 mkdirSync(dir,{recursive:true});
 const base=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
 const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs','services/deskbot-cognition/evaluations/recorded-calls.mjs',
-  'services/deskbot-cognition/life_semantics.py','apps/deskbot-service/src/cognitive-memory-frame.mjs',
+  'services/deskbot-cognition/evaluations/r3-window-review.mjs',
+  'contracts/cognitive-event-evidence.v1.json','apps/deskbot-service/src/cognitive-event-evidence.mjs','services/deskbot-cognition/event_evidence.py',
+  'contracts/cognitive-decision-fields.v1.json','services/deskbot-cognition/decision_fields.py',
+  'contracts/cognitive-followup-phases.v1.json','services/deskbot-cognition/followup_phases.py',
+  'contracts/cognitive-failure.v1.json','services/deskbot-cognition/failure_contract.py','apps/deskbot-service/src/cognitive-failure.mjs',
+  'services/deskbot-cognition/life_semantics.py','services/deskbot-cognition/actor_choice.py','services/deskbot-cognition/catalogue_choice.py',
+  'apps/deskbot-service/src/cognitive-choice-catalogue.mjs','apps/deskbot-service/src/cognitive-contact-purpose.mjs','apps/deskbot-service/src/cognitive-memory-frame.mjs',
+  'apps/deskbot-service/src/cognitive-action-semantics.mjs',
+  'contracts/activity-methods.v1.json','apps/deskbot-service/src/activity-methods.mjs',
+  'contracts/cognitive-opportunities.v1.json','apps/deskbot-service/src/cognitive-opportunities.mjs','apps/deskbot-service/src/cognitive-goal-opportunities.mjs',
+  'services/deskbot-cognition/opportunity_contract.py','services/deskbot-cognition/opportunity_goals.py',
+  'apps/deskbot-service/src/living-resources.mjs','apps/deskbot-service/src/realtime-world.mjs','apps/deskbot-service/src/development-facets.mjs',
   'apps/deskbot-service/src/cognitive-life-state.mjs','apps/deskbot-service/src/cognitive-continuity.mjs',
   'apps/deskbot-service/src/cognitive-development.mjs','apps/deskbot-service/src/waylight-life.mjs',
   'apps/deskbot-service/src/cognitive-social.mjs',
@@ -55,6 +67,7 @@ if(real){
  if(checked.version!==version||!['backend','python','frontend'].every(k=>checked.checks?.[k]?.passed===true))
   throw Error('validation_not_for_current_frozen_version');
  if(!Array.isArray(checked.cases)||!checked.cases.length)throw Error('validation_requires_small_case_list');
+ if(checked.require_window_review&&!process.argv.includes('--review-windows'))throw Error('registered_window_review_required');
  const selected=(arg('cases')??'').split(',').filter(Boolean);
  const selectedArms=(arg('arms')??'cognition,bounded,rules').split(',');
  if(!selected.length||selected.some(id=>!checked.cases.includes(id))||maxCalls>checked.max_calls
@@ -71,6 +84,7 @@ const budget=real?createCognitiveBudget({persistence:ledger,
   limitCny:null,maxCalls}):null;
 const bridge=createCognitionBridge({workerFile:'life_worker.py',timeoutMs:180000,maxFrames:60,mode:'real'});
 const file=join(runDir,replay?'replay.json':'results.json');
+const original=replay?JSON.parse(readFileSync(join(runDir,'results.json'),'utf8')):null;
 const report=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{version,results:[],limitations:[
   '声明的虚构起点与模拟推进，不是自然跨日观察；其他居民保持在初始位置。',
   '比较三条产品路径：旧计划可能包含多步骤，新认知每轮执行一个当前能力；不直接比较任务条数。',
@@ -163,6 +177,12 @@ try{
           record.latency_ms=Math.round(performance.now()-t);record.after=digest(w,c.actor);
           console.log(JSON.stringify({key,turn,op:record.compiled?.operation??record.plan?.goal,activity:record.compiled?.activity_id,followup:record.followup?.status}));
           if(record.truncated)break;
+          if(real&&process.argv.includes('--review-windows'))record.review=await awaitWindowReview({directory:join(runDir,'reviews'),version,key,record});
+          if(replay){
+            const review=original.results.find(r=>r.key===key)?.turns.find(t=>t.turn===turn)?.review;
+            if(review)record.review=structuredClone(review);
+          }
+          if(record.review?.decision==='stop')throw Object.assign(Error(record.review.note),{code:'window_review_stopped'});
           if(turn<turns){
             let next=record.followup?.next_review_at??plus(w.clock.synced_at,60);
             if(next<w.clock.synced_at)next=w.clock.synced_at;
@@ -173,7 +193,7 @@ try{
         }
         consecutiveFailures=0;
       }catch(e){
-        episode.error=e.code??e.message;episode.error_detail=e.message;consecutiveFailures++;
+        episode.error=e.code??e.message;episode.error_detail=e.message;episode.failure=e.failure??null;consecutiveFailures++;
         console.log(JSON.stringify({key,error:episode.error,detail:e.message}));
       }
       episode.latency_ms=Math.round(performance.now()-started);

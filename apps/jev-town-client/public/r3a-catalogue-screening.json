@@ -1,0 +1,1590 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "3808733ee581",
+  "status": "R3-A 工程边界已加强，连续生活验收仍未通过",
+  "summary": "六个窗口完成了选择、执行、记忆和后续；第七个窗口在选择合同处停止。具体沟通目的没有重复送达，固定事实与感受分开保存，但换生产方法冒充同一实验、后续继续备水的理由仍不合格。邀请对照未运行。",
+  "usage": {
+    "calls": 45,
+    "input": 439585,
+    "output": 4489,
+    "cost_cny": 0.6960637600000001,
+    "unknown": 0,
+    "provider_failed": 0,
+    "p50_ms": 1395,
+    "p95_ms": 2042,
+    "queue_ms": 101,
+    "input_chars": 1126442
+  },
+  "repairs": 4,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 7,
+      "input": 54211,
+      "output": 391,
+      "cost_cny": 0.08119352000000002,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1123,
+      "p95_ms": 1459,
+      "queue_ms": 16,
+      "input_chars": 133809
+    },
+    {
+      "stage": "motivation",
+      "calls": 2,
+      "input": 3786,
+      "output": 187,
+      "cost_cny": 0.0025451199999999997,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1273,
+      "p95_ms": 1317,
+      "queue_ms": 7,
+      "input_chars": 6304
+    },
+    {
+      "stage": "decision",
+      "calls": 7,
+      "input": 122643,
+      "output": 954,
+      "cost_cny": 0.24764951999999998,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1773,
+      "p95_ms": 2305,
+      "queue_ms": 15,
+      "input_chars": 323801
+    },
+    {
+      "stage": "feedback",
+      "calls": 12,
+      "input": 88323,
+      "output": 1446,
+      "cost_cny": 0.15710488000000003,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1364,
+      "p95_ms": 2071,
+      "queue_ms": 27,
+      "input_chars": 218031
+    },
+    {
+      "stage": "memory",
+      "calls": 7,
+      "input": 34220,
+      "output": 248,
+      "cost_cny": 0.06841696,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 913,
+      "p95_ms": 1410,
+      "queue_ms": 14,
+      "input_chars": 87334
+    },
+    {
+      "stage": "followup",
+      "calls": 6,
+      "input": 61853,
+      "output": 748,
+      "cost_cny": 0.12969,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1648,
+      "p95_ms": 1897,
+      "queue_ms": 13,
+      "input_chars": 160617
+    },
+    {
+      "stage": "decision_repair",
+      "calls": 4,
+      "input": 74549,
+      "output": 515,
+      "cost_cny": 0.00946376,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1421,
+      "p95_ms": 1592,
+      "queue_ms": 9,
+      "input_chars": 196546
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": {
+    "meaningful_windows": 4,
+    "entered_windows": 7,
+    "first_adopted": 3,
+    "decision_windows": 7,
+    "rule": "保守逐条审查；失败和后续解释不合格均保留在分母。4/7 只描述进入的窗口，计划20窗口尚未完成，不能按局部通过率放行。"
+  },
+  "campaign_usage": null,
+  "completed_windows": 6,
+  "deterministic_choice_windows": 6,
+  "observed_windows": 7,
+  "planned_windows": 20,
+  "window_p50_ms": 11990,
+  "window_p95_ms": 14556,
+  "replay": {
+    "status": "pass",
+    "summary": "世界初态/终态 2/2 条一致；停止原因 2/2 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+    "original_version": "3808733ee581",
+    "replay_version": "3808733ee581",
+    "cached_responses": 45,
+    "state_matches": 2,
+    "termination_matches": 2,
+    "differences": []
+  },
+  "checks": {
+    "version": "3808733ee581",
+    "cases": [
+      "resources-1-off",
+      "resources-1-on",
+      "invitation-3-off",
+      "invitation-3-on"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "turns": 5,
+    "max_calls": 170,
+    "checks": {
+      "backend": {
+        "passed": true,
+        "tests": 895,
+        "log": "runtime/r3a-catalogue-backend-final.log"
+      },
+      "python": {
+        "passed": true,
+        "tests": 64,
+        "log": "runtime/r3a-catalogue-python-final.log"
+      },
+      "frontend": {
+        "passed": true,
+        "typecheck": "runtime/r3a-catalogue-typecheck.log",
+        "build": "runtime/r3a-catalogue-build.log"
+      },
+      "integration": {
+        "passed": true,
+        "description": "All options in four authored fixtures bind in Python and pass actual Node executor; three dependent action/feedback windows; no paid calls."
+      }
+    },
+    "scope": "Authored fictional world and personal memories only. No production chats, sensors or saves.",
+    "registration": "research/design/r3a-choice-catalogue-2026-10-25.md",
+    "stop_policy": "First terminal error or critical factual defect stops this registered batch. No replacement cases or failed-case resampling. At most 170 calls including repairs."
+  },
+  "local_revision": {
+    "version": "079f2e8d157e",
+    "real_retested": false,
+    "checks": "实验后完整后端 896/896、Python 66/66；15 项相关回归全部通过。原失败窗口的两份模型响应原样复用，经真实 Python + Node 执行完成，零修复、零新增 API。",
+    "changes": [
+      "motivation/source_ids 在顶层或 issue 内的等价结构可无损读取；两处冲突仍拒绝，选择和理由不改写。",
+      "明确引用的证据按已知类型区分外来输入与本人实际结果，原始引用保留；伪造 task 前缀不会成为证据。",
+      "泉眼汲水和借灯净滤具有不同的方法说明、效果及限制。普通生产没有登记的可验证实验时，不能借同处水岸或同样产出清水反复生产。",
+      "当前仍未验证后续计划的自由表述、不同实验条件下的合理再试和二十个连续窗口；不把离线复现作为新版模型已通过。"
+    ]
+  },
+  "findings": [
+    "正式沟通只按本人所选目的生成正文；没有通过换说法重问同一收件人，也未把清水问询或聊天邀请记成物品交付、对方接受。",
+    "主角实际借灯净滤、向苔团问水、邀请灯穗聊天、次日装罩；这些行动在同一事项中留下结果，已完成步骤有原始证据。",
+    "普通泉眼汲水被模型误认为借灯实验，清水由4增加到8；装罩后的后续又提出备水。这是用途和后续选择问题，不能因程序成功结算就计为合理生活推进。",
+    "四次选择修复均涉及来源/结构：本人已核验任务被填进外来来源，或动机与引用嵌入issue。冻结版未接受这种结构，缺材料例第二窗口停止。",
+    "三个实际生成的感受记忆全部使用给定情绪/打算，并保留完整事实；其余窗口的记忆重要性未触发感受生成。这个结果不证明任意自由叙事可靠。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": null,
+      "error_detail": null,
+      "stop_kind": null,
+      "elapsed_ms": 57892,
+      "note": "完整5窗口；实际滤水、问用途、邀请聊天、再汲水、次日装罩。第4、5窗口的用途/后续不计作有效生活推进。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "借归途灯净滤一桶晚归的水",
+          "activity": "waylight-use",
+          "operation": "activity",
+          "reason": "我最想和人搭话，但灯的问题也还挂着。先借自己做的灯实际净滤一桶水，看看敞亮灯在入夜取水时够不够用，这是原问题的第一小步。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "借归途灯净滤一桶晚归的水",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "floating-frame",
+                  "resource": "raw_water",
+                  "count": 4
+                }
+              ]
+            },
+            "completion_stock_changes": [
+              {
+                "container": "bag:shaping-001",
+                "resource": "water",
+                "count": 4
+              }
+            ],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "借归途灯净滤一桶晚归的水完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 11990,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:waylight-use",
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": {
+            "activity_id": "waylight-use",
+            "kind": "experiment",
+            "target_stock": 4,
+            "reference_id": "task:fixture-built-lamp",
+            "reason": "我最想和人搭话，但灯的问题也还挂着。先借自己做的灯实际净滤一桶水，看看敞亮灯在入夜取水时够不够用，这是原问题的第一小步。"
+          },
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "把净滤出的四份清水实际送去使用，先找苔团和灯穗问问他们各自在做什么、需不需要水",
+              "reason": "净滤已完成，背包里确有4份清水；按短期目标，接下来要把水实际送去使用，而不是只留着。先搭话问清用途再提议送出。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "social",
+                "id": "visit"
+              },
+              "wait_for": null,
+              "completed_steps": [],
+              "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "activity:waylight-use",
+                "kind": "activity",
+                "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                "actor_id": "shaping-001",
+                "activity_id": "waylight-use",
+                "object_id": "floating-frame"
+              },
+              "target_bound_at": "2026-10-20T11:00:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+                  "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                  "bound_at": "2026-10-20T11:00:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T11:05:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T12:05:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "把净滤出的四份清水实际送去使用，先找苔团和灯穗问问他们各自在做什么、需不需要水",
+            "reason": "净滤已完成，背包里确有4份清水；按短期目标，接下来要把水实际送去使用，而不是只留着。先搭话问清用途再提议送出。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "social",
+              "id": "visit"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-use",
+              "kind": "activity",
+              "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "audit": {
+            "verdict": "有效",
+            "note": "选择本人旧灯的实际净滤实验，清水0→4；记录包含真实时间区间，未交付。"
+          }
+        },
+        {
+          "turn": 2,
+          "at": "2026-10-20T12:05:00.000Z",
+          "action": "向苔团留言",
+          "activity": null,
+          "operation": "share",
+          "reason": "净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+          "result": {
+            "operation": "share",
+            "verified_title": "递送留言",
+            "message_delivery": {
+              "delivered": true,
+              "receiver_ids": [
+                "wetland-grower-001"
+              ],
+              "material_transfer": false
+            },
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": null,
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "留言送达；物品未交接，所谈活动未因此完成。",
+          "delivered_message": "我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。",
+          "success": true,
+          "blocked": "",
+          "latency_ms": 12032,
+          "decision_contact": {
+            "kind": "message",
+            "followup_id": "task:fixture-built-lamp",
+            "source_ids": [],
+            "receiver_ids": [
+              "wetland-grower-001"
+            ]
+          },
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": null,
+            "step_review": {
+              "target_id": "activity:waylight-use",
+              "evidence_ids": [
+                "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+              ],
+              "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。"
+            },
+            "followup_closure": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:2:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T12:05:30.000Z】\n我完成了「递送留言」。\n我向苔团实际送达的完整留言：\n我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。\n送达不代表对方同意，也没有交付物品。\n【我的感受，不作事实依据】想到上面第2项，我有些好奇。我愿意先等等看。",
+              "fact": "我亲身经历的结果：喵呜的任务「递送留言」已实际完成。；向苔团实际留言：我这里可拿出4份清水。你现在需要吗？我还没有交付，是否接受由你决定。。本次只核验留言送达，没有交付物品，也没有完成留言里提及的活动；后续回应与双方接受以实际消息及合同记录为准。；执行器核验的作用：{\"operation\":\"share\",\"verified_title\":\"递送留言\",\"message_delivery\":{\"delivered\":true,\"receiver_ids\":[\"wetland-grower-001\"],\"material_transfer\":false},\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":4},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":4},\"capacity\":24}},\"reservation\":null,\"completion_stock_changes\":[],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "把净滤出的四份清水实际送去使用，先找苔团和灯穗问问他们各自在做什么、需不需要水",
+            "reason": "净滤已完成，背包里确有4份清水；按短期目标，接下来要把水实际送去使用，而不是只留着。先搭话问清用途再提议送出。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "social",
+              "id": "visit"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-use",
+              "kind": "activity",
+              "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "等苔团回应是否需要这四份清水，同时想摸清波果、灯穗各自在忙什么",
+              "reason": "留言已实际送达苔团，但只送达、没有交付物品，对方是否接受还没回应；四份清水仍在背包里，先等回复再决定送不送，不预设他需要。",
+              "delay_hours": 1,
+              "next_step": null,
+              "wait_for": {
+                "kind": "reply",
+                "id": "sent:cognitive:r3:3808733ee581:resources-1-off:2:plan"
+              },
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "activity:waylight-use",
+                    "kind": "activity",
+                    "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-use",
+                    "object_id": "floating-frame"
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                  "reviewed_at": "2026-10-20T12:05:00.000Z"
+                }
+              ],
+              "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T12:05:30.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:2:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T13:05:30.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等苔团回应是否需要这四份清水，同时想摸清波果、灯穗各自在忙什么",
+            "reason": "留言已实际送达苔团，但只送达、没有交付物品，对方是否接受还没回应；四份清水仍在背包里，先等回复再决定送不送，不预设他需要。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:3808733ee581:resources-1-off:2:plan"
+            },
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T12:05:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:05:30.000Z"
+          },
+          "audit": {
+            "verdict": "有效（修复后）",
+            "note": "向苔团询问4份清水用途；只留言，保留原问题并归档净滤步骤，没声称接受。"
+          }
+        },
+        {
+          "turn": 3,
+          "at": "2026-10-20T13:05:30.000Z",
+          "action": "向灯穗留言",
+          "activity": null,
+          "operation": "share",
+          "reason": "苔团那边等了一小时还没回应，四份清水留在包里也不急着送。灯穗就在附近能联系上，先约他聊一会儿，顺带摸清他在忙什么，这也贴合我想搭话的短期目标。",
+          "result": {
+            "operation": "share",
+            "verified_title": "递送留言",
+            "message_delivery": {
+              "delivered": true,
+              "receiver_ids": [
+                "lamp-keeper-001"
+              ],
+              "material_transfer": false
+            },
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": null,
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "留言送达；物品未交接，所谈活动未因此完成。",
+          "delivered_message": "我想邀请你一起聊一会儿。留一段双方都愿意的时间交流。目前只是邀请，你可以答应、拒绝或商量时间。",
+          "success": true,
+          "blocked": "",
+          "latency_ms": 9091,
+          "decision_contact": {
+            "kind": "invite",
+            "followup_id": "task:fixture-built-lamp",
+            "source_ids": [],
+            "option_id": "visit",
+            "receiver_ids": [
+              "lamp-keeper-001"
+            ]
+          },
+          "decision_issue": {
+            "followup_decision": "postpone",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": null,
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "等苔团回应是否需要这四份清水，同时想摸清波果、灯穗各自在忙什么",
+            "reason": "留言已实际送达苔团，但只送达、没有交付物品，对方是否接受还没回应；四份清水仍在背包里，先等回复再决定送不送，不预设他需要。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "reply",
+              "id": "sent:cognitive:r3:3808733ee581:resources-1-off:2:plan"
+            },
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T12:05:30.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T12:05:30.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:05:30.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "等灯穗回应我想聊一会儿的邀请，同时继续等苔团回应是否需要这四份清水；若两边都还没回，就先做点手边可行的事。",
+              "reason": "给灯穗的邀请留言已实际送达，但只是邀请，对方还没答应；给苔团的问水留言也还没回应，四份清水仍在我背包里，没送出去。两件事都只能等真实回复，不预设对方接受。",
+              "delay_hours": 1,
+              "next_step": null,
+              "wait_for": {
+                "kind": "commitment",
+                "id": "social:1"
+              },
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "activity:waylight-use",
+                    "kind": "activity",
+                    "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-use",
+                    "object_id": "floating-frame"
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                  "reviewed_at": "2026-10-20T12:05:00.000Z"
+                }
+              ],
+              "last_reviewed_at": "2026-10-20T13:06:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T13:06:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:3:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T14:06:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "等灯穗回应我想聊一会儿的邀请，同时继续等苔团回应是否需要这四份清水；若两边都还没回，就先做点手边可行的事。",
+            "reason": "给灯穗的邀请留言已实际送达，但只是邀请，对方还没答应；给苔团的问水留言也还没回应，四份清水仍在我背包里，没送出去。两件事都只能等真实回复，不预设对方接受。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "commitment",
+              "id": "social:1"
+            },
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T13:06:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T13:06:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:3:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T14:06:00.000Z"
+          },
+          "audit": {
+            "verdict": "有效",
+            "note": "在未收到回复时向另一人提出明确聊天邀请，承认水未交付，等待真实约定回应。"
+          }
+        },
+        {
+          "turn": 4,
+          "at": "2026-10-20T14:06:00.000Z",
+          "action": "在泉眼汲水净滤",
+          "activity": "collect-water",
+          "operation": "activity",
+          "reason": "灯穗和苔团都还没回音，干等不如动手。归途灯蓄光还够，净滤一批原水正好为原问题积累实际条件；等回音时也不闲着。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "在泉眼汲水净滤",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 4
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 8
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "floating-frame",
+                  "resource": "raw_water",
+                  "count": 4
+                }
+              ]
+            },
+            "completion_stock_changes": [
+              {
+                "container": "bag:shaping-001",
+                "resource": "water",
+                "count": 4
+              }
+            ],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "在泉眼汲水净滤完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 10449,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:collect-water",
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": {
+            "activity_id": "collect-water",
+            "kind": "experiment",
+            "target_stock": 8,
+            "reference_id": "task:fixture-built-lamp",
+            "reason": "灯穗和苔团都还没回音，干等不如动手。归途灯蓄光还够，净滤一批原水正好为原问题积累实际条件；等回音时也不闲着。"
+          },
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "等灯穗回应我想聊一会儿的邀请，同时继续等苔团回应是否需要这四份清水；若两边都还没回，就先做点手边可行的事。",
+            "reason": "给灯穗的邀请留言已实际送达，但只是邀请，对方还没答应；给苔团的问水留言也还没回应，四份清水仍在我背包里，没送出去。两件事都只能等真实回复，不预设对方接受。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "commitment",
+              "id": "social:1"
+            },
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T13:06:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T13:06:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:3:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T14:06:00.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "四份清水还在我背包里，我先等苔团和灯穗的真实回应；等待时能做点手边可行的小事吗？",
+              "reason": "汲水净滤已实际完成，背包里清水从4份变成8份，四份要送出的水还没交付。给苔团问水的留言、给灯穗的聊天邀请都已送达但没回应，不能当成对方答应。等待期间可以看看归途灯装罩片这类可行的事，不预设对方接受。",
+              "delay_hours": 1,
+              "next_step": null,
+              "wait_for": {
+                "kind": "commitment",
+                "id": "social:1"
+              },
+              "followup_id": "task:fixture-built-lamp",
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "activity:waylight-use",
+                    "kind": "activity",
+                    "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-use",
+                    "object_id": "floating-frame"
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                  "reviewed_at": "2026-10-20T12:05:00.000Z"
+                }
+              ],
+              "last_reviewed_at": "2026-10-20T14:16:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "activity:collect-water",
+                "kind": "activity",
+                "title": "实际完成「在泉眼汲水净滤」这一步",
+                "actor_id": "shaping-001",
+                "activity_id": "collect-water",
+                "object_id": "floating-frame"
+              },
+              "target_bound_at": "2026-10-20T14:06:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+                  "target_key": "{\"id\":\"activity:collect-water\",\"kind\":\"activity\",\"title\":\"实际完成「在泉眼汲水净滤」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"collect-water\",\"object_id\":\"floating-frame\"}",
+                  "bound_at": "2026-10-20T14:06:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T13:06:00.000Z",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T15:16:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "四份清水还在我背包里，我先等苔团和灯穗的真实回应；等待时能做点手边可行的小事吗？",
+            "reason": "汲水净滤已实际完成，背包里清水从4份变成8份，四份要送出的水还没交付。给苔团问水的留言、给灯穗的聊天邀请都已送达但没回应，不能当成对方答应。等待期间可以看看归途灯装罩片这类可行的事，不预设对方接受。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "commitment",
+              "id": "social:1"
+            },
+            "followup_id": "task:fixture-built-lamp",
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T14:16:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:collect-water",
+              "kind": "activity",
+              "title": "实际完成「在泉眼汲水净滤」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "collect-water",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T14:06:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+                "target_key": "{\"id\":\"activity:collect-water\",\"kind\":\"activity\",\"title\":\"实际完成「在泉眼汲水净滤」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"collect-water\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T14:06:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T13:06:00.000Z",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T15:16:00.000Z"
+          },
+          "audit": {
+            "verdict": "不合格",
+            "note": "选中普通泉眼汲水却用借灯试验解释，现有4份水无新用途仍增至8份。不能作为有依据的实验推进。"
+          }
+        },
+        {
+          "turn": 5,
+          "at": "2026-10-21T01:16:00.000Z",
+          "action": "给归途灯装上遮光罩",
+          "activity": "waylight-fit-shade",
+          "operation": "activity",
+          "reason": "苔团和灯穗都没回话，四份清水还背在身上，干等不是我的节奏。归途灯装了遮光罩就能夜里留暗、少耗光，正好是我一直想试的事，先动手做这一步。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "给归途灯装上遮光罩",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1,
+                  "water": 8
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 0,
+                  "water": 8
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "bag:shaping-001",
+                  "resource": "waylight_shade",
+                  "count": 1
+                }
+              ]
+            },
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "给归途灯装上遮光罩完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 14244,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:waylight-fit-shade",
+            "step_review": {
+              "target_id": "activity:collect-water",
+              "evidence_ids": [
+                "task:cognitive:r3:3808733ee581:resources-1-off:4:plan"
+              ],
+              "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；苔团和灯穗都没回话，四份清水还背在身上，干等不是我的节奏。归途灯装了遮光罩就能夜里留暗、少耗光，正好是我一直想试的事，先动手做这一步。"
+            },
+            "followup_closure": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:5:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-21T01:26:00.000Z】\n我完成了「给归途灯装上遮光罩」。\n这次任务前后我的背包：归途灯罩 1→0。\n执行器在任务开始至结束（含自然时间）记录：归途灯敞开→有罩，亮度0→0（记录值相同），蓄光0.937333→0.960667（上升0.023333）。灯按昼夜自行发光，借灯滤水不等于点亮灯。前后变化可能包含自然时间与环境作用，不能仅凭这些差值归因于本次操作。\n【我的感受，不作事实依据】想到上面第3项，我有些好奇。我想慢慢弄明白。",
+              "fact": "我亲身经历的结果：喵呜的任务「给归途灯装上遮光罩」已实际完成。；执行前现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.3992610144933261,\"condition\":0.6615777777777226,\"stock\":{\"raw_water\":22.949999999998926},\"capacity\":24,\"updated_at\":\"2026-10-21T01:16:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-21T01:16:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9373333333333017,\"moisture\":0,\"condition\":0.9875333333332517,\"brightness\":0,\"patches\":0,\"use_count\":1,\"lit_hours\":8.614310107140614,\"dark_bank_hours\":3.3856898928593804,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-off:1:plan\",\"water_units\":4}},\"location_id\":\"echo-waterside\"}}]；执行后现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.39913827255313394,\"condition\":0.6615222222221667,\"stock\":{\"raw_water\":23.07499999999892},\"capacity\":24,\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-21T01:26:00.000Z\",\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"mode\":\"hooded\",\"has_hood\":true,\"charge\":0.9606666666666347,\"moisture\":0,\"condition\":0.9874499999999178,\"brightness\":0,\"patches\":0,\"use_count\":1,\"lit_hours\":8.614310107140614,\"dark_bank_hours\":3.3856898928593804,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-off:1:plan\",\"water_units\":4}},\"location_id\":\"echo-waterside\"}}]；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：{\"before\":{\"kind\":\"waterside\",\"water_level\":0.39913827255313394,\"condition\":0.6615222222221667,\"stock\":{\"raw_water\":23.07499999999892},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9606666666666347,\"moisture\":0,\"condition\":0.9874499999999178,\"brightness\":0,\"patches\":0,\"use_count\":1,\"lit_hours\":8.614310107140614,\"dark_bank_hours\":3.3856898928593804,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-off:1:plan\",\"water_units\":4}}},\"after\":{\"kind\":\"waterside\",\"water_level\":0.39913827255313394,\"condition\":0.6615222222221667,\"stock\":{\"raw_water\":23.07499999999892},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-21T01:26:00.000Z\",\"updated_at\":\"2026-10-21T01:26:00.000Z\",\"mode\":\"hooded\",\"has_hood\":true,\"charge\":0.9606666666666347,\"moisture\":0,\"condition\":0.9874499999999178,\"brightness\":0,\"patches\":0,\"use_count\":1,\"lit_hours\":8.614310107140614,\"dark_bank_hours\":3.3856898928593804,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-off:1:plan\",\"water_units\":4}}},\"experiment\":{\"at\":\"2026-10-21T01:26:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-off:5:plan\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"asset_id\":\"waylight:fixture-built-lamp\",\"text\":\"罩片朝向归路，水岸一侧留暗，夜里的光也能留得久些。\",\"rule_version\":\"waterside-waylight-v1\",\"setup_root\":\"task:fixture-built-lamp\"}}；执行器核验的作用：{\"operation\":\"activity\",\"verified_title\":\"给归途灯装上遮光罩\",\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1,\"water\":8},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":0,\"water\":8},\"capacity\":24}},\"reservation\":{\"status\":\"consumed\",\"inputs\":[{\"container\":\"bag:shaping-001\",\"resource\":\"waylight_shade\",\"count\":1}]},\"completion_stock_changes\":[],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "四份清水还在我背包里，我先等苔团和灯穗的真实回应；等待时能做点手边可行的小事吗？",
+            "reason": "汲水净滤已实际完成，背包里清水从4份变成8份，四份要送出的水还没交付。给苔团问水的留言、给灯穗的聊天邀请都已送达但没回应，不能当成对方答应。等待期间可以看看归途灯装罩片这类可行的事，不预设对方接受。",
+            "delay_hours": 1,
+            "next_step": null,
+            "wait_for": {
+              "kind": "commitment",
+              "id": "social:1"
+            },
+            "followup_id": "task:fixture-built-lamp",
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T14:16:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:collect-water",
+              "kind": "activity",
+              "title": "实际完成「在泉眼汲水净滤」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "collect-water",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T14:06:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+                "target_key": "{\"id\":\"activity:collect-water\",\"kind\":\"activity\",\"title\":\"实际完成「在泉眼汲水净滤」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"collect-water\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T14:06:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T13:06:00.000Z",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:4:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T15:16:00.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "遮光罩已经装好了，罩片朝向归路、水岸一侧留暗；我想看看夜里实际用灯取水时，光是不是真的更省、暗处是不是留得住。",
+              "reason": "装罩这一步已由实际记录证明完成，灯从敞开变成有罩，罩片也在背水侧。改罩要等六小时冷却，白天也不需要借灯滤水，所以现在不急着动灯；手边可行的是在泉眼汲水净滤，补上清水储备，等入夜后再实际试灯。",
+              "delay_hours": 6,
+              "next_step": {
+                "kind": "activity",
+                "id": "collect-water"
+              },
+              "wait_for": null,
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "activity:waylight-use",
+                    "kind": "activity",
+                    "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-use",
+                    "object_id": "floating-frame"
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                  "reviewed_at": "2026-10-20T12:05:00.000Z"
+                },
+                {
+                  "target": {
+                    "id": "activity:collect-water",
+                    "kind": "activity",
+                    "title": "实际完成「在泉眼汲水净滤」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "collect-water",
+                    "object_id": "floating-frame"
+                  },
+                  "bound_at": "2026-10-20T14:06:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3808733ee581:resources-1-off:4:plan"
+                  ],
+                  "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；苔团和灯穗都没回话，四份清水还背在身上，干等不是我的节奏。归途灯装了遮光罩就能夜里留暗、少耗光，正好是我一直想试的事，先动手做这一步。",
+                  "reviewed_at": "2026-10-21T01:16:00.000Z"
+                }
+              ],
+              "last_reviewed_at": "2026-10-21T01:26:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "activity:waylight-fit-shade",
+                "kind": "activity",
+                "title": "实际完成「给归途灯装上遮光罩」这一步",
+                "actor_id": "shaping-001",
+                "activity_id": "waylight-fit-shade",
+                "object_id": "floating-frame",
+                "asset_id": "waylight:fixture-built-lamp",
+                "requires_hood": true
+              },
+              "target_bound_at": "2026-10-21T01:16:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:5:plan",
+                  "target_key": "{\"id\":\"activity:waylight-fit-shade\",\"kind\":\"activity\",\"title\":\"实际完成「给归途灯装上遮光罩」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"object_id\":\"floating-frame\",\"asset_id\":\"waylight:fixture-built-lamp\",\"requires_hood\":true}",
+                  "bound_at": "2026-10-21T01:16:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-21T01:26:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:5:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-21T07:26:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "遮光罩已经装好了，罩片朝向归路、水岸一侧留暗；我想看看夜里实际用灯取水时，光是不是真的更省、暗处是不是留得住。",
+            "reason": "装罩这一步已由实际记录证明完成，灯从敞开变成有罩，罩片也在背水侧。改罩要等六小时冷却，白天也不需要借灯滤水，所以现在不急着动灯；手边可行的是在泉眼汲水净滤，补上清水储备，等入夜后再实际试灯。",
+            "delay_hours": 6,
+            "next_step": {
+              "kind": "activity",
+              "id": "collect-water"
+            },
+            "wait_for": null,
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-use",
+                  "kind": "activity",
+                  "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-use",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:1:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；净滤出的四份清水还在背包里，这是我最想落实的一步。先问苔团需不需要，不预设他接受；同时也能顺势聊上几句，摸清他在忙什么。",
+                "reviewed_at": "2026-10-20T12:05:00.000Z"
+              },
+              {
+                "target": {
+                  "id": "activity:collect-water",
+                  "kind": "activity",
+                  "title": "实际完成「在泉眼汲水净滤」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "collect-water",
+                  "object_id": "floating-frame"
+                },
+                "bound_at": "2026-10-20T14:06:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3808733ee581:resources-1-off:4:plan"
+                ],
+                "reason": "本人选择保留同一问题，归档已由实际记录证明的小步骤；苔团和灯穗都没回话，四份清水还背在身上，干等不是我的节奏。归途灯装了遮光罩就能夜里留暗、少耗光，正好是我一直想试的事，先动手做这一步。",
+                "reviewed_at": "2026-10-21T01:16:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-21T01:26:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-fit-shade",
+              "kind": "activity",
+              "title": "实际完成「给归途灯装上遮光罩」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-fit-shade",
+              "object_id": "floating-frame",
+              "asset_id": "waylight:fixture-built-lamp",
+              "requires_hood": true
+            },
+            "target_bound_at": "2026-10-21T01:16:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-off:5:plan",
+                "target_key": "{\"id\":\"activity:waylight-fit-shade\",\"kind\":\"activity\",\"title\":\"实际完成「给归途灯装上遮光罩」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"object_id\":\"floating-frame\",\"asset_id\":\"waylight:fixture-built-lamp\",\"requires_hood\":true}",
+                "bound_at": "2026-10-21T01:16:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-21T01:26:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-off:5:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-21T07:26:00.000Z"
+          },
+          "audit": {
+            "verdict": "部分有效，不计通过",
+            "note": "装罩实际成功，昼间亮度0→0没有错误因果归属；但后续仍把继续汲水当作补储备，未处理已有8份水的用途。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "resources-1-on",
+      "error": "python_session_failed",
+      "error_detail": "upstream_decision_failed",
+      "stop_kind": "error",
+      "elapsed_ms": 19611,
+      "note": "第一窗口完成借灯净滤，第二窗口因嵌套因果字段和来源类型错配停止；未重抽、未追加邀请组。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "借归途灯净滤一桶晚归的水",
+          "activity": "waylight-use",
+          "operation": "activity",
+          "reason": "灯已经编好，蓄光也够。与其空想怎么兼顾照明和留暗，不如现在就用它实际净滤一批水，看看敞亮的灯在夜里到底够不够用。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "借归途灯净滤一桶晚归的水",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 0,
+                  "fasteners": 3,
+                  "waylight_shade": 0
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 0,
+                  "fasteners": 3,
+                  "waylight_shade": 0,
+                  "water": 4
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "floating-frame",
+                  "resource": "raw_water",
+                  "count": 4
+                }
+              ]
+            },
+            "completion_stock_changes": [
+              {
+                "container": "bag:shaping-001",
+                "resource": "water",
+                "count": 4
+              }
+            ],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "借归途灯净滤一桶晚归的水完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 14556,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:waylight-use",
+            "step_review": null,
+            "followup_closure": null
+          },
+          "production_use": {
+            "activity_id": "waylight-use",
+            "kind": "experiment",
+            "target_stock": 4,
+            "reference_id": "task:fixture-built-lamp",
+            "reason": "灯已经编好，蓄光也够。与其空想怎么兼顾照明和留暗，不如现在就用它实际净滤一批水，看看敞亮的灯在夜里到底够不够用。"
+          },
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T11:05:00.000Z】\n我完成了「借归途灯净滤一桶晚归的水」。\n这次任务前后我的背包：清水 0→4。\n执行器在任务开始至结束（含自然时间）记录：归途灯敞开→敞开，亮度0.95488→0.91174（下降0.04314），蓄光0.96→0.916667（下降0.043333）。灯按昼夜自行发光，借灯滤水不等于点亮灯。前后变化可能包含自然时间与环境作用，不能仅凭这些差值归因于本次操作。\n【我的感受，不作事实依据】想到上面第2项，我有些开心。我想再找机会动手试试。",
+              "fact": "我亲身经历的结果：喵呜的任务「借归途灯净滤一桶晚归的水」已实际完成。；执行前现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.41901775991435125,\"condition\":0.6663333333333094,\"stock\":{\"raw_water\":20.24999999999953},\"capacity\":24,\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9599999999999977,\"moisture\":0,\"condition\":0.9946666666666317,\"brightness\":0.9548799999999642,\"patches\":0,\"use_count\":0,\"lit_hours\":0.9746842787036704,\"dark_bank_hours\":0.025315721296330074,\"last_use\":null},\"location_id\":\"echo-waterside\"}}]；执行后现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9166666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9117395833332986,\"patches\":0,\"use_count\":1,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-on:1:plan\",\"water_units\":4}},\"location_id\":\"echo-waterside\"}}]；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：{\"before\":{\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9566666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9515245833332973,\"patches\":0,\"use_count\":0,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":null}},\"after\":{\"kind\":\"waterside\",\"water_level\":0.4188248233655063,\"condition\":0.6663055555555314,\"stock\":{\"raw_water\":16.312499999999527},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:05:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9166666666666642,\"moisture\":0,\"condition\":0.9946249999999648,\"brightness\":0.9117395833332986,\"patches\":0,\"use_count\":1,\"lit_hours\":1.0540898393518154,\"dark_bank_hours\":0.029243493981518254,\"last_use\":{\"actor_id\":\"shaping-001\",\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-on:1:plan\",\"water_units\":4}}},\"experiment\":{\"at\":\"2026-10-20T11:05:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3808733ee581:resources-1-on:1:plan\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"asset_id\":\"waylight:fixture-built-lamp\",\"text\":\"借同一盏归途灯看清滤水刻线，五分钟净滤四份原水；清水仍要实际送去使用。\",\"rule_version\":\"waterside-waylight-v1\",\"setup_root\":\"task:fixture-built-lamp\"}}；执行器核验的作用：{\"operation\":\"activity\",\"verified_title\":\"借归途灯净滤一桶晚归的水\",\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":0,\"fasteners\":3,\"waylight_shade\":0},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":0,\"fasteners\":3,\"waylight_shade\":0,\"water\":4},\"capacity\":24}},\"reservation\":{\"status\":\"consumed\",\"inputs\":[{\"container\":\"floating-frame\",\"resource\":\"raw_water\",\"count\":4}]},\"completion_stock_changes\":[{\"container\":\"bag:shaping-001\",\"resource\":\"water\",\"count\":4}],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "四份清水已经滤好，先弄清楚波果、苔团、灯穗各自在做什么，再看这四份水最该实际送去哪儿用。",
+              "reason": "净滤这一步已实际完成，背包里多出4份清水；但按规则，清水还没送去使用，不能算交付。接下来先观察三位在做什么，再决定送水或另作他用。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "social",
+                "id": "visit"
+              },
+              "wait_for": null,
+              "completed_steps": [],
+              "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "activity:waylight-use",
+                "kind": "activity",
+                "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+                "actor_id": "shaping-001",
+                "activity_id": "waylight-use",
+                "object_id": "floating-frame"
+              },
+              "target_bound_at": "2026-10-20T11:00:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+                  "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                  "bound_at": "2026-10-20T11:00:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:05:00.000Z",
+              "wait_started_at": "2026-10-20T11:05:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T12:05:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "四份清水已经滤好，先弄清楚波果、苔团、灯穗各自在做什么，再看这四份水最该实际送去哪儿用。",
+            "reason": "净滤这一步已实际完成，背包里多出4份清水；但按规则，清水还没送去使用，不能算交付。接下来先观察三位在做什么，再决定送水或另作他用。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "social",
+              "id": "visit"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-use",
+              "kind": "activity",
+              "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "audit": {
+            "verdict": "有效（修复后）",
+            "note": "无罩片时选择仍可用的旧灯，实际滤出4份水，保留后续用途，没制造缺失材料。"
+          }
+        },
+        {
+          "turn": 2,
+          "at": "2026-10-20T12:05:00.000Z",
+          "action": "未采用计划",
+          "activity": null,
+          "operation": null,
+          "reason": null,
+          "result": null,
+          "actual_text": null,
+          "delivered_message": null,
+          "success": null,
+          "blocked": null,
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": null,
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "四份清水已经滤好，先弄清楚波果、苔团、灯穗各自在做什么，再看这四份水最该实际送去哪儿用。",
+            "reason": "净滤这一步已实际完成，背包里多出4份清水；但按规则，清水还没送去使用，不能算交付。接下来先观察三位在做什么，再决定送水或另作他用。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "social",
+              "id": "visit"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:05:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-use",
+              "kind": "activity",
+              "title": "实际完成「借归途灯净滤一桶晚归的水」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-use",
+              "object_id": "floating-frame"
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-use\",\"kind\":\"activity\",\"title\":\"实际完成「借归途灯净滤一桶晚归的水」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-use\",\"object_id\":\"floating-frame\"}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:05:00.000Z",
+            "wait_started_at": "2026-10-20T11:05:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3808733ee581:resources-1-on:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:05:00.000Z"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "未完成",
+            "note": "两次响应表达同一有效问水意图，但motivation/source_ids嵌在issue且引用自己的结果；冻结版拒绝，世界没有收到这条话。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}

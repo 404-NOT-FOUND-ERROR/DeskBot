@@ -28,6 +28,7 @@ export function createCognitiveBudget({persistence,now=()=>new Date(),configurat
   async function execute(callId,request,enqueuedAt){
     if(closed)throw error('broker_closed');
     if(!Array.isArray(request.messages)||request.messages.length>12||request.messages.some(m=>!['user','system','assistant'].includes(m.role)||typeof m.content!=='string'))throw error('invalid_model_messages');
+    if(request.json_mode&&!request.messages.some(m=>/json/i.test(m.content)))throw error('json_prompt_required','JSON mode requires an explicit JSON instruction before provider admission.');
     const max_tokens=Math.min(1800,Math.max(256,Math.floor(request.max_tokens||900)));
     const body={model:'deepseek-flash',messages:request.messages,max_tokens,temperature:Math.min(1,Math.max(0,request.temperature??.55)),
       thinking:{type:'disabled'},...(request.json_mode?{response_format:{type:'json_object'}}:{})};

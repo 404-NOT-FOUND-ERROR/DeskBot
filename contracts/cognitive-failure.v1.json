@@ -1,0 +1,91 @@
+{
+  "schema": "deskbot.failure-catalogue.v1",
+  "report_schema": "deskbot.cognitive-failure.v1",
+  "layers": {
+    "transport": [
+      "python_unavailable",
+      "python_timeout",
+      "interrupted_on_restart",
+      "invalid_bridge_frame",
+      "invalid_model_request",
+      "invalid_model_reply"
+    ],
+    "provider": [
+      "network_unavailable",
+      "provider_usage_missing",
+      "provider_incomplete_response"
+    ],
+    "budget": [
+      "call_limit_reached",
+      "budget_exhausted",
+      "call_not_replayable",
+      "call_id_conflict",
+      "broker_closed",
+      "unsupported_paid_configuration",
+      "budget_configuration_changed"
+    ],
+    "contract": [
+      "invalid_contract",
+      "cognitive_motivation_invalid",
+      "cognitive_followup_phase_invalid",
+      "cognitive_communication_evidence_invalid",
+      "cognitive_obligation_evidence_invalid",
+      "invalid_context_version",
+      "unknown_phase",
+      "json_prompt_required",
+      "invalid_model_messages",
+      "semantic_contract_rejected_after_retry",
+      "catalogue_operation_changed",
+      "catalogue_purpose_changed",
+      "catalogue_evidence_changed",
+      "catalogue_speech_changed",
+      "catalogue_source_missing",
+      "catalogue_issue_changed",
+      "private_memory_scope_invalid",
+      "private_relation_scope_invalid",
+      "cognitive_state_field_forbidden",
+      "followup_opportunity_unavailable",
+      "followup_opportunity_issue_mismatch",
+      "goal_opportunity_invalid",
+      "goal_opportunity_unavailable",
+      "goal_opportunity_rebind",
+      "goal_opportunity_requires_plan",
+      "goal_completion_without_result"
+    ],
+    "decision": [
+      "upstream_decision_failed"
+    ],
+    "stale_context": [
+      "cognitive_context_changed",
+      "choice_catalogue_changed",
+      "activity_reference_unavailable",
+      "object_reference_unavailable",
+      "message_reference_unavailable",
+      "cognitive_source_expired",
+      "cognitive_job_obsolete",
+      "cognitive_opportunity_changed"
+    ],
+    "world_precondition": [
+      "cognitive_actor_busy",
+      "actor_cognition_in_progress",
+      "pending_result_requires_feedback",
+      "feedback_without_result",
+      "task_not_finished",
+      "cognitive_rest_unavailable"
+    ],
+    "unknown": []
+  },
+  "fields": [
+    "schema",
+    "layer",
+    "code",
+    "cause_code",
+    "phase",
+    "stage",
+    "job_id",
+    "actor_id",
+    "retryable",
+    "record_as_experience"
+  ],
+  "note": "Job diagnostics only. Normal choice/decline/rest and actual task outcomes keep their own contracts. Classification does not grant retries or budget. Unknown errors are not guessed from prose."
+}

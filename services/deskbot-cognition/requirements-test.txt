@@ -1,0 +1,2 @@
+# Windows Python needs IANA timezone data; the adapter otherwise uses stdlib/vendor.
+tzdata==2026.5

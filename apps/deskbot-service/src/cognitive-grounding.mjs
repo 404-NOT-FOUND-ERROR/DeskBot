@@ -30,7 +30,8 @@ export function cognitiveGrounding(world, actorId, objects, activities) {
 /** Production is an opportunity, not proof that more stock is needed. No peer inventories. */
 export function cognitiveUseContext(world,actorId,activities,at){
  const stock=world.living?.inventories[actorId]?.stock??{};
- return {contract:'finite-use-v1',assessed_at:at,capacity:world.living?.inventories[actorId]?.capacity??24,production:activities.filter(a=>a.output).map(a=>({activity_id:a.activity_id,
+ return {contract:'finite-use-v1',experiment_rule:'method-conditions-v2',assessed_at:at,capacity:world.living?.inventories[actorId]?.capacity??24,production:activities.filter(a=>a.output).map(a=>({activity_id:a.activity_id,
+  experiment:a.method?.experiment??null,
   resource:a.output.resource,name:RESOURCES[a.output.resource]??a.output.resource,output_count:a.output.count,
   already_held:stock[a.output.resource]??0,
   reserve_limit:a.output.count,
@@ -56,9 +57,13 @@ export function validateProductionUse(compiled,context){
   const consumer=p.uses.find(o=>o.activity_id===choice.reference_id);
   if(!consumer||choice.target_stock!==consumer.count)reject();
  }else if(choice.kind==='experiment'){
+  if(['authored-method-v1','method-conditions-v2'].includes(use.experiment_rule)&&!p.experiment)reject();
+  const registered=use.experiment_rule==='method-conditions-v2';
+  if(registered&&(!p.experiment.available||choice.target_stock!==p.already_held+p.output_count))reject();
+  const target=registered?p.experiment.completion_target_id:`activity:${p.activity_id}`;
   const issue=[context.continuation.current,...(context.continuation.deferred??[])].find(f=>f?.followup_id===choice.reference_id);
   if(!issue||!['continue','postpone'].includes(compiled.followup_decision)||compiled.followup_id!==issue.followup_id
-   ||compiled.completion_target_id!==`activity:${p.activity_id}`||issue.completed_steps?.some(s=>s.target.id===compiled.completion_target_id)
+   ||compiled.completion_target_id!==target||issue.completed_steps?.some(s=>s.target.id===compiled.completion_target_id)
    ||issue.completion_target?.id===compiled.completion_target_id&&issue.resolution_evidence_ids?.length)reject();
  }else if(choice.reference_id!=null||choice.target_stock>(p.reserve_limit??use.capacity))reject();
  if(choice.kind!=='experiment'&&p.already_held>=choice.target_stock)reject();
@@ -73,6 +78,9 @@ export function validateDecisionIssue(proposal){
 }
 
 export function validateDecisionMethod(proposal,context){
+ if(proposal.choice_binding && (!['single-choice-v1','choice-catalogue-v2'].includes(proposal.choice_binding.contract)
+   || proposal.choice_binding.model_compile_calls!==0 || !isDeepStrictEqual(proposal.choice_binding.compiled,proposal.compiled)))
+  throw Object.assign(Error('actor_choice_binding_changed'),{code:'actor_choice_binding_changed',statusCode:409});
  if(!Object.hasOwn(proposal,'decision_method')||context.use_context?.contract!=='finite-use-v1')return;
  const c=proposal.compiled,method=proposal.decision_method;
  if(method!=null?(c.operation!=='activity'||c.activity_id!==method):c.operation==='activity')

@@ -59,6 +59,7 @@ export function createContextSourceRegistry({
   now = () => new Date(),
   timezone = DEFAULT_TIMEZONE,
   weatherConnector = null,
+  inputRuntime = null,
 } = {}) {
   function snapshot() {
     const clock = formatClock(now(), timezone);
@@ -69,7 +70,7 @@ export function createContextSourceRegistry({
       generated_at: clock.iso_utc,
       real_time: clock,
       weather_forecast: weatherForecast,
-      sources: [
+      sources: reconcileSources([
         {
           source_id: 'clock',
           display_name: '本地时钟',
@@ -113,11 +114,32 @@ export function createContextSourceRegistry({
           kind: 'plugin_slot',
           contribution: '后续可接入日历、习惯或设备以外的指定数据源。',
         }),
-      ],
+      ], inputRuntime?.status?.().sources ?? []),
     };
   }
 
   return { snapshot };
+}
+
+// The scheduler owns connection health. Do not keep showing the historical
+// unconfigured "news" slot alongside a real configured provider.
+function reconcileSources(placeholders, actual) {
+  const registered = new Map(actual.map(s => [s.source_id, s]));
+  const hasExternal = actual.some(s => s.provenance?.mutation === 'attributed_reference');
+  const base = placeholders.filter(s => s.source_id !== 'news' || !hasExternal);
+  const result = base.map(s => {
+    const scheduled = registered.get(s.source_id);
+    if (!scheduled) return s;
+    // Weather may also refresh from an explicit user request. Its connector
+    // owns the freshest observation; scheduler cadence must not overwrite it.
+    if (s.source_id === 'weather' && s.provider) return { ...scheduled, ...s,
+      next_attempt_at: scheduled.next_attempt_at, schedule_status: scheduled.status };
+    return { ...s, ...scheduled, connection: scheduled.enabled ? 'input_runtime' : 'disabled' };
+  });
+  const ids = new Set(result.map(s => s.source_id));
+  for (const source of actual) if (!ids.has(source.source_id)) result.push({ ...source,
+    connection: source.enabled ? 'input_runtime' : 'disabled', contribution: '带来源与时效的已配置输入，实际内容以接收记录为准。' });
+  return result;
 }
 
 export { DEFAULT_TIMEZONE };

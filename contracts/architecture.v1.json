@@ -1,0 +1,42 @@
+{
+  "schema": "deskbot.architecture-register.v1",
+  "baseline": "documentation/development-baseline.md",
+  "canonical_committer": "world",
+  "modules": [
+    {"id":"event-evidence","entry":"apps/deskbot-service/src/cognitive-event-evidence.mjs","anchor":"export function resultDisclosures","authority":"projection"},
+    {"id":"input","entry":"apps/deskbot-service/src/input-runtime.mjs","anchor":"export function createInputRuntime","authority":"input_status"},
+    {"id":"content","entry":"apps/deskbot-service/src/world-map-content.mjs","anchor":"export function validateWorldMapContent","authority":"authored_definition"},
+    {"id":"methods","entry":"apps/deskbot-service/src/activity-methods.mjs","anchor":"export function methodView","authority":"authored_definition"},
+    {"id":"opportunities","entry":"apps/deskbot-service/src/cognitive-opportunities.mjs","anchor":"export function projectCognitiveOpportunities","authority":"projection"},
+    {"id":"schedule","entry":"apps/deskbot-service/src/cognitive-schedule.mjs","anchor":"export function scheduleCognitiveActor","authority":"proposal"},
+    {"id":"coordinator","entry":"apps/deskbot-service/src/cognitive-life.mjs","anchor":"export function createCognitiveLife","authority":"command"},
+    {"id":"cognition","entry":"services/deskbot-cognition/life_worker.py","anchor":"async def run(context)","authority":"proposal"},
+    {"id":"adoption","entry":"apps/deskbot-service/src/cognitive-life-state.mjs","anchor":"export function applyCognitiveMutation","authority":"world_reducer"},
+    {"id":"tasks","entry":"apps/deskbot-service/src/realtime-world.mjs","anchor":"export function startActivityTask","authority":"world_reducer"},
+    {"id":"world","entry":"apps/deskbot-service/src/persistent-world.mjs","anchor":"export function createPersistentWorld","authority":"canonical_commit"},
+    {"id":"development","entry":"apps/deskbot-service/src/cognitive-development.mjs","anchor":"export function adoptCognitiveDevelopment","authority":"world_reducer"},
+    {"id":"presentation","entry":"apps/deskbot-service/src/app.mjs","anchor":"/api/world/snapshot","authority":"projection"}
+  ],
+  "interfaces": [
+    {"id":"event-evidence","producer":"event-evidence","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-event-evidence.v1.json","version":"deskbot.cognitive-event-evidence.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-event-evidence.test.mjs","services/deskbot-cognition/test_event_evidence.py","contracts/fixtures/event-evidence.v1.json"]},
+    {"id":"followup-phase-fields","producer":"adoption","consumers":["cognition","adoption"],"definition":"contracts/cognitive-followup-phases.v1.json","version":"deskbot.cognitive-followup-phases.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-followup-phases.test.mjs","services/deskbot-cognition/test_followup_phases.py"]},
+    {"id":"decision-fields","producer":"adoption","consumers":["cognition","adoption"],"definition":"contracts/cognitive-decision-fields.v1.json","version":"deskbot.cognitive-decision-fields.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-decision-fields.test.mjs","services/deskbot-cognition/test_decision_fields.py"]},
+    {"id":"input-refresh","producer":"input","consumers":["world"],"definition":"apps/deskbot-service/src/input-runtime.mjs","version":"foundry.input-runtime-run.v0.1","coverage":"handwritten","evidence":["apps/deskbot-service/test/input-runtime.test.mjs"]},
+    {"id":"map-content","producer":"content","consumers":["world","presentation"],"definition":"apps/deskbot-service/src/world-map-content.mjs","version":"deskbot.world-map-content.v1","coverage":"handwritten","evidence":["apps/deskbot-service/test/world-map-content.test.mjs"]},
+    {"id":"activity-methods","producer":"methods","consumers":["tasks","adoption","cognition","development"],"definition":"contracts/activity-methods.v1.json","version":"deskbot.activity-methods.v1","coverage":"shared","evidence":["apps/deskbot-service/test/activity-methods.test.mjs","apps/deskbot-service/test/cognitive-choice-catalogue.test.mjs"]},
+    {"id":"cognitive-opportunities","producer":"opportunities","consumers":["adoption","cognition","schedule"],"definition":"contracts/cognitive-opportunities.v1.json","version":"deskbot.opportunities.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-opportunities.test.mjs","services/deskbot-cognition/test_opportunities.py"]},
+    {"id":"schedule-request","producer":"schedule","consumers":["coordinator"],"definition":"apps/deskbot-service/src/cognitive-schedule.mjs","version":"scheduleCognitiveActor","coverage":"handwritten","evidence":["apps/deskbot-service/test/cognitive-life.test.mjs"]},
+    {"id":"life-context","producer":"adoption","consumers":["cognition"],"definition":"apps/deskbot-service/src/cognitive-continuity.mjs","version":"deskbot.cognitive-life.context.v3","coverage":"handwritten","evidence":["services/deskbot-cognition/test_life_worker.py"]},
+    {"id":"choice-catalogue","producer":"adoption","consumers":["cognition","adoption"],"definition":"apps/deskbot-service/src/cognitive-choice-catalogue.mjs","version":"deskbot.choice-catalogue.v2","coverage":"handwritten","evidence":["apps/deskbot-service/test/cognitive-choice-catalogue.test.mjs","services/deskbot-cognition/test_catalogue_choice.py"]},
+    {"id":"life-proposal","producer":"cognition","consumers":["adoption"],"definition":"services/deskbot-cognition/life_worker.py","version":"deskbot.cognitive-life.proposal.v3","coverage":"handwritten","evidence":["apps/deskbot-service/test/cognitive-life.test.mjs"]},
+    {"id":"followup","producer":"cognition","consumers":["adoption","schedule"],"definition":"apps/deskbot-service/src/cognitive-continuation.mjs","version":"deskbot.cognitive-continuation.v3","coverage":"handwritten","evidence":["services/deskbot-cognition/test_current_review.py"]},
+    {"id":"fact-frame","producer":"tasks","consumers":["cognition","development"],"definition":"apps/deskbot-service/src/cognitive-memory-frame.mjs","version":"deskbot.event-memory-frame.v1","coverage":"handwritten","evidence":["apps/deskbot-service/test/cognitive-memory-frame.test.mjs"]},
+    {"id":"cognitive-failure","producer":"coordinator","consumers":["adoption","cognition","presentation"],"definition":"contracts/cognitive-failure.v1.json","version":"deskbot.cognitive-failure.v1","coverage":"shared","evidence":["apps/deskbot-service/test/cognitive-failure.test.mjs","services/deskbot-cognition/test_failure_contract.py"]}
+  ],
+  "pending": [
+    "Full life context/proposal/followup shared schemas and semantic contracts",
+    "Remaining legacy activities and regional law adapters beyond the first three registered methods",
+    "Real-model acceptance of shared opportunities, bound goals and future steps",
+    "Versioned region mechanisms and renderer adapters"
+  ]
+}

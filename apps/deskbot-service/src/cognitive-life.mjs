@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {createCognitionBridge} from './cognition-bridge.mjs';
 import {cognitiveActorIds,cognitiveContext,cognitiveActualResult,cognitivePerson} from './cognitive-life-state.mjs';
 import {scheduleCognitiveActor,fairCognitiveQueue} from './cognitive-schedule.mjs';
+import {cognitiveFailure} from './cognitive-failure.mjs';
 
 export function readCognitiveLifeStatus(world,{budget,at,clockScope='real_time',activeActors=[],maxPlans=4,enabled=true}={}) {
   return {schema:'deskbot.cognitive-life.status.v2',clock_scope:clockScope,at,enabled,
@@ -30,19 +31,24 @@ export function createCognitiveLife({world,budget,now=()=>new Date(),clockScope=
     if(phase==='reflect'&&!prior?.continuous&&(prior?.reflection_count??0)>=2)throw Object.assign(new Error('首轮整理次数已达到上限。'),{code:'reflection_limit'});
     const jobId=`cog-${id}-${randomUUID()}`;
     mutate(id,'claim',jobId,{phase,max_plans:maxPlans});
-    const context=cognitiveContext(world.cognitionView?.(id)??world.get(),id,now().toISOString(),phase);context.mode=mode;
-    if(phase==='feedback'){
-      context.result=cognitiveActualResult(world.get(),id,now().toISOString());
-      if(!context.result)throw Object.assign(new Error('任务尚未结束。'),{code:'task_not_finished'});
-      context.action=context.saved.pending.action;
-      context.reflect=!prior?.continuous&&context.saved.memories.filter(m=>m.payload.stream==='experiential').length>=2;
-    }
-    let call=0;
+    let call=0,stage='context';
     try{
+      const context=cognitiveContext(world.cognitionView?.(id)??world.get(),id,now().toISOString(),phase);context.mode=mode;
+      if(phase==='feedback'){
+        context.result=cognitiveActualResult(world.get(),id,now().toISOString());
+        if(!context.result)throw Object.assign(new Error('任务尚未结束。'),{code:'task_not_finished'});
+        context.action=context.saved.pending.action;
+        context.reflect=!prior?.continuous&&context.saved.memories.filter(m=>m.payload.stream==='experiential').length>=2;
+      }
+      stage='worker';
       const proposal=await transport.session(context,request=>budget.complete(`${jobId}:${++call}`,{...request,phase,usage_scope:clockScope}));
+      stage='adoption';
       const adoption=mutate(id,phase,jobId,{proposal,relevant_key:context.relevant_key,...(phase==='feedback'?{result:context.result}:{})});
       return {job_id:jobId,phase,actor_id:id,calls:call,adoption:adoption.mutation.details};
-    }catch(error){mutate(id,'error',jobId,{phase,error:error.code??error.message,retryable:error.retryable===true});throw error;}
+    }catch(error){
+      error.failure=cognitiveFailure(error.code??error.message,{...error.failure,phase,stage:error.failure?.stage??stage,job_id:jobId,actor_id:id,retryable:error.retryable===true});
+      mutate(id,'error',jobId,{phase,error:error.code??error.message,retryable:error.retryable===true,failure:error.failure});throw error;
+    }
   }
   async function run(id,phase='plan'){
     if(!cognitiveActorIds(world.get()).includes(id)||!['plan','feedback','reflect','perceive','interpret','relate','maintain'].includes(phase))throw Object.assign(new Error('invalid actor/phase'),{code:'invalid_cognitive_request'});

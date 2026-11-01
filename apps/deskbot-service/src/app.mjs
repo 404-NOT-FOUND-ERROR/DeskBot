@@ -165,7 +165,7 @@ export function createDeskBotServer({
   refractionSources = [],
   inputRuntime: configuredInputRuntime = null,
   inputRuntimeIntervalMs = 5 * 60 * 1000,
-  contextSources = createContextSourceRegistry({ now, weatherConnector }),
+  contextSources = null,
   interactionPolicy = createInteractionPolicy({ now, persistence }),
   roleProposalStore = null,
   worldCandidateStore = null,
@@ -194,6 +194,8 @@ export function createDeskBotServer({
   modelUsage = null,
   runtimeProfile = null,
 } = {}) {
+  const inputRuntime = configuredInputRuntime ?? createInputRuntime({ now, persistence, intervalMs: inputRuntimeIntervalMs });
+  contextSources ??= createContextSourceRegistry({ now, weatherConnector, inputRuntime });
   const bodyProfiles = new Map(bodyDeviceProfiles.map(profile => [profile.device_id, structuredClone(profile)]));
   function bodyContextForPeer(peer) {
     const registered=deviceRegistry.get(peer.deviceId),profile=bodyProfiles.get(peer.deviceId);
@@ -470,11 +472,6 @@ export function createDeskBotServer({
     }, { now: () => new Date(receivedAt) });
   }
 
-  const inputRuntime = configuredInputRuntime ?? createInputRuntime({
-    now,
-    persistence,
-    intervalMs: inputRuntimeIntervalMs,
-  });
   const sourceAdapters=new Map(refractionSources.map(s=>{
     if(!s||!['provider','agent'].includes(s.kind)||typeof s.sourceId!=='string'||typeof s.displayName!=='string')throw new TypeError('Refraction sources require a server-owned sourceId, displayName and provider/agent kind');
     return [s.sourceId,{attestedKind:s.kind,sourceLabel:s.displayName,sourceUrl:s.sourceUrl??null}];
@@ -2291,8 +2288,11 @@ export function createDeskBotServer({
     if(autonomousLifeEnabled)lifeObservation.start();
     inputRuntime.start();
     const externalIds = refractionSources.filter(s => s.enabled !== false && typeof s.refresh === 'function').map(s => s.sourceId);
-    if (externalIds.length) void inputRuntime.tick({ sourceIds: externalIds });
-    if(residentLifeEnabled && weatherConnector?.status?.().enabled===true && weatherConnector.status().configured===true) {
+    const initialWeather = residentLifeEnabled && weatherConnector?.status?.().enabled===true && weatherConnector.status().configured===true;
+    const initialIds = initialWeather ? [...externalIds, 'weather'] : externalIds;
+    if (initialIds.length) void inputRuntime.tick({ sourceIds: initialIds });
+    if(initialWeather && (weatherConnector.status().freshness==='fresh'
+      || inputRuntime.status().sources.some(s=>s.source_id==='weather'&&s.freshness==='fresh'))) {
       // InputRuntime may correctly skip a still-fresh persisted source. Ask
       // the connector for its cache so installation can adopt that reference.
       void weatherConnector.refresh({force:false}).then(({event})=>ingestWeatherEvent(event))

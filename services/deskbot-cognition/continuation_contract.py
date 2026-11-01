@@ -1,4 +1,7 @@
 """Validate issue references without inferring a person's intention from keywords."""
+from opportunity_contract import opportunity_errors, OPPORTUNITY_PROMPT
+from followup_phases import CONTRACT as PHASE_CONTRACT, FEEDBACK_PROMPT, feedback_field_errors
+from event_evidence import communication_errors
 
 
 def issue_id(issue):
@@ -6,11 +9,16 @@ def issue_id(issue):
 
 
 def continuation_errors(value, context):
+    if context.get('phase') == 'feedback' and feedback_field_errors(value):
+        # Do not suggest completing a plan-only object in a feedback repair.
+        return feedback_field_errors(value)
     view = context.get('continuation') or {}
     if view.get('schema') not in ('deskbot.cognitive-continuation.v2', 'deskbot.cognitive-continuation.v3'):
         return []  # Replay of an earlier context keeps its earlier contract.
-    errors = []
-    if any(k in value for k in ('completion_target', 'target_bound_at', 'resolution_evidence_ids', 'completion_proofs', 'object_scope_ids', 'related_object_ids', 'current_conditions', 'completed_steps')):
+    errors = opportunity_errors(value, context)
+    if context.get('phase') == 'feedback':
+        errors.extend(communication_errors(value,context))
+    if any(k in value for k in PHASE_CONTRACT['server_fields']):
         errors.append('completion_target/target_bound_at/resolution_evidence_ids/completion_proofs是执行器只读字段；只可选择completion_target_id')
     current = view.get('current')
     issues = [f for f in [current, *view.get('deferred', [])] if f]
@@ -78,7 +86,7 @@ def continuation_errors(value, context):
             errors.append('next_step必须使用给定next_options；无可绑定办法请填null')
         else:
             wait = value.get('wait_for') or {}
-            if wait.get('kind') in ('activity', 'commitment') and step != wait:
+            if not view.get('opportunity_contract') and wait.get('kind') in ('activity', 'commitment') and step != wait:
                 errors.append('wait_for与next_step不一致；等待activity或commitment时，next_step必须同kind/id或null。邀请已送出就等已有约定，不再选social重新提议；想交接不能等取水')
             if wait.get('kind') == 'reply' and step['kind'] == 'commitment':
                 option = next((o for o in view.get('wait_options', []) if o['kind'] == 'reply' and o['id'] == wait['id']), {})
@@ -123,6 +131,7 @@ ISSUE_CHOICE_CONTRACT = (
 
 
 CONTINUATION_CONTRACT = (
+    OPPORTUNITY_PROMPT +
     'followup_id绑定当前或deferred中的本人问题；没有关联问题填null。'
     'followup_decision=continue/postpone保持同一问题，不能因为换了方法就new。'
     'new/none表示做另一件事，原问题会暂存，可后来按ID恢复，不是关闭。'
@@ -139,4 +148,14 @@ CONTINUATION_CONTRACT = (
     '旧question/reason只说明上次为何惦记，current_conditions和wait_options说明现在；逐次重估，已到时的冷却不可再作为阻碍。'
     'wait_for只能选available=false的条件；ready的清空。每个blocker和ready_at只属于该id，不能把改罩六小时限制套给用灯/观察。无wait_for时delay_hours只是本人下次复查安排，不得说成系统禁止。'
     '反馈时可根据绑定目标的resolution_evidence_ids填写status:drop及followup_closure；不能事后补绑目标。'
+)
+
+# Feedback never receives the planning contract or its step-review examples.
+FEEDBACK_CONTINUATION_CONTRACT = (
+    FEEDBACK_PROMPT + OPPORTUNITY_PROMPT +
+    'next_step选next_options的{kind,id}或null；wait_for选未就绪的给定条件，已经ready的清空。'
+    '旧question/reason只是上次的想法，按current_conditions和wait_options复查。'
+    '每个blocker和ready_at只属于对应方法，不能把装罩冷却套给用灯/测记。'
+    '没有wait_for时delay_hours是个人下次复查安排，不是系统禁止。'
+    '已经发出的邀请等待已有reply/commitment，不再重提；送达不等于接受，水未交接仍在本人背包。'
 )

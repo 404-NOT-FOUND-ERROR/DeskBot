@@ -1,0 +1,12 @@
+{
+  "schema": "deskbot.cognitive-followup-phases.v1",
+  "server_fields": ["completion_target", "target_bound_at", "resolution_evidence_ids", "completion_proofs", "object_scope_ids", "related_object_ids", "current_conditions", "completed_steps", "next_binding", "wait_binding"],
+  "plan_only_fields": ["followup_decision", "completion_target_id", "step_review"],
+  "feedback": {
+    "allowed_fields": ["status", "question", "reason", "delay_hours", "next_step", "wait_for", "review_after_minutes", "followup_id", "followup_closure", "communication_evidence_id"],
+    "invalid_code": "cognitive_followup_phase_invalid",
+    "rule": "当前是结果反馈阶段。动作已经结算；只表达怎样看待实际结果、是否继续惦记和下次复查安排。status表达continue/postpone/drop/none，不使用计划阶段的followup_decision。当前问题的身份和已绑定目标由服务端保留；可选followup_id只能指向当前问题，不能恢复另一问题。next_step只是未来意向，不执行动作、不绑定完成标准。步骤归档与下一目标选择留到下一次计划；现在保留已经完成的目标及其真实证据，不重复执行它。",
+    "closure_rule": "可以按当前已绑定目标的resolution_evidence_ids给出status:drop和followup_closure:{followup_id,kind:resolved|satisfied|abandoned,reason,evidence_ids:[]}。resolved只证明事先绑定的一步，不能宣称整项研究完成；个人觉得了解够了用satisfied，主动放下用abandoned。还想继续研究就保持continue/postpone，不必为了记录完成而结案。"
+  },
+  "note": "Field ownership only. Existing value, evidence, opportunity and wait-condition validators remain authoritative. Rejection never rewrites the model reply, executes an action or grants a retry."
+}

@@ -1,0 +1,20 @@
+{
+  "context": {"event_evidence":{"schema":"deskbot.cognitive-event-evidence.v1","obligations":[{"commitment_id":"agreement:1","terms_revision":2,"choice_ids":["go-meeting"]}]}},
+  "obligation_cases": [
+    {"name":"accepted scoped terms","valid":true,"payload":{"choice_id":"go-meeting","motivation":"accepted_obligation","obligation_ref":{"commitment_id":"agreement:1","terms_revision":2}}},
+    {"name":"external invitation is not accepted","valid":false,"payload":{"choice_id":"go-meeting","motivation":"accepted_obligation","source_ids":["external-letter"]}},
+    {"name":"old terms","valid":false,"payload":{"choice_id":"go-meeting","motivation":"accepted_obligation","obligation_ref":{"commitment_id":"agreement:1","terms_revision":1}}},
+    {"name":"unrelated action","valid":false,"payload":{"choice_id":"tell-story","motivation":"accepted_obligation","obligation_ref":{"commitment_id":"agreement:1","terms_revision":2}}},
+    {"name":"another agreement","valid":false,"payload":{"choice_id":"go-meeting","motivation":"accepted_obligation","obligation_ref":{"commitment_id":"other","terms_revision":2}}},
+    {"name":"extra claim","valid":false,"payload":{"choice_id":"go-meeting","motivation":"accepted_obligation","obligation_ref":{"commitment_id":"agreement:1","terms_revision":2,"accepted":true}}},
+    {"name":"invitation attribution","valid":true,"payload":{"choice_id":"go-meeting","motivation":"invited","source_ids":["external-letter"]}},
+    {"name":"hidden obligation on another motivation","valid":false,"payload":{"choice_id":"go-meeting","motivation":"need","obligation_ref":{"commitment_id":"agreement:1","terms_revision":2}}}
+  ],
+  "receipt":{"schema":"deskbot.message-receipt.v1","id":"receipt:1","summary":"仅完成通知已经送达，未包含测记读数。"},
+  "communication_cases":[
+    {"name":"only proved receipt","valid":true,"value":{"reason":"仅完成通知已经送达，未包含测记读数。","communication_evidence_id":"receipt:1"}},
+    {"name":"missing receipt","valid":false,"value":{"reason":"仅完成通知已经送达，未包含测记读数。"}},
+    {"name":"wrong receipt","valid":false,"value":{"reason":"仅完成通知已经送达，未包含测记读数。","communication_evidence_id":"receipt:2"}},
+    {"name":"invented disclosed readings","valid":false,"value":{"reason":"实测结果已经送到灯穗那里","communication_evidence_id":"receipt:1"}}
+  ]
+}

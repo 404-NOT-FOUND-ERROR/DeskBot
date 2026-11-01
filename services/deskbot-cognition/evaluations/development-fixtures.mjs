@@ -46,7 +46,8 @@ export function policyChoice(w,compiled,job=`fixture:${w.tasks.length}:${w.clock
  if(life.pending){
   const actual=cognitiveActualResult(w,OWNER,w.clock.synced_at),feedbackJob=job+':feedback';
   applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'feedback',job_id:feedbackJob},w.clock.synced_at,feedbackJob+':claim');
-  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,actor_id:OWNER,phase:'feedback',state:{},memories:[],followup:{status:'continue',question:'测试后续仍待自主选择',reason:'确定性夹具',delay_hours:24}}},w.clock.synced_at,feedbackJob+':adopt');
+  const receipt=actual.effects?.communication;
+  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,actor_id:OWNER,phase:'feedback',state:{},memories:[],followup:{status:'continue',question:'测试后续仍待自主选择',reason:receipt?.summary??'确定性夹具',delay_hours:24,...(receipt?{communication_evidence_id:receipt.id}:{})}}},w.clock.synced_at,feedbackJob+':adopt');
  }
  return task;
 }

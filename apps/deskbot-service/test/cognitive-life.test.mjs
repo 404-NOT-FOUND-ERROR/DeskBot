@@ -11,6 +11,7 @@ import {cognitiveContext,cognitiveActualResult,cognitiveRelevantKey,cognitiveDia
 import {advanceAutonomousLife} from '../src/autonomous-life.mjs';
 import {createCognitiveRuntime} from '../src/cognitive-runtime.mjs';
 import {bindRuntimeStore} from '../src/runtime-profile.mjs';
+import {cognitiveFailure} from '../src/cognitive-failure.mjs';
 
 function fixture(t){
  const dir=mkdtempSync(join(tmpdir(),'deskbot-cognitive-v2-')),closers=[];
@@ -29,9 +30,30 @@ function fakeBridge(selector,inspect=()=>{}){return {close(){},async session(c){
   action:{action_type:'work',action_description:'按现场条件行动',inner_monologue:'我想亲自弄清苗况。',expected_outcome:'取得真实记录',agent_id:c.actor.actor_id,step:state.step,target:{acts_on:[],claims:[],reaches:[]}}};
  return {schema:'deskbot.cognitive-life.proposal.v2',phase:'feedback',actor_id:c.actor.actor_id,state,memory_sequence:1,
   memories:[{id:`${c.actor.actor_id}:${c.result.root_outcome_id}`,payload:{agent_id:c.actor.actor_id,stream:'factual',kind:'event',raw_content:c.result.personal_fact,stored_content:c.result.personal_fact}}],
-  followup:{status:c.result.success?'continue':'postpone',question:c.result.success?'下次比较苗床':'改为先观察或等待设施空闲',reason:c.result.fact,delay_hours:24}};
+  followup:{status:c.result.success?'continue':'postpone',question:c.result.success?'下次比较苗床':'改为先观察或等待设施空闲',reason:c.result.effects?.communication?.summary??c.result.fact,delay_hours:24,...(c.result.effects?.communication?{communication_evidence_id:c.result.effects.communication.id}:{})}};
 }};}
 function makeLife(f,selector,inspect){const life=createCognitiveLife({world:f.world,budget:{complete(){throw Error('fake bridge should not call model')},status(){return {}}},now:f.now,mode:'mock',clockScope:'isolated_test_clock',bridge:fakeBridge(selector,inspect)});f.close(()=>life.close());return life;}
+
+test('decision failure persists the exact job seam without creating a lived outcome',async t=>{
+ const f=fixture(t),bridge={close(){},async session(){throw Object.assign(Error('upstream_decision_failed'),{code:'python_session_failed',
+  failure:cognitiveFailure('python_session_failed',{cause_code:'upstream_decision_failed',stage:'decision_repair'})});}};
+ const life=createCognitiveLife({world:f.world,budget:{status:()=>({})},now:f.now,bridge});f.close(()=>life.close());
+ const before=f.world.get();await assert.rejects(life.run('shaping-001'),{code:'python_session_failed'});
+ const after=f.world.get(),actor=after.cognition.actors['shaping-001'];
+ assert.equal(actor.job.status,'failed');assert.equal(actor.job.failure.layer,'decision');assert.equal(actor.job.failure.stage,'decision_repair');
+ assert.equal(actor.job.failure.job_id,actor.job.id);assert.equal(actor.job.failure.actor_id,'shaping-001');
+ assert.equal(actor.job.failure.record_as_experience,false);assert.equal(actor.retry.retryable,false);
+ assert.deepEqual(after.tasks,before.tasks);assert.deepEqual(after.living,before.living);assert.deepEqual(actor.memories,[]);
+ const restored=f.reload().get().cognition.actors['shaping-001'];assert.deepEqual(restored.job.failure,actor.job.failure);
+});
+
+test('context assembly failure releases a claimed job and never enters the worker',async t=>{
+ const f=fixture(t),life=makeLife(f,()=>{throw Error('must not select');});
+ f.world.cognitionView=()=>{throw Object.assign(Error('broken projection'),{code:'context_projection_failed'});};
+ await assert.rejects(life.run('shaping-001'),{code:'context_projection_failed'});
+ const actor=f.world.get().cognition.actors['shaping-001'];assert.equal(actor.job.status,'failed');
+ assert.equal(actor.job.failure.stage,'context');assert.equal(actor.job.failure.layer,'unknown');assert.equal(actor.enabled,false);
+});
 
 test('continuous ownership and completed outcomes survive restart during feedback without repeating practice',async t=>{
  const f=fixture(t),first=makeLife(f,()=>({operation:'observe',object_index:1,reason:'看清今天的苗况'}));first.configure('shaping-001');
@@ -162,6 +184,14 @@ const config={base_url:'https://api.deepseek.com',api_key:'local-test-fixture',m
 const request={scene:'agent_decision_main',messages:[{role:'user',content:'仅输出 JSON'}],max_tokens:256,json_mode:true};
 function provider(payload){return async()=>({ok:true,json:async()=>payload});}
 function payload(content='{}',usage={prompt_tokens:100,completion_tokens:20,prompt_cache_hit_tokens:30}){return {model:'deepseek-flash',usage,choices:[{finish_reason:'stop',message:{content}}]};}
+
+test('JSON mode without a JSON instruction rejects locally before cost reservation or network',async t=>{
+ const f=fixture(t);let network=0;
+ const broker=createCognitiveBudget({persistence:f.p,configuration:config,fetchImpl:async()=>{network++;return {ok:true,json:async()=>payload()};}});f.close(()=>broker.close());
+ await assert.rejects(broker.complete('missing-json',{...request,messages:[{role:'user',content:'只返回一个对象'}]}),{code:'json_prompt_required'});
+ assert.equal(network,0);assert.equal(broker.status().used_upper_cny,0);assert.equal(broker.status().calls.length,0);
+ await broker.complete('explicit-json',request);assert.equal(network,1);assert.equal(broker.status().calls.length,1);
+});
 
 test('local model or endpoint configuration rejection makes no outbound call or cost reservation',async t=>{
  const f=fixture(t);let network=0;

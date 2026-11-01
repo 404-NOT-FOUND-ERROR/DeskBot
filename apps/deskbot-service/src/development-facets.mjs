@@ -1,4 +1,5 @@
 import { ACTIVITIES } from './living-resources.mjs';
+import {registeredMethod} from './activity-methods.mjs';
 
 // These are views of the settled common ledger. They do not grant experience,
 // change old interests, certify a profession, or establish a character wish.
@@ -24,8 +25,8 @@ const localDay = at => DAY_FORMAT.format(new Date(at));
 // establish what was actually practised. Eating is not social competence.
 export function activityTopic(activityId) {
   if (!REGISTERED.has(activityId) || activityId === 'share-meal') return null;
+  const method=registeredMethod(activityId);if(method)return method.topic;
   if(activityId==='waylight-repair')return 'repair';
-  if(activityId==='waylight-use')return 'care';
   if(['waylight-build-open','waylight-build-hooded','waylight-craft-shade','waylight-fit-shade'].includes(activityId))return 'craft';
   if(['leaf-read','leaf-observe-lowland','leaf-open','leaf-half-close','leaf-close','leaf-turn-lee','leaf-turn-wind'].includes(activityId))return 'explore';
   if(['leaf-craft-kit','leaf-install'].includes(activityId))return 'craft';

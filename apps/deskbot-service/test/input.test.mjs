@@ -3,10 +3,10 @@ import { after, before, test } from 'node:test';
 
 import { createDeskBotServer } from '../src/app.mjs';
 import { normalizeChat } from '../src/input-store.mjs';
+import {listenOnFetchSafePort,closeTestServer} from './support/fetch-safe-server.mjs';
 
 const fixedTime = new Date('2026-08-21T00:00:00.000Z');
-const server = createDeskBotServer({ now: () => fixedTime });
-let baseUrl;
+let server,baseUrl;
 
 test('omitted chat identity uses the canonical 聚形域 character', () => {
   const event = normalizeChat({ event_id: 'evt-canonical-default', message: '你好' }, { now: () => fixedTime });
@@ -14,15 +14,11 @@ test('omitted chat identity uses the canonical 聚形域 character', () => {
 });
 
 before(async () => {
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  ({server,baseUrl}=await listenOnFetchSafePort(()=>createDeskBotServer({now:()=>fixedTime})));
 });
 
 after(async () => {
-  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  await closeTestServer(server);
 });
 
 test('POST /api/chat normalizes text into a conversation input event', async () => {

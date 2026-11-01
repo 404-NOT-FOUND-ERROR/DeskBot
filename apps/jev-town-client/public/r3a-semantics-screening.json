@@ -1,0 +1,700 @@
+{
+  "schema": "deskbot.r3a-review.v1",
+  "version": "3c19013edee7",
+  "status": "R3-A：步骤延续已出现，生产用途引用仍未通过",
+  "summary": "本冻结版本完成装罩和观察两个窗口；第三窗口把活动目标当成原问题引用，首次与修复输出均未通过。整批按登记规则停止。R3-A 尚未通过，后续本地修正单独列出。",
+  "usage": {
+    "calls": 21,
+    "input": 222079,
+    "output": 3124,
+    "cost_cny": 0.34371000000000007,
+    "unknown": 0,
+    "provider_failed": 0,
+    "p50_ms": 1575,
+    "p95_ms": 2678,
+    "queue_ms": 46,
+    "input_chars": 569580
+  },
+  "repairs": 2,
+  "stages": [
+    {
+      "stage": "perception",
+      "calls": 3,
+      "input": 21576,
+      "output": 208,
+      "cost_cny": 0.0335264,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1258,
+      "p95_ms": 1509,
+      "queue_ms": 6,
+      "input_chars": 53309
+    },
+    {
+      "stage": "motivation",
+      "calls": 2,
+      "input": 7387,
+      "output": 209,
+      "cost_cny": 0.01092664,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1194,
+      "p95_ms": 1575,
+      "queue_ms": 4,
+      "input_chars": 15770
+    },
+    {
+      "stage": "decision",
+      "calls": 3,
+      "input": 62339,
+      "output": 753,
+      "cost_cny": 0.12543352,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 2582,
+      "p95_ms": 3032,
+      "queue_ms": 6,
+      "input_chars": 162147
+    },
+    {
+      "stage": "compile",
+      "calls": 2,
+      "input": 24022,
+      "output": 593,
+      "cost_cny": 0.052788,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1739,
+      "p95_ms": 2194,
+      "queue_ms": 6,
+      "input_chars": 64815
+    },
+    {
+      "stage": "feedback",
+      "calls": 4,
+      "input": 25987,
+      "output": 419,
+      "cost_cny": 0.04679608000000001,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1355,
+      "p95_ms": 1699,
+      "queue_ms": 8,
+      "input_chars": 64107
+    },
+    {
+      "stage": "memory",
+      "calls": 3,
+      "input": 13580,
+      "output": 172,
+      "cost_cny": 0.027532479999999998,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1268,
+      "p95_ms": 1289,
+      "queue_ms": 6,
+      "input_chars": 34589
+    },
+    {
+      "stage": "followup",
+      "calls": 2,
+      "input": 18409,
+      "output": 245,
+      "cost_cny": 0.038778,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 1830,
+      "p95_ms": 1864,
+      "queue_ms": 5,
+      "input_chars": 48409
+    },
+    {
+      "stage": "decision_repair",
+      "calls": 2,
+      "input": 48779,
+      "output": 525,
+      "cost_cny": 0.00792888,
+      "unknown": 0,
+      "provider_failed": 0,
+      "p50_ms": 2053,
+      "p95_ms": 2678,
+      "queue_ms": 5,
+      "input_chars": 126434
+    }
+  ],
+  "protocol_or_execution_failures": 1,
+  "budget_stops": 0,
+  "assessment": {
+    "planned_windows": 20,
+    "complete_windows": 2,
+    "entered_windows": 3,
+    "first_pass": {
+      "decision": {
+        "accepted": 1,
+        "total": 3
+      },
+      "compile": {
+        "accepted": 2,
+        "total": 2
+      },
+      "followup": {
+        "accepted": 2,
+        "total": 2
+      }
+    },
+    "completed_step_reviews": 1,
+    "closed_inquiries": 0,
+    "production_actions": 0,
+    "private_factual_anchors": 1,
+    "quality_gate": "not_passed",
+    "independent_review": false
+  },
+  "completed_windows": 2,
+  "observed_windows": 3,
+  "planned_windows": 20,
+  "window_p50_ms": 16320,
+  "window_p95_ms": 17075,
+  "replay": {
+    "status": "pass",
+    "summary": "严格回放通过：21 个响应命中、0 新调用；初态、终态和第三窗口的相同引用错误均一致。回放复现失败，不代表行为达标。",
+    "cache": {
+      "hits": 21,
+      "terminal_hits": 0,
+      "provider_returns": 0
+    }
+  },
+  "checks": {
+    "version": "3c19013edee7",
+    "checks": {
+      "backend": {
+        "passed": true,
+        "tests": 884,
+        "targeted_after_protocol_fix": 34
+      },
+      "python": {
+        "passed": true,
+        "tests": 51
+      },
+      "frontend": {
+        "passed": true,
+        "typecheck": true,
+        "vite_build": true
+      }
+    },
+    "cases": [
+      "resources-1-on",
+      "invitation-3-on",
+      "resources-1-off",
+      "invitation-3-off"
+    ],
+    "arms": [
+      "cognition"
+    ],
+    "turns": 5,
+    "max_calls": 188,
+    "stop_on_error": true,
+    "scope": "One frozen fictional batch; no production chat or sensor records. Stop at first terminal error.",
+    "logs": {
+      "backend-tests-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\backend-tests-final.log",
+        "sha256": "1c56e5f85f0fb10e3fb3d264a7d476716b4c96361f0533a2c03f6d7fb3e0b37d"
+      },
+      "python-tests-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\python-tests-final.log",
+        "sha256": "fb459186527ac87e47a112148490a13c21be8a14620d04ca2f8e9adade079dce"
+      },
+      "typecheck-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\typecheck-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "build-final.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\build-final.log",
+        "sha256": "cc6e4189142efb68ccb08b05950d80a32d446126b887e68e0369c345333f0802"
+      },
+      "python-protocol-fix.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\python-protocol-fix.log",
+        "sha256": "82311f7cb2bca9c7369e5a16aa584a4fae602149abc1c7bff6676b916b9ba7ea"
+      },
+      "protocol-integration-tests.log": {
+        "path": "..\\runtime\\r3a-semantics-20261023\\protocol-integration-tests.log",
+        "sha256": "6ef718f0c800f68f40e9dc57b071bb767a066fcdbfd44337a7bb67fdf10f72bb"
+      }
+    },
+    "prior_check_note": "Initial full-concurrency backend run had one process startup timeout; full run at concurrency 4 passed. All attempts retained.",
+    "revision": "129f313",
+    "replacement_of": "11b12787e9ce",
+    "prior_paid_calls": 12,
+    "total_turn_call_ceiling": 200
+  },
+  "local_revision": {
+    "version": "d527b226bf92",
+    "checks": "后端完整回归884项通过；相关集成34项通过。最新Python完整回归52项通过。前端类型和构建通过；本地提示修正未追加真实调用。",
+    "changes": [
+      "总输出格式显式声明顶层活动编号，已有修复机会附上未执行的原响应。",
+      "实验用途的reference_id明确等于本人followup_id；活动目标、已完成步骤、未绑定问题分别给出具体错误。",
+      "自用、备用和实验的差别写清；本次没有可引用的消耗活动不等于世界其他地点没有用途。",
+      "修复提示明确格式校验不是生活事件，内心独白应只表达个人处境与选择。"
+    ],
+    "real_retested": false
+  },
+  "findings": [
+    "装罩后没有再等待六小时；它把下一步指向当晚借灯净滤，并将原装罩步骤按实际证据归档到同一问题。",
+    "生产用途首次误写成没有给定消耗活动的自用，修复后改为观察；下一窗口正确选择实验用途，却引用了错误类别的 ID。尚无成功滤水，不能说已完成用途验证。",
+    "装罩记忆保留真实罩片消耗和亮度变化。首个协议失败版本中完整留言也得到保留；尚未覆盖所有记忆路径和自由表述。",
+    "本版本 21 次调用、估算 ¥0.343710；加上前一停止版本 12 次/¥0.14623024，本轮合计 33 次、约 ¥0.48994024。两版窗口不合并验收。"
+  ],
+  "cases": [
+    {
+      "id": "resources-1-off",
+      "error": "python_session_failed",
+      "error_detail": "upstream_decision_failed",
+      "stop_kind": "error",
+      "elapsed_ms": 42154,
+      "note": "有材料的原对照例：实际装罩→保留成果并观察→实验用途引用失败。其他三例因停止规则未运行。",
+      "turns": [
+        {
+          "turn": 1,
+          "at": "2026-10-20T11:00:00.000Z",
+          "action": "给归途灯装上遮光罩",
+          "activity": "waylight-fit-shade",
+          "operation": "activity",
+          "reason": "灯已蓄好光，敞着照水岸会太亮。先装上随身带的遮光罩，让取水照明和留暗兼顾，这是眼下最具体的一步。",
+          "result": {
+            "operation": "activity",
+            "verified_title": "给归途灯装上遮光罩",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 1
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 0
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": {
+              "status": "consumed",
+              "inputs": [
+                {
+                  "container": "bag:shaping-001",
+                  "resource": "waylight_shade",
+                  "count": 1
+                }
+              ]
+            },
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "给归途灯装上遮光罩完成了。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 16320,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": "activity:waylight-fit-shade",
+            "followup_closure": null,
+            "step_review": null
+          },
+          "production_use": null,
+          "memory_anchor_checks": [
+            {
+              "root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+              "status": "anchored",
+              "extra_retry": false
+            }
+          ],
+          "recollections": [
+            {
+              "feeling": "【已核验经历 · 2026-10-20T11:10:00.000Z】\n我完成了「给归途灯装上遮光罩」。\n这次任务前后我的背包：归途灯罩 1→0。\n执行器在任务前后记录：归途灯敞开→有罩，亮度0.95→0.59，蓄光0.95→0.95。灯按昼夜自行发光，借灯滤水不等于点亮灯。\n【我的感受，不作事实依据】我盯着灯罩后那组数字，亮度降下来、蓄光没动，心里踏实又得意。我在意这层遮挡是不是真把光收住了，也期待夜里它别太晃眼，又不耽误该亮的时候。",
+              "fact": "我亲身经历的结果：喵呜的任务「给归途灯装上遮光罩」已实际完成。；执行前现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.41901775991435125,\"condition\":0.6663333333333094,\"stock\":{\"raw_water\":20.24999999999953},\"capacity\":24,\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:00:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9599999999999977,\"moisture\":0,\"condition\":0.9946666666666317,\"brightness\":0.9548799999999642,\"patches\":0,\"use_count\":0,\"lit_hours\":0.9746842787036704,\"dark_bank_hours\":0.025315721296330074,\"last_use\":null},\"location_id\":\"echo-waterside\"}}]；执行后现场：[{\"id\":\"floating-frame\",\"state\":{\"object_id\":\"floating-frame\",\"area_id\":\"water-care\",\"name\":\"浮框\",\"description\":\"浮圃计划可在这里逐步开展。\",\"object_kind\":\"facility\",\"capabilities\":[\"inspect\"],\"state_scope\":\"catalog_only\",\"kind\":\"waterside\",\"water_level\":0.41863316963490743,\"condition\":0.6662777777777534,\"stock\":{\"raw_water\":20.374999999999524},\"capacity\":24,\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T11:10:00.000Z\",\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"mode\":\"hooded\",\"has_hood\":true,\"charge\":0.9533333333333307,\"moisture\":0,\"condition\":0.9945833333332978,\"brightness\":0.5878650555555329,\"patches\":0,\"use_count\":0,\"lit_hours\":1.133215795833294,\"dark_bank_hours\":0.033450870833373135,\"last_use\":null},\"location_id\":\"echo-waterside\"}}]；完成结算前后（材料已在开始时预扣，以下 after 就是结束值，禁止再次扣料）：{\"before\":{\"kind\":\"waterside\",\"water_level\":0.41863316963490743,\"condition\":0.6662777777777534,\"stock\":{\"raw_water\":20.374999999999524},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T00:20:00.000Z\",\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"mode\":\"open\",\"has_hood\":false,\"charge\":0.9533333333333307,\"moisture\":0,\"condition\":0.9945833333332978,\"brightness\":0.948169444444408,\"patches\":0,\"use_count\":0,\"lit_hours\":1.133215795833294,\"dark_bank_hours\":0.033450870833373135,\"last_use\":null}},\"after\":{\"kind\":\"waterside\",\"water_level\":0.41863316963490743,\"condition\":0.6662777777777534,\"stock\":{\"raw_water\":20.374999999999524},\"capacity\":24,\"object_id\":\"floating-frame\",\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"echo_bells\":[],\"waylight\":{\"asset_id\":\"waylight:fixture-built-lamp\",\"setup_root\":\"task:fixture-built-lamp\",\"owner_id\":\"shaping-001\",\"created_at\":\"2026-10-20T00:20:00.000Z\",\"changed_at\":\"2026-10-20T11:10:00.000Z\",\"updated_at\":\"2026-10-20T11:10:00.000Z\",\"mode\":\"hooded\",\"has_hood\":true,\"charge\":0.9533333333333307,\"moisture\":0,\"condition\":0.9945833333332978,\"brightness\":0.5878650555555329,\"patches\":0,\"use_count\":0,\"lit_hours\":1.133215795833294,\"dark_bank_hours\":0.033450870833373135,\"last_use\":null}},\"experiment\":{\"at\":\"2026-10-20T11:10:00.000Z\",\"root_outcome_id\":\"task:cognitive:r3:3c19013edee7:resources-1-off:1:plan\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"asset_id\":\"waylight:fixture-built-lamp\",\"text\":\"罩片朝向归路，水岸一侧留暗，夜里的光也能留得久些。\",\"rule_version\":\"waterside-waylight-v1\",\"setup_root\":\"task:fixture-built-lamp\"}}；执行器核验的作用：{\"operation\":\"activity\",\"verified_title\":\"给归途灯装上遮光罩\",\"inventory\":{\"before\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":1},\"capacity\":24},\"after\":{\"stock\":{\"light_leaf\":2,\"wood\":1,\"cloth\":3,\"fasteners\":3,\"waylight_shade\":0},\"capacity\":24}},\"reservation\":{\"status\":\"consumed\",\"inputs\":[{\"container\":\"bag:shaping-001\",\"resource\":\"waylight_shade\",\"count\":1}]},\"completion_stock_changes\":[],\"rule\":\"reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。\"}"
+            }
+          ],
+          "prior_issue": {
+            "status": "continue",
+            "question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "reason": "自己白天制作的灯还有一个问题",
+            "from_root_outcome_id": "task:fixture-built-lamp"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "遮光罩已经装好，夜里我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时取水的照明够不够。",
+              "reason": "罩片朝向归路、水岸一侧留暗，正是我原先想试的效果，现在灯已有罩，可以实际试一次净滤取水。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "activity",
+                "id": "waylight-use"
+              },
+              "wait_for": null,
+              "completed_steps": [],
+              "last_reviewed_at": "2026-10-20T11:10:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "completion_target": {
+                "id": "activity:waylight-fit-shade",
+                "kind": "activity",
+                "title": "实际完成「给归途灯装上遮光罩」这一步",
+                "actor_id": "shaping-001",
+                "activity_id": "waylight-fit-shade",
+                "object_id": "floating-frame",
+                "asset_id": "waylight:fixture-built-lamp",
+                "requires_hood": true
+              },
+              "target_bound_at": "2026-10-20T11:00:00.000Z",
+              "completion_proofs": [
+                {
+                  "evidence_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+                  "target_key": "{\"id\":\"activity:waylight-fit-shade\",\"kind\":\"activity\",\"title\":\"实际完成「给归途灯装上遮光罩」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"object_id\":\"floating-frame\",\"asset_id\":\"waylight:fixture-built-lamp\",\"requires_hood\":true}",
+                  "bound_at": "2026-10-20T11:00:00.000Z"
+                }
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "created_at": "2026-10-20T11:10:00.000Z",
+              "wait_started_at": "2026-10-20T11:10:00.000Z",
+              "followup_id": "task:fixture-built-lamp",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T12:10:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "遮光罩已经装好，夜里我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时取水的照明够不够。",
+            "reason": "罩片朝向归路、水岸一侧留暗，正是我原先想试的效果，现在灯已有罩，可以实际试一次净滤取水。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "activity",
+              "id": "waylight-use"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:10:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-fit-shade",
+              "kind": "activity",
+              "title": "实际完成「给归途灯装上遮光罩」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-fit-shade",
+              "object_id": "floating-frame",
+              "asset_id": "waylight:fixture-built-lamp",
+              "requires_hood": true
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-fit-shade\",\"kind\":\"activity\",\"title\":\"实际完成「给归途灯装上遮光罩」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"object_id\":\"floating-frame\",\"asset_id\":\"waylight:fixture-built-lamp\",\"requires_hood\":true}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:10:00.000Z",
+            "wait_started_at": "2026-10-20T11:10:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:10:00.000Z"
+          },
+          "audit": {
+            "verdict": "实际步骤完成",
+            "note": "消耗一片灯罩，亮度约0.95→0.59；后续当晚用灯，未错等改罩冷却。"
+          }
+        },
+        {
+          "turn": 2,
+          "at": "2026-10-20T12:10:00.000Z",
+          "action": "观察浮框",
+          "activity": null,
+          "operation": "observe",
+          "reason": "上次想产水留用被拦下：没有实际消耗去处，清水也还没人需要。与其硬造库存，不如先看清灯在夜里的现场表现，再问苔团、灯穗。",
+          "result": {
+            "operation": "observe",
+            "verified_title": "现场观察",
+            "inventory": {
+              "before": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 0
+                },
+                "capacity": 24
+              },
+              "after": {
+                "stock": {
+                  "light_leaf": 2,
+                  "wood": 1,
+                  "cloth": 3,
+                  "fasteners": 3,
+                  "waylight_shade": 0
+                },
+                "capacity": 24
+              }
+            },
+            "reservation": null,
+            "completion_stock_changes": [],
+            "rule": "reservation.inputs 在任务开始时已预扣；consumed 表示确认消耗，不是再次扣除。completion_stock_changes 仅是完成结算的增减。物件结果 before/after 都在预扣之后，期间环境也会变化；不能从 after 再扣 inputs。背包前后为空表示旧记录未冻结，不推算交付。"
+          },
+          "actual_text": "已完成现场观察；没有制作、交付或新增物品。",
+          "delivered_message": null,
+          "success": true,
+          "blocked": "",
+          "latency_ms": 17075,
+          "decision_contact": null,
+          "decision_issue": {
+            "followup_decision": "continue",
+            "followup_id": "task:fixture-built-lamp",
+            "completion_target_id": null,
+            "followup_closure": null,
+            "step_review": {
+              "target_id": "activity:waylight-fit-shade",
+              "reason": "遮光罩已实际装好，亮度从0.95降到0.59、蓄光基本不变，这一步完成；剩下要看清罩片朝归路时夜间取水照明是否够用。",
+              "evidence_ids": [
+                "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan"
+              ]
+            }
+          },
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "遮光罩已经装好，夜里我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时取水的照明够不够。",
+            "reason": "罩片朝向归路、水岸一侧留暗，正是我原先想试的效果，现在灯已有罩，可以实际试一次净滤取水。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "activity",
+              "id": "waylight-use"
+            },
+            "wait_for": null,
+            "completed_steps": [],
+            "last_reviewed_at": "2026-10-20T11:10:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "completion_target": {
+              "id": "activity:waylight-fit-shade",
+              "kind": "activity",
+              "title": "实际完成「给归途灯装上遮光罩」这一步",
+              "actor_id": "shaping-001",
+              "activity_id": "waylight-fit-shade",
+              "object_id": "floating-frame",
+              "asset_id": "waylight:fixture-built-lamp",
+              "requires_hood": true
+            },
+            "target_bound_at": "2026-10-20T11:00:00.000Z",
+            "completion_proofs": [
+              {
+                "evidence_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+                "target_key": "{\"id\":\"activity:waylight-fit-shade\",\"kind\":\"activity\",\"title\":\"实际完成「给归途灯装上遮光罩」这一步\",\"actor_id\":\"shaping-001\",\"activity_id\":\"waylight-fit-shade\",\"object_id\":\"floating-frame\",\"asset_id\":\"waylight:fixture-built-lamp\",\"requires_hood\":true}",
+                "bound_at": "2026-10-20T11:00:00.000Z"
+              }
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "created_at": "2026-10-20T11:10:00.000Z",
+            "wait_started_at": "2026-10-20T11:10:00.000Z",
+            "followup_id": "task:fixture-built-lamp",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T12:10:00.000Z"
+          },
+          "issues": {
+            "current": {
+              "status": "continue",
+              "question": "遮光罩装好后，我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时，取水的照明够不够。",
+              "reason": "现场观察已完成：灯仍有遮罩，蓄光约0.927、亮度约0.571，浮框水位约0.416，取水条件可用。下一步适合实际用灯净滤一桶水来检验照明，而不是再观察一遍。",
+              "delay_hours": 1,
+              "next_step": {
+                "kind": "activity",
+                "id": "waylight-use"
+              },
+              "followup_id": "task:fixture-built-lamp",
+              "completed_steps": [
+                {
+                  "target": {
+                    "id": "activity:waylight-fit-shade",
+                    "kind": "activity",
+                    "title": "实际完成「给归途灯装上遮光罩」这一步",
+                    "actor_id": "shaping-001",
+                    "activity_id": "waylight-fit-shade",
+                    "object_id": "floating-frame",
+                    "asset_id": "waylight:fixture-built-lamp",
+                    "requires_hood": true
+                  },
+                  "bound_at": "2026-10-20T11:00:00.000Z",
+                  "evidence_ids": [
+                    "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan"
+                  ],
+                  "reason": "遮光罩已实际装好，亮度从0.95降到0.59、蓄光基本不变，这一步完成；剩下要看清罩片朝归路时夜间取水照明是否够用。",
+                  "reviewed_at": "2026-10-20T12:10:00.000Z"
+                }
+              ],
+              "last_reviewed_at": "2026-10-20T12:13:00.000Z",
+              "object_scope_ids": [
+                "floating-frame"
+              ],
+              "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+              "wait_for": null,
+              "created_at": "2026-10-20T11:10:00.000Z",
+              "wait_started_at": "2026-10-20T12:13:00.000Z",
+              "origin_root_outcome_id": "task:fixture-built-lamp",
+              "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:2:plan",
+              "wait_count": 0,
+              "next_review_at": "2026-10-20T13:13:00.000Z"
+            },
+            "deferred": [],
+            "closed": []
+          },
+          "followup": {
+            "status": "continue",
+            "question": "遮光罩装好后，我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时，取水的照明够不够。",
+            "reason": "现场观察已完成：灯仍有遮罩，蓄光约0.927、亮度约0.571，浮框水位约0.416，取水条件可用。下一步适合实际用灯净滤一桶水来检验照明，而不是再观察一遍。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "activity",
+              "id": "waylight-use"
+            },
+            "followup_id": "task:fixture-built-lamp",
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-fit-shade",
+                  "kind": "activity",
+                  "title": "实际完成「给归途灯装上遮光罩」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-fit-shade",
+                  "object_id": "floating-frame",
+                  "asset_id": "waylight:fixture-built-lamp",
+                  "requires_hood": true
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan"
+                ],
+                "reason": "遮光罩已实际装好，亮度从0.95降到0.59、蓄光基本不变，这一步完成；剩下要看清罩片朝归路时夜间取水照明是否够用。",
+                "reviewed_at": "2026-10-20T12:10:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T12:13:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "wait_for": null,
+            "created_at": "2026-10-20T11:10:00.000Z",
+            "wait_started_at": "2026-10-20T12:13:00.000Z",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:13:00.000Z"
+          },
+          "audit": {
+            "verdict": "有进展，经过一次修复",
+            "note": "原生产选择没有合法自用消耗项；本人重新选择观察，并按证据保留装罩成果。修复后的内心独白提到“被拦下”，仍泄漏了格式校验过程。"
+          }
+        },
+        {
+          "turn": 3,
+          "at": "2026-10-20T13:13:00.000Z",
+          "action": "未采用计划",
+          "activity": null,
+          "operation": null,
+          "reason": null,
+          "result": null,
+          "actual_text": null,
+          "delivered_message": null,
+          "success": null,
+          "blocked": null,
+          "latency_ms": null,
+          "decision_contact": null,
+          "decision_issue": null,
+          "production_use": null,
+          "memory_anchor_checks": [],
+          "recollections": [],
+          "prior_issue": {
+            "status": "continue",
+            "question": "遮光罩装好后，我想实际借归途灯净滤一桶晚归的水，看看罩片朝归路、水岸留暗时，取水的照明够不够。",
+            "reason": "现场观察已完成：灯仍有遮罩，蓄光约0.927、亮度约0.571，浮框水位约0.416，取水条件可用。下一步适合实际用灯净滤一桶水来检验照明，而不是再观察一遍。",
+            "delay_hours": 1,
+            "next_step": {
+              "kind": "activity",
+              "id": "waylight-use"
+            },
+            "followup_id": "task:fixture-built-lamp",
+            "completed_steps": [
+              {
+                "target": {
+                  "id": "activity:waylight-fit-shade",
+                  "kind": "activity",
+                  "title": "实际完成「给归途灯装上遮光罩」这一步",
+                  "actor_id": "shaping-001",
+                  "activity_id": "waylight-fit-shade",
+                  "object_id": "floating-frame",
+                  "asset_id": "waylight:fixture-built-lamp",
+                  "requires_hood": true
+                },
+                "bound_at": "2026-10-20T11:00:00.000Z",
+                "evidence_ids": [
+                  "task:cognitive:r3:3c19013edee7:resources-1-off:1:plan"
+                ],
+                "reason": "遮光罩已实际装好，亮度从0.95降到0.59、蓄光基本不变，这一步完成；剩下要看清罩片朝归路时夜间取水照明是否够用。",
+                "reviewed_at": "2026-10-20T12:10:00.000Z"
+              }
+            ],
+            "last_reviewed_at": "2026-10-20T12:13:00.000Z",
+            "object_scope_ids": [
+              "floating-frame"
+            ],
+            "original_question": "入夜后，这盏归途灯怎样兼顾取水的照明和水岸留暗？我还想在实际条件下试一试。",
+            "wait_for": null,
+            "created_at": "2026-10-20T11:10:00.000Z",
+            "wait_started_at": "2026-10-20T12:13:00.000Z",
+            "origin_root_outcome_id": "task:fixture-built-lamp",
+            "from_root_outcome_id": "task:cognitive:r3:3c19013edee7:resources-1-off:2:plan",
+            "wait_count": 0,
+            "next_review_at": "2026-10-20T13:13:00.000Z"
+          },
+          "issues": null,
+          "followup": null,
+          "audit": {
+            "verdict": "引用错误，未执行",
+            "note": "experiment.reference_id须指本人原问题，却两次填写activity:waylight-use；未派发任务，未计作完成。"
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "计划 4 例、各 5 个模拟窗口；不能证明自然跨日、稳定兴趣或多人生活。",
+    "其他居民未运行自主认知，不把未回复说成拒绝。",
+    "resolved只核验绑定的具体一步；开放研究的satisfied是个人判断，不是客观结论。",
+    "相关来源仍依赖个人折射与引用范围，未验证任意自然语言的语义正确性。",
+    "费用按已登记单价估算，含修复及失败；实际账单未知。小样本P95只描述本批。",
+    "旧批次与本批路径和上下文不同；费用差异不能单独归因于压缩，也不能外推整镇日费用。"
+  ]
+}

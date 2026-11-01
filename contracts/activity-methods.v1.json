@@ -1,0 +1,44 @@
+{
+  "schema": "deskbot.activity-methods.v1",
+  "methods": [
+    {
+      "id": "collect-water", "version": 1, "topic": "care", "executor": "recipe",
+      "recipe": {"activity_id":"collect-water","title":"在泉眼汲水净滤","kind":"care","target":"floating-frame","seconds":600,"inputs":[{"container":"floating-frame","resource":"raw_water","count":4}],"output":{"container":"bag","resource":"water","count":4}},
+      "method": "在泉眼按普通方法汲取原水并净滤",
+      "effects": ["消耗泉眼4份原水，增加本人4份清水"],
+      "limits": ["不借用归途灯，不测量灯的照明表现，不提供装罩对照证据"],
+      "conditions": [
+        {"field":"water_level","op":"gte","value":0.15,"code":"water_level_low","reason":"水位过低，暂时无法汲水。"},
+        {"field":"water_level","op":"lte","value":0.88,"code":"water_level_high","reason":"水位过高，暂时无法安全汲水。"},
+        {"field":"condition","op":"gte","value":0.4,"code":"facility_damaged","reason":"浮框已经损坏，需要先修缮再汲水。"}
+      ],
+      "observations": [{"field":"water_level","label":"水位"},{"field":"condition","label":"浮框完好度"}],
+      "experiment": null
+    },
+    {
+      "id": "waylight-use", "version": 1, "topic": "care", "executor": "waylight",
+      "recipe": {"activity_id":"waylight-use","title":"借归途灯净滤一桶晚归的水","kind":"care","target":"floating-frame","seconds":300,"inputs":[{"container":"floating-frame","resource":"raw_water","count":4}],"output":{"container":"bag","resource":"water","count":4},"waylight_rule":"waterside-waylight-v1"},
+      "method": "在入夜条件下借归途灯看清刻线并净滤原水",
+      "effects": ["消耗4份原水，增加本人4份清水，执行器记录同一盏灯的一次实际使用"],
+      "limits": ["未交付清水；蓄光与亮度还随时间和环境变化，前后差值不证明装罩的单独因果"],
+      "conditions": [],
+      "observations": [{"field":"waylight.brightness","label":"亮度"},{"field":"waylight.charge","label":"蓄光量"},{"field":"waylight.moisture","label":"灯具湿润度"},{"field":"waylight.use_count","label":"实际使用次数"}],
+      "experiment": {"purpose":"记录同一盏灯在当前罩片状态下能否支持一次实际净滤","subject":"waylight.asset_id","axes":["waylight.mode","waylight.has_hood","$phase"]}
+    },
+    {
+      "id": "measure-bank-light", "version": 1, "topic": "explore", "executor": "sample",
+      "recipe": {"activity_id":"measure-bank-light","title":"在水岸测记归途灯的明暗","kind":"care","target":"floating-frame","seconds":180,"inputs":[]},
+      "method": "留在浮框旁三分钟，记录灯的亮度、蓄光与湿润度",
+      "effects": ["留下开始与结束的观测值、对象和罩片条件；不生产清水，不调整灯具"],
+      "limits": ["单次记录不能证明哪一种罩片更好；时间、环境也在变化，比较必须保留各次真实条件"],
+      "conditions": [
+        {"field":"waylight.asset_id","op":"exists","code":"method_subject_missing","reason":"这里还没有可测记的归途灯。"},
+        {"field":"$phase","op":"eq","value":"night","code":"method_requires_night","reason":"这次要观察夜间的明暗，等入夜再来。"},
+        {"field":"water_level","op":"lte","value":0.88,"code":"water_level_high","reason":"水位过高，暂时不能站在浮框旁测记。"},
+        {"field":"condition","op":"gte","value":0.4,"code":"facility_damaged","reason":"浮框损坏，需要先修缮。"}
+      ],
+      "observations": [{"field":"waylight.brightness","label":"亮度"},{"field":"waylight.charge","label":"蓄光量"},{"field":"waylight.moisture","label":"灯具湿润度"}],
+      "experiment": {"purpose":"留下当前罩片状态下的夜间观测，用于之后与其他实际条件比较","subject":"waylight.asset_id","axes":["waylight.mode","waylight.has_hood","$phase"]}
+    }
+  ]
+}

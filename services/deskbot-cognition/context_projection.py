@@ -4,6 +4,7 @@ Identity remains in Asamana's personality layer. Execution uses the full frozen
 context, irrespective of this prompt-only projection.
 """
 from copy import deepcopy
+from followup_phases import FEEDBACK_PROMPT
 
 BODY_BOUNDARY = ('现实身体无摄像头、不能走动，仅屏幕、声音、触摸、单轴转头。虚拟化身可以按实际任务行走。'
                  '只知道给定现场和自己的记录；留言是听闻，想法不是事实。库存、承诺、身份改变均由执行器核验。'
@@ -12,9 +13,29 @@ BODY_BOUNDARY = ('现实身体无摄像头、不能走动，仅屏幕、声音�
 def continuation_view(context):
     """Keep identity/history intact but label an old appraisal as dated, not current truth."""
     view = deepcopy(context.get('continuation') or {})
+    if context.get('phase') == 'feedback':
+        view['rule'] = FEEDBACK_PROMPT
+        # Unbound targets are plan choices. Keep the current target, completed
+        # history and actual resolution evidence available for honest feedback.
+        view.pop('completion_targets', None)
+        view.pop('decision_contract', None)
+        view.pop('step_contract', None)
+    if view.get('opportunity_contract'):
+        for key in ('next_options', 'wait_options'):
+            # IDs/conditions suffice for a future reference. Actual execution
+            # retains the complete frozen binding outside the prompt.
+            view[key] = [{k:v for k,v in o.items() if k not in ('binding','legacy_alias')}
+                         for o in view.get(key, []) if not o.get('legacy_alias')]
     for issue in [view.get('current'), *view.get('deferred', [])]:
         if not issue or 'current_conditions' not in issue:
             continue
+        for key in ('next_binding','wait_binding'):
+            if issue.get(key):
+                issue[key] = {k:v for k,v in issue[key].items() if k != 'binding'}
+        for key in ('next_step','wait_for'):
+            row = issue['current_conditions'].get(key)
+            if row:
+                issue['current_conditions'][key] = {k:v for k,v in row.items() if k != 'binding'}
         issue['original_question'] = issue.get('original_question') or issue.get('question', '')
         issue['previous_review'] = {k: issue.pop(k) for k in ('question', 'reason', 'next_step', 'wait_for') if k in issue}
         issue['previous_review']['at'] = issue.get('last_reviewed_at') or issue.get('wait_started_at') or issue.get('created_at')
@@ -22,7 +43,7 @@ def continuation_view(context):
     return view
 
 def stage_context(context, stage):
-    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context')
+    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context', 'goal_opportunities', 'event_evidence')
     research = ('inquiry', 'resonant_inquiry', 'windleaf_inquiry', 'waylight', 'development')
     if stage in ('perception', 'interrupt'):
         fields = common + ('social',)

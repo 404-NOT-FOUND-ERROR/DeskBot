@@ -31,7 +31,8 @@ function finish(w,task){
 function feedback(w,id){
  const at=w.clock.synced_at,job=`test-feedback-${++seq}`,result=cognitiveActualResult(w,id,at);
  applyCognitiveMutation(w,{actor_id:id,phase:'feedback',operation:'claim',job_id:job},at,job+':claim');
- applyCognitiveMutation(w,{actor_id:id,phase:'feedback',operation:'feedback',job_id:job,result,proposal:proposal(id,'feedback',{followup:{status:'none',question:'继续自己的生活',reason:'依据实际结果',delay_hours:2}})},at,job+':adopt');
+ const receipt=result.effects?.communication;
+ applyCognitiveMutation(w,{actor_id:id,phase:'feedback',operation:'feedback',job_id:job,result,proposal:proposal(id,'feedback',{followup:{status:'none',question:'继续自己的生活',reason:receipt?.summary??'依据实际结果',delay_hours:2,...(receipt?{communication_evidence_id:receipt.id}:{})}})},at,job+':adopt');
 }
 function perform(w,fields){
  const at=w.clock.synced_at,job=`test-action-${++seq}`;

@@ -11,6 +11,12 @@ export function completionTargets(w,id,activities=[],socialOptions=[],recipientI
   activity_id:a.activity_id,object_id:a.target_object_id,
   ...(a.activity_id==='waylight-fit-shade'&&lamp?{asset_id:lamp.asset_id,requires_hood:true}:{}),
  }));
+ for(const a of activities){
+  const e=a.method?.experiment;if(!e?.conditions?.subject)continue;
+  targets.push({id:e.completion_target_id,kind:'activity',title:`在已登记条件下完成「${a.title}」`,actor_id:id,
+    activity_id:a.activity_id,object_id:a.target_object_id,method_condition_key:e.condition_key,
+    method_version:a.method.version});
+ }
  // Public offers are not proof. The criterion is an actual handoff to this named peer.
  const own=[w.protagonist,...w.npcs].find(p=>(p.character_id??p.npc_id)===id);
  const peers=[w.protagonist,...w.npcs].filter(p=>(p.character_id??p.npc_id)!==id&&p.location_id===own?.location_id
@@ -30,6 +36,8 @@ export function issueResolutionEvidence(w,id,issue){
  const retained=(issue.completion_proofs??[]).filter(p=>p.target_key===JSON.stringify(target)&&p.bound_at===issue.target_bound_at).map(p=>p.evidence_id);
  if(target.kind==='activity')return [...new Set([...retained,...w.tasks.filter(t=>t.actor_id===id&&success(t)
   &&Date.parse(t.started_at)>=bound&&t.activity_id===target.activity_id&&t.target_object_id===target.object_id
+  &&(!target.method_condition_key||t.completion?.result?.method_result?.condition_key===target.method_condition_key
+    &&t.completion.result.method_result.version===target.method_version)
   &&(!target.asset_id||t.completion?.result?.after?.waylight?.asset_id===target.asset_id
    &&(!target.requires_hood||t.completion.result.after.waylight.has_hood===true)))
   .map(root)])];

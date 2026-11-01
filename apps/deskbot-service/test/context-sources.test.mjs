@@ -7,6 +7,18 @@ import { createContextSourceRegistry } from '../src/context-sources.mjs';
 
 const fixedTime = new Date('2026-09-04T08:00:00.000Z');
 
+test('configured sources use scheduler health instead of obsolete news placeholder', () => {
+  let state = {source_id:'nasa_science',display_name:'科学消息',enabled:true,status:'fresh',freshness:'fresh',last_success_at:fixedTime.toISOString(),
+    provenance:{mutation:'attributed_reference'}};
+  const registry=createContextSourceRegistry({now:()=>fixedTime,inputRuntime:{status:()=>({sources:[state]})}});
+  assert.ok(!registry.snapshot().sources.some(s=>s.source_id==='news'));
+  assert.equal(registry.snapshot().sources.find(s=>s.source_id==='nasa_science').status,'fresh');
+  state={...state,status:'disabled',enabled:false,freshness:'stale'};
+  const updated=registry.snapshot().sources.find(s=>s.source_id==='nasa_science');
+  assert.equal(updated.status,'disabled');assert.equal(updated.freshness,'stale');
+  assert.equal(updated.connection,'disabled');
+});
+
 test('runtime context exposes an auditable live server clock and unconfigured provider slots', () => {
   const context = createContextSourceRegistry({ now: () => fixedTime }).snapshot();
 

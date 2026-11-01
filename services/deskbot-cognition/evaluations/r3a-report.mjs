@@ -7,6 +7,7 @@ const optional=name=>existsSync(join(dir,name))?JSON.parse(readFileSync(join(dir
 const audit=optional('semantic-audit.json'),replay=optional('replay-check.json');
 const validation=optional('local-validation.json'),manifest=optional('manifest.json');
 const budgetStopped=r=>['call_limit_reached','budget_exhausted','budget_limit_reached'].includes(r.error);
+const reviewStopped=r=>r.error==='window_review_stopped';
 const calls=raw.budget?.calls??[],quantile=(values,q)=>values.length?[...values].sort((a,b)=>a-b)[Math.max(0,Math.ceil(values.length*q)-1)]:null;
 function usage(rows){return {calls:rows.length,input:rows.reduce((n,r)=>n+(r.usage?.prompt_tokens??0),0),output:rows.reduce((n,r)=>n+(r.usage?.completion_tokens??0),0),
  cost_cny:rows.reduce((n,r)=>n+r.held_cny,0),unknown:rows.filter(r=>r.uncertain).length,provider_failed:rows.filter(r=>r.status!=='completed').length,
@@ -15,17 +16,20 @@ function usage(rows){return {calls:rows.length,input:rows.reduce((n,r)=>n+(r.usa
 const report={schema:'deskbot.r3a-review.v1',version:raw.version,status:audit?.status??'真实调用已保存，语义审查未完成',
  summary:audit?.summary??'尚未判定行为达标。',usage:usage(calls),repairs:calls.filter(c=>c.stage.endsWith('_repair')).length,
  stages:[...new Set(calls.map(c=>c.stage))].map(stage=>({stage,...usage(calls.filter(c=>c.stage===stage))})),
- protocol_or_execution_failures:raw.results.filter(r=>r.error&&!budgetStopped(r)).length,
- budget_stops:raw.results.filter(budgetStopped).length,assessment:audit?.assessment??null,
- completed_windows:raw.results.flatMap(r=>r.turns).filter(t=>t.followup&&!t.truncated).length,
+ protocol_or_execution_failures:raw.results.filter(r=>r.error&&!budgetStopped(r)&&!reviewStopped(r)).length,
+ semantic_review_stops:raw.results.filter(reviewStopped).length,
+ budget_stops:raw.results.filter(budgetStopped).length,assessment:audit?.assessment??null,campaign_usage:audit?.campaign_usage??null,
+ completed_windows:raw.results.flatMap(r=>r.turns).filter(t=>t.after&&!t.truncated&&(t.feedback_proposal||t.compiled?.operation==='wait')).length,
+ deterministic_choice_windows:raw.results.flatMap(r=>r.turns).filter(t=>['single-choice-v1','choice-catalogue-v2'].includes(t.plan_proposal?.choice_binding?.contract)).length,
  observed_windows:raw.results.reduce((n,r)=>n+r.turns.length,0),planned_windows:(validation?.cases?.length??raw.results.length)*(manifest?.turns??4),
  window_p50_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.5),
  window_p95_ms:quantile(raw.results.flatMap(r=>r.turns).map(t=>t.latency_ms).filter(Number.isFinite),.95),
  replay,checks:optional('local-validation.json'),local_revision:optional('local-followup.json'),findings:audit?.findings??[],
- cases:raw.results.map(r=>({id:r.id,error:r.error??null,error_detail:r.error_detail??null,stop_kind:r.error?(budgetStopped(r)?'budget':'error'):null,elapsed_ms:r.latency_ms,note:audit?.cases?.[r.id]?.note??'待逐例审查',
+ cases:raw.results.map(r=>({id:r.id,error:r.error??null,error_detail:r.error_detail??null,stop_kind:r.error?(budgetStopped(r)?'budget':reviewStopped(r)?'review':'error'):null,elapsed_ms:r.latency_ms,note:audit?.cases?.[r.id]?.note??'待逐例审查',
   turns:r.turns.map(t=>({turn:t.turn,at:t.at,action:t.task?.title??t.compiled?.operation??'未采用计划',activity:t.task?.activity_id??null,
    operation:t.compiled?.operation??null,reason:t.reason??null,result:t.actual_result?.effects??null,
-   actual_text:t.task?.cognitive_operation==='share'?'留言送达；物品未交接，所谈活动未因此完成。':t.compiled?.operation==='wait'?'本人选择暂不行动，保留后续复查；没有新增物质成果。':t.task?.completion?.result?.text??(t.task?.status==='completed'&&t.compiled?.operation==='rest'?'已完成这次休息；没有把休息计作研究成果。':t.task?.status==='completed'&&t.compiled?.operation==='observe'?'已完成现场观察；没有制作、交付或新增物品。':null),
+   feedback_pending:Boolean(t.actual_result&&!t.feedback_proposal),
+   actual_text:t.task?.cognitive_operation==='share'?(t.task.cognitive_message_delivered_at?'留言送达；物品未交接，所谈活动未因此完成。':'留言未送达；没有向对方公开结果。'):t.compiled?.operation==='wait'?'本人选择暂不行动，保留后续复查；没有新增物质成果。':t.task?.completion?.result?.text??(t.task?.status==='completed'&&t.compiled?.operation==='rest'?'已完成这次休息；没有把休息计作研究成果。':t.task?.status==='completed'&&t.compiled?.operation==='observe'?'已完成现场观察；没有制作、交付或新增物品。':null),
    delivered_message:t.task?.cognitive_message_delivered_at?t.task?.cognitive_message?.text??null:null,
    success:t.actual_result?.success??null,blocked:t.actual_result?.failure_reason??null,latency_ms:t.latency_ms??null,
    decision_contact:t.plan_proposal?.decision_contact??null,

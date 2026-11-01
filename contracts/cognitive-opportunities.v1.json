@@ -1,0 +1,9 @@
+{
+  "schema": "deskbot.opportunity-contract.v1",
+  "view_schema": "deskbot.opportunities.v1",
+  "goal_schema": "deskbot.goal-opportunities.v1",
+  "reference_kinds": ["opportunity", "activity", "social", "reply", "commitment"],
+  "executable_statuses": ["ready"],
+  "schedulable_statuses": ["ready", "blocked"],
+  "rule": "One executor-owned opportunity per concrete method, purpose and recipient. A future step is not a reservation or completed goal. Legacy aliases are admitted only when unambiguous. Missing or changed conditions require review, never an invented result."
+}

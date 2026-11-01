@@ -6,6 +6,7 @@ import {RESONANT_ACTIVITIES,resonantActivityReason,resonantActivityBinding,apply
 import {WINDLEAF_ACTIVITIES,windleafActivityReason,windleafActivityBinding,applyWindleafActivity,advanceWindleafLife} from './windleaf-life.mjs';
 import {diningSeats,nextDiningSlot} from './meal-coordination.mjs';
 import {WAYLIGHT_ACTIVITIES,waylightActivityReason,waylightActivityBinding,applyWaylightActivity,advanceWaylightLife} from './waylight-life.mjs';
+import {METHOD_RECIPES,methodView,methodBlocker,bindMethod,settleMethod} from './activity-methods.mjs';
 export const LIVING_RULE_VERSION = 'morrowmere-living-resources-v1';
 export const RESOURCE_RENEWAL_VERSION = 'morrowmere-resource-renewal-v1';
 export const SPRING_UNITS_PER_HOUR = .75;
@@ -50,9 +51,8 @@ export const ACTIVITIES = Object.freeze([
   { activity_id: 'gather-light-fruit', title: '在林缘采集两份光果', kind: 'care', target: 'light-fruit-bough', seconds: 600, inputs: [{ container: 'light-fruit-bough', resource: 'light_fruit', count: 2 }], output: { container: 'bag', resource: 'light_fruit', count: 2 } },
   { activity_id: 'cook-grove-stew', title: '煮一锅林间光果餐', kind: 'craft', target: 'trial-stove', seconds: 1200, inputs: [{ container: 'bag', resource: 'light_fruit', count: 2 }, { container: 'trial-stove', resource: 'water', count: 1 }], output: { container: 'bag', resource: 'rations', count: 3 } },
   { activity_id: 'share-meal', title: '在长桌吃一份饭', kind: 'care', target: 'shared-table', seconds: 600, inputs: [{ container: 'shared-table', resource: 'rations', count: 1 }] },
-  { activity_id: 'collect-water', title: '在泉眼汲水净滤', kind: 'care', target: 'floating-frame', seconds: 600, inputs: [{ container: 'floating-frame', resource: 'raw_water', count: 4 }], output: { container: 'bag', resource: 'water', count: 4 } },
   { activity_id: 'save-seeds', title: '从苔芽中留种', kind: 'care', target: 'seedling-rack', seconds: 1200, inputs: [{ container: 'bag', resource: 'moss', count: 2 }], output: { container: 'bag', resource: 'seeds', count: 2 } },
-  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES, ...WINDLEAF_ACTIVITIES, ...WAYLIGHT_ACTIVITIES,
+  ...PROJECT_ACTIVITIES, ...FANTASY_ACTIVITIES, ...RESONANT_ACTIVITIES, ...WINDLEAF_ACTIVITIES, ...WAYLIGHT_ACTIVITIES, ...METHOD_RECIPES.filter(r=>!r.waylight_rule),
 ]);
 function definition(world, objectId) {
   const object = world.map_catalog?.objects?.find(o => o.object_id === objectId);
@@ -243,6 +243,8 @@ function activityBlocker(world, recipe, actorId, { completion = false, taskId = 
   // and reserved portion; a different use of the table remains exclusive.
   if(peers.length>=slots||peers.some(t=>recipe.activity_id==='share-meal'&&t.activity_id!=='share-meal'))return blocked('facility_busy','coordination',recipe.activity_id==='share-meal'?'长桌座位已满，等一位居民用完餐。':'有人正在使用这个设施，或还有未完成的活动。');
   if (!completion && world.living.recovery.pending) return blocked('world_recovery_pending', 'condition', '世界正在补算此前经过的时间。');
+  const methodReason=methodBlocker(world,recipe,actorId,at,{completion,task});
+  if(methodReason)return methodReason;
   const projectReason = projectActivityReason(world, recipe, actorId, at, { completion, task })??fantasyActivityReason(world,recipe,actorId,at,{completion,task})??resonantActivityReason(world,recipe,actorId,at,{completion,task})??windleafActivityReason(world,recipe,actorId,at,{completion,task})??waylightActivityReason(world,recipe,actorId,at,{completion,task});
   if (projectReason) return blocked('project_conditions_changed', 'condition', projectReason);
   const bed = world.living.objects['garden-bed'];
@@ -252,11 +254,6 @@ function activityBlocker(world, recipe, actorId, { completion = false, taskId = 
   if (recipe.activity_id === 'water-bed' && bed?.moisture > .82) return blocked('crop_already_wet', 'condition', '苗床已经很湿，不宜再浇水。');
   if (recipe.activity_id === 'drain-bed' && bed?.moisture < .72) return blocked('crop_not_waterlogged', 'condition', '苗床现在没有积水。');
   if (recipe.activity_id === 'repair-frame' && state.water_level > .88) return blocked('water_level_high', 'condition', '水位过高，暂时无法安全修补浮框。');
-  if (recipe.activity_id === 'collect-water') {
-    if (state.water_level < .15) return blocked('water_level_low', 'condition', '水位过低，暂时无法汲水。');
-    if (state.water_level > .88) return blocked('water_level_high', 'condition', '水位过高，暂时无法安全汲水。');
-    if (state.condition < .4) return blocked('facility_damaged', 'condition', '浮框已经损坏，需要先修缮再汲水。');
-  }
   if (['craft-tray', 'craft-frame-kit', 'cook-moss', 'cook-grove-stew'].includes(recipe.activity_id) && state.condition < .4) return blocked('facility_damaged', 'condition', '设施已经损坏，需要先修缮。');
   if (['repair-frame', 'repair-bench', 'repair-rack', 'repair-stove', 'stitch-canopy'].includes(recipe.activity_id) && state.condition > .9) return blocked('facility_healthy', 'condition', '设施状况良好，暂时无需修缮。');
   if (!completion) for (const input of recipe.inputs) if (countIn(world, input.container, actorId, input.resource) < input.count) return blocked('material_shortage', 'resource', `缺少${RESOURCES[input.resource]}，需要 ${input.count} 份${input.container === 'bag' ? '随身携带' : ''}。`);
@@ -273,11 +270,13 @@ export function prepareLivingActivity(world, activityId, actorId, at) {
   const blocker = activityBlocker(world, recipe, actorId, { at });
   if (blocker) throw Object.assign(new LivingResourceError('activity_unavailable',blocker.reason),{blocker_code:blocker.code,classification:blocker.classification,target_object_id:recipe.target});
   const projectBinding = projectActivityBinding(world, recipe);
+  const methodBinding = bindMethod(world,actorId,activityId,at);
   const reserved = recipe.inputs.map(input => ({ ...input, container: input.container === 'bag' ? `bag:${actorId}` : input.container }));
   for (const input of recipe.inputs) container(world, input.container, actorId).stock[input.resource] -= input.count;
   world.living.revision += 1;
   note(world, at, `${person(world, actorId).display_name ?? '居民'}开始${recipe.title}。`, { kind: 'activity_started', activity_id: activityId, actor_id: actorId });
   return { activity_id: activityId, target_object_id: recipe.target, title: recipe.title, kind: recipe.kind, duration_seconds: recipe.seconds,
+    ...(methodBinding?{method_binding:methodBinding}:{}),
     completion_effect: LIVING_RULE_VERSION, reservation: { status: 'held', inputs: reserved,
       ...(activityId==='share-meal'?{facility_slot:nextDiningSlot(world)}:{}) }, ...projectBinding, ...fantasyActivityBinding(world,recipe,actorId),...resonantActivityBinding(world,recipe,actorId),...windleafActivityBinding(world,recipe,actorId),...waylightActivityBinding(world,recipe) };
 }
@@ -324,7 +323,8 @@ export function completeLivingActivity(world, task, at) {
   target.updated_at = at; task.reservation.status = 'consumed'; world.living.revision += 1;
   const text = recipe.activity_id === 'harvest-bed' ? `收获了 ${changes[0].count} 份鲜苔芽，苗床等待下一次播种。` : recipe.activity_id === 'share-meal' ? '在长桌吃完一份饭。' : `${recipe.title}完成了。`;
   note(world, at, text, { kind: 'activity_completed', task_id: task.task_id, actor_id: task.actor_id });
-  return { success: true, text, before, after: copy(target), stock_changes: changes, ...(fantasyResult?{fantasy_result:fantasyResult}:{}), ...(projectResult ? { project_result: projectResult } : {}) };
+  const methodResult=settleMethod(world,task,at,changes);
+  return { success: true, text, before, after: copy(target), stock_changes: changes, ...(methodResult?{method_result:methodResult}:{}), ...(fantasyResult?{fantasy_result:fantasyResult}:{}), ...(projectResult ? { project_result: projectResult } : {}) };
 }
 function heldCount(world, storageId, resource) {
   return (world.tasks ?? []).filter(t => t.reservation?.status === 'held').flatMap(t => t.reservation.inputs).filter(input => input.container === storageId && input.resource === resource).reduce((sum, input) => sum + input.count, 0);
@@ -378,6 +378,7 @@ export function livingReadModel(world, actorId = world.protagonist.character_id,
     activities: ACTIVITIES.filter(recipe => projectActivityVisible(world, recipe, actorId)).map(recipe => {
       const reason = eligibility(world, recipe, actorId, { at });
       return { activity_id: recipe.activity_id, title: recipe.title, kind: recipe.kind, target_object_id: recipe.target,
+        ...(methodView(world,actorId,recipe.activity_id,at)?{method:methodView(world,actorId,recipe.activity_id,at)}:{}),
         location_id: definition(world, recipe.target)?.location_id ?? null, duration_seconds: recipe.seconds,
         inputs: recipe.inputs.map(input => ({ resource: input.resource, name: RESOURCES[input.resource], count: input.count, from: input.container === 'bag' ? '随身袋' : definition(world, input.container)?.name ?? input.container })),
         ...(recipe.project_id ? { project_id: recipe.project_id, project_stage_id: recipe.project_stage } : {}),

@@ -5,6 +5,10 @@ import {RESONANT_REVIEW_SECONDS} from './resonant-life.mjs';
 import {WINDLEAF_LAW} from './windleaf-life.mjs';
 import {WAYLIGHT_LAW} from './waylight-life.mjs';
 import {completionTargets,issueResolutionEvidence,hasNewIssueEvidence,issueObjectIds} from './cognitive-issue-evidence.mjs';
+import {opportunityBinding,validateOpportunityTransition} from './cognitive-opportunities.mjs';
+import {ownContactReceipts} from './cognitive-contact-purpose.mjs';
+import {readFileSync} from 'node:fs';
+const phases=JSON.parse(readFileSync(new URL('../../../contracts/cognitive-followup-phases.v1.json',import.meta.url),'utf8'));
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
 const ms=value=>Date.parse(value);
@@ -12,7 +16,7 @@ const iso=value=>new Date(value).toISOString();
 const active=f=>f&&['continue','postpone'].includes(f.status);
 const issueId=f=>f?.followup_id??f?.origin_root_outcome_id??f?.from_root_outcome_id??null;
 const issueRoots=f=>[f?.origin_root_outcome_id,f?.from_root_outcome_id].filter(Boolean);
-const SERVER_FIELDS=['completion_target','target_bound_at','resolution_evidence_ids','completion_proofs','object_scope_ids','related_object_ids','current_conditions','completed_steps'];
+const SERVER_FIELDS=phases.server_fields;
 export function validateFollowupTransition(value,context){
  if(SERVER_FIELDS.some(k=>Object.hasOwn(value,k)))fail('followup_server_fields');
  validateNextStep(value,context);
@@ -131,12 +135,16 @@ export function cognitiveContinuationContext(w,id,at,activities=[],commitments=[
    applies_only_to:a.activity_id,
    ...timing,...(timing.ready_at?{ready_time:cognitiveTime(timing.ready_at,zone),minutes_until_clock_ready:Math.max(0,Math.ceil((ms(timing.ready_at)-ms(at))/60000))}:{})};
  });
- const outgoing=(life.outbox??[]).slice(-4),waitingMessage=(life.outbox??[]).find(m=>life.followup?.wait_for?.kind==='reply'&&m.message_id===life.followup.wait_for.id);
- if(waitingMessage&&!outgoing.includes(waitingMessage))outgoing.unshift(waitingMessage);
+ const receipts=ownContactReceipts(life),outgoing=receipts.slice(-4);
+ for(const f of [life.followup,...(life.deferred_followups??[])]){
+  const message=receipts.find(m=>f?.wait_for?.kind==='reply'&&m.message_id===f.wait_for.id);
+  if(message&&!outgoing.includes(message))outgoing.unshift(message);
+ }
  for(const message of outgoing){
   const replies=(life.inbox??[]).filter(m=>isCognitiveReplyTo(message,m));
   options.push({kind:'reply',id:message.message_id,title:'等这条已送达消息的回应',sent_at:message.at,sent_time:cognitiveTime(message.at,zone),
-   receiver_ids:copy(message.receiver_ids??[]),commitment_id:message.commitment_id??null,text:message.text,available:replies.length>0,reply_ids:replies.map(m=>m.message_id)});
+   receiver_ids:copy(message.receiver_ids??[]),commitment_id:message.commitment_id??null,text:message.text,
+   available:replies.length>0||Boolean(message.response_receipts?.length),reply_ids:[...new Set([...replies.map(m=>m.message_id),...(message.response_receipts??[]).map(r=>r.reply_id).filter(Boolean)])]});
  }
  for(const c of commitments)options.push({kind:'commitment',id:c.id,title:c.title,status:c.status,available:['completed','declined','withdrawn','failed','cancelled','expired'].includes(c.status),
   not_before_at:c.not_before_at??null,deadline_at:c.deadline_at??null});
@@ -177,6 +185,7 @@ export function validateWaitFor(value,context){
  return copy(value);
 }
 export function validateNextStep(value,context){
+ validateOpportunityTransition(value,context);
  const waiting=selectedOption(context.wait_options??[],value.wait_for);
  if(context.wait_contract==='current-method-v1'&&waiting?.available)fail('followup_condition_already_ready');
  const step=value.next_step;
@@ -184,6 +193,7 @@ export function validateNextStep(value,context){
  if(typeof step!=='object'||Array.isArray(step)||Object.keys(step).some(k=>!['kind','id'].includes(k))
   ||!selectedOption(context.next_options??[],step))fail('followup_next_step_unknown');
  const wait=value.wait_for;
+ if(context.opportunity_contract)return; // Canonical opportunity identities, including aliases, were checked above.
  // A material/social handoff cannot be postponed on an unrelated gathering recipe.
  if(wait?.kind==='activity'&&(step.kind!=='activity'||step.id!==wait.id))fail('followup_wait_step_mismatch');
  if(wait?.kind==='commitment'&&(step.kind!=='commitment'||step.id!==wait.id))fail('followup_wait_step_mismatch');
@@ -193,7 +203,7 @@ export function validateNextStep(value,context){
 }
 function reviewAt(at,minutes,waitFor,context,since){
  let next=ms(at)+minutes*60000;const option=selectedOption(context.wait_options,waitFor);
- if(option?.kind==='activity'&&option.ready_at&&ms(option.ready_at)>ms(at))next=Math.min(next,ms(option.ready_at));
+ if((option?.kind==='activity'||option?.operation==='activity')&&option.ready_at&&ms(option.ready_at)>ms(at))next=Math.min(next,ms(option.ready_at));
  if(option?.kind==='reply')next=Math.min(next,Math.max(ms(at)+10*60000,ms(since)+6*3600000));
  return iso(next);
 }
@@ -213,6 +223,8 @@ export function cognitiveWaitFollowup(life,compiled,context,at){
   reason:compiled.reason,original_question:same?old.original_question??old.question:compiled.reason,followup_id:same?(issueId(old)??`followup:${since}`):`followup:${at}`,
   from_root_outcome_id:same?old.from_root_outcome_id??null:null,created_at:same?old.created_at??since:at,wait_started_at:since,
   wait_for:waitFor,next_step:copy(Object.hasOwn(compiled,'next_step')?compiled.next_step:old?.next_step??null),wait_count:(same?old.wait_count??0:0)+1,last_reviewed_at:at,
+  next_binding:Object.hasOwn(compiled,'next_step')?opportunityBinding(compiled.next_step,context):copy(same?old?.next_binding??null:null),
+  wait_binding:opportunityBinding(waitFor,context),
   object_scope_ids:copy(same?old.object_scope_ids??[]:[]),
   completed_steps:copy(same?old.completed_steps??[]:[]),
   ...(same&&old.completion_target?{completion_target:copy(old.completion_target),target_bound_at:old.target_bound_at,completion_proofs:copy(old.completion_proofs??[])}:compiled.completion_target_id?{completion_target:copy(context.completion_targets.find(t=>t.id===compiled.completion_target_id)),target_bound_at:at}:{}),
@@ -220,7 +232,9 @@ export function cognitiveWaitFollowup(life,compiled,context,at){
 }
 export function cognitiveResultFollowup(life,followup,context,at,root,decision=null){
  if(followup&&SERVER_FIELDS.some(k=>Object.hasOwn(followup,k)))fail('followup_server_fields');
- if(followup?.completion_target_id!=null)fail('followup_target_requires_plan');
+ // The Node boundary checks the entire reply, even if Python was bypassed.
+ // Plan-only fields must never be silently persisted or executed here.
+ if(followup&&Object.keys(followup).some(k=>!phases.feedback.allowed_fields.includes(k)))fail(phases.feedback.invalid_code);
  if(!followup||!['continue','postpone','drop','none'].includes(followup.status)||typeof followup.question!=='string'||typeof followup.reason!=='string'||!Number.isSafeInteger(followup.delay_hours)||followup.delay_hours<1||followup.delay_hours>48)fail('followup_invalid');
  const waitFor=validateWaitFor(followup.wait_for,context);
  validateNextStep(followup,context);
@@ -236,7 +250,8 @@ export function cognitiveResultFollowup(life,followup,context,at,root,decision=n
  const same=Boolean(waitFor&&JSON.stringify(waitFor)===JSON.stringify(old?.wait_for)&&['continue','postpone'].includes(old?.status));
  const since=same?(old.wait_started_at??old.created_at??at):at;
  const target=sameIssue?old.completion_target:life.pending?.completion_target;
- followup={...followup,completed_steps:copy(sameIssue?old.completed_steps??[]:[])};
+ followup={...followup,completed_steps:copy(sameIssue?old.completed_steps??[]:[]),
+  next_binding:opportunityBinding(followup.next_step,context),wait_binding:opportunityBinding(waitFor,context)};
  return {...copy(followup),last_reviewed_at:at,object_scope_ids:copy((sameIssue?old:life.pending)?.object_scope_ids??[]),...(target?{completion_target:copy(target),target_bound_at:sameIssue?old.target_bound_at:life.pending.target_bound_at,completion_proofs:copy((sameIssue?old:life.pending).completion_proofs??[])}:{}),original_question:sameIssue?old.original_question??old.question:followup.question,wait_for:waitFor,created_at:sameIssue?old.created_at??at:at,wait_started_at:since,followup_id:sameIssue||same?issueId(old)??root:root,
   origin_root_outcome_id:sameIssue?old.origin_root_outcome_id??old.from_root_outcome_id??root:root,
   from_root_outcome_id:root,wait_count:same?old.wait_count??0:0,next_review_at:reviewAt(at,minutes,waitFor,context,since)};
@@ -274,6 +289,9 @@ export function unansweredCognitiveContacts(w,id){
  return pending;
 }
 export function duplicateUnansweredMessage(w,id,message){
+ // Catalogue speech already checked its concrete purpose, terms and recipient
+ // against persisted receipts. Unrelated issue evidence is not consulted.
+ if(message.contact_purpose)return null;
  const life=w.cognition?.actors[id]??{},basis=message.contact_basis;
  if(basis?.followup_id&&!message.reply_to&&!message.social_command){
   const repeated=unansweredCognitiveContacts(w,id).some(old=>old.followup_id===basis.followup_id

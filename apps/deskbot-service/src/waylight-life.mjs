@@ -1,5 +1,6 @@
 // R2: one shared, finite work of light, used by the existing life executor.
 // All laws below describe the Shaping Field, not real plants or lighting safety.
+import {METHOD_RECIPES} from './activity-methods.mjs';
 export const WAYLIGHT_VERSION='waterside-waylight-v1';
 export const WAYLIGHT_ACTORS=['shaping-001','lamp-keeper-001','wetland-grower-001'];
 export const WAYLIGHT_LAW=Object.freeze({day_charge_per_hour:.14,open_drain_per_hour:.04,hooded_drain_per_hour:.025,
@@ -18,7 +19,7 @@ export const WAYLIGHT_ACTIVITIES=Object.freeze([
   recipe('waylight-open','重新展开归途灯的罩片','floating-frame',300),
   recipe('waylight-shade','把归途灯的罩片合到背水侧','floating-frame',300),
   recipe('waylight-repair','缝补同一盏归途灯','floating-frame',900,[bag('cloth',1),bag('fasteners',1)]),
-  recipe('waylight-use','借归途灯净滤一桶晚归的水','floating-frame',300,[{container:'floating-frame',resource:'raw_water',count:4}],bag('water',4)),
+  ...METHOD_RECIPES.filter(r=>r.waylight_rule),
 ]);
 export function installWaylightLife(w,at){
   if(!w.windleaf_life||!w.living?.objects['floating-frame']||w.waylight_life?.version===WAYLIGHT_VERSION)return false;

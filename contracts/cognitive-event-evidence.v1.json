@@ -1,0 +1,13 @@
+{
+  "schema": "deskbot.cognitive-event-evidence.v1",
+  "disclosure_schema": "deskbot.result-disclosure.v1",
+  "receipt_schema": "deskbot.message-receipt.v1",
+  "disclosure_kinds": ["completion_notice", "result_extract"],
+  "obligation_statuses": ["accepted", "meeting", "working"],
+  "obligation_ref_fields": ["commitment_id", "terms_revision"],
+  "feedback_id_field": "communication_evidence_id",
+  "errors": {"obligation": "cognitive_obligation_evidence_invalid", "communication": "cognitive_communication_evidence_invalid"},
+  "obligation_rule": "accepted_obligation 必须填写 obligation_ref:{commitment_id,terms_revision}，逐字选择 event_evidence.obligations 中包含本次 choice_id 的一项。仅有来信、正文署名、邀请或自己打算不构成已接受责任。其他 motivation 不填写 obligation_ref。没有匹配项时按自己的实际原因选择其他类别或暂不行动，程序不替本人改写归因。",
+  "feedback_rule": "若 actual_result.effects.communication 有回执，本次 reason 是事实依据：必须逐字等于回执 summary，并填写 communication_evidence_id 等于回执 id。question 表达尚待做的事或疑问；个人感受留在独立经历记忆。回执只证明实际送达的正文和列出的公开字段；不证明对方理解、接受，不交物，不公开来源全文或私人理由。没有回执时不得编造 communication_evidence_id。",
+  "boundary": "执行器产生摘录和回执；模型选择沟通与后续，不增加已发送字段。自由感受和未来意向不作为公共事实。旧记录没有该合同的回执时保留旧语义，不补造历史。"
+}
