@@ -88,5 +88,5 @@ export function eventEvidenceContext(w,id,c){
  return {schema:EVENT_EVIDENCE.schema,obligations:obligationEvidence(w,id,c),obligation_rule:EVENT_EVIDENCE.obligation_rule,
   feedback_rule:EVENT_EVIDENCE.feedback_rule,
   // A known name alone provides no remote position. No other actor's private state.
-  people:c.visible_people.map(p=>({actor_id:p.actor_id,location_id:c.location.id,observed_at:c.at,basis:'seen_here'}))};
+  people:c.position_knowledge.people,position_rule:c.position_knowledge.rule};
 }

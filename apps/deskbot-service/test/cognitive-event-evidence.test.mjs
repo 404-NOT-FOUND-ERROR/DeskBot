@@ -73,7 +73,7 @@ _,bound=bind_catalogue_choice(p,c,[NS(action_type=NS(value=k)) for k in ('work',
 json.dump(bound,sys.stdout,ensure_ascii=False)`;
  const proc=spawnSync(findCognitionPython(),['-c',script],{cwd:fileURLToPath(new URL('../../../services/deskbot-cognition/',import.meta.url)),input:JSON.stringify([context,payload]),encoding:'utf8',env:{...process.env,PYTHONUTF8:'1'},windowsHide:true});
  assert.equal(proc.status,0,proc.stderr);const compiled=JSON.parse(proc.stdout);
- const proposal={schema:'deskbot.cognitive-life.proposal.v3',actor_id:OWNER,phase:'plan',state:{},memories:[],compiled,action:{inner_monologue:compiled.reason},
+ const proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'plan',state:{},memories:[],compiled,action:{inner_monologue:compiled.reason},
   choice_binding:{contract:'choice-catalogue-v2',actor_payload:payload,compiled:structuredClone(compiled),model_compile_calls:0}};
  const adopt=world=>applyCognitiveMutation(world,{actor_id:OWNER,operation:'plan',phase:'plan',job_id:'obligation',proposal,relevant_key:cognitiveRelevantKey(world,OWNER)},at,'adopt');
  const binding=proposal.choice_binding;delete proposal.choice_binding;const noReceipt=structuredClone(w);
@@ -103,14 +103,22 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
  const respond=async req=>{
   let v;
   if(req.stage==='perception')v={reason:'看看现场',emotion:'anticipation',intensity:.3,valence:.3,need_activation:{self_actualization:.4}};
-  else if(req.stage==='motivation')v={goals:[]};
+  else if(req.stage==='motivation'){
+   v={goal_updates:[]};
+   if(turn===2){
+    const view=JSON.parse(req.messages.at(-1).content),criterion=view.goals.criteria.find(k=>k.kind==='disclosure');
+    assert.ok(criterion);
+    v.goal_updates=[{operation:'new',goal_id:'goal:send-readings',text:'把这次真实读数告诉在场朋友',criterion_id:criterion.id,
+     next_step:{kind:'opportunity',id:criterion.opportunity_ids[0]},reason:'完成通知不等于传达实际数据'}];
+   }
+  }
   else if(req.stage==='decision'){
    const view=JSON.parse(req.messages.at(-1).content);
    const row=view.choices.find(r=>turn===1?r.effect.activity_id==='measure-bank-light':
     turn===2?r.effect.contact_purpose?.key==='share-result':r.effect.contact_purpose?.key==='share-result-fields');
    assert.ok(row,'intended option exists');
    v={act:true,choice_id:row.id,inner_monologue:'我想记录实际变化，再把可以公开的部分告诉朋友。',expected_outcome:'留下真实记录',issue:{decision:'continue',id:'current'},motivation:'self_continuation',source_ids:[]};
-  }else if(req.stage==='feedback')v=req.scene==='need_goal_generation'?{goals:[],residue:[]}:{reason:'记录结果',emotion:'joy',intensity:.3,valence:.3};
+  }else if(req.stage==='feedback')v=req.scene==='need_goal_generation'?{goal_updates:turn===3?[{operation:'complete',goal_id:'goal:send-readings',reason:'同一结果根的指定字段确已送达指定接收者'}]:[]}:{reason:'记录结果',emotion:'joy',intensity:.3,valence:.3};
   else if(req.stage==='memory')v=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
   else if(req.stage==='followup'||req.stage==='followup_repair'){
    const receipt=cognitiveActualResult(w,OWNER,w.clock.synced_at)?.effects.communication;
@@ -139,6 +147,7 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
  turn=2;await run('plan');let task=w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id);settle(w,task);
  const receipt=task.cognitive_message.receipt;
  assert.equal(receipt.disclosures[0].kind,'completion_notice');assert.ok(!receipt.text.includes('蓄光'));
+ assert.equal(cognitiveContext(w,OWNER,w.clock.synced_at).goal_lifecycle.goals.find(g=>g.goal_id==='goal:send-readings').evidence_ids.length,0);
  const taskCount=w.tasks.length,stock=structuredClone(w.living.inventories[OWNER]);
  mode='bad';await assert.rejects(run('feedback'),e=>e.failure?.cause_code==='cognitive_communication_evidence_invalid');
  // Close and reopen the same SQLite persistence used by the service. The
@@ -159,4 +168,5 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
  const peer=full.receiver_ids[0],received=w.cognition.actors[peer].inbox.find(m=>m.task_id===task.task_id);
  assert.deepEqual(received.receipt,full);assert.equal(received.contact_basis,undefined);
  assert.ok(w.cognition.actors[OWNER].followup.reason.includes('含回执列明的结果字段'));
+ assert.equal(w.cognition.actors[OWNER].goal_bindings['goal:send-readings'].lifecycle_status,'completed');
 });

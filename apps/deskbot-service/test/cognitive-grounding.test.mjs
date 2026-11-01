@@ -54,7 +54,7 @@ test('altered communication choice fails before adoption or resource changes',()
   const c=cognitiveContext(w,own,at),index=c.capabilities.share.receivers.find(r=>r.actor_id===peer).receiver_index;
   const before=JSON.stringify(w);
   assert.throws(()=>applyCognitiveMutation(w,{actor_id:own,operation:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,own),proposal:{
-    schema:'deskbot.cognitive-life.proposal.v3',actor_id:own,phase:'plan',state:{agent_id:own},memories:[],
+    schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:own,phase:'plan',state:{agent_id:own},memories:[],
     decision_contact:{kind:'message',receiver_ids:[peer],source_ids:[],followup_id:c.continuation.current.followup_id},
     compiled:{operation:'share',receiver_indices:[index],source_ids:[],followup_id:c.continuation.current.followup_id,reason:'改变主意',social:{operation:'invite',option_id:'visit'}},
   }},at,'adopt'),{code:'decision_contact_changed_by_compiler'});

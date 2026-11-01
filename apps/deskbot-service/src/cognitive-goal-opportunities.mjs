@@ -1,8 +1,10 @@
 import {OPPORTUNITY_CONTRACT,opportunityBinding,validateOpportunityTransition} from './cognitive-opportunities.mjs';
+import {GOAL_LIFECYCLE,prepareGoalLifecycle,lifecycleEvidence} from './cognitive-goal-lifecycle.mjs';
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
 
 function evidence(w,id,goal){
+ if(goal.schema===GOAL_LIFECYCLE.schema)return lifecycleEvidence(w,id,goal);
  return [...new Set([...(goal.evidence_ids??[]),...(w.tasks??[]).filter(t=>t.actor_id===id&&t.status==='completed'
   &&t.completion&&t.cognitive_observation&&t.completion.effect!=='no_effect'
   &&t.completion.result?.success!==false&&t.started_at>=goal.bound_at
@@ -13,14 +15,17 @@ function evidence(w,id,goal){
 export function cognitiveGoalOpportunities(w,id,c){
  const life=w.cognition?.actors[id]??{};
  const goals=Object.values(life.goal_bindings??{}).map(goal=>{
-  const roots=evidence(w,id,goal),current=c.opportunities.entries.find(e=>e.id===goal.binding.id);
-  return {...copy(goal),evidence_ids:roots,status:roots.length?'achieved':!current||current.identity!==goal.binding.identity?'review_required':current.status,
+  const roots=evidence(w,id,goal),current=c.opportunities.entries.find(e=>e.id===goal.binding?.id);
+  return {...copy(goal),evidence_ids:roots,status:roots.length?'achieved':!current||current.identity!==goal.binding?.identity?'review_required':current.status,
    reason:roots.length?'实际完成了绑定的具体步骤；不证明更大愿望已经实现。':current?.blocker??null};
  });
  return {schema:OPPORTUNITY_CONTRACT.goal_schema,goals,rule:'绑定属于一个具体机会步骤。未绑定的目标仍是个人设想，没有执行权限或客观完成证据。目标过期、放下、失败与实际完成分开。'};
 }
 
 export function prepareGoalBindings(life,proposal,c,refs,at){
+ if(proposal.goal_contract===GOAL_LIFECYCLE.schema)return prepareGoalLifecycle(life,proposal,c,refs,at);
+ if(refs.goal_lifecycle?.schema===GOAL_LIFECYCLE.schema||proposal.goal_contract!=null||proposal.goal_updates!=null
+  ||Object.values(life.goal_bindings??{}).some(g=>g.schema===GOAL_LIFECYCLE.schema))fail('goal_lifecycle_contract_required');
  const bindings=copy(life.goal_bindings??{}),declarations=proposal.goal_bindings??[];
  if(!Array.isArray(declarations)||declarations.length>2)fail('goal_opportunity_invalid');
  if(c.phase!=='plan'&&declarations.length)fail('goal_opportunity_requires_plan');

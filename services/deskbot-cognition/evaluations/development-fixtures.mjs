@@ -38,7 +38,7 @@ export function settle(w,task){
 export function policyChoice(w,compiled,job=`fixture:${w.tasks.length}:${w.clock.synced_at}`){
  const at=w.clock.synced_at;
  applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'plan',job_id:job},at,job+':claim');
- const proposal={schema:'deskbot.cognitive-life.proposal.v3',actor_id:OWNER,phase:'plan',state:{},action:{action_description:'确定性合同测试'},
+ const proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'plan',state:{},action:{action_description:'确定性合同测试'},
   compiled:{reason:'明确编排的隔离测试意图',source_ids:[],followup_decision:'continue',...compiled}};
  const result=applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:job,proposal,relevant_key:cognitiveRelevantKey(w,OWNER)},at,job+':adopt');
  const task=w.tasks.find(t=>t.task_id===result.task_id);settle(w,task);
@@ -47,7 +47,7 @@ export function policyChoice(w,compiled,job=`fixture:${w.tasks.length}:${w.clock
   const actual=cognitiveActualResult(w,OWNER,w.clock.synced_at),feedbackJob=job+':feedback';
   applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'feedback',job_id:feedbackJob},w.clock.synced_at,feedbackJob+':claim');
   const receipt=actual.effects?.communication;
-  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,actor_id:OWNER,phase:'feedback',state:{},memories:[],followup:{status:'continue',question:'测试后续仍待自主选择',reason:receipt?.summary??'确定性夹具',delay_hours:24,...(receipt?{communication_evidence_id:receipt.id}:{})}}},w.clock.synced_at,feedbackJob+':adopt');
+  applyCognitiveMutation(w,{actor_id:OWNER,operation:'feedback',job_id:feedbackJob,result:actual,proposal:{schema:proposal.schema,goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'feedback',state:{},memories:[],followup:{status:'continue',question:'测试后续仍待自主选择',reason:receipt?.summary??'确定性夹具',delay_hours:24,...(receipt?{communication_evidence_id:receipt.id}:{})}}},w.clock.synced_at,feedbackJob+':adopt');
  }
  return task;
 }

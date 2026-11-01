@@ -2,6 +2,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {pendingContactPurpose,purposeSignature} from './cognitive-contact-purpose.mjs';
 import {cognitiveActionSemantics} from './cognitive-action-semantics.mjs';
 import {validateObligationEvidence} from './cognitive-event-evidence.mjs';
+import {selfPositionDisclosure} from './cognitive-position-knowledge.mjs';
 
 const copy=structuredClone;
 const fail=code=>{throw Object.assign(Error(code),{code,statusCode:409});};
@@ -55,6 +56,8 @@ export function cognitiveChoiceCatalogue(w,id,c){
   add(title,{operation:'share',receiver_indices:[peer.receiver_index],contact,text,contact_purpose:purpose,speech_sources:evidence,...(disclosures.length?{disclosures:copy(disclosures)}:{})});
  };
  for(const peer of c.capabilities.share.receivers){
+  const position=selfPositionDisclosure(c);
+  contact(peer,'share-position',{location_id:c.location.id},'告诉'+peer.name+'我现在的位置',position.text,{kind:'message'},[],[position]);
   // An informal query and a formal offer share a purpose. Switching wrappers
   // must not bypass a pending question about exactly the same resource terms.
   for(const option of c.social.options){

@@ -45,6 +45,7 @@ from decision_fields import MOTIVATIONS, MOTIVATION_PROMPT
 from catalogue_choice import bind_catalogue_choice, CONTRACT as CATALOGUE_CONTRACT
 from failure_contract import error_frame
 from opportunity_goals import OpportunityNeedEngine
+from goal_lifecycle import CONTRACT as GOAL_LIFECYCLE, enabled as goal_lifecycle_enabled
 from event_evidence import CONTRACT as EVENT_EVIDENCE, communication_errors
 from contact_contract import (CONTACT_CONTRACT, contact_readiness, contact_intent_errors,
     bind_contact_intent, compiled_contact_errors, social_contact_errors)
@@ -125,7 +126,7 @@ class BoundedDecision(DecisionEngine):
         positions={p['actor_id']:p for p in self.context.get('event_evidence',{}).get('people',[])}
         people=[{'person_index':i,'actor_id':aid,'name':who.name,'contactable':aid in allowed,
                  'known_position':positions.get(aid),
-                 'position_rule':'只有known_position为本次亲见位置；其余未知，不从名字、职业或住处推断当前位置。'}
+                 'position_rule':self.context.get('event_evidence',{}).get('position_rule','只有本次亲见位置可知；其余未知，不从名字、职业或住处推断当前位置。')}
             for i,(aid,who) in enumerate(_message_roster(packet),1)]
         view={'self':personality.to_prompt_context(),
             'direction':plain(getattr(awareness,'need_evaluation',None)),
@@ -639,6 +640,9 @@ async def run(context):
     await memory.drain_writes()
     output['memory_anchor_checks']=memory.anchor_checks
     output['state']=plain(personality.state); output['memory_sequence']=memory._seq
+    if context['phase'] in ('plan','feedback') and goal_lifecycle_enabled(context):
+        output['goal_contract']=GOAL_LIFECYCLE['schema']
+        output['goal_updates']=plain(need.updates)
     original={m['id']:m['payload'] for m in saved.get('memories',[])}
     output['memories']=[];output['memory_updates']=[]
     for stream in MemoryStream:

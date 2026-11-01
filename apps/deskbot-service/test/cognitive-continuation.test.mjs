@@ -57,7 +57,7 @@ test('rewriting a wait does not renew its six-hour review boundary, explicit pos
 test('unknown wait references reject before mutating personal state or resources',()=>{
  const w=developmentFixture(),at=w.clock.synced_at,job='bad-wait';
  applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'plan',job_id:job},at,job+':claim');const before=structuredClone(w);
- assert.throws(()=>applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,OWNER),proposal:{schema:'deskbot.cognitive-life.proposal.v3',actor_id:OWNER,phase:'plan',state:{},compiled:{operation:'wait',reason:'偷看私信',wait_for:{kind:'reply',id:'private-other-message'}}}},at,job+':adopt'),{code:'followup_condition_unknown'});
+ assert.throws(()=>applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,OWNER),proposal:{schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'plan',state:{},compiled:{operation:'wait',reason:'偷看私信',wait_for:{kind:'reply',id:'private-other-message'}}}},at,job+':adopt'),{code:'followup_condition_unknown'});
  assert.deepEqual(w,before);
 });
 test('duplicate unanswered messages are blocked as non-executed attempts, without another delivery',()=>{

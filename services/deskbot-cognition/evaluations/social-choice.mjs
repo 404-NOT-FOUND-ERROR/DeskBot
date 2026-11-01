@@ -18,7 +18,7 @@ const arg=name=>process.argv.find(a=>a.startsWith(`--${name}=`))?.slice(name.len
 const output=resolve(arg('output')??'runtime/asamana-deployment/stage4a');mkdirSync(output,{recursive:true});
 const own='shaping-001',other='wetland-grower-001',at='2026-10-11T02:00:00.000Z';
 const cases=['ordinary','tired','prior-misgiving'].flatMap(variant=>[1,2,3].map(repeat=>({id:`${variant}:${repeat}`,variant,repeat})));
-const proposal=(id,phase,extra={})=>({schema:'deskbot.cognitive-life.proposal.v3',actor_id:id,phase,state:{agent_id:id},memories:[],...extra});
+const proposal=(id,phase,extra={})=>({schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:id,phase,state:{agent_id:id},memories:[],...extra});
 function settle(w,task){while(task.status==='running'){advanceLivingResources(w,task.due_at,{force:true});applyRealTimeClock(w,task.due_at);advanceWorldTask(w,{task_id:task.task_id,expected_task_revision:task.revision},task.due_at);}settleCognitiveTask(w,task,w.clock.synced_at);}
 function seed(c){
  const api=createPersistentWorld({timeMode:'realtime',now:()=>new Date(at)});

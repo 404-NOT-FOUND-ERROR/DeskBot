@@ -16,7 +16,7 @@ function fixture(){
  w.cognition={actors:{},epoch:BASE};w.memory??={episodes:[]};return w;
 }
 let seq=0;
-function proposal(id,phase,fields={}){return {schema:'deskbot.cognitive-life.proposal.v3',actor_id:id,phase,state:{agent_id:id},memories:[],...fields};}
+function proposal(id,phase,fields={}){return {schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:id,phase,state:{agent_id:id},memories:[],...fields};}
 function share(w,id,receiver,fields={}){
  const at=w.clock.synced_at,job=`test-social-${++seq}`,context=cognitiveContext(w,id,at);
  const compiled={operation:'share',receiver_indices:[context.capabilities.share.receivers.findIndex(r=>r.actor_id===receiver)+1],message:'',message_parts:[],reason:'实验选择',title:'商量事情',...fields};

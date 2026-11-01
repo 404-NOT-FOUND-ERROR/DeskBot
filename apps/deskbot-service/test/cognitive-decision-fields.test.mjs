@@ -31,7 +31,9 @@ for(const corrected of [false,true])test(corrected?
  'recorded invalid motivation and repeated repair stop before action or memory with an exact contract error',async t=>{
  const w=fixture(cases.find(c=>c.id===recorded.case_id)),at=w.clock.synced_at,job='motivation-boundary';
  applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:'plan',job_id:job},at,job+':claim');
- const before=structuredClone(w),context=cognitiveContext(w,OWNER,at,'plan');context.mode='mock';
+ const context=cognitiveContext(w,OWNER,at,'plan');context.mode='mock';
+ delete context.goal_lifecycle;delete w.cognition.actors[OWNER].job.references.goal_lifecycle; // Frozen historical goal protocol.
+ const before=structuredClone(w);
  const raw=JSON.parse(recorded.calls.find(c=>c.stage==='decision').content);
  const selected=context.choice_catalogue.choices.find(c=>c.id===raw.choice_id);
  assert.equal(selected.binding.activity_id,'waylight-fit-shade');

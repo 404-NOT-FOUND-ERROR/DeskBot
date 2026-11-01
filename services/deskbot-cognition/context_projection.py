@@ -10,6 +10,15 @@ BODY_BOUNDARY = ('现实身体无摄像头、不能走动，仅屏幕、声音�
                  '只知道给定现场和自己的记录；留言是听闻，想法不是事实。库存、承诺、身份改变均由执行器核验。'
                  'UTC与上海时间是同一时刻的不同表示，不混用。')
 
+
+def goal_lifecycle_view(context):
+    """The prompt needs current criteria and proof, not duplicated attempt logs."""
+    raw=context.get('goal_lifecycle', {})
+    fields=('goal_id','text','completion_criteria','lifecycle_status','evidence_ids','next_review_at','review_due','method_status','completion_status')
+    view={k:deepcopy(v) for k,v in raw.items() if k!='goals'}
+    view['goals']=[{k:deepcopy(g[k]) for k in fields if k in g} for g in raw.get('goals', [])]
+    return view
+
 def continuation_view(context):
     """Keep identity/history intact but label an old appraisal as dated, not current truth."""
     view = deepcopy(context.get('continuation') or {})
@@ -43,7 +52,7 @@ def continuation_view(context):
     return view
 
 def stage_context(context, stage):
-    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context', 'goal_opportunities', 'event_evidence')
+    common = ('time', 'inventory', 'continuation', 'grounding', 'use_context', 'goal_opportunities', 'goal_lifecycle', 'event_evidence')
     research = ('inquiry', 'resonant_inquiry', 'windleaf_inquiry', 'waylight', 'development')
     if stage in ('perception', 'interrupt'):
         fields = common + ('social',)
@@ -56,6 +65,9 @@ def stage_context(context, stage):
         # Motivation and decision both retain alternative activities and real limits.
         fields = common + research + ('capabilities', 'social')
     result = {k: deepcopy(context[k]) for k in fields if k in context}
+    if 'goal_lifecycle' in result:
+        result['goal_lifecycle']=goal_lifecycle_view(context)
+        result.pop('goal_opportunities',None)  # Legacy view is the same records, not additional evidence.
     if 'continuation' in result:
         result['continuation'] = continuation_view(context)
     if stage not in ('decision', 'motivation', 'plan', ''):

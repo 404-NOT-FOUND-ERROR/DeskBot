@@ -34,6 +34,7 @@ test('recorded feedback failure preserves an executed task; an offline corrected
   // Replay this older contract's persisted references. It predates message
   // receipts; the new protocol and its original failure have a separate suite.
   delete context.event_evidence;delete w.cognition.actors[OWNER].job.references.event_evidence;
+  delete context.goal_lifecycle;delete w.cognition.actors[OWNER].job.references.goal_lifecycle;
   if(phase==='feedback'){context.result=cognitiveActualResult(w,OWNER,at);context.action=w.cognition.actors[OWNER].pending.action;}
   const before=structuredClone(w),originals=recorded.calls.filter(c=>c.turn===turn&&c.phase===phase);let n=0;
   try{

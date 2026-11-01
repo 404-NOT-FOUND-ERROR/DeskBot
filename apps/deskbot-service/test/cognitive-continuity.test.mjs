@@ -39,7 +39,7 @@ test('an actual user conversation enters the source adapter and its interpreted 
  assert.equal(cognitiveDialogueContext(state,id).understood_inputs[0].epistemic,'personal_interpretation');
  assert.equal(state.cognition.actors[id].memories.length,0);
 });
-function proposal(compiled,phase='plan'){return {schema:'deskbot.cognitive-life.proposal.v3',actor_id:id,phase,state:{agent_id:id},memories:[],compiled,action:{agent_id:id,step:0,action_type:'work',action_description:'按实际条件执行',inner_monologue:'延续自己的问题',expected_outcome:'留下可核验结果',target:{acts_on:[],claims:[],reaches:[]}}};}
+function proposal(compiled,phase='plan'){return {schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:id,phase,state:{agent_id:id},memories:[],compiled,action:{agent_id:id,step:0,action_type:'work',action_description:'按实际条件执行',inner_monologue:'延续自己的问题',expected_outcome:'留下可核验结果',target:{acts_on:[],claims:[],reaches:[]}}};}
 function begin(w,at,job='job'){
  applyCognitiveMutation(w,{actor_id:id,operation:'claim',phase:'plan',job_id:job},at,job+'-claim');return {actor_id:id,operation:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,id)};
 }

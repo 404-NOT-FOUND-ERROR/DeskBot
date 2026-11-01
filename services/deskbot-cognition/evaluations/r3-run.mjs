@@ -26,6 +26,8 @@ const base=resolve(fileURLToPath(new URL('../../../',import.meta.url)));
 const relevant=['services/deskbot-cognition/life_worker.py','services/deskbot-cognition/evaluations/r3-fixtures.mjs','services/deskbot-cognition/evaluations/recorded-calls.mjs',
   'services/deskbot-cognition/evaluations/r3-window-review.mjs',
   'contracts/cognitive-event-evidence.v1.json','apps/deskbot-service/src/cognitive-event-evidence.mjs','services/deskbot-cognition/event_evidence.py',
+  'contracts/cognitive-goal-lifecycle.v1.json','apps/deskbot-service/src/cognitive-goal-lifecycle.mjs','services/deskbot-cognition/goal_lifecycle.py',
+  'contracts/cognitive-position-knowledge.v1.json','apps/deskbot-service/src/cognitive-position-knowledge.mjs',
   'contracts/cognitive-decision-fields.v1.json','services/deskbot-cognition/decision_fields.py',
   'contracts/cognitive-followup-phases.v1.json','services/deskbot-cognition/followup_phases.py',
   'contracts/cognitive-failure.v1.json','services/deskbot-cognition/failure_contract.py','apps/deskbot-service/src/cognitive-failure.mjs',

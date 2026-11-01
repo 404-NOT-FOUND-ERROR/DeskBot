@@ -43,6 +43,8 @@ test('real Python worker binds one choice, executes two dependent steps and reme
   const at=w.clock.synced_at,job=`single:${turn}:${name}`;
   applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase:name,job_id:job},at,job+':claim');
   const context=cognitiveContext(w,OWNER,at,name);context.mode='mock';context.choice_contract='single-choice-v1';
+  delete context.goal_lifecycle; // Exercise the historical single-choice/goal protocol unchanged.
+  delete w.cognition.actors[OWNER].job.references.goal_lifecycle;
   if(name==='feedback'){context.result=cognitiveActualResult(w,OWNER,at);context.action=w.cognition.actors[OWNER].pending.action;}
   const proposal=await bridge.session(context,respond);
   applyCognitiveMutation(w,{actor_id:OWNER,operation:name,phase:name,job_id:job,proposal,relevant_key:cognitiveRelevantKey(w,OWNER),

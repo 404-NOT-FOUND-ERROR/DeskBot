@@ -11,6 +11,10 @@ export function cognitiveOpportunityKey(context){
   (context.social?.commitments??[]).filter(c=>c.status==='proposed'&&c.available_responses?.length)
    .map(c=>[c.id,c.terms_revision,c.available_responses]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]);
 }
+export function cognitiveGoalReviewKey(context){
+ const due=(context.goal_lifecycle?.goals??[]).filter(g=>g.review_due);
+ return due.length?JSON.stringify(due.map(g=>[g.goal_id,g.next_review_at]).sort((a,b)=>a[0].localeCompare(b[0]))):null;
+}
 export function scheduleCognitiveActor(w,id,at,context,{actualResult=false}={}){
  const life=w.cognition?.actors[id];if(!life?.enabled)return null;
  if(life.retry){return life.retry.retryable&&life.retry.at<=at?{phase:life.retry.phase,reason:'retry_due',priority:90}:null;}
@@ -39,7 +43,8 @@ export function scheduleCognitiveActor(w,id,at,context,{actualResult=false}={}){
   ||context.continuation.review_key!==life.schedule?.condition_review_key);
  const offered=context.refraction?.pending?.length>0||commitments.some(c=>c.available_responses?.length&&c.status==='proposed');
  const newOpportunity=offered&&cognitiveOpportunityKey(context)!==life.schedule?.opportunity_review_key;
- if((due||newOpportunity||conditionReview)&&age>=10)return {phase:'plan',reason:conditionReview?'followup_condition_review':due?'followup_due':'new_opportunity',priority:40+Math.min(40,age/60)};
+ const goalKey=cognitiveGoalReviewKey(context),goalReview=goalKey&&goalKey!==life.schedule?.goal_review_key;
+ if((due||newOpportunity||conditionReview||goalReview)&&age>=10)return {phase:'plan',reason:conditionReview?'followup_condition_review':goalReview?'goal_review_due':due?'followup_due':'new_opportunity',priority:40+Math.min(40,age/60)};
  return null;
 }
 export function fairCognitiveQueue(candidates){

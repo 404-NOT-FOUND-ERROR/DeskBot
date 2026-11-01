@@ -153,7 +153,7 @@ json.dump(b,sys.stdout,ensure_ascii=False)`;
   input:JSON.stringify([c,payload]),encoding:'utf8',windowsHide:true,env:{...process.env,PYTHONUTF8:'1'}});
  assert.equal(py.status,0,py.stderr);const compiled=JSON.parse(py.stdout);
  assert.equal(compiled.completion_target_id,row.step_target_id);
- const proposal={schema:'deskbot.cognitive-life.proposal.v3',actor_id:OWNER,phase:'plan',state:{},action:{inner_monologue:compiled.reason},compiled,
+ const proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'plan',state:{},action:{inner_monologue:compiled.reason},compiled,
   decision_method:compiled.activity_id,decision_production:null,choice_binding:{contract:'choice-catalogue-v2',actor_payload:payload,compiled:structuredClone(compiled),model_compile_calls:0}};
  applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:job,proposal,relevant_key:cognitiveRelevantKey(w,OWNER)},at,'adopt');
  const t=w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id);settle(w,t);

@@ -12,7 +12,7 @@ function plan(w,compiled){
   const at=w.clock.synced_at,job='r3-regression';
   applyCognitiveMutation(w,{actor_id:owner,operation:'claim',phase:'plan',job_id:job},at,job+':claim');
   applyCognitiveMutation(w,{actor_id:owner,operation:'plan',phase:'plan',job_id:job,relevant_key:cognitiveRelevantKey(w,owner),proposal:{
-    schema:'deskbot.cognitive-life.proposal.v3',actor_id:owner,phase:'plan',state:{agent_id:owner},
+    schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:owner,phase:'plan',state:{agent_id:owner},
     memories:[],action:{agent_id:owner,action_description:compiled.title},compiled,
   }},at,job+':plan');
   return w.tasks.find(t=>t.task_id===w.cognition.actors[owner].pending.task_id);

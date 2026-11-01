@@ -74,7 +74,7 @@ test('only owners act on their trial; own private measurement notes are not remo
 
 function travel(w,index){
  applyCognitiveMutation(w,{actor_id:id,operation:'claim',phase:'plan',job_id:'journey'},at,'claim');
- const req={actor_id:id,operation:'plan',job_id:'journey',relevant_key:cognitiveRelevantKey(w,id),proposal:{schema:'deskbot.cognitive-life.proposal.v3',actor_id:id,phase:'plan',state:{agent_id:id},memories:[],action:{action_type:'move',inner_monologue:'去工坊准备托盘'},compiled:{operation:'travel',destination_index:index,reason:'先到工坊准备材料'}}};
+ const req={actor_id:id,operation:'plan',job_id:'journey',relevant_key:cognitiveRelevantKey(w,id),proposal:{schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:id,phase:'plan',state:{agent_id:id},memories:[],action:{action_type:'move',inner_monologue:'去工坊准备托盘'},compiled:{operation:'travel',destination_index:index,reason:'先到工坊准备材料'}}};
  return req;
 }
 test('cognitive travel uses frozen destination indices and actual multi-hop arrival after reload',()=>{

@@ -1,4 +1,5 @@
 import {activityTopic} from './development-facets.mjs';
+import {adoptPositionKnowledge} from './cognitive-position-knowledge.mjs';
 import {readFileSync} from 'node:fs';
 const decisionFields=JSON.parse(readFileSync(new URL('../../../contracts/cognitive-decision-fields.v1.json',import.meta.url),'utf8'));
 // Canonical inputs and bounded personal working state. No model may write world facts here.
@@ -11,6 +12,7 @@ export function cognitiveInputs(world,id,at){
     inputs.push({id:message.message_id??`message:${message.task_id}:${id}`,category:'agent',sender_id:message.sender_id,
       sender_name:message.sender_name??'居民',sender_is_agent:message.source_kind!=='joint_result',content:message.text,occurred_at:message.at,
       root_outcome_id:message.root_outcome_id,attested:true,epistemic:message.source_kind==='joint_result'?'shared_result':'heard',authority:'information',reply_to:message.reply_to??null,
+      position_reports:copy((message.disclosures??[]).filter(d=>d.kind==='position_report')),
       response_route:message.source_kind==='joint_result'?{kind:'no_reply_address',reason:'共同结果通知，不是人物发来的问话'}:
         {kind:'local_message',message_id:message.message_id??`message:${message.task_id}:${id}`,sender_actor_id:message.sender_id}});
   }
@@ -49,7 +51,7 @@ export function cognitiveWorkingState(life,query=''){
     const size=JSON.stringify([...group.values()]).length;if(bytes+size>96000||selected.size+group.size>80)continue;
     for(const [key,value]of group)selected.set(key,value);bytes+=size;
   }
-  const {history,inbox,job,memories,contact_purposes,...state}=raw;
+  const {history,inbox,job,memories,contact_purposes,position_knowledge,...state}=raw;
   return {...copy(state),memories:copy([...selected.values()]),memory_window:{total:raw.memory_archive?.total??all.length,loaded:selected.size,originals_retained:true},
     // Transport IDs are not the canonical archive. Pending execution remains readable independently.
     job:job?{id:job.id,phase:job.phase,status:job.status}:null,history:copy((history??[]).slice(-4)),inbox:copy((inbox??[]).slice(-8))};
@@ -60,7 +62,7 @@ export function freezeCognitiveReferences(context){
     destinations:(context.capabilities.travel?.destinations??[]).map(p=>p.id),receivers:context.capabilities.share.receivers.map(r=>r.actor_id),sources:copy(context.inputs??[]),
     social:copy(context.social??{}),speech_evidence:copy(context.speech_evidence??[]),development:copy(context.development??null),
     choice_contract:context.choice_contract,choice_catalogue:copy(context.choice_catalogue??null),
-    opportunities:copy(context.opportunities??null),event_evidence:copy(context.event_evidence??null),
+    opportunities:copy(context.opportunities??null),event_evidence:copy(context.event_evidence??null),goal_lifecycle:copy(context.goal_lifecycle??null),
     continuation:copy(context.continuation??null),
     perceptions:copy(context.perceptions??[]),interpretation_pending:copy(context.refraction?.pending??[]),known_people:copy(context.visible_people??[]),captured_at:context.at};
 }
@@ -76,6 +78,7 @@ export function mergeMemoryMetadata(life,updates=[]){
 }
 
 export function adoptPersonalContinuity(world,id,life,proposal,at,{perceptionSources=[]}={}){
+  adoptPositionKnowledge(life,life.job?.references??{},perceptionSources);
   const known=new Map((life.known_people??[]).map(p=>[p.actor_id,p]));
   for(const person of life.job?.references?.known_people??[])known.set(person.actor_id,copy(person));
   for(const source of perceptionSources)if(source.sender_is_agent)known.set(source.sender_id,{actor_id:source.sender_id,name:source.sender_name});

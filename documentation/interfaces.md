@@ -16,6 +16,8 @@
 | 结果与记忆 | `cognitiveActualResult` / `cognitiveMemoryFrame` → Python feedback → Node 接纳 | 事实来自实际结果；个人理解保留本人范围 | 技术失败只进入 job 诊断，不创造经历；重启先反馈原结果 |
 | 公开结果与责任 | `cognitive-event-evidence` → 选项/消息/实际回执 → `event_evidence.py` 与 Node 复核 | Node 投影执行结果；消息与条款仍由原执行器保存 | 完成通知不等于告知读数；责任需当前条款和动作范围；见 [事件证据接口](cognitive-event-evidence.md) |
 | 机会、目标与后续 | `cognitive-opportunities`、`cognitive-goal-opportunities` → 选择 / Asamana 目标适配 / `cognitive-continuation` | Node 保存条件绑定、目标证据和事项；视图只读 | 同源用途和条件、失效复查、实际结果根与恢复，见 [机会规范](cognitive-opportunities.md) |
+| 稳定目标与复查 | `cognitive-goal-lifecycle` ↔ Python `goal_lifecycle` / `OpportunityNeedEngine` → 原 `goal_bindings` | Node 固定标准并校验显式转换；Python 无世界提交权 | 等价方法、近义目标、跨夜、单次唤起、恢复与旧合同；见 [A2 规范](cognitive-goal-lifecycle.md) |
+| 可知位置 | `cognitive-position-knowledge` → `event_evidence.people` → 原感知采用 | 本人有界位置知识，来源为已采用观察或实际收到的结构化报告 | 不从远处人物状态补全，思考时间不改冻结观察时间，过期线索置为未知 |
 | 发展 | `cognitive-development` → 同一结果根 | Node 保存兴趣、能力与愿望状态 | 登记方法主题接入；目标文本不授予实践或角色资格 |
 | 表现 | `app` 的 `/api/world/snapshot` → 前端地图、任务、人物与角色投影 | 客户端只读投影；输入请求返回服务端 | 显示版本、断线和实际绘制；动画不能结算任务 |
 
@@ -67,3 +69,5 @@
 随后 [反馈阶段合同版冻结验收](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 完成 18/20、有效 15 个，在语义审阅处停止：完成通知被个人后续扩大成读数已告知，原责任枚举与实际约定也未完全贯通。该批原始结论保留。
 
 2026-11-01 [事件证据第一批](../research/milestones/r3a-event-evidence-2026-11-01.md) 接入共享内容/送达/责任校验，登记为 13 个模块、14 个接口。原失败以未修改反例校验，新协议经真实子进程和 SQLite 离线恢复；目标连续性、历史位置和新版真实模型复验仍未完成。后续按 [标准交付管线](../research/design/engineering-delivery-plan-2026-11-01.md) 推进。
+
+同日 A2 后续交付已补目标生命周期、等价方法、复查时钟和历史/报告位置，登记为 **15 个模块、16 个接口**。新 job 强制版本合同，旧冻结响应按旧协议回放；记录与边界见 [A2 交付](../research/milestones/a2-goal-lifecycle-2026-11-01.md)。R3-A 真实模型复验仍待 A3。

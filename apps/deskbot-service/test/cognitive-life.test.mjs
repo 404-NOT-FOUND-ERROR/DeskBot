@@ -26,9 +26,9 @@ function fixture(t){
 }
 function fakeBridge(selector,inspect=()=>{}){return {close(){},async session(c){inspect(c);
  const state={agent_id:c.actor.actor_id,step:Math.floor((Date.parse(c.at)-Date.parse(c.epoch))/3600000),emotion:{primary:'anticipation',intensity:.3,valence:.1},short_term_goal_entities:[]};
- if(c.phase==='plan')return {schema:'deskbot.cognitive-life.proposal.v2',phase:'plan',actor_id:c.actor.actor_id,state,memories:[],compiled:selector(c),
+ if(c.phase==='plan')return {schema:'deskbot.cognitive-life.proposal.v2',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],phase:'plan',actor_id:c.actor.actor_id,state,memories:[],compiled:selector(c),
   action:{action_type:'work',action_description:'按现场条件行动',inner_monologue:'我想亲自弄清苗况。',expected_outcome:'取得真实记录',agent_id:c.actor.actor_id,step:state.step,target:{acts_on:[],claims:[],reaches:[]}}};
- return {schema:'deskbot.cognitive-life.proposal.v2',phase:'feedback',actor_id:c.actor.actor_id,state,memory_sequence:1,
+ return {schema:'deskbot.cognitive-life.proposal.v2',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],phase:'feedback',actor_id:c.actor.actor_id,state,memory_sequence:1,
   memories:[{id:`${c.actor.actor_id}:${c.result.root_outcome_id}`,payload:{agent_id:c.actor.actor_id,stream:'factual',kind:'event',raw_content:c.result.personal_fact,stored_content:c.result.personal_fact}}],
   followup:{status:c.result.success?'continue':'postpone',question:c.result.success?'下次比较苗床':'改为先观察或等待设施空闲',reason:c.result.effects?.communication?.summary??c.result.fact,delay_hours:24,...(c.result.effects?.communication?{communication_evidence_id:c.result.effects.communication.id}:{})}};
 }};}

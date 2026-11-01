@@ -1,0 +1,7 @@
+{
+  "schema":"deskbot.position-knowledge.v1",
+  "fresh_minutes":30,
+  "retention_hours":24,
+  "max_people":24,
+  "rule":"seen_here仅代表本次在场亲见。seen_before与reported都是带来源、时间的位置线索，不能证明对方现在仍在那里。超过30分钟标为stale，超过24小时只保留来源并将位置置空。未知位置可以探索，不从职业、住处、名字或其他人的私有状态补全。"
+}

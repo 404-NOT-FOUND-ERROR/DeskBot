@@ -50,7 +50,25 @@
       "goal_opportunity_unavailable",
       "goal_opportunity_rebind",
       "goal_opportunity_requires_plan",
-      "goal_completion_without_result"
+      "goal_completion_without_result",
+      "goal_lifecycle_invalid",
+      "goal_lifecycle_contract_missing",
+      "goal_lifecycle_contract_required",
+      "goal_lifecycle_mixed_contract",
+      "goal_review_reason_required",
+      "goal_criterion_immutable",
+      "goal_duplicate_use_existing_id",
+      "goal_transition_invalid",
+      "goal_replan_requires_plan",
+      "goal_method_required",
+      "goal_method_not_compatible",
+      "goal_replan_required",
+      "goal_review_time_invalid",
+      "goal_capacity_review_required",
+      "goal_identity_changed",
+      "goal_identity_missing",
+      "goal_transition_required",
+      "goal_deadline_immutable"
     ],
     "decision": [
       "upstream_decision_failed"
@@ -63,7 +81,9 @@
       "message_reference_unavailable",
       "cognitive_source_expired",
       "cognitive_job_obsolete",
-      "cognitive_opportunity_changed"
+      "cognitive_opportunity_changed",
+      "goal_criterion_changed",
+      "goal_lifecycle_changed"
     ],
     "world_precondition": [
       "cognitive_actor_busy",

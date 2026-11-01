@@ -2,14 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPersistentWorld} from '../src/persistent-world.mjs';
 import {createCognitiveLife} from '../src/cognitive-life.mjs';
-import {scheduleCognitiveActor,cognitiveSleepWindow,fairCognitiveQueue,cognitiveOpportunityKey} from '../src/cognitive-schedule.mjs';
+import {scheduleCognitiveActor,cognitiveSleepWindow,fairCognitiveQueue,cognitiveOpportunityKey,cognitiveGoalReviewKey} from '../src/cognitive-schedule.mjs';
 import {syncLifeNeeds} from '../src/life-state.mjs';
 const initial='2026-10-11T02:00:00Z';
 const budget={status:()=>({}),complete:()=>{throw Error('No paid calls in scheduler test');}};
+test('goal review deadline wakes once and respects sleep instead of polling or failing the goal',()=>{
+ const at='2026-11-02T02:00:00.000Z',id='shaping-001';
+ const actor={enabled:true,next_decision_at:'2026-11-03T02:00:00.000Z',schedule:{last_dispatch_at:'2026-11-02T01:00:00.000Z'}};
+ const w={cognition:{actors:{[id]:actor}},clock:{time_zone:'Asia/Shanghai'},autonomy:{actors:{[id]:{energy:.8}}}};
+ const c={perceptions:[],goal_lifecycle:{goals:[{goal_id:'same-goal',review_due:true,next_review_at:at}]}};
+ assert.equal(scheduleCognitiveActor(w,id,at,c).reason,'goal_review_due');
+ actor.schedule.goal_review_key=cognitiveGoalReviewKey(c);
+ assert.equal(scheduleCognitiveActor(w,id,at,c),null);
+ c.goal_lifecycle.goals[0].next_review_at='2026-11-02T15:00:00.000Z';
+ assert.equal(scheduleCognitiveActor(w,id,'2026-11-02T16:00:00.000Z',c).phase,'rest_window');
+ assert.equal(c.goal_lifecycle.goals[0].goal_id,'same-goal');
+});
 function fixture(t,session){
  let at=new Date(initial);const world=createPersistentWorld({now:()=>at,timeMode:'realtime'});
  world.ingest({event_id:'residents',type:'world.mutation',source:'fixture',character_id:'shaping-001',payload:{action:'install_resident_life'}});
- const bridge={close(){},session:session??(async c=>({schema:'deskbot.cognitive-life.proposal.v3',actor_id:c.actor.actor_id,phase:c.phase,state:{agent_id:c.actor.actor_id},memories:[],compiled:{operation:'wait',reason:'留时间做安静观察',followup_decision:'postpone'}}))};
+ const bridge={close(){},session:session??(async c=>({schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:c.actor.actor_id,phase:c.phase,state:{agent_id:c.actor.actor_id},memories:[],compiled:{operation:'wait',reason:'留时间做安静观察',followup_decision:'postpone'}}))};
  const life=createCognitiveLife({world,budget,now:()=>at,bridge,clockScope:'isolated_test_clock'});t.after(()=>life.close());
  return {world,life,setTime(value){at=new Date(value);},now:()=>at};
 }
@@ -29,7 +41,7 @@ test('thirteen configured residents each get a dispatch without fixed actor-orde
 test('a slow resident does not prevent another slot from serving the next person',async t=>{
  let release,entered;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve),seen=[];
  const f=fixture(t,async c=>{seen.push(c.actor.actor_id);if(c.actor.actor_id==='shaping-001'){entered();await gate;}
-  return {schema:'deskbot.cognitive-life.proposal.v3',actor_id:c.actor.actor_id,phase:c.phase,state:{agent_id:c.actor.actor_id},memories:[],compiled:{operation:'wait',reason:'先留一个窗口'}};
+  return {schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:c.actor.actor_id,phase:c.phase,state:{agent_id:c.actor.actor_id},memories:[],compiled:{operation:'wait',reason:'先留一个窗口'}};
  });
  for(const id of ['shaping-001','wetland-grower-001','lamp-keeper-001'])f.life.configure(id);
  // The protagonist is put first in the actual queue by earlier eligible dispatch time.

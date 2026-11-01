@@ -11,6 +11,8 @@ from agent.goals import GoalStatus
 from agent.personality import PersonalityLayer
 from core.interfaces.llm import LLMScene, LLMMessage, extract_json
 from opportunity_contract import CONTRACT, OPPORTUNITY_PROMPT, opportunity_errors
+from goal_lifecycle import CONTRACT as LIFECYCLE, PROMPT as LIFECYCLE_PROMPT, enabled, parse_updates
+from context_projection import goal_lifecycle_view
 
 
 def parse_goal_opportunities(data, context):
@@ -58,8 +60,29 @@ class OpportunityNeedEngine(NeedEngine):
     def __init__(self, *args, context, **kwargs):
         super().__init__(*args, **kwargs)
         self.context, self.pending_bindings, self.bindings = context, {}, []
+        self.updates = []
+        self.lifecycle_entities = None
+
+    async def _lifecycle_call(self, entities, step, evidence):
+        if self._llm_router is None:
+            return deepcopy(entities), []
+        view = {'phase':self.context['phase'],'at':self.context['at'],
+                'goals':goal_lifecycle_view(self.context), 'evidence':evidence,
+                'next_options':[{k:v for k,v in r.items() if k!='binding'} for r in self.context['continuation']['next_options'] if not r.get('legacy_alias')]}
+        response = await self._llm_router.complete(LLMScene.NEED_GOAL_GENERATION,
+            [LLMMessage('system',LIFECYCLE_PROMPT),LLMMessage('user',json.dumps(view,ensure_ascii=False,default=str))],
+            temperature=.3,max_tokens=1400,json_mode=True)
+        return parse_updates(extract_json(response.content),self.context,entities,step)
 
     async def _generate_short_term_goals(self, **kwargs):
+        if enabled(self.context):
+            self.lifecycle_entities,self.updates=await self._lifecycle_call(
+                kwargs['personality'].state.short_term_goal_entities, kwargs['now_step'],
+                {'self':PersonalityLayer.to_prompt_context(kwargs['personality']),
+                 'dominant_need':kwargs['dominant_need'].value if kwargs.get('dominant_need') else None,
+                 'signals':kwargs.get('perceived_signal_texts') or [],'memories':(kwargs.get('recent_memory_texts') or [])[:10],
+                 'external':[getattr(g,'text','') for g in kwargs.get('external_goals') or []]})
+            return []  # Queue membership is ID-addressed; do not invoke fuzzy text enqueue.
         if self.context.get('opportunities', {}).get('schema') != CONTRACT['view_schema']:
             return await super()._generate_short_term_goals(**kwargs)
         if self._llm_router is None or kwargs.get('personality') is None or kwargs.get('dominant_need') is None:
@@ -83,6 +106,17 @@ class OpportunityNeedEngine(NeedEngine):
 
     async def run(self, **kwargs):
         self.pending_bindings = {}
+        self.updates = []; self.lifecycle_entities = None
+        if enabled(self.context):
+            if any(g.get('review_due') for g in self.context['goal_lifecycle']['goals']):kwargs['force_goal_update']=True
+            evaluation=await super().run(**kwargs)
+            entities=self.lifecycle_entities if self.lifecycle_entities is not None else deepcopy(kwargs['personality'].state.short_term_goal_entities)
+            active=[g for g in entities if g.status in (GoalStatus.ACTIVE,GoalStatus.INTERRUPTED)]
+            # Rebuild motivation's view after applying the same queue's explicit transitions.
+            prompt=self.to_prompt_context(kwargs['personality'],evaluation.dominant_need,evaluation.active_needs,active,
+                recently_completed=[g for g in entities if g.status==GoalStatus.COMPLETED],now_step=kwargs['current_step'])
+            return replace(evaluation,short_term_goal_entities=entities,short_term_goals=[g.text for g in active],
+                           prompt_context=prompt+'\n'+LIFECYCLE['rule'])
         prior = {g.id for g in kwargs['personality'].state.short_term_goal_entities}
         evaluation = await super().run(**kwargs)
         self.bindings = [{'goal_id':g.id, **deepcopy(self.pending_bindings[g.text])}
@@ -90,6 +124,12 @@ class OpportunityNeedEngine(NeedEngine):
         return evaluation
 
     async def evaluate_goal_progress(self, **kwargs):
+        if enabled(self.context):
+            entities,self.updates=await self._lifecycle_call(kwargs['personality'].state.short_term_goal_entities,kwargs['step'],
+                {'action':kwargs['action_description'],'actual_result':self.context.get('result'),
+                 'outcome':kwargs['action_result'],'expected_outcome':kwargs.get('expected_outcome'),
+                 'recent_factuals':kwargs.get('recent_factuals',[])})
+            return entities
         prior = list(kwargs['personality'].state.short_term_goal_entities)
         result = await super().evaluate_goal_progress(**kwargs)
         return grounded_goal_progress(result, prior, self.context)

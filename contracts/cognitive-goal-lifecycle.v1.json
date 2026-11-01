@@ -1,0 +1,16 @@
+{
+  "schema": "deskbot.goal-lifecycle.v1",
+  "max_live": 6,
+  "max_new": 2,
+  "max_updates": 8,
+  "history_limit": 24,
+  "review_hours": {"min": 1, "max": 48, "default": 6},
+  "operations": ["new", "continue", "replan", "postpone", "resume", "abandon", "complete"],
+  "transitions": {
+    "active": ["continue", "replan", "postpone", "abandon", "complete"],
+    "postponed": ["continue", "replan", "resume", "abandon", "complete"]
+  },
+  "entity_status": {"active":"active", "postponed":"interrupted", "abandoned":"failed", "completed":"completed"},
+  "water_reserve_methods": ["collect-water", "waylight-use"],
+  "rule": "目标ID与完成标准固定，尝试方法可以显式改计划；到复查时间只提示复查，不失败、不改约定截止、不自动续期。开放研究没有客观完成谓词，可以明确放下；执行成功只证明列明的具体结果。"
+}

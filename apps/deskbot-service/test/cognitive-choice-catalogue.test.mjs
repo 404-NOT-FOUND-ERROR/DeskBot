@@ -47,7 +47,7 @@ json.dump(result,sys.stdout,ensure_ascii=False)
  const bound=JSON.parse(r.stdout);assert.ok(bound.length>30);
  for(const b of bound){
   const w=structuredClone(worlds[b.world]),c=b.compiled;
-  const proposal={schema:'deskbot.cognitive-life.proposal.v3',actor_id:OWNER,phase:'plan',state:{},action:{inner_monologue:c.reason},compiled:c,
+  const proposal={schema:'deskbot.cognitive-life.proposal.v3',goal_contract:'deskbot.goal-lifecycle.v1',goal_updates:[],actor_id:OWNER,phase:'plan',state:{},action:{inner_monologue:c.reason},compiled:c,
     decision_method:c.activity_id,decision_production:c.production_use,choice_binding:{contract:'choice-catalogue-v2',actor_payload:b.payload,compiled:structuredClone(c),model_compile_calls:0}};
   const result=applyCognitiveMutation(w,{actor_id:OWNER,operation:'plan',job_id:'catalogue-all',proposal,relevant_key:cognitiveRelevantKey(w,OWNER)},w.clock.synced_at,'adopt');
   assert.equal(result.accepted,true,JSON.stringify(b));
@@ -121,7 +121,7 @@ test('real Python and Node execute selected catalogue steps, keep proof, then se
  const respond=async request=>{
   stages.push(request.stage);let v;
   if(request.stage==='perception')v={reason:'看实际灯况',emotion:'anticipation',intensity:.3,valence:.3,need_activation:{self_actualization:.4}};
-  else if(request.stage==='motivation')v={goals:[{text:'了解归途灯的实际用途',due_in_hours:null}]};
+  else if(request.stage==='motivation')v={goal_updates:[]};
   else if(request.stage==='decision'){
    const view=JSON.parse(request.messages.at(-1).content);
    const row=view.choices.find(r=>turn===1?r.effect.activity_id==='waylight-fit-shade':turn===2?
@@ -130,7 +130,7 @@ test('real Python and Node execute selected catalogue steps, keep proof, then se
    assert.ok(row,'desired grounded option exists');
    v={act:true,choice_id:row.id,inner_monologue:'我想逐步了解灯的使用，再确认这些水有没有用途。',expected_outcome:'多了解一点实际情况',
     issue:{decision:'continue',id:'current'},motivation:'self_continuation',source_ids:[]};
-  }else if(request.stage==='feedback')v=request.scene==='need_goal_generation'?{goals:[],residue:[]}:{reason:'记录这一步',emotion:'joy',intensity:.4,valence:.4};
+  }else if(request.stage==='feedback')v=request.scene==='need_goal_generation'?{goal_updates:[]}:{reason:'记录这一步',emotion:'joy',intensity:.4,valence:.4};
   else if(request.stage==='memory'&&request.scene==='memory_importance')v={score:.8,reason:'自己的结果'};
   else if(request.stage==='memory'&&request.scene==='memory_summarization'){
    const view=JSON.parse(request.messages.at(-1).content);v={focus_id:view.facts[0].id,feeling:'curious',wish:'understand'};

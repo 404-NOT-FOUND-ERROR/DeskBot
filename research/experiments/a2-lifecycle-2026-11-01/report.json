@@ -1,0 +1,122 @@
+{
+  "schema": "deskbot.a2-lifecycle-check.v1",
+  "scope": "isolated_fictional_rule_execution",
+  "model_calls": 0,
+  "contract": "deskbot.goal-lifecycle.v1",
+  "goal_id": "goal:a2-water",
+  "criterion": "实际净滤4份自用清水（不是交付或灯具实验）",
+  "rows": [
+    {
+      "label": "提出目标",
+      "at": "2026-10-20T11:00:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "active",
+      "review_due": false,
+      "next_review_at": "2026-10-20T17:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-b6fa59f5a5b4c6b62d4f",
+      "evidence_ids": [],
+      "water": 0,
+      "completed_tasks": 0
+    },
+    {
+      "label": "暂缓十二小时",
+      "at": "2026-10-20T11:00:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "postponed",
+      "review_due": false,
+      "next_review_at": "2026-10-20T23:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-b6fa59f5a5b4c6b62d4f",
+      "evidence_ids": [],
+      "water": 0,
+      "completed_tasks": 0
+    },
+    {
+      "label": "隔夜到期，仍未失败",
+      "at": "2026-10-21T00:00:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "postponed",
+      "review_due": true,
+      "next_review_at": "2026-10-20T23:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-b6fa59f5a5b4c6b62d4f",
+      "evidence_ids": [],
+      "water": 0,
+      "completed_tasks": 0
+    },
+    {
+      "label": "保持目标，换用普通净滤",
+      "at": "2026-10-21T00:00:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "active",
+      "review_due": false,
+      "next_review_at": "2026-10-21T06:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-db6c105bda1c278e11a2",
+      "evidence_ids": [],
+      "water": 0,
+      "completed_tasks": 0
+    },
+    {
+      "label": "实际执行，产出四份水",
+      "at": "2026-10-21T00:10:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "active",
+      "review_due": false,
+      "next_review_at": "2026-10-21T06:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-db6c105bda1c278e11a2",
+      "evidence_ids": [
+        "task:a2-water-execution"
+      ],
+      "water": 4,
+      "completed_tasks": 1
+    },
+    {
+      "label": "SQLite 重启，结果未重复",
+      "at": "2026-10-21T00:10:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "active",
+      "review_due": false,
+      "next_review_at": "2026-10-21T06:00:00.000Z",
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-db6c105bda1c278e11a2",
+      "evidence_ids": [
+        "task:a2-water-execution"
+      ],
+      "water": 4,
+      "completed_tasks": 1
+    },
+    {
+      "label": "有证据地完成",
+      "at": "2026-10-21T00:10:00.000Z",
+      "goal_id": "goal:a2-water",
+      "lifecycle_status": "completed",
+      "review_due": false,
+      "next_review_at": null,
+      "criterion_id": "criterion:c624914036768f96d2a0f5e3",
+      "method_id": "c-db6c105bda1c278e11a2",
+      "evidence_ids": [
+        "task:a2-water-execution"
+      ],
+      "water": 4,
+      "completed_tasks": 1
+    }
+  ],
+  "checks": {
+    "stable_goal_id": true,
+    "stable_criterion": true,
+    "overnight_not_failed": true,
+    "changed_method": true,
+    "actual_water_delta": 4,
+    "completed_task_count": 1,
+    "sqlite_no_duplicate": true,
+    "completion_evidence_count": 1
+  },
+  "limitations": [
+    "人为编排的合同执行，未测试模型会如何选择",
+    "测试时钟推进十三小时，不是自然跨日观察",
+    "不代表 R3-A 真实模型验收通过"
+  ]
+}

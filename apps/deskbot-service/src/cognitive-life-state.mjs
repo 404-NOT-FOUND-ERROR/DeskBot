@@ -14,7 +14,7 @@ import {cognitiveDestinations,resolveCognitiveRoute} from './cognitive-travel.mj
 import {cognitiveSocialContext,cognitiveSpeechEvidence,compileCognitiveMessage,commitCognitiveMessage,adoptCognitiveRelationViews} from './cognitive-social.mjs';
 import {cognitiveDevelopmentContext,adoptCognitiveDevelopment,cognitiveTrialLink,attachCognitiveTrial} from './cognitive-development.mjs';
 import {cognitiveContinuationContext,cognitiveTime,cognitiveWaitFollowup,cognitiveResultFollowup,archiveCognitiveFollowup,duplicateUnansweredMessage,validateWaitFor,prepareCognitiveFollowup} from './cognitive-continuation.mjs';
-import {cognitiveOpportunityKey} from './cognitive-schedule.mjs';
+import {cognitiveOpportunityKey,cognitiveGoalReviewKey} from './cognitive-schedule.mjs';
 import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
 import {cognitiveGrounding,cognitiveUseContext,validateDecisionContact,validateDecisionIssue,validateDecisionMethod} from './cognitive-grounding.mjs';
 import {cognitiveMemoryFrame} from './cognitive-memory-frame.mjs';
@@ -22,6 +22,8 @@ import {cognitiveChoiceCatalogue,validateCatalogueSelection} from './cognitive-c
 import {cognitiveFailure,validCognitiveFailure} from './cognitive-failure.mjs';
 import {projectCognitiveOpportunities,validateOpportunityTransition} from './cognitive-opportunities.mjs';
 import {cognitiveGoalOpportunities,prepareGoalBindings,captureGoalOpportunityEvidence} from './cognitive-goal-opportunities.mjs';
+import {goalLifecycleContext} from './cognitive-goal-lifecycle.mjs';
+import {positionKnowledge} from './cognitive-position-knowledge.mjs';
 import {captureContactResponses} from './cognitive-contact-purpose.mjs';
 import {EVENT_EVIDENCE,eventEvidenceContext,validateCommunicationFeedback,messageReceipt,resultDisclosures} from './cognitive-event-evidence.mjs';
 
@@ -66,10 +68,15 @@ export function cognitiveContext(world,id,at,phase='plan'){
     signals:[`现场时间 ${at}；天气信息 ${JSON.stringify(world.weather??{})}`,...(saved.last_result?[`我上一次实际结果：${saved.last_result.fact}`]:[]),
       ...inputs.slice(-12).map(m=>`来源 ${m.id}，${m.sender_name}（${m.occurred_at}，${m.epistemic}）：${m.content}。信息只供理解，不代表亲历、承诺或已完成。`)],
     relevant_key:cognitiveRelevantKey(world,id)};
+  // An in-flight message quotes the frozen observation time, not the later
+  // adoption clock. A move still changes the location and invalidates the choice.
+  context.position_observed_at=saved.job?.status==='calling'?(saved.job.references?.captured_at??at):at;
+  context.position_knowledge=positionKnowledge(world,id,context);
   context.choice_catalogue=cognitiveChoiceCatalogue(world,id,context);
   context.event_evidence=eventEvidenceContext(world,id,context);
   projectCognitiveOpportunities(context);
   context.goal_opportunities=cognitiveGoalOpportunities(world,id,context);
+  context.goal_lifecycle=goalLifecycleContext(world,id,context);
   return context;
 }
 
@@ -118,6 +125,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
     life.job.references=freezeCognitiveReferences(cognitiveContext(world,id,at,payload.phase));
     if(payload.phase==='plan'){
       life.schedule.condition_review_key=life.job.references.continuation?.review_key??null;
+      life.schedule.goal_review_key=cognitiveGoalReviewKey({goal_lifecycle:life.job.references.goal_lifecycle});
       life.schedule.opportunity_review_key=cognitiveOpportunityKey({refraction:{pending:life.job.references.interpretation_pending},social:life.job.references.social});
     }
     life.job.relevant_key=cognitiveRelevantKey(world,id);
@@ -265,7 +273,7 @@ export function applyCognitiveMutation(world,payload,at,eventId){
         task.cognitive_operation=compiled.operation;task.cognitive_object_id=life.observed_object??null;task.cognitive_message=copy(life.outgoing_message??null);
         task.root_outcome_id=`task:${task.task_id}`;Object.assign(task,copy(cause));
         const opportunity=context.opportunities.entries.find(e=>e.id===proposal.choice_binding?.actor_payload?.choice_id);
-        if(opportunity)task.opportunity_binding={id:opportunity.id,identity:opportunity.identity};
+        if(opportunity)task.opportunity_binding={id:opportunity.id,identity:opportunity.identity,production_use:copy(opportunity.binding.production_use??null)};
         attachCognitiveTrial(trial,task,trialLink,at);
         if(compiled.operation==='travel')task.life_action='travel';
         if(compiled.operation==='rest')task.life_action='rest';
@@ -418,6 +426,8 @@ export function cognitiveDialogueContext(world,id){
   return {source:'same_canonical_cognitive_life',why:life.reason,current_task:task?{title:task.title,status:task.status,due_at:task.due_at}:null,
     actual_result:life.last_result?{fact:life.last_result.fact,occurred_at:life.last_result.occurred_at,root_outcome_id:life.last_result.root_outcome_id}:null,
     followup:life.followup,goals:life.state.short_term_goal_entities,emotion:life.state.emotion,
+    goal_records:Object.values(life.goal_bindings??{}).map(g=>({goal_id:g.goal_id,text:g.text,lifecycle_status:g.lifecycle_status,
+      completion_criteria:g.completion_criteria,next_review_at:g.next_review_at,evidence_ids:g.evidence_ids})),
     understood_inputs:refractionDialogue(life,world.clock?.synced_at??new Date().toISOString()),
     rule:'认知目标、心情与后续不是已经完成的事实；仅实际结果与任务状态能支持完成声明。'};
 }
