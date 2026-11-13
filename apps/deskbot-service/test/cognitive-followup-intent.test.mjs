@@ -20,7 +20,7 @@ test('captured A3 question cannot enter a new factual followup; creative ideas r
  assert.throws(()=>compileFollowupIntent(captured.original_followup,c),{code:FOLLOWUP_INTENT.error});
  assert.throws(()=>compileFollowupIntent({...choice,question:captured.original_followup.question},c),{code:FOLLOWUP_INTENT.error});
  const payload={...choice,unverified_idea:'也许湖面的光粒会记住雨声？'},value=compileFollowupIntent(payload,c);
- const proposal={followup:value,followup_binding:{contract:FOLLOWUP_INTENT.schema,actor_payload:payload}};
+ const proposal={followup:value,followup_binding:{contract:FOLLOWUP_INTENT.schema,prompt_version:c.followup_intent.prompt_version,actor_payload:payload}};
  assert.equal(value.reason,captured.receipt.summary);assert.match(value.question,/尚未执行/);
  const metadata=validateFollowupIntent(proposal,c,refs);assert.equal(metadata.unverified_idea.epistemic,'unverified');
  assert.ok(!JSON.stringify(value).includes('记住雨声'));
@@ -65,4 +65,47 @@ test('in-flight sightings retain their ID but leaving the scene or expiry remove
  assert.deepEqual(classifyEvidence([id],after.evidence_refs).context_evidence_ids,[id]);
  const person=w.npcs.find(n=>before.position_knowledge.people.some(p=>p.actor_id===n.npc_id&&p.source_id===id));person.location_id='moss-sprout-garden';
  assert.throws(()=>classifyEvidence([id],cognitiveContext(w,OWNER,plus(at,4)).evidence_refs),{code:'evidence_ref_unavailable'});
+});
+
+test('A3.2 captured commands, precise diagnostics and Unicode limits agree across both engines',()=>{
+ const capture=JSON.parse(readFileSync(new URL('../../../research/experiments/a32-2026-11-02/followup-shape-counterexample.json',import.meta.url)));
+ const context=structuredClone(capture.diagnostic_context);
+ context.followup_intent.prompt_version=FOLLOWUP_INTENT.prompt_version;
+ const corrected={...capture.raw_response,unverified_idea:capture.raw_response.unverified_idea.text};
+ const vectors=[
+  [capture.raw_response,'$.unverified_idea','type'],[capture.repair_response,'$.unverified_idea','type'],
+  [corrected,null],[{...corrected,unverified_idea:'🌙'.repeat(160)},null],
+  [{...corrected,unverified_idea:'🌙'.repeat(161)},'$.unverified_idea','maxLength'],
+  [{...corrected,unverified_idea:null},'$.unverified_idea','type'],
+  [{...corrected,unverified_idea:'   '},'$.unverified_idea','pattern'],
+  [{...corrected,unverified_idea:'\u0085\uFEFF'},'$.unverified_idea','pattern'],
+  [{...corrected,status:'none'},null],
+  [{...corrected,question:'旧字段'},'$.question','additionalProperties'],
+  [{...corrected,basis_ids:[]},'$.basis_ids','evidence'],
+  [{...corrected,next_step:{kind:'opportunity',id:'stale'}},'$.next_step','reference'],
+  [{...corrected,wait_for:{id:'stale'}},'$.wait_for.kind','required'],
+  [{...corrected,status:'drop'},'$.closure','required'],
+  [{...corrected,status:'drop',closure:{kind:'resolved',evidence_ids:['unknown']}},'$.closure.evidence_ids','evidence'],
+  [{...corrected,status:'drop',closure:{kind:'abandoned',evidence_ids:[]}},null],
+ ];
+ const node=vectors.map(([command,path,rule])=>{
+  try{const compiled=compileFollowupIntent(command,context);assert.equal(path,null);return {compiled};}
+  catch(error){assert.equal(error.code,FOLLOWUP_INTENT.error);assert.equal(error.diagnostic.path,path);
+   assert.equal(error.diagnostic.rule,rule);return {diagnostic:error.diagnostic};}
+ });
+ assert.deepEqual(node[0].diagnostic,{path:'$.unverified_idea',rule:'type',expected:'string',actual:'object'});
+ const py=spawnSync(findCognitionPython(),['-X','utf8','-c',
+  'import json,sys\nfrom followup_intent import compile_intent,IntentCommandError\ndata=json.load(sys.stdin);out=[]\nfor raw in data["commands"]:\n try:out.append({"compiled":compile_intent(raw,data["context"])})\n except IntentCommandError as e:out.append({"diagnostic":e.diagnostic})\nprint(json.dumps(out))'],
+  {cwd:fileURLToPath(new URL('../../../services/deskbot-cognition',import.meta.url)),encoding:'utf8',windowsHide:true,
+   input:JSON.stringify({commands:vectors.map(([command])=>command),context})});
+ assert.equal(py.status,0,py.stderr);assert.deepEqual(JSON.parse(py.stdout),node);
+});
+
+test('claim-time prompt version is checked for new jobs; unversioned receipts remain readable',()=>{
+ const c=sample(),command=raw(c),value=compileFollowupIntent(command,c);
+ const proposal={followup:value,followup_binding:{contract:FOLLOWUP_INTENT.schema,actor_payload:command}};
+ const refs={followup_intent:structuredClone(c.followup_intent),continuation:structuredClone(c.continuation)};
+ assert.throws(()=>validateFollowupIntent(proposal,c,refs),{code:FOLLOWUP_INTENT.binding_error});
+ delete refs.followup_intent.prompt_version;
+ assert.equal(validateFollowupIntent(proposal,c,refs).prompt_version,undefined);
 });

@@ -99,6 +99,14 @@ test('failed delivery cannot disclose a prepared extract or prove acceptance',()
 
 test('real bridge: measure, notify, disclose; reject false feedback atomically and resume once after SQLite restart',async t=>{
  let w=seed(),turn=1,mode='good';
+ const folder=mkdtempSync(join(tmpdir(),'deskbot-event-evidence-'));
+ t.after(()=>rmSync(folder,{recursive:true,force:true}));
+ const filename=join(folder,'world.sqlite'),followupCalls=[];
+ function restart(){
+  const saved=createSqlitePersistence({filename});saved.put('canonical-world.states',w.world_id,w);saved.close();
+  const reopened=createSqlitePersistence({filename});
+  try{w=reopened.get('canonical-world.states',w.world_id);}finally{reopened.close();}
+ }
  const bridge=createCognitionBridge({workerFile:'life_worker.py',mode:'mock',timeoutMs:30000,maxFrames:30});t.after(()=>bridge.close());
  const respond=async req=>{
   let v;
@@ -122,7 +130,18 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
   else if(req.stage==='memory')v=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
   else if(req.stage==='followup'||req.stage==='followup_repair'){
    v={status:'continue',basis_ids:cognitiveContext(w,OWNER,w.clock.synced_at,'feedback').followup_intent.bases.map(b=>b.id),delay_hours:1,next_step:null,unverified_idea:'灯光会不会记得雨水的声音？'};
-   if(mode==='bad')v.question='清水已经送到苔团眼前了，我该等回应，还是先做点别的？';
+   followupCalls.push([turn,mode,req.stage]);
+   if(req.stage==='followup'){
+    const view=JSON.parse(req.messages.at(-1).content);
+    assert.equal(view.prompt_version,'deskbot.followup-intent-prompt.v2');
+    assert.equal(view.previous_unverified_thought,turn===1?null:v.unverified_idea);
+    assert.equal(view.command_schema.properties.unverified_idea.type,'string');
+    assert.ok(view.verified_bases.every(b=>v.basis_ids.includes(b.id)));
+   }else{
+    const hint=req.messages.at(-1).content;
+    assert.ok(hint.includes('$.unverified_idea')&&hint.includes('"expected":"string"')&&hint.includes('"actual":"object"'));
+   }
+   if(mode==='bad')v.unverified_idea=w.cognition.actors[OWNER].followup.intent_evidence.unverified_idea;
   }else throw Error(req.stage);
   return JSON.stringify(v);
  };
@@ -131,7 +150,12 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
   applyCognitiveMutation(w,{actor_id:OWNER,operation:'claim',phase,job_id:job},at,job);
   const context=cognitiveContext(w,OWNER,at,phase);context.mode='mock';
   if(phase==='feedback'){context.result=cognitiveActualResult(w,OWNER,at);context.action=w.cognition.actors[OWNER].pending.action;}
-  const proposal=await bridge.session(context,respond);
+  let proposal;
+  try{proposal=await bridge.session(context,respond);}
+  catch(error){
+   applyCognitiveMutation(w,{actor_id:OWNER,operation:'error',phase,job_id:job,error:error.code,failure:error.failure,diagnostic:error.diagnostic},at,job);
+   throw error;
+  }
   const payload={actor_id:OWNER,operation:phase,phase,job_id:job,proposal,relevant_key:cognitiveRelevantKey(w,OWNER),...(context.result?{result:context.result}:{})};
   if(phase==='feedback'&&context.result.effects.communication){
    const before=structuredClone(w),bad=structuredClone(payload);bad.proposal.followup.reason=original.adopted_followup.reason;
@@ -141,20 +165,24 @@ test('real bridge: measure, notify, disclose; reject false feedback atomically a
   return context;
  };
  await run('plan');settle(w,w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id));await run('feedback');
+ const firstIssue=structuredClone(w.cognition.actors[OWNER].followup);
+ restart();
+ assert.deepEqual(w.cognition.actors[OWNER].followup,firstIssue);
  const readings=structuredClone(w.cognition.actors[OWNER].last_result);
  turn=2;await run('plan');let task=w.tasks.find(t=>t.task_id===w.cognition.actors[OWNER].pending.task_id);settle(w,task);
  const receipt=task.cognitive_message.receipt;
  assert.equal(receipt.disclosures[0].kind,'completion_notice');assert.ok(!receipt.text.includes('蓄光'));
  assert.equal(cognitiveContext(w,OWNER,w.clock.synced_at).goal_lifecycle.goals.find(g=>g.goal_id==='goal:send-readings').evidence_ids.length,0);
  const taskCount=w.tasks.length,stock=structuredClone(w.living.inventories[OWNER]);
- mode='bad';await assert.rejects(run('feedback'),e=>e.failure?.cause_code==='followup_intent_invalid');
- // Close and reopen the same SQLite persistence used by the service. The
- // coordinator's failed job stays pending; resuming must not execute it again.
- const directory=mkdtempSync(join(tmpdir(),'deskbot-event-evidence-'));
- t.after(()=>rmSync(directory,{recursive:true,force:true}));
- const filename=join(directory,'world.sqlite');w.cognition.actors[OWNER].job.status='failed';
- const saved=createSqlitePersistence({filename});saved.put('canonical-world.states',w.world_id,w);saved.close();
- const reopened=createSqlitePersistence({filename});w=reopened.get('canonical-world.states',w.world_id);reopened.close();
+ mode='bad';await assert.rejects(run('feedback'),e=>e.failure?.cause_code==='followup_intent_invalid'&&e.diagnostic.path==='$.unverified_idea');
+ assert.equal(w.cognition.actors[OWNER].job.diagnostic.actual,'object');
+ assert.equal(w.cognition.actors[OWNER].job.status,'failed');
+ assert.equal(w.cognition.actors[OWNER].pending.task_id,task.task_id);
+ assert.deepEqual(followupCalls.filter(([n,mode])=>n===2&&mode==='bad').map(r=>r[2]),['followup','followup_repair']);
+ const unfinished=structuredClone(w.cognition.actors[OWNER].goal_bindings);
+ restart();
+ assert.deepEqual(w.cognition.actors[OWNER].goal_bindings,unfinished);
+ assert.equal(w.cognition.actors[OWNER].followup.followup_id,firstIssue.followup_id);
  mode='good';await run('feedback');
  settleCognitiveTask(w,w.tasks.find(t=>t.task_id===task.task_id),w.clock.synced_at);
  assert.equal(w.tasks.length,taskCount);assert.deepEqual(w.living.inventories[OWNER],stock);

@@ -38,7 +38,7 @@ from input_refraction import interpret_inputs, external_goals
 from relationship_review import review_relationships
 from continuation_contract import continuation_errors, CONTINUATION_CONTRACT, FEEDBACK_CONTINUATION_CONTRACT, issue_choice_errors, compiled_issue_errors, ISSUE_CHOICE_CONTRACT
 from followup_phases import feedback_error_code
-from context_projection import BODY_BOUNDARY, stage_context, continuation_view
+from context_projection import BODY_BOUNDARY, stage_context, continuation_view, followup_intent_view
 from life_semantics import production_errors, PRODUCTION_CONTRACT, render_anchored_memory, compiled_method_errors, AFFECT_FEELINGS, AFFECT_WISHES
 from actor_choice import bind_choice, CONTRACT as SINGLE_CHOICE_CONTRACT
 from decision_fields import MOTIVATIONS, MOTIVATION_PROMPT
@@ -47,7 +47,7 @@ from failure_contract import error_frame
 from opportunity_goals import OpportunityNeedEngine
 from goal_lifecycle import CONTRACT as GOAL_LIFECYCLE, enabled as goal_lifecycle_enabled
 from event_evidence import CONTRACT as EVENT_EVIDENCE, communication_errors
-from followup_intent import CONTRACT as FOLLOWUP_INTENT, compile_intent
+from followup_intent import CONTRACT as FOLLOWUP_INTENT, IntentCommandError, compile_intent
 from contact_contract import (CONTACT_CONTRACT, contact_readiness, contact_intent_errors,
     bind_contact_intent, compiled_contact_errors, social_contact_errors)
 
@@ -338,16 +338,71 @@ def hydrate_action(data):
     return AgentAction(**data)
 
 
-async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None,stage='contract',failure_code=None):
+async def contract_json(router,messages,validator,max_tokens=900,repair_hint=None,stage='contract',failure_code=None,diagnose=None):
     for attempt in range(2):
         with observe_stage(stage if attempt == 0 else stage+'_repair'):
             reply=await router.complete(LLMScene.DIRECTIVE,messages,max_tokens=max_tokens,json_mode=True)
+        if diagnose is not None:
+            try:
+                value = json.loads(reply.content)
+                problem = diagnose(value)
+            except json.JSONDecodeError:
+                problem = IntentCommandError({'path':'$', 'rule':'format', 'expected':'JSON object', 'actual':'invalid JSON'})
+            if problem is None:
+                return value
+            if attempt:
+                raise problem
+            messages = messages + [LLMMessage('assistant', reply.content), LLMMessage('user', problem.repair_hint())]
+            continue
         value=extract_json(reply.content)
         if isinstance(value,dict) and validator(value): return value
         if not isinstance(value,dict): value={}
         hint=repair_hint(value) if callable(repair_hint) else repair_hint
         messages=messages+[LLMMessage('assistant',reply.content),LLMMessage('user',hint or '该 JSON 不符合给定字段合同。重新检查原合同要求的字段名、数据类型与取值。只修复本次合同，不引入其他阶段字段，不新增事实。')]
     raise ValueError(failure_code(value) if callable(failure_code) else failure_code or 'semantic_contract_rejected_after_retry')
+
+
+def intent_problem(command, context):
+    try:
+        compiled = compile_intent(command, context)
+    except IntentCommandError as error:
+        return error
+    if valid_continuation_binding(compiled, context):
+        return None
+    errors = continuation_errors(compiled, context)
+    issue = errors[0] if errors else 'followup_condition_unknown'
+    # Material conditions, commitment IDs and completed-step proofs are validated
+    # by their existing contracts. Diagnostics refer to the command field.
+    field = 'wait_for' if compiled.get('wait_for') else 'next_step'
+    if compiled.get('followup_closure'):
+        field = 'closure'
+    return IntentCommandError({'path': '$.'+field, 'rule':'transition',
+                               'expected':'compatible current option or closure', 'actual':issue})
+
+
+async def legacy_intent_command(router, personality, context):
+    def valid(raw):
+        try:
+            value = compile_intent(raw, context)
+            return valid_followup(value) and valid_continuation_binding(value, context)
+        except (ValueError, TypeError, KeyError):
+            return False
+
+    def repair(raw):
+        try:
+            return followup_repair(compile_intent(raw, context), context)
+        except (ValueError, TypeError, KeyError):
+            return FOLLOWUP_INTENT['rule']+' 必填status/basis_ids/next_step/delay_hours；不能输出question/reason。保留原意，返回完整JSON。'
+
+    view = {key: value for key,value in context['followup_intent'].items() if key not in ('next_options','wait_options')}
+    schema = FOLLOWUP_INTENT['command']
+    fields = {'required':schema['required'], 'optional':[key for key in schema['properties'] if key not in schema['required']],
+              'statuses':schema['properties']['status']['enum'], 'delay_hours':'integer 1..48','review_after_minutes':'integer 10..2880',
+              'next_step':'null or {kind,id} from next_options','wait_for':'null or {kind,id} from wait_options'}
+    request = {'self':PersonalityLayer.to_prompt_context(personality), 'now':context.get('time',context['at']),
+               'evidence':view, 'continuation':continuation_view(context), 'contract':fields}
+    return await contract_json(router, [LLMMessage('system', FOLLOWUP_INTENT['rule']), LLMMessage('user', prompt_json(request, context))],
+                               valid, repair_hint=repair, stage='followup', failure_code=FOLLOWUP_INTENT['error'])
 
 
 def valid_followup(value):
@@ -633,26 +688,21 @@ async def run(context):
             reflection=await ReflectionEngine(router,memory,personality,agent_id=actor['actor_id'],seconds_per_step=3600,time_label_for=time_label,world_start_second_of_day=start).reflect(step)
             output['reflection']=plain(reflection)
         if context.get('followup_intent',{}).get('schema')==FOLLOWUP_INTENT['schema']:
-            def valid_intent(raw):
-                try:
-                    value=compile_intent(raw,context)
-                    return valid_followup(value) and valid_continuation_binding(value,context)
-                except (ValueError,TypeError,KeyError):return False
-            def intent_repair(raw):
-                try:return followup_repair(compile_intent(raw,context),context)
-                except (ValueError,TypeError,KeyError):return FOLLOWUP_INTENT['rule']+' 必填status/basis_ids/next_step/delay_hours；不能输出question/reason。保留原意，返回完整JSON。'
-            # The result's large object/inventory snapshots have already been
-            # used by the feedback/memory stages. This call selects intentions.
-            view={k:v for k,v in context['followup_intent'].items() if k not in ('next_options','wait_options')}
-            cont=continuation_view(context)
-            raw=await contract_json(router,[LLMMessage('system',FOLLOWUP_INTENT['rule']),
-                LLMMessage('user',prompt_json({'self':PersonalityLayer.to_prompt_context(personality),
-                    'now':context.get('time',context['at']),'evidence':view,'continuation':cont,
-                    'contract':{'required':FOLLOWUP_INTENT['required'],'optional':FOLLOWUP_INTENT['optional'],'statuses':FOLLOWUP_INTENT['statuses'],
-                        'delay_hours':'integer 1..48','review_after_minutes':'integer 10..2880',
-                        'next_step':'null or {kind,id} from next_options','wait_for':'null or {kind,id} from wait_options'}},context))],
-                valid_intent,repair_hint=intent_repair,stage='followup',failure_code=FOLLOWUP_INTENT['error'])
-            output['followup_binding']={'contract':FOLLOWUP_INTENT['schema'],'actor_payload':raw}
+            version = context['followup_intent'].get('prompt_version')
+            if version == FOLLOWUP_INTENT['prompt_version']:
+                view = followup_intent_view(context, PersonalityLayer.to_prompt_context(personality))
+                messages = [LLMMessage('system', FOLLOWUP_INTENT['prompt_rule']), LLMMessage('user', prompt_json(view, context))]
+                raw = await contract_json(router, messages, None, stage='followup',
+                                          diagnose=lambda command: intent_problem(command, context))
+            elif version is None:
+                # Already frozen v1 jobs keep their original messages, including the
+                # generic repair hint. Their command had the same allowed field types.
+                raw = await legacy_intent_command(router, personality, context)
+            else:
+                raise ValueError(FOLLOWUP_INTENT['binding_error'])
+            output['followup_binding'] = {'contract': FOLLOWUP_INTENT['schema'], 'actor_payload': raw}
+            if version:
+                output['followup_binding']['prompt_version'] = version
             output['followup']=compile_intent(raw,context)
         else:
             output['followup']=await contract_json(router,[LLMMessage('system','你就是此角色。基于已经核验的结果，留下一项诚实的后续。actual_result.effects 是执行器作用：share 只送达留言，不交付物品；原计划和标题不是完成证据。reservation.inputs 已在开始时预扣，不从结果 after 再扣一次。引用结束库存用 after 或冻结背包。没有实际回复/合同不能说已答应或已履约。只返回 JSON。'),

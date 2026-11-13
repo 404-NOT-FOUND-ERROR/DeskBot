@@ -19,7 +19,7 @@ import {captureIssueResolutionEvidence} from './cognitive-issue-evidence.mjs';
 import {cognitiveGrounding,cognitiveUseContext,validateDecisionContact,validateDecisionIssue,validateDecisionMethod} from './cognitive-grounding.mjs';
 import {cognitiveMemoryFrame} from './cognitive-memory-frame.mjs';
 import {cognitiveChoiceCatalogue,validateCatalogueSelection} from './cognitive-choice-catalogue.mjs';
-import {cognitiveFailure,validCognitiveFailure} from './cognitive-failure.mjs';
+import {cognitiveFailure,validCognitiveFailure,validFieldDiagnostic} from './cognitive-failure.mjs';
 import {projectCognitiveOpportunities,validateOpportunityTransition} from './cognitive-opportunities.mjs';
 import {cognitiveGoalOpportunities,prepareGoalBindings,captureGoalOpportunityEvidence} from './cognitive-goal-opportunities.mjs';
 import {goalLifecycleContext} from './cognitive-goal-lifecycle.mjs';
@@ -143,6 +143,8 @@ export function applyCognitiveMutation(world,payload,at,eventId){
   if(life.job?.id!==payload.job_id)fail('cognitive_job_obsolete');
   if(payload.operation==='error'){
     if(payload.failure!==undefined&&!validCognitiveFailure(payload.failure))fail('invalid_failure_report');
+    if(payload.diagnostic!==undefined&&!validFieldDiagnostic(payload.diagnostic))fail('invalid_failure_report');
+    if(payload.diagnostic)life.job.diagnostic=copy(payload.diagnostic);
     life.job.status='failed';life.job.error=payload.error;
     const retryable=(life.retry?.attempt??0)<3&&(payload.retryable===true||['interrupted_on_restart','python_timeout','cognitive_context_changed','activity_reference_unavailable','object_reference_unavailable','message_reference_unavailable','cognitive_source_expired'].includes(payload.error)||/^fetch_|^network_/.test(payload.error??''));
     life.retry={phase:payload.phase??life.job.phase,reason:payload.error,attempt:(life.retry?.attempt??0)+1,at:new Date(Date.parse(at)+Math.min(15*60000,30000*2**Math.min(life.retry?.attempt??0,5))).toISOString(),retryable};

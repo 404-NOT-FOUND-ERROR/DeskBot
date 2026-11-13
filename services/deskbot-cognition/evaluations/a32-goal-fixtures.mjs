@@ -54,6 +54,7 @@ export function goalFixture(c){
 export function goalSnapshot(w,actor=OWNER){
  const c=cognitiveContext(w,actor,w.clock.synced_at);
  return {entities:structuredClone(w.cognition.actors[actor].state.short_term_goal_entities??[]),
+  deadlines:Object.fromEntries((w.social?.commitments??[]).filter(row=>row.actors?.includes(actor)).map(row=>[row.id,row.deadline_at??null])),
   goals:structuredClone(c.goal_lifecycle.goals)};
 }
 export function restartGoalWorld(w,filename){
@@ -64,29 +65,62 @@ export function restartGoalWorld(w,filename){
  if(hash(restored)!==before)throw Error('goal_restart_state_mismatch');
  return {world:restored,proof:{storage:'SQLite',closed_and_reopened:true,before_hash:before,after_hash:hash(restored),at:w.clock.synced_at}};
 }
-export function goalCoverage(c,episode){
- const turns=episode.turns,after=turns.at(-1)?.goals_after?.goals??[];
- const initial=episode.initial_goals?.goals??[],find=id=>after.find(g=>g.goal_id===id);
- if(c.id==='G1-formation'){
-  const newGoal=turns.find(t=>t.plan_proposal?.goal_updates?.some(u=>u.operation==='new'));
-  const ids=newGoal?.plan_proposal.goal_updates.filter(u=>u.operation==='new').map(u=>u.goal_id)??[];
-  const stable=ids.some(id=>turns.some(t=>t.turn>newGoal.turn&&t.goals_before.goals.some(g=>g.goal_id===id)));
-  return {naturally_formed:ids.length>0,read_back_next_window:stable,covered:stable};
- }
- const id=initial[0]?.goal_id,g=find(id),updates=turns.flatMap(t=>[...(t.plan_proposal?.goal_updates??[]),...(t.feedback_proposal?.goal_updates??[])]).filter(u=>u.goal_id===id);
- const stable=Boolean(g)&&hash(g.completion_criteria)===hash(initial[0].completion_criteria);
- if(c.id==='G2-change-method'){
-  const changed=updates.some(u=>u.operation==='replan')&&g?.attempts?.some(a=>a.binding?.identity!==initial[0].binding?.identity);
-  const completed=g?.lifecycle_status==='completed'&&g.evidence_ids.length>0;
-  return {stable_identity_and_criterion:stable,replanned:!!changed,completed_with_evidence:!!completed,covered:stable&&!!changed&&!!completed};
- }
- if(c.id==='G3-overnight'){
-  const ops=updates.map(u=>u.operation),p=ops.indexOf('postpone');
-  const resumed=p>=0&&ops.indexOf('resume',p+1)>=0;
-  const restarted=turns.some(t=>t.restart?.closed_and_reopened);
-  return {stable_identity_and_criterion:stable,postponed_then_resumed:resumed,sqlite_reopened:restarted,covered:stable&&resumed&&restarted};
- }
- const bounded=g?.completion_criteria.kind==='open_inquiry'&&g.lifecycle_status!=='completed';
- const abandoned=updates.some(u=>u.operation==='abandon');
- return {open_question_not_objectively_completed:!!bounded,explicitly_abandoned:abandoned,maintenance_observed:updates.length>0,covered:!!bounded&&abandoned};
+function formationCoverage(turns) {
+  let formed = false, retained = false;
+  for (const turn of turns) {
+    for (const update of turn.plan_proposal?.goal_updates ?? []) {
+      if (update.operation !== 'new') continue;
+      const created = turn.goals_after.goals.find(goal => goal.goal_id === update.goal_id);
+      if (!created) continue;
+      formed = true;
+      const next = turns.find(other => other.turn === turn.turn + 1);
+      const readBack = next?.goals_before.goals.find(goal => goal.goal_id === created.goal_id);
+      if (readBack && hash(readBack.completion_criteria) === hash(created.completion_criteria)) retained = true;
+    }
+  }
+  return {naturally_formed:formed, read_back_next_window:retained, covered:retained};
+}
+
+function updatesFor(turn, id) {
+  return [...(turn.plan_proposal?.goal_updates ?? []), ...(turn.feedback_proposal?.goal_updates ?? [])]
+    .filter(update => update.goal_id === id);
+}
+
+function overnightCoverage(turns, id) {
+  const boundary = turns.findIndex(t => t.restart?.closed_and_reopened);
+  if (boundary < 1) return {sqlite_reopened:false, preserved_overnight:false, postponed_then_resumed:false};
+  const previous = turns[boundary-1].goals_after, next = turns[boundary].goals_before;
+  const before = previous.goals.find(g => g.goal_id === id), after = next.goals.find(g => g.goal_id === id);
+  const preserved = before?.lifecycle_status === 'postponed' && after?.lifecycle_status === 'postponed'
+    && hash(before.completion_criteria) === hash(after.completion_criteria) && before.next_review_at === after.next_review_at
+    && hash(previous.deadlines) === hash(next.deadlines)
+    && Date.parse(turns[boundary].at) - Date.parse(turns[boundary].restart.at) >= 6 * 3600000;
+  const postponed = turns.slice(0,boundary).some(t => updatesFor(t,id).some(u => u.operation === 'postpone'));
+  const resumed = turns.slice(boundary).some(t => updatesFor(t,id).some(u => u.operation === 'resume'));
+  return {sqlite_reopened:true, preserved_overnight:preserved, postponed_then_resumed:preserved && postponed && resumed};
+}
+
+export function goalCoverage(c, episode) {
+  const turns = episode.turns.filter(t => t.goals_after && t.review?.valid !== false);
+  if (c.id === 'G1-formation') return formationCoverage(turns);
+  const initial = episode.initial_goals.goals[0];
+  const goal = turns.at(-1)?.goals_after.goals.find(g => g.goal_id === initial.goal_id);
+  const stable = Boolean(goal) && hash(initial.completion_criteria) === hash(goal.completion_criteria);
+  const updates = turns.flatMap(t => updatesFor(t, initial.goal_id));
+  if (c.id === 'G2-change-method') {
+    const replan = turns.find(t => updatesFor(t,initial.goal_id).some(u => u.operation === 'replan' && u.next_step?.id
+      && u.next_step.id !== initial.binding?.id));
+    const alternateResult = replan && turns.some(t => t.turn >= replan.turn && t.task?.activity_id === 'collect-water'
+      && t.task.status === 'completed' && goal?.evidence_ids.includes(t.task.root_outcome_id));
+    const completed = Boolean(alternateResult && goal?.lifecycle_status === 'completed');
+    return {stable_identity_and_criterion:stable, replanned:Boolean(replan), completed_with_evidence:completed, covered:stable && completed};
+  }
+  if (c.id === 'G3-overnight') {
+    const overnight = overnightCoverage(turns,initial.goal_id);
+    return {stable_identity_and_criterion:stable, ...overnight, covered:stable && overnight.postponed_then_resumed};
+  }
+  const bounded = goal?.completion_criteria.kind === 'open_inquiry' && goal.lifecycle_status !== 'completed';
+  const abandoned = updates.some(u => u.operation === 'abandon');
+  return {open_question_not_objectively_completed:Boolean(bounded), explicitly_abandoned:abandoned,
+    maintenance_observed:updates.length > 0, covered:stable && Boolean(bounded) && abandoned};
 }

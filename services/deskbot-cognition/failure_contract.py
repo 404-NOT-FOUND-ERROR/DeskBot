@@ -24,4 +24,7 @@ def error_frame(error, context, stage=None):
     actor = context.get('actor') if isinstance(context.get('actor'), dict) else {}
     report = cognitive_failure(str(error), phase=context.get('phase'), stage=stage, actor_id=actor.get('actor_id'))
     # The legacy error field remains available; the shared report never copies prose.
-    return {'type': 'error', 'error': str(error)[:500], 'failure': report}
+    frame = {'type': 'error', 'error': str(error)[:500], 'failure': report}
+    if getattr(error, 'diagnostic', None):
+        frame['diagnostic'] = error.diagnostic
+    return frame

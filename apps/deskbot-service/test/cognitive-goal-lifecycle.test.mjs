@@ -142,7 +142,7 @@ test('actual Python worker uses explicit ID lifecycle in existing plan and feedb
   }else if(req.stage==='decision')value={act:true,choice_id:chosen.id,inner_monologue:'我想先备一批水',expected_outcome:'得到实际清水',issue:{decision:'continue',id:'current'},motivation:'self_exploration',source_ids:[]};
   else if(req.stage==='feedback')value=req.scene==='need_goal_generation'?{goal_updates:[{operation:'complete',goal_id:goalId,reason:'执行器记录了这批实际产出'}]}:{reason:'做成这一步',emotion:'joy',intensity:.3,valence:.3};
   else if(req.stage==='memory')value=req.scene==='memory_importance'?{score:.8,reason:'实际结果'}:{focus_id:JSON.parse(req.messages.at(-1).content).facts[0].id,feeling:'curious',wish:'understand'};
-  else if(req.stage==='followup')value={status:'continue',basis_ids:JSON.parse(req.messages.at(-1).content).evidence.bases.map(b=>b.id),delay_hours:1,next_step:null};
+  else if(req.stage==='followup')value={status:'continue',basis_ids:JSON.parse(req.messages.at(-1).content).verified_bases.map(b=>b.id),delay_hours:1,next_step:null};
   else throw Error(req.stage);return JSON.stringify(value);
  };
  for(const phase of ['plan','feedback']){

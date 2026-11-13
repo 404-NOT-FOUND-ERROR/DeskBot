@@ -246,7 +246,7 @@ export function cognitiveResultFollowup(life,followup,context,at,root,decision=n
  if(closure)validateFollowupTransition({followup_id:issueId(old),status:followup.status,followup_closure:closure},context);
  // "No new question after this action" is not proof that an older issue is solved.
  if(sameIssue&&['drop','none'].includes(followup.status)&&!closure)
-  return {...copy(old),status:'postpone',reason:followup.reason,last_reviewed_at:at,next_review_at:reviewAt(at,minutes,old.wait_for,context,old.wait_started_at??at)};
+  return {...copy(old),original_question:old.original_question??old.question,status:'postpone',reason:followup.reason,last_reviewed_at:at,next_review_at:reviewAt(at,minutes,old.wait_for,context,old.wait_started_at??at)};
  const same=Boolean(waitFor&&JSON.stringify(waitFor)===JSON.stringify(old?.wait_for)&&['continue','postpone'].includes(old?.status));
  const since=same?(old.wait_started_at??old.created_at??at):at;
  const target=sameIssue?old.completion_target:life.pending?.completion_target;

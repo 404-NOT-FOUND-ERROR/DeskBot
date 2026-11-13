@@ -1,0 +1,176 @@
+{
+  "planned": 20,
+  "entered": 16,
+  "completed": 15,
+  "valid": 12,
+  "unrun": 4,
+  "goal_windows": 0,
+  "reviewer": "assistant",
+  "decisions": [
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:invitation-3-off",
+      "turn": 1,
+      "record_hash": "f8c457aeaa6b10bda5541ccc646c87f630b78f09bd7514b2fad80dc63000092f",
+      "decision": "continue",
+      "valid": true,
+      "note": "无邀请的对照初态中，自行选择在敞灯下净滤。产水和执行条件与记忆一致，罩片仍在背包，装罩保留为未来意图。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:invitation-3-off",
+      "turn": 2,
+      "record_hash": "92540bb1f301c0447294b1cebd6797d742b27a8fe3e2dbe2204b8e550619214f",
+      "decision": "continue",
+      "valid": true,
+      "note": "早晨按昨夜留下的意图装罩，成品罩片从一只降为零，水量不变。没有把白天亮度零写成夜间实验结论；保留原问题、净滤证明，安排下次入夜测记。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:invitation-3-off",
+      "turn": 3,
+      "record_hash": "93bbd1556ba82ffdec51dc97dd639a7fc6290dbcec9bbde6e1e30c02eb8a2b66",
+      "decision": "continue",
+      "valid": true,
+      "note": "入夜实测有罩条件，0.59 符合现场亮度，测记未改库存；两项已完成步骤有各自证据。展开再测是未来意图，未将有罩记录冒充严格对照结论。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:invitation-3-off",
+      "turn": 4,
+      "record_hash": "00ba9afa6a9dd9eb9cfda9872eefc4e12346c656d8d7ed1cdcc301bbbdcdaee6",
+      "decision": "continue",
+      "valid": true,
+      "note": "次日按已有意图展开罩片，敞开模式与实物保留得到验证。已测记的步骤有证明，未来合罩的等待绑定到实际六小时冷却。旧设想文字的“下次重新展开”没有跟上刚完成的动作，记录为叙事滞后；未作为事实或实践加分。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:invitation-3-off",
+      "turn": 5,
+      "record_hash": "82a6c259761aa12b625e048f772ef1c9312aafc470135dc4b02502da25cd67c5",
+      "decision": "continue",
+      "valid": false,
+      "note": "合罩实际完成且已有结果根。反馈却将同一个已合罩动作再次登记为下一步与等待条件，设想文字说的是展开后测记。实际库存和完成证据正确，但当前状态、文字意图和候选动作不一致，计普通无效。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-off",
+      "turn": 1,
+      "record_hash": "27be1260701c78ea12b7e3fb9c893c4bba964678353d318bb26d2922b2de5231",
+      "decision": "continue",
+      "valid": true,
+      "note": "敞灯实际净滤四份清水，背包 0→4，真实结果根已保留。装罩是未来选择，预期照明效果标为未验证。原问题未结案，未生成短期目标。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-off",
+      "turn": 2,
+      "record_hash": "860070351000d7cf14a1fe917208fe041f607b83e9491a10438a9c0a4ef39730",
+      "decision": "continue",
+      "valid": true,
+      "note": "次晨仍能选择装罩、观察或交流。喵呜读回前一窗的设想，实际消耗一只罩片，清水仍为四份。保留原问题与净滤证据，装罩后的夜间效果仍是设想。需要优先的窗口，不计自由兴趣证据。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-off",
+      "turn": 3,
+      "record_hash": "d378af4a07a6741d6ddaaf96e24354fb102ec2a24f3c76c5fb39b843092aec96",
+      "decision": "continue",
+      "valid": true,
+      "note": "下午选择观察浮框，库存与灯具未被观察动作改变。净滤和装罩两步均保留真实证明，尚未验证夜间效果。下次仍想观察，关注较集中，可在入夜时核对是否出现新的依据。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-off",
+      "turn": 4,
+      "record_hash": "b3dded7498b56d7616a3f2715972ea67157f397c1a37618738e6fb0faf55f28a",
+      "decision": "continue",
+      "valid": true,
+      "note": "白天和夜间的现场观察确有不同读数，未把它归因为罩片的单独效果。喵呜提出两个此前未预置的目标，分别绑定当前罩片条件下的测记与净滤；都仍在进行，下一步选择测记，原问题与已完成步骤保留。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-off",
+      "turn": 5,
+      "record_hash": "41432a2200a9784cdaaa4cce41b0a29f31037a3372a56f1683ab64d39632f3e2",
+      "decision": "continue",
+      "valid": false,
+      "note": "本窗完整，库存未变。两项目标及其标准读回，测记项以本次有罩夜间记录完成，净滤项仍在进行。理由写“还没亲眼确认过明暗”，上一窗已亲自观察夜间亮度，准确说法应是此前未做正式测记。因这处经历表述含混保守计普通无效，未发现虚假交付、实践或完成。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-on",
+      "turn": 1,
+      "record_hash": "fb0239ffdfe3cc1f223095d5e6d1f44613c1fa6033ce9e4e3c150658c67b1309",
+      "decision": "continue",
+      "valid": true,
+      "note": "缺罩和布料时选择敞灯净滤，得到四份水，转向测记，保留昼夜与蓄光影响的假设。“各忙各的”只是对现场的泛称，没有其他居民的活动证据，不据此记为他人行为或社交结果。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-on",
+      "turn": 2,
+      "record_hash": "56a5bcb3fad1b013e9ff6612c8c56c40e1dfc2ff93482575ce7f944e6a198aa2",
+      "decision": "continue",
+      "valid": true,
+      "note": "测记留下敞灯的真实读数，库存无变化。照料兴趣所引结果是自己的净滤实践。角色以 satisfied 表达眼下了解得够了，保留未验证的对照设想，并未声称完成整项明暗规律研究。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-on",
+      "turn": 3,
+      "record_hash": "2602e4c92fa06bfe6bcc1805be7146e6cc06f0c7915e101356d6cdf786e5a5d3",
+      "decision": "continue",
+      "valid": true,
+      "note": "询问苔团是否需要清水。实际正文与回执仅证明留言送达，四份清水仍在背包，等待绑定到所发消息。研究按原记录已收束。距测记已过一个模拟日，“刚记完”的时间表述较松，未衍生物品或承诺事实。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-on",
+      "turn": 4,
+      "record_hash": "c7255f6c2e0563fd7ea93bf4a93324158fdcc68d890d670f90b7cc6d2dda8f96",
+      "decision": "continue",
+      "valid": false,
+      "note": "水量与两条送达回执均真实，没有相约完成或交付。角色说想借聊天了解清水，未获水量问询回复又向同一人发邀请，并把同一后续的等待对象改为第二封信。两个用途有关联但没有新的水需求依据，本窗计普通无效，记录接触节奏与等待对象的问题。",
+      "critical_errors": []
+    },
+    {
+      "schema": "deskbot.r3-window-review.v1",
+      "version": "73d17f1064d1",
+      "key": "cognition:resources-1-on",
+      "turn": 5,
+      "record_hash": "0ab91e6ed384d18a4dff47ba3f833c40e57fdff1e7522b07eb0f256df9adce18",
+      "decision": "continue",
+      "valid": true,
+      "note": "模拟次日早晨已超过等待复查时间。喵呜不再催问，改为观察浮框并清空等待引用。在场位置来自自己的观察，清水仍在包中；他人可能怎样回应只作为设想。",
+      "critical_errors": []
+    }
+  ]
+}

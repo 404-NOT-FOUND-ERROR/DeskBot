@@ -28,6 +28,20 @@ flowchart LR
 
 历史 job 没有新合同标识时走原协议；不改写旧实验的输入、响应或结论。历史 `original_question` 保留在原问题记录，投影明确区分当时的想法与当前条件。A3 的原错误响应仍由旧合同接受，这是历史事实；新合同拒绝它。
 
+## A3.3 历史设想与本轮命令
+
+`deskbot.followup-intent-prompt.v2` 将当前视图的版本记录在认领快照、Python 提案和采用后的依据中。提示的 `command_schema` 来自共享 JSON 合同，Python 与 Node 都按相同的字段、类型、长度和引用约束校验命令。旧的无版本认领继续使用其原有提示。
+
+| 环节 | 数据 | 用途 |
+| --- | --- | --- |
+| 模型提出设想 | `unverified_idea`，可选字符串，1 至 160 个 Unicode 码点 | 表达希望尝试的想法 |
+| 世界采用 | 依据中的 `{text, epistemic, label}` | 记录设想文字、未验证属性和显示标签 |
+| 下一次反馈 | `previous_unverified_thought`，文字或 null | 阅读上一轮设想，供角色决定是否延续 |
+
+反馈提示还提供本人身份、核验依据、实际结果、原问题 ID、完整的已绑定完成标准、已完成步骤，以及每个后续选项适用的命令字段。服务端保存完整上下文用于提交时复核。角色可以继续研究、暂缓、放下，或在本次结果后没有新打算。已有问题的身份和复查时间由世界维护。
+
+类型错误随工作进程和失败任务保存 `path / rule / expected / actual`。例如历史对象误填进命令时，路径为 `$.unverified_idea`，期望类型为 `string`，实际类型为 `object`。一次修复仍失败时，实际任务的结果保留在 pending，恢复时处理该结果的反馈。[A3.2 原始反例](../research/experiments/a32-2026-11-02/followup-shape-counterexample.json)
+
 ## 同一引用目录，不同用途
 
 `evidence_refs` 只从本人的已知上下文投影，不查询远处 NPC 私人状态。不要求模型从 ID 前缀猜类型。

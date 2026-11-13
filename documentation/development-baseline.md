@@ -4,7 +4,7 @@
 
 执行状态（2026-11-01）：A1 [公共事件证据](../research/milestones/r3a-event-evidence-2026-11-01.md) 与 A2 [目标连续性和位置知识](../research/milestones/a2-goal-lifecycle-2026-11-01.md) 已实现并经离线门禁。[A3 真实复验](../research/milestones/a3-behavior-validation-2026-11-01.md) 完成 8/20、7 个有效，第 8 窗因后续问题夹带未发生的呈送动作停止。64 次调用峰时估算 ¥2.233，原版本严格回放一致。正式新认知未启用，R3-B 未放行。
 
-[A3.1 离线修复](../research/milestones/a31-followup-remediation-2026-11-01.md) 已完成。2026-11-02 的 [A3.2](../research/milestones/a32-refrozen-acceptance-2026-11-02.md) 新冻结复验进入 2/20 窗，1 窗完整有效，第二窗因命令字段复制了存储对象而停止；14 次调用上界约 ¥0.32，原版本严格回放一致。1,399 项离线检查通过；目标专项已准备但 0/16 运行，不能算通过。下一步 [A3.3](../research/design/a33-command-readmodel-boundary-2026-11-02.md)先修命令、读模型与提示投影接缝。历史 A3 及 10 月 31 日 [18/20 复验](../research/milestones/r3a-phase-contract-validation-2026-10-31.md) 保持原判，不合并窗口。具体出口见 [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)。
+11 月 14 日核对的 A3.3 原矩阵完整 15/20、有效 12/20。1,403 项工程检查与构建通过。第四个情境首窗在目标形成时混用了问题与行动编号，正式新认知仍待验收。下一轮先修目标引用和完成范围。[A3.3 记录](../research/milestones/a33-refrozen-acceptance-2026-11-10.md) · [历史 A3.2](../research/milestones/a32-refrozen-acceptance-2026-11-02.md) · [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)
 
 ## 产品目标
 

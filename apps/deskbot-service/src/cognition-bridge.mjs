@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { cognitionRoot, fail } from './cognition-contracts.mjs';
-import { cognitiveFailure, validCognitiveFailure } from './cognitive-failure.mjs';
+import { cognitiveFailure, validCognitiveFailure, validFieldDiagnostic } from './cognitive-failure.mjs';
 
 export function findCognitionPython() {
   if (process.env.DESKBOT_COGNITION_PYTHON) return process.env.DESKBOT_COGNITION_PYTHON;
@@ -45,7 +45,11 @@ export function createCognitionBridge({ python = findCognitionPython(), timeoutM
             if (value.failure !== undefined && !validCognitiveFailure(value.failure)) fail('invalid_bridge_frame');
             const failure = cognitiveFailure('python_session_failed', {cause_code:value.failure?.code ?? value.error,
               phase:frame.phase,stage:value.failure?.stage ?? stage,actor_id:frame.actor?.actor_id});
-            throw Object.assign(new Error(value.error), {code:'python_session_failed',failure});
+            const diagnostic = value.diagnostic;
+            if (diagnostic !== undefined && !validFieldDiagnostic(diagnostic))
+              fail('invalid_bridge_frame');
+            const detail = diagnostic ? value.error+' '+diagnostic.path+' ('+diagnostic.rule+'): expected '+diagnostic.expected+', got '+diagnostic.actual : value.error;
+            throw Object.assign(new Error(detail), {code:'python_session_failed',failure,...(diagnostic ? {diagnostic} : {})});
           }
           else fail('invalid_bridge_frame');
         } catch (e) { error = e; child.kill(); }

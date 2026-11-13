@@ -135,7 +135,7 @@ test('real Python and Node execute selected catalogue steps, keep proof, then se
   else if(request.stage==='memory'&&request.scene==='memory_summarization'){
    const view=JSON.parse(request.messages.at(-1).content);v={focus_id:view.facts[0].id,feeling:'curious',wish:'understand'};
   }else if(request.stage==='followup'){
-   v={status:'continue',basis_ids:JSON.parse(request.messages.at(-1).content).evidence.bases.map(b=>b.id),delay_hours:1,next_step:null,wait_for:null};
+   v={status:'continue',basis_ids:JSON.parse(request.messages.at(-1).content).verified_bases.map(b=>b.id),delay_hours:1,next_step:null,wait_for:null};
   }
   else throw Error('Unexpected stage '+request.stage+'/'+request.scene);
   return JSON.stringify(v);

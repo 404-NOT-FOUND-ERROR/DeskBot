@@ -2,6 +2,7 @@
 from opportunity_contract import opportunity_errors, OPPORTUNITY_PROMPT
 from followup_phases import CONTRACT as PHASE_CONTRACT, FEEDBACK_PROMPT, feedback_field_errors
 from event_evidence import communication_errors
+from followup_intent import CONTRACT as INTENT_CONTRACT
 
 
 def issue_id(issue):
@@ -72,7 +73,9 @@ def continuation_errors(value, context):
             selected.get('from_root_outcome_id'), selected.get('origin_root_outcome_id')) and value.get('prior_root_id'):
         if decision in ('new', 'none', 'drop') and not closure:
             errors.append('已引用此问题的实际旧结果继续行动，不能同时new/none/drop；继续用continue并保留问题ID')
-    if current and value.get('status') in ('none', 'drop') and not closure:
+    preserving_issue = (value.get('status') == 'none' and
+                        (context.get('followup_intent') or {}).get('prompt_version') == INTENT_CONTRACT['prompt_version'])
+    if current and value.get('status') in ('none', 'drop') and not closure and not preserving_issue:
         errors.append('已有问题不能因为本次动作结束而自动结案；仍未解决用postpone，明确放下或解决才填followup_closure')
     wait = value.get('wait_for') or {}
     if view.get('wait_contract') == 'current-method-v1' and any(o['kind'] == wait.get('kind') and o['id'] == wait.get('id') and o.get('available') for o in view.get('wait_options', [])):

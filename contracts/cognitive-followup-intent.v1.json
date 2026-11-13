@@ -1,8 +1,36 @@
 {
   "schema": "deskbot.followup-intent.v1",
-  "required": ["status", "basis_ids", "next_step", "delay_hours"],
-  "optional": ["wait_for", "review_after_minutes", "followup_id", "closure", "unverified_idea"],
-  "statuses": ["continue", "postpone", "drop", "none"],
+  "prompt_version": "deskbot.followup-intent-prompt.v2",
+  "command": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["status", "basis_ids", "next_step", "delay_hours"],
+    "properties": {
+      "status": {"type": "string", "enum": ["continue", "postpone", "drop", "none"], "description": "continue 和 postpone 保留当前问题。drop 用于结束当前问题，需给 closure。none 表示本次没有新意向，原问题可保留到复查。"},
+      "basis_ids": {"type": "array", "items": {"type": "string"}, "description": "按 verified_bases 的顺序引用全部 id。"},
+      "next_step": {"$ref": "#/$defs/option", "description": "从 options 中选允许用于 next_step 的引用。尚无具体下一步可填 null。"},
+      "delay_hours": {"type": "integer", "minimum": 1, "maximum": 48},
+      "wait_for": {"$ref": "#/$defs/option", "description": "只选允许用于 wait_for 的真实等待条件。也可填 null 或省略。"},
+      "review_after_minutes": {"type": "integer", "minimum": 10, "maximum": 2880, "description": "可选。给出分钟时按分钟安排复查。"},
+      "followup_id": {"type": ["string", "null"], "description": "可引用 current_issue.id。"},
+      "closure": {
+        "type": ["object", "null"], "additionalProperties": false, "required": ["kind", "evidence_ids"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["resolved", "satisfied", "abandoned"]},
+          "evidence_ids": {"type": "array", "items": {"type": "string"}}
+        },
+        "description": "结束当前问题时使用。resolved 需要已绑定步骤的 resolution_evidence_ids。satisfied 和 abandoned 表达个人选择。"
+      },
+      "unverified_idea": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "[^\\s\\u001c-\\u001f\\u0085\\uFEFF]", "description": "可选。写一句自己的待验证设想，最多160个 Unicode 码点。历史设想可沿用其文字。"}
+    },
+    "$defs": {
+      "option": {
+        "type": ["object", "null"], "additionalProperties": false, "required": ["kind", "id"],
+        "properties": {"kind": {"type": "string"}, "id": {"type": "string"}}
+      }
+    }
+  },
+  "prompt_rule": "根据 verified_bases 和当前情况，选择还想惦记的事与复查时间。仅输出符合 command_schema 的 JSON 命令。previous_unverified_thought 是自己以前的设想，可以延续、修改或放下。如果沿用，把文字写入 unverified_idea。options 的 allowed_for 指明每个引用可以填在哪个字段。同时填写 next_step 和 wait_for 时须指向同一机会，等回信也可关联原约定。当前问题如需收束，在 drop 或 none 时给出 closure；resolved 只引用已绑定步骤的完成证据。个人收束和放下由自己选择。",
   "error": "followup_intent_invalid",
   "binding_error": "followup_intent_binding_changed",
   "rule": "只选择实际依据与未来意图。basis_ids逐字引用本次bases全部ID；next_step/wait_for引用现有机会或等待条件，不执行任务。question/reason由执行器生成，模型不能提供。可用unverified_idea表达最多160字的奇幻想法或待验证假说；它不属于事实、交付、承诺或完成证据。closure可选{kind:resolved|satisfied|abandoned,evidence_ids:[]}，仍由原问题完成合同核验，不改问题ID或标准。",

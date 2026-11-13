@@ -1,0 +1,20 @@
+{
+  "calls": 104,
+  "stages": {
+    "perception": 16,
+    "motivation": 15,
+    "decision": 15,
+    "feedback": 17,
+    "memory": 20,
+    "followup": 15,
+    "decision_repair": 4,
+    "followup_repair": 1,
+    "directive": 1
+  },
+  "input_tokens": 1758066,
+  "cache_hits_tokens": 314874,
+  "output_tokens": 9076,
+  "latency_ms_p50": 1251,
+  "latency_ms_p95": 2340,
+  "peak_cny_upper": 2.97158696
+}

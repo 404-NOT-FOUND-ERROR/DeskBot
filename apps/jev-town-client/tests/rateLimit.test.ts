@@ -1,3 +1,4 @@
+import { withLocalServer } from "./localTestServer.ts";
 import { describe, expect, it } from "vitest";
 import { CITIZEN_COUNT } from "../shared/citizens.ts";
 import { createApp } from "../server/app.ts";
@@ -65,13 +66,7 @@ describe("POST /api/broadcast rate limiting", () => {
 
   it("answers 429 once a caller exceeds the limit", async () => {
     const app = createApp({ jevConfig, rateLimit: { limit: 1, windowMs: 60_000 } });
-    const server = app.listen(0);
-    await new Promise<void>((resolve) => server.once("listening", resolve));
-    const address = server.address();
-    if (typeof address !== "object" || address === null) throw new Error("no server address");
-    const baseUrl = `http://127.0.0.1:${address.port}`;
-
-    try {
+    await withLocalServer(app, async baseUrl => {
       // Jev itself is unreachable here, so the first call falls back to the simulation - but it
       // still consumes the caller's quota, which is what we are asserting on.
       const first = await post(baseUrl, 1);
@@ -80,24 +75,14 @@ describe("POST /api/broadcast rate limiting", () => {
       const second = await post(baseUrl, 2);
       expect(second.status).toBe(429);
       expect(second.headers.get("retry-after")).toBeTruthy();
-    } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
+    });
   });
 
   it("does not limit anything when no key is configured", async () => {
     const app = createApp({ jevConfig: null, rateLimit: { limit: 1, windowMs: 60_000 } });
-    const server = app.listen(0);
-    await new Promise<void>((resolve) => server.once("listening", resolve));
-    const address = server.address();
-    if (typeof address !== "object" || address === null) throw new Error("no server address");
-    const baseUrl = `http://127.0.0.1:${address.port}`;
-
-    try {
+    await withLocalServer(app, async baseUrl => {
       expect((await post(baseUrl, 1)).status).toBe(200);
       expect((await post(baseUrl, 2)).status).toBe(200);
-    } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
+    });
   });
 });

@@ -17,3 +17,11 @@ export function validCognitiveFailure(value){
   const normalized=cognitiveFailure(value.code,value);
   return contract.fields.every(k=>value[k]===normalized[k]);
 }
+
+/** Optional, bounded job diagnostics. These fields never enter actor experience. */
+export function validFieldDiagnostic(value) {
+  const limits = {path:240, rule:80, expected:500, actual:500};
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).length === 4
+    && Object.entries(limits).every(([key, limit]) => typeof value[key] === 'string' && value[key].length > 0 && value[key].length <= limit);
+}

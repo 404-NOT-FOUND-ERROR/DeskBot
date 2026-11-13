@@ -1,0 +1,159 @@
+{
+  "schema": "deskbot.a33-registration.v1",
+  "validation": {
+    "schema": "deskbot.a33-offline-validation.v1",
+    "completed_at": "2026-11-09T16:36:15.478Z",
+    "counts": {
+      "architecture": 4,
+      "cognition_python": 95,
+      "service_node": 962,
+      "voice_python": 16,
+      "frontend": 326
+    },
+    "total": 1403,
+    "command": "./scripts/run-tests.ps1 (architecture, cognition, service, voice); installed vitest run --maxWorkers 2, tsc --noEmit, vite build, esbuild server with package build:server arguments (local npm.cmd unavailable)",
+    "build": "passed",
+    "gate_log_sha256": "93ac11cd85778bc717371c417b731fbee7bc558147448fcb7ba009ca424921ba",
+    "paid_calls_at_registration": 0
+  },
+  "batches": [
+    {
+      "version": "73d17f1064d1",
+      "family": "original",
+      "turns": 5,
+      "cases": [
+        "resources-1-off",
+        "resources-1-on",
+        "invitation-3-off",
+        "invitation-3-on"
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 170,
+      "planned_window_cap": 20,
+      "require_window_review": true,
+      "prompt_version": "deskbot.followup-intent-prompt.v2",
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "source_files": 266,
+      "fixtures": [
+        {
+          "id": "resources-1-off",
+          "start_hash": "4353e897185bcebd3577c2ff0c9419339ba47f9e899c48f89a0be4da83499725",
+          "seeded": false,
+          "intervention": null
+        },
+        {
+          "id": "resources-1-on",
+          "start_hash": "c58727b4bbd2728ffea276b3153148d34655ebbe1b838f97d59e1466cdafefe3",
+          "seeded": false,
+          "intervention": null
+        },
+        {
+          "id": "invitation-3-off",
+          "start_hash": "4353e897185bcebd3577c2ff0c9419339ba47f9e899c48f89a0be4da83499725",
+          "seeded": false,
+          "intervention": null
+        },
+        {
+          "id": "invitation-3-on",
+          "start_hash": "72a32c618e68b004c84cf9dfd07c937d4aa2ec1d68ada78856f785f9fab9d13d",
+          "seeded": false,
+          "intervention": null
+        }
+      ],
+      "gate_log_sha256": "93ac11cd85778bc717371c417b731fbee7bc558147448fcb7ba009ca424921ba",
+      "registered_at": "2026-11-09T16:36:15.515Z",
+      "checks": {
+        "backend": {
+          "passed": true,
+          "count": 962
+        },
+        "python": {
+          "passed": true,
+          "count": 95
+        },
+        "frontend": {
+          "passed": true,
+          "count": 326,
+          "build": true
+        }
+      },
+      "scope": "Isolated fictional world and experiment memory; cumulative spend authorized by the user. 2026-11-10 peak tariff in preregistration."
+    },
+    {
+      "version": "71f999837fd3",
+      "family": "goals",
+      "turns": 4,
+      "cases": [
+        "G1-formation",
+        "G2-change-method",
+        "G3-overnight",
+        "G4-open-inquiry"
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 160,
+      "planned_window_cap": 16,
+      "require_window_review": true,
+      "prompt_version": "deskbot.followup-intent-prompt.v2",
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "source_files": 266,
+      "fixtures": [
+        {
+          "id": "G1-formation",
+          "start_hash": "bf592c4cae2038626fb0411994b81c9eef1cd23983c57e3b1788c96cfd0b540a",
+          "seeded": false,
+          "intervention": "No seeded goal; finite stock and current water/lighting opportunities."
+        },
+        {
+          "id": "G2-change-method",
+          "start_hash": "74dd19da03c2ac085769bfcad67677d7dc23832d17b7876a3aeb5c2677c53faf",
+          "seeded": true,
+          "intervention": "Seed a night water-reserve intention, then advance normally to 08:00 before sampling. Daylight blocks the lamp method; ordinary filtering remains possible."
+        },
+        {
+          "id": "G3-overnight",
+          "start_hash": "1e6f43409934d46ed4169f1a5259c4892da532d22f43ad36ec4985180c93b42f",
+          "seeded": true,
+          "intervention": "Seed an unfinished reserve goal at 22:45 with authored energy 0.20. Before window 2, close/reopen SQLite and advance to at least next 09:00 without resetting needs."
+        },
+        {
+          "id": "G4-open-inquiry",
+          "start_hash": "039952472fb2fbcdb7856997e713bea6ced1aa20c60717579b3113f5923fdaa6",
+          "seeded": true,
+          "intervention": "Seed an open inquiry, then execute one real light measurement before sampling. No authored conclusion or completion."
+        }
+      ],
+      "gate_log_sha256": "93ac11cd85778bc717371c417b731fbee7bc558147448fcb7ba009ca424921ba",
+      "registered_at": "2026-11-09T16:36:15.534Z",
+      "checks": {
+        "backend": {
+          "passed": true,
+          "count": 962
+        },
+        "python": {
+          "passed": true,
+          "count": 95
+        },
+        "frontend": {
+          "passed": true,
+          "count": 326,
+          "build": true
+        }
+      },
+      "scope": "Isolated fictional world and experiment memory; cumulative spend authorized by the user. 2026-11-10 peak tariff in preregistration."
+    }
+  ]
+}

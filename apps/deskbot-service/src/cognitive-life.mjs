@@ -47,7 +47,7 @@ export function createCognitiveLife({world,budget,now=()=>new Date(),clockScope=
       return {job_id:jobId,phase,actor_id:id,calls:call,adoption:adoption.mutation.details};
     }catch(error){
       error.failure=cognitiveFailure(error.code??error.message,{...error.failure,phase,stage:error.failure?.stage??stage,job_id:jobId,actor_id:id,retryable:error.retryable===true});
-      mutate(id,'error',jobId,{phase,error:error.code??error.message,retryable:error.retryable===true,failure:error.failure});throw error;
+      mutate(id,'error',jobId,{phase,error:error.code??error.message,retryable:error.retryable===true,failure:error.failure,...(error.diagnostic ? {diagnostic:error.diagnostic} : {})});throw error;
     }
   }
   async function run(id,phase='plan'){

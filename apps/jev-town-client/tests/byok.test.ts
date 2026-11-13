@@ -1,3 +1,4 @@
+import { withLocalServer as withServer } from "./localTestServer.ts";
 import {afterEach,describe,expect,it,vi} from "vitest";
 import { CITIZEN_COUNT } from "../shared/citizens.ts";
 import { createApp } from "../server/app.ts";
@@ -21,18 +22,6 @@ function body(round: number) {
     history: [],
     citizens: Array.from({ length: CITIZEN_COUNT }, (_, i) => ({ id: i + 1, lastAction: null })),
   };
-}
-
-async function withServer<T>(app: ReturnType<typeof createApp>, run: (baseUrl: string) => Promise<T>) {
-  const server = app.listen(0,'127.0.0.1');
-  await new Promise<void>((resolve) => server.once("listening", resolve));
-  const address = server.address();
-  const port = typeof address === "object" && address !== null ? address.port : 0;
-  try {
-    return await run(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
 }
 
 async function post(baseUrl: string, round: number, key?: string) {

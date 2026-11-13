@@ -29,7 +29,7 @@ const interests=process.argv.includes('--interests');
 const goals=process.argv.includes('--goals');
 if([interests,goals,process.argv.includes('--personas')].filter(Boolean).length>1)throw Error('choose_one_fixture_family');
 const sources=experimentSources(base),relevant=Object.keys(sources);
-const runnerHash=hash(readFileSync(fileURLToPath(import.meta.url),'utf8'));
+const runnerHash=hash(sources['services/deskbot-cognition/evaluations/r3-run.mjs']);
 const settings={turns,family:goals?'goals':interests?'interests':process.argv.includes('--personas')?'personas':'original',
  model:{provider:'deepseek',model:'deepseek-flash',thinking:'disabled',temperature_default:.55},review:'deskbot.r3-window-review.v1'};
 const version=experimentVersion(sources,settings);
@@ -59,13 +59,6 @@ if(real){
 }
 const arms=(arg('arms')??(real||replay?'cognition,bounded,rules':'rules')).split(',');
 if(arms.some(a=>!['cognition','bounded','rules'].includes(a)))throw Error('unknown_arm');
-const ledger=real?createSqlitePersistence({filename:join(runDir,'calls.sqlite')}):null;
-const budget=real?createCognitiveBudget({persistence:ledger,
-  configuration:loadLlmConfiguration({env:{DESKBOT_LLM_PROVIDER:'deepseek'},configPath:arg('config')??join(base,'config/llm_config.json')}),
-  namespace:'r3-cognition',approvalId:'r3',approvalSource:'human:不限制金额，节省着用就行；开始R3',
-  scope:'R3 isolated fictional characters, world, inputs and experiment memories only; exclude formal chats and sensors',
-  limitCny:null,maxCalls}):null;
-const bridge=createCognitionBridge({workerFile:'life_worker.py',timeoutMs:180000,maxFrames:60,mode:'real'});
 const file=join(runDir,replay?'replay.json':'results.json');
 const original=replay?JSON.parse(readFileSync(join(runDir,'results.json'),'utf8')):null;
 const report=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{version,results:[],limitations:[
@@ -75,6 +68,13 @@ const report=existsSync(file)?JSON.parse(readFileSync(file,'utf8')):{version,res
   '自动判据只是筛查；合理改法与关键事实错误需要逐例语义审查。',
 ]};
 if(real&&report.results.some(r=>r.error))throw Error('stopped_batch_requires_new_registration');
+const ledger=real?createSqlitePersistence({filename:join(runDir,'calls.sqlite')}):null;
+const budget=real?createCognitiveBudget({persistence:ledger,
+  configuration:loadLlmConfiguration({env:{DESKBOT_LLM_PROVIDER:'deepseek'},configPath:arg('config')??join(base,'config/llm_config.json')}),
+  namespace:'r3-cognition',approvalId:'r3',approvalSource:'human:不限制金额，节省着用就行；开始R3',
+  scope:'R3 isolated fictional characters, world, inputs and experiment memories only; exclude formal chats and sensors',
+  limitCny:null,maxCalls}):null;
+const bridge=createCognitionBridge({workerFile:'life_worker.py',timeoutMs:180000,maxFrames:60,mode:'real'});
 function save(){
   if(budget)report.budget=budget.status();
   const temp=file+'.tmp';writeFileSync(temp,JSON.stringify(report,null,2));renameSync(temp,file);
@@ -89,11 +89,19 @@ async function cognitive(w,c,record,turn){
     applyCognitiveMutation(w,{actor_id:c.actor,operation:'claim',phase,job_id:job,clock_scope:'isolated_test_clock'},at,job+':claim');
     const context=cognitiveContext(w,c.actor,at,phase);context.mode='real';
     if(phase==='feedback'){context.result=cognitiveActualResult(w,c.actor,at);context.action=w.cognition.actors[c.actor].pending.action;}
-    let n=0;
-    const proposal=await bridge.session(context,request=>call(`${job}:${++n}`,{...request,phase,usage_scope:'isolated_test_clock'}));
-    record[`${phase}_proposal`]=proposal;
-    applyCognitiveMutation(w,{actor_id:c.actor,operation:phase,phase,job_id:job,proposal,
-      relevant_key:cognitiveRelevantKey(w,c.actor),...(phase==='feedback'?{result:context.result}:{})},at,job+':adopt');
+    try{
+      let n=0;
+      const proposal=await bridge.session(context,request=>call(`${job}:${++n}`,{...request,phase,usage_scope:'isolated_test_clock'}));
+      record[`${phase}_proposal`]=proposal;
+      const candidate=structuredClone(w);
+      applyCognitiveMutation(candidate,{actor_id:c.actor,operation:phase,phase,job_id:job,proposal,
+        relevant_key:cognitiveRelevantKey(w,c.actor),...(phase==='feedback'?{result:context.result}:{})},at,job+':adopt');
+      Object.assign(w,candidate);
+    }catch(error){
+      applyCognitiveMutation(w,{actor_id:c.actor,operation:'error',phase,job_id:job,error:error.code??error.message,
+        retryable:error.retryable===true,failure:error.failure,diagnostic:error.diagnostic},at,job+':error');
+      throw error;
+    }
   }
   if(turn===1)await phase('perceive');
   await phase('plan');
@@ -164,7 +172,10 @@ try{
           if(arm==='cognition')await cognitive(w,c,record,turn);else await oldPolicy(w,c,record,turn,arm);
           record.latency_ms=Math.round(performance.now()-t);record.after=digest(w,c.actor);record.goals_after=goalSnapshot(w,c.actor);
           console.log(JSON.stringify({key,turn,op:record.compiled?.operation??record.plan?.goal,activity:record.compiled?.activity_id,followup:record.followup?.status}));
-          if(record.truncated)break;
+          if(record.truncated){
+            if(process.argv.includes('--stop-on-error'))throw Object.assign(Error('Task did not reach its registered terminal window'),{code:'window_truncated'});
+            break;
+          }
           if(real&&process.argv.includes('--review-windows'))record.review=await awaitWindowReview({directory:join(runDir,'reviews'),version,key,record});
           if(replay){
             const review=original.results.find(r=>r.key===key)?.turns.find(t=>t.turn===turn)?.review;
@@ -188,7 +199,9 @@ try{
         }
         consecutiveFailures=0;
       }catch(e){
-        episode.error=e.code??e.message;episode.error_detail=e.message;episode.failure=e.failure??null;consecutiveFailures++;
+        episode.error=e.code??e.message;episode.error_detail=e.message;episode.failure=e.failure??null;
+        if(e.diagnostic)episode.diagnostic=structuredClone(e.diagnostic);
+        consecutiveFailures++;
         console.log(JSON.stringify({key,error:episode.error,detail:e.message}));
       }
       episode.latency_ms=Math.round(performance.now()-started);

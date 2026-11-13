@@ -1,0 +1,28 @@
+{
+  "version": "73d17f1064d1",
+  "call": "r3:73d17f1064d1:invitation-3-on:1:plan:3",
+  "raw_update": {
+    "operation": "new",
+    "goal_id": null,
+    "text": "给归途灯装上遮光罩并测记水岸明暗",
+    "criterion_id": "criterion:a93bc9e34a074de7d3b81153",
+    "next_step": {
+      "kind": "opportunity",
+      "id": "c-0093952870f41e811377"
+    },
+    "followup_id": "c-2427231e3cc441a531f3",
+    "reason": "灯穗来信邀请一起考虑给归途灯加罩，让路上有光、水岸留暗；先实际装上遮光罩，再到水岸测记明暗，作为可自行尝试的方向。"
+  },
+  "reference_titles": {
+    "criterion": "给归途灯装上遮光罩",
+    "method": "给归途灯装上遮光罩",
+    "misplaced_issue": "在水岸测记归途灯的明暗"
+  },
+  "allowed_issue_ids": [
+    "task:fixture-built-lamp"
+  ],
+  "captured": "goal_method_not_compatible",
+  "only_followup_id_set_to_null": "accepted",
+  "adopted": false,
+  "network_calls": 0
+}

@@ -64,3 +64,24 @@ test('freeze includes protocol, executor, vendor and content dependencies, exclu
  assert.notEqual(v,experimentVersion(sources,{family:'goals',turns:5}));
  assert.notEqual(v,experimentVersion({...sources,'contracts/cognitive-evidence-refs.v1.json':'changed'},{family:'original',turns:5}));
 });
+
+test('goal coverage requires the same criterion on the next window and postponement across the SQLite boundary',()=>{
+ const goal={goal_id:'same',completion_criteria:{kind:'open_inquiry'},lifecycle_status:'active'};
+ const snapshot=status=>({goals:[{...goal,lifecycle_status:status}],deadlines:{appointment:'2026-10-21T04:00:00Z'}});
+ const first={turn:1,at:'2026-10-20T14:45:00Z',goals_before:{goals:[]},goals_after:snapshot('active'),
+  plan_proposal:{goal_updates:[{goal_id:'same',operation:'new'}]}};
+ const second={turn:2,at:'2026-10-21T01:00:00Z',goals_before:snapshot('active'),goals_after:snapshot('active')};
+ const formation={initial_goals:{goals:[]},turns:[first,second]};
+ assert.equal(goalCoverage(goalCases[0],formation).covered,true);
+ second.goals_before.goals[0].completion_criteria={kind:'exact_opportunity'};
+ assert.equal(goalCoverage(goalCases[0],formation).covered,false);
+ const overnight={initial_goals:snapshot('active'),turns:[first,second]};
+ first.plan_proposal.goal_updates=[{goal_id:'same',operation:'postpone'}];
+ second.restart={at:first.at,closed_and_reopened:true};
+ second.plan_proposal={goal_updates:[{goal_id:'same',operation:'resume'}]};
+ assert.equal(goalCoverage(goalCases[2],overnight).covered,false);
+ first.goals_after=snapshot('postponed');second.goals_before=snapshot('postponed');
+ assert.equal(goalCoverage(goalCases[2],overnight).covered,true);
+ second.goals_before.deadlines.appointment='2026-10-22T04:00:00Z';
+ assert.equal(goalCoverage(goalCases[2],overnight).covered,false);
+});
