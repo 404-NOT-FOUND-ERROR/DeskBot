@@ -16,6 +16,8 @@ def goal_lifecycle_view(context):
     """The prompt needs current criteria and proof, not duplicated attempt logs."""
     raw=context.get('goal_lifecycle', {})
     fields=('goal_id','text','completion_criteria','lifecycle_status','evidence_ids','next_review_at','review_due','method_status','completion_status')
+    if raw.get('prompt_version'):
+        fields += ('followup_id',)
     view={k:deepcopy(v) for k,v in raw.items() if k!='goals'}
     view['goals']=[{k:deepcopy(g[k]) for k in fields if k in g} for g in raw.get('goals', [])]
     if context.get('evidence_refs') and context.get('phase')=='feedback':

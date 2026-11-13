@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
@@ -129,6 +129,47 @@ test('Node and Python reject the same lifecycle transitions before any state is 
  assert.equal(py.status,0,py.stderr);assert.deepEqual(JSON.parse(py.stdout),rows.map(r=>r[1]));
 });
 
+test('captured A3.3 method cannot serve as a current or deferred issue, even for an unbound goal',()=>{
+ const capture=JSON.parse(readFileSync(new URL('../../../research/experiments/a33-2026-11-10/goal-reference-counterexample.json',import.meta.url)));
+ const w=fixture(cases.find(row=>row.id==='invitation-3-on')),c=context(w),frozen=freezeCognitiveReferences(c);
+ const update={...capture.raw_update,goal_id:'goal:fixture'};
+ assert.ok(c.goal_lifecycle.criteria.some(k=>k.id===update.criterion_id && k.opportunity_ids.includes(update.next_step.id)));
+ assert.deepEqual([c.continuation.current.followup_id],capture.allowed_issue_ids);
+ const check=(u,refs=frozen)=>prepareGoalLifecycle(w.cognition.actors[OWNER],proposal(w,[u]),c,refs,c.at);
+ const before=JSON.stringify(w);
+ assert.throws(()=>check(update),{code:'followup_issue_unknown'});
+ assert.throws(()=>check({...update,criterion_id:null,next_step:null}),{code:'followup_issue_unknown'});
+ const step={...update,followup_id:null,text:capture.reference_titles.criterion};
+ assert.equal(check(step)[step.goal_id].completion_criteria.id,step.criterion_id);
+ const deferred={followup_id:'issue:later',original_question:'仍想研究的事'};
+ c.continuation.deferred.push(deferred);
+ assert.throws(()=>check({...step,followup_id:deferred.followup_id}),{code:'followup_issue_unknown'});
+ const linked=check({...step,followup_id:deferred.followup_id},freezeCognitiveReferences(c))[step.goal_id];
+ assert.equal(linked.followup_id,deferred.followup_id);
+ assert.equal(linked.attempts[0].followup_id,deferred.followup_id);
+ assert.equal(JSON.stringify(w),before);
+});
+
+test('original invitation response reaches the job boundary with the exact invalid goal field',async t=>{
+ const capture=JSON.parse(readFileSync(new URL('../../../research/experiments/a33-2026-11-10/goal-reference-counterexample.json',import.meta.url)));
+ const w=fixture(cases.find(row=>row.id==='invitation-3-on')),c=context(w);
+ const bridge=createCognitionBridge({workerFile:'life_worker.py',mode:'mock',timeoutMs:30000,maxFrames:30});
+ t.after(()=>bridge.close());
+ const before=JSON.stringify(w);
+ await assert.rejects(bridge.session({...c,mode:'mock'},req=>{
+  if(req.stage==='directive')return JSON.stringify({interpretations:[{source_id:c.refraction.pending[0].id,
+   kind:'invitation',stance:'uncertain',effect:'offer',topic:'给归途灯加罩试光',question:'怎样试光？',
+   reason:'收到邀请，尚未答应',evidence_quote:'想邀请你一起考虑给归途灯加罩',target_object_ids:['floating-frame'],confidence:.7}]});
+  if(req.stage==='perception')return JSON.stringify({reason:'看看来信',emotion:'anticipation',intensity:.3,valence:.3,need_activation:{self_actualization:.4}});
+  assert.equal(req.scene,'need_goal_generation');
+  const view=JSON.parse(req.messages.at(-1).content);
+  assert.ok(view.next_options.some(m=>m.id===capture.raw_update.followup_id));
+  assert.ok(!view.issues.some(issue=>issue.followup_id===capture.raw_update.followup_id));
+  return JSON.stringify({goal_updates:[capture.raw_update]});
+ }),err=>err.failure?.cause_code==='followup_issue_unknown' && err.diagnostic?.path==='$.goal_updates[0].followup_id');
+ assert.equal(JSON.stringify(w),before);
+});
+
 test('actual Python worker uses explicit ID lifecycle in existing plan and feedback calls',async t=>{
  const w=seed(),bridge=createCognitionBridge({workerFile:'life_worker.py',mode:'mock',timeoutMs:30000,maxFrames:30});t.after(()=>bridge.close());
  let chosen,goalId;const calls=[];
@@ -137,6 +178,8 @@ test('actual Python worker uses explicit ID lifecycle in existing plan and feedb
   if(req.stage==='perception')value={reason:'先看看',emotion:'anticipation',intensity:.3,valence:.3,need_activation:{self_actualization:.4}};
   else if(req.stage==='motivation'){
    const view=JSON.parse(req.messages.at(-1).content),criterion=view.goals.criteria.find(k=>k.kind==='water_reserve');
+   assert.deepEqual(view.issues.filter(i=>i.current).map(i=>i.followup_id),[context(w).continuation.current.followup_id]);
+   assert.ok(view.next_options.every(o=>o.kind==='opportunity' && !Object.hasOwn(o,'binding')));
    chosen=view.next_options.find(o=>criterion.opportunity_ids.includes(o.id)&&o.title.includes('泉眼'));
    value={goal_updates:[{operation:'new',goal_id:null,text:'备好一批自用水',criterion_id:criterion.id,next_step:ref(chosen),reason:'现在有余力且背包缺水'}]};
   }else if(req.stage==='decision')value={act:true,choice_id:chosen.id,inner_monologue:'我想先备一批水',expected_outcome:'得到实际清水',issue:{decision:'continue',id:'current'},motivation:'self_exploration',source_ids:[]};

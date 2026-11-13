@@ -72,6 +72,20 @@ class OpportunityNeedEngine(NeedEngine):
                 'next_options':[{k:v for k,v in r.items() if k!='binding'} for r in self.context['continuation']['next_options'] if not r.get('legacy_alias')]}
         if self.context.get('evidence_refs') and self.context['phase']=='feedback':view.pop('next_options',None)
         prompt=LIFECYCLE_PROMPT
+        if self.context['goal_lifecycle'].get('prompt_version') == LIFECYCLE['prompt_version'] and self.context['phase']=='plan':
+            continuation = self.context['continuation']
+            view['issues'] = [{'followup_id':issue['followup_id'],
+                               'question':issue.get('original_question') or issue.get('question'),
+                               'current':issue is continuation.get('current')}
+                              for issue in [continuation.get('current'), *continuation.get('deferred', [])]
+                              if issue and issue.get('followup_id')]
+            view['next_options'] = [{k:r[k] for k in ('kind','id','title','status','blocker','requires_issue') if k in r}
+                                    for r in view['next_options'] if r.get('kind')=='opportunity' and r.get('opportunity_id')]
+            prompt += ('goal_id指向goals.goals已有目标，新建填null；criterion_id只选goals.criteria的id，开放研究填null。'
+                       'next_step只选next_options的{kind,id}，具体标准允许的方法见opportunity_ids。'
+                       'followup_id只选issues中与该意图有关的问题编号，无关联填null；方法限定requires_issue时遵守它。'
+                       '一个具体目标的text只描述其标准能证明的那一步。跨步骤愿望可以保留为开放研究，'
+                       '也可先绑定一个具体目标，在reason说明后续打算；后续每一步都需要自己的执行证据。')
         if self.context.get('evidence_refs'):
             prompt=prompt.replace('只返回JSON {goal_updates:[]}；没有必要变化时为空。',
                 '评估需要、现有后续和机会：若已有安排足够可保留；需要另一个可持续追踪的目标才新建。只返回JSON，goal_updates是转换数组；没有必要变化时允许空数组。')

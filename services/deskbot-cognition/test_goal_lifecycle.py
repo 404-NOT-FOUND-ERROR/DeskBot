@@ -1,15 +1,37 @@
 import unittest
 import json
 from copy import deepcopy
+from pathlib import Path
 import life_worker
 from agent.goals import GoalEntity, GoalStatus
 from agent.personality import SoulLayer, PersonalityLayer
 from goal_lifecycle import CONTRACT, parse_updates
 from opportunity_goals import OpportunityNeedEngine
 from core.interfaces.llm import LLMResponse
+from opportunity_contract import CONTRACT as OPPORTUNITIES
 
 
 class GoalLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    def test_captured_issue_reference_keeps_original_error_for_old_context(self):
+        capture = json.loads((Path(__file__).resolve().parents[2] / 'research/experiments/a33-2026-11-10/goal-reference-counterexample.json').read_text(encoding='utf-8'))
+        raw = capture['raw_update']
+        method = raw['next_step']
+        c = {'phase':'plan', 'continuation':{'opportunity_contract':OPPORTUNITIES['view_schema'],
+             'current':{'followup_id':capture['allowed_issue_ids'][0]},
+             'next_options':[{**method,'opportunity_id':method['id'],'identity':'hood'}]},
+             'goal_lifecycle':{'goals':[], 'criteria':[{'kind':'exact_opportunity','id':raw['criterion_id'],
+             'identity':'hood','opportunity_ids':[method['id']]}]}}
+        with self.assertRaisesRegex(ValueError,'goal_method_not_compatible'):
+            parse_updates({'goal_updates':[raw]},c,[],0)
+        c['goal_lifecycle']['prompt_version'] = CONTRACT['prompt_version']
+        for update in (raw, {**raw,'criterion_id':None,'next_step':None}):
+            with self.assertRaisesRegex(ValueError,'followup_issue_unknown') as failure:
+                parse_updates({'goal_updates':[update]},c,[],0)
+            self.assertEqual(failure.exception.diagnostic['path'],'$.goal_updates[0].followup_id')
+        for issue_id in (None,capture['allowed_issue_ids'][0]):
+            goals,_ = parse_updates({'goal_updates':[{**raw,'followup_id':issue_id}]},c,[],0)
+            self.assertEqual(len(goals),1)
+
     async def test_empty_progress_skips_call_but_preserves_closed_history_and_new_goal_formation(self):
         _,c=self.setup_context();c['evidence_refs']={'schema':'deskbot.evidence-refs.v1','entries':[]}
         c['goal_lifecycle']['goals']=[];c['actor']={'actor_id':'test'}

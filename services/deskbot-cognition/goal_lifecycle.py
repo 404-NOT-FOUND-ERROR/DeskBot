@@ -32,6 +32,13 @@ def enabled(context):
     return context.get('goal_lifecycle', {}).get('schema') == CONTRACT['schema']
 
 
+class GoalReferenceError(ValueError):
+    def __init__(self, code, index, field, expected):
+        super().__init__(code)
+        self.diagnostic = {'path': f'$.goal_updates[{index}].{field}', 'rule': 'reference_scope',
+                           'expected': expected, 'actual': 'outside allowed references'}
+
+
 def parse_updates(data, context, entities, step):
     if not isinstance(data, dict) or set(data) != {'goal_updates'} or not isinstance(data['goal_updates'], list) or len(data['goal_updates']) > CONTRACT['max_updates']:
         raise ValueError('goal_lifecycle_invalid')
@@ -39,7 +46,7 @@ def parse_updates(data, context, entities, step):
         raise ValueError('goal_capacity_review_required')
     view = context['goal_lifecycle']; records = {g['goal_id']:deepcopy(g) for g in view['goals']}
     current = {g.id:deepcopy(g) for g in entities}; seen = set(); updates = []
-    for raw in data['goal_updates']:
+    for index, raw in enumerate(data['goal_updates']):
         if not isinstance(raw, dict) or set(raw)-{'operation','goal_id','reason','text','criterion_id','next_step','followup_id','review_in_hours'}:
             raise ValueError('goal_lifecycle_invalid')
         u = deepcopy(raw); op = u.get('operation'); gid = u.get('goal_id'); reason = u.get('reason')
@@ -74,8 +81,16 @@ def parse_updates(data, context, entities, step):
             if context['phase']!='plan':raise ValueError('goal_replan_requires_plan')
             ref = u.get('next_step'); criterion = record['completion_criteria']
             if criterion['kind']!='open_inquiry' and not ref:raise ValueError('goal_method_required')
+            scoped = view.get('prompt_version') == CONTRACT['prompt_version']
+            errors = opportunity_errors({'status':'continue','next_step':ref,'followup_id':u.get('followup_id')},context)
+            if scoped and errors:
+                issue = errors[0] in ('followup_issue_unknown', 'followup_opportunity_issue_mismatch')
+                raise GoalReferenceError(errors[0], index, 'followup_id' if issue else 'next_step',
+                                         'current or deferred issue compatible with method, or null' if issue else 'catalogued opportunity {kind,id}')
+            if scoped and ref is not None and (not isinstance(ref, dict) or ref.get('kind') != 'opportunity'):
+                raise GoalReferenceError('followup_opportunity_unavailable', index, 'next_step', 'catalogued opportunity {kind,id}')
             if ref:
-                if opportunity_errors({'status':'continue','next_step':ref,'followup_id':u.get('followup_id')},context):raise ValueError('goal_method_not_compatible')
+                if errors:raise ValueError('goal_method_not_compatible')
                 method = next((r for r in context['continuation']['next_options'] if r['kind']==ref['kind'] and r['id']==ref['id']),None)
                 candidate = next((k for k in view['criteria'] if method and method.get('opportunity_id') in k['opportunity_ids']),None)
                 if not method or not method.get('opportunity_id') or not (criterion['kind']=='open_inquiry' or criterion['kind']=='exact_opportunity' and criterion.get('identity')==method.get('identity') or criterion.get('id') and candidate and candidate['id']==criterion['id']):

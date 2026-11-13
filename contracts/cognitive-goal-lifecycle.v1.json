@@ -1,5 +1,6 @@
 {
   "schema": "deskbot.goal-lifecycle.v1",
+  "prompt_version": "deskbot.goal-references.v2",
   "max_live": 6,
   "max_new": 2,
   "max_updates": 8,

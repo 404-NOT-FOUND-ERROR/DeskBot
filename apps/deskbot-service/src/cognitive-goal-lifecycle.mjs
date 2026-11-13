@@ -80,7 +80,12 @@ export function goalLifecycleContext(w,id,c){
    method_status:!g.binding?'unbound':!current||current.identity!==g.binding.identity?'review_required':current.status,
    completion_status:evidence.length?'evidence_satisfied':g.completion_criteria.kind==='open_inquiry'?'open':'pending'};
  });
- return {schema:GOAL_LIFECYCLE.schema,goals,criteria:goalCriteria(c),max_live:GOAL_LIFECYCLE.max_live,rule:GOAL_LIFECYCLE.rule};
+ const view={schema:GOAL_LIFECYCLE.schema,goals,criteria:goalCriteria(c),max_live:GOAL_LIFECYCLE.max_live,rule:GOAL_LIFECYCLE.rule};
+ const job=w.cognition?.actors[id]?.job;
+ const frozen=job?.status==='calling' && job.references;
+ const version=frozen ? frozen.goal_lifecycle?.prompt_version : GOAL_LIFECYCLE.prompt_version;
+ if(version)view.prompt_version=version;
+ return view;
 }
 
 export function prepareGoalLifecycle(life,proposal,c,refs,at){
@@ -115,16 +120,25 @@ export function prepareGoalLifecycle(life,proposal,c,refs,at){
   if(['new','replan'].includes(u.operation)){
    if(c.phase!=='plan')fail('goal_replan_requires_plan');
    if(g.completion_criteria.kind!=='open_inquiry'&&!u.next_step)fail('goal_method_required');
+   const scoped=frozen.prompt_version===GOAL_LIFECYCLE.prompt_version;
+   if(scoped){
+    if(u.next_step!=null && u.next_step.kind!=='opportunity')fail('followup_opportunity_unavailable');
+    if(u.followup_id!=null && ![refs.continuation?.current,...(refs.continuation?.deferred??[])].some(issue=>issue?.followup_id===u.followup_id))fail('followup_issue_unknown');
+   }
+   if(scoped||u.next_step)validateOpportunityTransition({status:'continue',next_step:u.next_step,followup_id:u.followup_id},c.continuation,refs.continuation);
    if(u.next_step){
-    validateOpportunityTransition({status:'continue',next_step:u.next_step,followup_id:u.followup_id},c.continuation,refs.continuation);
     const binding=opportunityBinding(u.next_step,c.continuation);
     const criterion=c.goal_lifecycle.criteria.find(k=>k.opportunity_ids.includes(binding?.id));
     const fixed=g.completion_criteria;
     const compatible=fixed.kind==='open_inquiry'||fixed.kind==='exact_opportunity'&&fixed.identity===binding?.identity
       ||fixed.id&&criterion?.id===fixed.id;
     if(!binding||!compatible)fail('goal_method_not_compatible');
-    g.binding=binding;g.attempts=[...g.attempts,{at,binding:copy(binding),reason:u.reason}].slice(-GOAL_LIFECYCLE.history_limit);
+    g.binding=binding;
+    const attempt={at,binding:copy(binding),reason:u.reason};
+    if(scoped)attempt.followup_id=u.followup_id??binding.requires_issue??null;
+    g.attempts=[...g.attempts,attempt].slice(-GOAL_LIFECYCLE.history_limit);
    }else g.binding=null;
+   if(scoped)g.followup_id=u.followup_id??g.binding?.requires_issue??null;
   }else if(u.next_step!=null||u.followup_id!=null)fail('goal_replan_required');
   const before=g.lifecycle_status;
   if(u.operation==='postpone')g.lifecycle_status='postponed';

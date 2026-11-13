@@ -8,7 +8,7 @@
 
 固定隔离上下文的免费对照中，请求由 **29 次降至 25 次**，提示字符减少 **26.85%**；目标形成调用保留。这是预设响应的工程测量，**不是真实费用节省或生活质量验收**。上一轮 [A3](research/milestones/a3-behavior-validation-2026-11-01.md) 仍保留 8/20 完整、7 有效的原结论。
 
-下一步是修正目标形成时的引用范围，让角色能保留较长的愿望，并为眼前的一步选择合适的完成标准。目标专项已登记，真实覆盖为 0/16。三人双向生活、地区扩展和自然跨日观察排在行为验收之后。[开发基线](documentation/development-baseline.md) · [接口与调用链](documentation/interfaces.md) · [工程交付管线](research/design/engineering-delivery-plan-2026-11-01.md)
+**A3.4 已完成目标引用的离线修正。** 喵呜能把眼前的一步关联到自己正在追踪的问题，服务会分别核对问题、方法和完成标准。下一次真实复验将检验它能否持续用对这些引用。目标专项真实覆盖仍为 0/16。[目标接口](documentation/cognitive-goal-lifecycle.md) · [开发基线](documentation/development-baseline.md) · [工程交付管线](research/design/engineering-delivery-plan-2026-11-01.md)
 
 ```mermaid
 flowchart LR

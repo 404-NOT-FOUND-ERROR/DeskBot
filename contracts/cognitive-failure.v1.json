@@ -45,6 +45,7 @@
       "private_relation_scope_invalid",
       "cognitive_state_field_forbidden",
       "followup_opportunity_unavailable",
+      "followup_issue_unknown",
       "followup_opportunity_issue_mismatch",
       "goal_opportunity_invalid",
       "goal_opportunity_unavailable",
