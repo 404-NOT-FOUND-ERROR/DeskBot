@@ -221,13 +221,13 @@
     "stop_policy": "First terminal error or critical factual defect, or more than four invalid windows. Review every completed window. No replacement cases, retries beyond existing one repair, or additional paid runs after stop."
   },
   "local_revision": {
-    "version": "a33-2026-11-10 · 73d17f1064d1",
-    "checks": "A3.3 工程检查 1,403 项通过。真实矩阵 15/20 窗完整，12 窗有效，R3-A 仍待验收。",
+    "version": "a34-2026-11-14 · 5612a87cb850",
+    "checks": "A3.4 真实复验进入 3/20 窗，2 窗完整且有效，第三窗换绑测光方法时停止。R3-A 仍待验收。",
     "changes": [
-      "第四个情境提出先装罩再测光，行动编号误填为持续问题编号，提案在开工前被拒绝。",
-      "104 次真实调用，峰时费用估算上界约 2.97 元，四个情境严格回放一致。",
+      "先装罩，白天净滤四份清水，夜间更换测光方法时发现原目标绑定了白天条件。",
+      "17 次真实调用，峰时估算上界约 0.39 元，严格回放一致。",
       "目标专项另列最多16窗，已准备但未启动，保持未覆盖；没有启用正式新认知。",
-      "A3.4 已离线修正目标引用范围。多步愿望仍待新的真实复验。"
+      "下一步离线验证跨时段目标和条件改变后的执行证据。"
     ],
     "real_retested": true
   },

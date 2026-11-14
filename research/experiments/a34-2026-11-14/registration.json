@@ -1,0 +1,141 @@
+{
+  "batches": [
+    {
+      "version": "5612a87cb850",
+      "head": "61f22348010439213dd6b5510133751064fd526a",
+      "family": "original",
+      "turns": 5,
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "cases": [
+        "resources-1-off",
+        "resources-1-on",
+        "invitation-3-off",
+        "invitation-3-on"
+      ],
+      "fixtures": [
+        {
+          "id": "resources-1-off",
+          "start_hash": "4353e897185bcebd3577c2ff0c9419339ba47f9e899c48f89a0be4da83499725",
+          "seeded": false
+        },
+        {
+          "id": "resources-1-on",
+          "start_hash": "c58727b4bbd2728ffea276b3153148d34655ebbe1b838f97d59e1466cdafefe3",
+          "seeded": false
+        },
+        {
+          "id": "invitation-3-off",
+          "start_hash": "4353e897185bcebd3577c2ff0c9419339ba47f9e899c48f89a0be4da83499725",
+          "seeded": false
+        },
+        {
+          "id": "invitation-3-on",
+          "start_hash": "72a32c618e68b004c84cf9dfd07c937d4aa2ec1d68ada78856f785f9fab9d13d",
+          "seeded": false
+        }
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 170,
+      "planned_window_cap": 20,
+      "require_window_review": true,
+      "registered_at": "2026-11-13T17:32:11.178Z",
+      "checks": {
+        "backend": {
+          "passed": true
+        },
+        "python": {
+          "passed": true
+        },
+        "frontend": {
+          "passed": true
+        }
+      },
+      "gate": "https://github.com/404-NOT-FOUND-ERROR/DeskBot/actions/runs/43472247406",
+      "goal_prompt": "deskbot.goal-references.v2",
+      "followup_prompt": "deskbot.followup-intent-prompt.v2"
+    },
+    {
+      "version": "074e3638adb9",
+      "head": "61f22348010439213dd6b5510133751064fd526a",
+      "family": "goals",
+      "turns": 4,
+      "model": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "thinking": "disabled",
+        "temperature_default": 0.55
+      },
+      "cases": [
+        "G1-formation",
+        "G2-change-method",
+        "G3-overnight",
+        "G4-open-inquiry"
+      ],
+      "fixtures": [
+        {
+          "id": "G1-formation",
+          "start_hash": "bf592c4cae2038626fb0411994b81c9eef1cd23983c57e3b1788c96cfd0b540a",
+          "seeded": false
+        },
+        {
+          "id": "G2-change-method",
+          "start_hash": "7f4c3edee8b1b0df170b2f27512e4dcd775975dac77ca9a87b82a68e250f1969",
+          "seeded": true
+        },
+        {
+          "id": "G3-overnight",
+          "start_hash": "eea5e115d779bddfcf9e24e5f1209f8a5029ea0dae997bf672d519fbffbd06f7",
+          "seeded": true
+        },
+        {
+          "id": "G4-open-inquiry",
+          "start_hash": "4f1019b1385dda0de8da40076eb3deda623b3efc52e4d9e1bb5fe7f9a5282e2d",
+          "seeded": true
+        }
+      ],
+      "arms": [
+        "cognition"
+      ],
+      "max_calls": 160,
+      "planned_window_cap": 16,
+      "require_window_review": true,
+      "registered_at": "2026-11-13T17:32:11.185Z",
+      "checks": {
+        "backend": {
+          "passed": true
+        },
+        "python": {
+          "passed": true
+        },
+        "frontend": {
+          "passed": true
+        }
+      },
+      "gate": "https://github.com/404-NOT-FOUND-ERROR/DeskBot/actions/runs/43472247406",
+      "goal_prompt": "deskbot.goal-references.v2",
+      "followup_prompt": "deskbot.followup-intent-prompt.v2"
+    }
+  ],
+  "scope": "Isolated fictional worlds, actor and experiment memories only",
+  "protocol": "research/design/a33-refrozen-acceptance-2026-11-10.md",
+  "original_gate": {
+    "complete": 20,
+    "min_valid": 16,
+    "max_critical": 0
+  },
+  "watch": [
+    "remember past observations",
+    "repeated contact while awaiting reply",
+    "avoid already-satisfied actions",
+    "method vs issue reference and evidence for multi-step wishes"
+  ],
+  "goals_conditional_on_original": true,
+  "paid_calls_at_registration": 0
+}

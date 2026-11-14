@@ -4,7 +4,7 @@
 
 执行状态（2026-11-01）：A1 [公共事件证据](../research/milestones/r3a-event-evidence-2026-11-01.md) 与 A2 [目标连续性和位置知识](../research/milestones/a2-goal-lifecycle-2026-11-01.md) 已实现并经离线门禁。[A3 真实复验](../research/milestones/a3-behavior-validation-2026-11-01.md) 完成 8/20、7 个有效，第 8 窗因后续问题夹带未发生的呈送动作停止。64 次调用峰时估算 ¥2.233，原版本严格回放一致。正式新认知未启用，R3-B 未放行。
 
-11 月 14 日核对的 A3.3 原矩阵完整 15/20、有效 12/20。1,403 项工程检查与构建通过。第四个情境首窗在目标形成时混用了问题与行动编号。A3.4 已完成目标引用接口的离线修正，等待新冻结批次复验。[目标接口](cognitive-goal-lifecycle.md) · [A3.3 记录](../research/milestones/a33-refrozen-acceptance-2026-11-10.md) · [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)
+A3.3 原矩阵完整 15/20、有效 12/20。11 月 14 日 A3.4 的新冻结批次进入 3/20、完整有效 2/20，第三窗在跨时段测光目标换绑时停止。各批次独立计数。下一步核对未来试验条件与实际执行证据。[A3.4 复验](../research/milestones/a34-behavior-validation-2026-11-14.md) · [工程交付管线](../research/design/engineering-delivery-plan-2026-11-01.md)
 
 ## 产品目标
 

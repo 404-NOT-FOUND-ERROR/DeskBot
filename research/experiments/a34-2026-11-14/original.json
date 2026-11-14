@@ -1,0 +1,88 @@
+{
+  "version": "5612a87cb850",
+  "family": "original",
+  "planned_cap": 20,
+  "entered": 3,
+  "completed": 2,
+  "valid": 2,
+  "critical_errors": 0,
+  "unentered": 17,
+  "reviewer": "assistant",
+  "cases": [
+    {
+      "case": "resources-1-off",
+      "initial_hash": "4353e897185bcebd3577c2ff0c9419339ba47f9e899c48f89a0be4da83499725",
+      "final_hash": "0f0387e1c1f6674787d85fcc687a764e4941860f32425cdf216097f524bc33b1",
+      "error": "python_session_failed",
+      "cause": "goal_method_not_compatible",
+      "detail": "goal_method_not_compatible",
+      "diagnostic": null,
+      "coverage": null,
+      "windows": [
+        {
+          "turn": 1,
+          "activity": "waylight-fit-shade",
+          "task": "completed",
+          "goals_created": [
+            "给归途灯装上遮光罩"
+          ],
+          "review": {
+            "schema": "deskbot.r3-window-review.v1",
+            "version": "5612a87cb850",
+            "key": "cognition:resources-1-off",
+            "turn": 1,
+            "record_hash": "7cf97ceff0044925580017c6e4c011e596c3a62185984bf30061f546ee471d33",
+            "decision": "continue",
+            "valid": true,
+            "note": "实际消耗一片灯罩并完成安装，仅用安装回执结清这一步。原问题和下一次借灯净滤的意向保留，尚未宣称已经取水。",
+            "critical_errors": []
+          }
+        },
+        {
+          "turn": 2,
+          "activity": "collect-water",
+          "task": "completed",
+          "goals_created": [
+            "在水岸测记归途灯的明暗"
+          ],
+          "review": {
+            "schema": "deskbot.r3-window-review.v1",
+            "version": "5612a87cb850",
+            "key": "cognition:resources-1-off",
+            "turn": 2,
+            "record_hash": "0943e25824d9045a9bdd11c7f3e90c5ee068b0278ffd982d2e5952cd650dcaff",
+            "decision": "continue",
+            "valid": true,
+            "note": "白天改用泉眼净滤，清水实际增加四份。安装回执被保留，新建测光目标仍待入夜，净滤没有替测光结案。",
+            "critical_errors": []
+          }
+        },
+        {
+          "turn": 3,
+          "activity": null,
+          "task": null,
+          "goals_created": [],
+          "review": null
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "calls": 17,
+    "input_tokens": 202328,
+    "output_tokens": 1420,
+    "cache_hit_tokens": 12800,
+    "upper_cny": 0.39092800000000005,
+    "billed": null
+  },
+  "replay": {
+    "status": "pass",
+    "summary": "世界初态/终态 1/1 条一致；停止原因 1/1 条一致；新增调用 0。严格回放通过（含 1 条原停止，不计作行为成功）。",
+    "original_version": "5612a87cb850",
+    "replay_version": "5612a87cb850",
+    "cached_responses": 17,
+    "state_matches": 1,
+    "termination_matches": 1,
+    "differences": []
+  }
+}

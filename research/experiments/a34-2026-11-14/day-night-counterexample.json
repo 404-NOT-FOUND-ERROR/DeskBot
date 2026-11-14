@@ -1,0 +1,75 @@
+{
+  "day": {
+    "at": "2026-10-21T01:10:00.000Z",
+    "update": {
+      "operation": "new",
+      "goal_id": null,
+      "reason": "归途灯已装好遮光罩，但入夜后照明与留暗的平衡还没实测；这是当前唯一未了结的开放问题，先绑定一个具体可验证的步骤。",
+      "text": "在水岸测记归途灯的明暗",
+      "criterion_id": "criterion:9b28db011378761ae65f8c28",
+      "next_step": {
+        "kind": "opportunity",
+        "id": "c-ecd3c4d84bdaa56db32e"
+      },
+      "followup_id": "task:fixture-built-lamp",
+      "review_in_hours": 12
+    },
+    "method": {
+      "kind": "opportunity",
+      "id": "c-ecd3c4d84bdaa56db32e",
+      "title": "在水岸测记归途灯的明暗",
+      "status": "blocked",
+      "blocker": "这次要观察夜间的明暗，等入夜再来。",
+      "requires_issue": null
+    },
+    "current_criterion": "criterion:9b28db011378761ae65f8c28",
+    "completion_target": "method:measure-bank-light:7c78ac310f196ee74d7ff2ba",
+    "experiment_conditions": {
+      "subject": "waylight:fixture-built-lamp",
+      "axes": {
+        "waylight.mode": "hooded",
+        "waylight.has_hood": true,
+        "$phase": "day"
+      }
+    },
+    "goal_status": null
+  },
+  "night": {
+    "at": "2026-10-21T13:20:00.000Z",
+    "update": {
+      "operation": "replan",
+      "goal_id": "goal:9774df0c19e96f6caf964c66",
+      "reason": "复查时间已到，方法仍可行；改用当前可用的测记机会继续，保留原完成标准。",
+      "next_step": {
+        "kind": "opportunity",
+        "id": "c-025d1fb131059dc9e522"
+      },
+      "followup_id": "task:fixture-built-lamp",
+      "review_in_hours": 6
+    },
+    "method": {
+      "kind": "opportunity",
+      "id": "c-025d1fb131059dc9e522",
+      "title": "在水岸测记归途灯的明暗",
+      "status": "ready",
+      "blocker": null,
+      "requires_issue": null
+    },
+    "current_criterion": "criterion:a741229613d4725ee4198ff1",
+    "completion_target": "method:measure-bank-light:943dd849bf6d5771a307cdee",
+    "experiment_conditions": {
+      "subject": "waylight:fixture-built-lamp",
+      "axes": {
+        "waylight.mode": "hooded",
+        "waylight.has_hood": true,
+        "$phase": "night"
+      }
+    },
+    "goal_status": "review_required"
+  },
+  "issue_id_in_scope": true,
+  "captured": "goal_method_not_compatible",
+  "authored_continue_without_rebinding": "accepted",
+  "probe_adopted": false,
+  "additional_calls": 0
+}
